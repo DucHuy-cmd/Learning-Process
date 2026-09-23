@@ -1,0 +1,29 @@
+{
+  "name": "Bài tập Giáo trình (Slide)",
+  "isBuilding": false,
+  "directed": false,
+  "nodes": [
+    {"id":"u", "name":"u", "short":"u", "kind":"phong", "x":120, "y":230},
+    {"id":"r", "name":"r", "short":"r", "kind":"phong", "x":280, "y":80},
+    {"id":"s", "name":"s", "short":"s", "kind":"phong", "x":680, "y":50},
+    {"id":"t", "name":"t", "short":"t", "kind":"phong", "x":480, "y":220},
+    {"id":"x", "name":"x", "short":"x", "kind":"phong", "x":800, "y":150},
+    {"id":"y", "name":"y", "short":"y", "kind":"phong", "x":220, "y":370},
+    {"id":"z", "name":"z", "short":"z", "kind":"phong", "x":530, "y":370},
+    {"id":"w", "name":"w", "short":"w", "kind":"phong", "x":860, "y":370}
+  ],
+  "edges": [
+    ["u", "r", 4.0],
+    ["u", "y", 1.0],
+    ["r", "y", 2.0],
+    ["r", "t", 3.0],
+    ["r", "s", 7.0],
+    ["y", "z", 3.0],
+    ["t", "s", 3.0],
+    ["t", "z", 4.0],
+    ["t", "x", 1.0],
+    ["s", "x", 1.0],
+    ["x", "w", 3.0],
+    ["z", "w", 5.0]
+  ]
+}

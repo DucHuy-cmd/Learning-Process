@@ -1,0 +1,23 @@
+{
+  "name": "Bài tập Euler (Có Đường đi, Không có Chu trình)",
+  "isBuilding": false,
+  "directed": false,
+  "algo": "euler",
+  "nodes": [
+    {"id":"A", "name":"A", "short":"A", "kind":"phong", "x":260, "y":180},
+    {"id":"B", "name":"B", "short":"B", "kind":"phong", "x":640, "y":180},
+    {"id":"C", "name":"C", "short":"C", "kind":"phong", "x":640, "y":380},
+    {"id":"D", "name":"D", "short":"D", "kind":"phong", "x":260, "y":380},
+    {"id":"E", "name":"E", "short":"E", "kind":"phong", "x":450, "y":60}
+  ],
+  "edges": [
+    ["A", "B", 1.0],
+    ["B", "C", 1.0],
+    ["C", "D", 1.0],
+    ["D", "A", 1.0],
+    ["A", "C", 1.0],
+    ["B", "D", 1.0],
+    ["A", "E", 1.0],
+    ["E", "B", 1.0]
+  ]
+}

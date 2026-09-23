@@ -1,0 +1,18 @@
+{
+  "name": "Hamilton Undirected 4-Cycle",
+  "isBuilding": false,
+  "directed": false,
+  "algo": "hamilton",
+  "nodes": [
+    {"id":"A", "name":"A", "short":"A", "kind":"phong", "x":100, "y":100},
+    {"id":"B", "name":"B", "short":"B", "kind":"phong", "x":300, "y":100},
+    {"id":"C", "name":"C", "short":"C", "kind":"phong", "x":300, "y":300},
+    {"id":"D", "name":"D", "short":"D", "kind":"phong", "x":100, "y":300}
+  ],
+  "edges": [
+    ["A", "B", 1.0],
+    ["B", "C", 1.0],
+    ["C", "D", 1.0],
+    ["D", "A", 1.0]
+  ]
+}

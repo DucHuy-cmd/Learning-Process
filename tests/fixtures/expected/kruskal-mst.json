@@ -1,0 +1,11 @@
+{
+  "connected": true,
+  "componentCount": 1,
+  "expectedTotalWeight": 6.0,
+  "expectedMstEdgeCount": 3,
+  "expectedAcceptedEdges": [
+    {"a": 0, "b": 1, "w": 1.0},
+    {"a": 1, "b": 2, "w": 2.0},
+    {"a": 1, "b": 3, "w": 3.0}
+  ]
+}

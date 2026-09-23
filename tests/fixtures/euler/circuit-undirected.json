@@ -1,0 +1,21 @@
+{
+  "name": "Bài tập Euler (Có Chu trình)",
+  "isBuilding": false,
+  "directed": false,
+  "algo": "euler",
+  "nodes": [
+    {"id":"A", "name":"A", "short":"A", "kind":"phong", "x":180, "y":120},
+    {"id":"B", "name":"B", "short":"B", "kind":"phong", "x":180, "y":340},
+    {"id":"C", "name":"C", "short":"C", "kind":"phong", "x":470, "y":230},
+    {"id":"D", "name":"D", "short":"D", "kind":"phong", "x":760, "y":120},
+    {"id":"E", "name":"E", "short":"E", "kind":"phong", "x":760, "y":340}
+  ],
+  "edges": [
+    ["A", "B", 1.0],
+    ["B", "C", 1.0],
+    ["C", "A", 1.0],
+    ["C", "D", 1.0],
+    ["D", "E", 1.0],
+    ["E", "C", 1.0]
+  ]
+}

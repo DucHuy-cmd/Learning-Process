@@ -1,0 +1,9 @@
+{
+  "graphName": "Bài tập Euler (Có Chu trình)",
+  "type": "circuit",
+  "typeTitle": "Tồn tại Chu trình Euler",
+  "connected": true,
+  "oddCount": 0,
+  "totalEdges": 6,
+  "circuitVertexCount": 7
+}

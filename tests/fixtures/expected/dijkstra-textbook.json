@@ -1,0 +1,20 @@
+{
+  "startNode": "u",
+  "startIndex": 0,
+  "targetNode": "w",
+  "targetIndex": 7,
+  "reachable": true,
+  "expectedTotal": 9,
+  "expectedPathIndices": [0, 5, 6, 7],
+  "expectedPathNames": ["u", "y", "z", "w"],
+  "finalDistances": {
+    "u": 0,
+    "r": 3,
+    "y": 1,
+    "z": 4,
+    "t": 6,
+    "s": 8,
+    "x": 7,
+    "w": 9
+  }
+}

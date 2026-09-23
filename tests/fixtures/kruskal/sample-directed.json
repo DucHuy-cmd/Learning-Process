@@ -1,0 +1,12 @@
+{
+  "name": "Kruskal Directed Graph (Invalid for Kruskal)",
+  "isBuilding": false,
+  "directed": true,
+  "nodes": [
+    {"id":"A", "name":"A", "short":"A", "kind":"phong", "x":100, "y":200},
+    {"id":"B", "name":"B", "short":"B", "kind":"phong", "x":300, "y":100}
+  ],
+  "edges": [
+    ["A", "B", 1.0]
+  ]
+}

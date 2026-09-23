@@ -1,0 +1,9 @@
+{
+  "startNode": "X1",
+  "startIndex": 0,
+  "connected": true,
+  "reached": 8,
+  "expectedMstEdgeCount": 7,
+  "expectedTotal": 101.0,
+  "headers": ["X1", "X2", "X3", "X4", "X5", "X6", "X7", "X8", "Tv", "Te"]
+}

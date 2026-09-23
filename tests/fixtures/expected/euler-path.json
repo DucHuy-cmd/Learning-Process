@@ -1,0 +1,9 @@
+{
+  "graphName": "Bài tập Euler (Có Đường đi, Không có Chu trình)",
+  "type": "path",
+  "typeTitle": "Tồn tại Đường đi Euler (Không có Chu trình)",
+  "connected": true,
+  "oddCount": 2,
+  "totalEdges": 8,
+  "pathVertexCount": 9
+}

@@ -1,0 +1,18 @@
+{
+  "name": "Kruskal Undirected MST Graph",
+  "isBuilding": false,
+  "directed": false,
+  "nodes": [
+    {"id":"A", "name":"A", "short":"A", "kind":"phong", "x":100, "y":200},
+    {"id":"B", "name":"B", "short":"B", "kind":"phong", "x":300, "y":100},
+    {"id":"C", "name":"C", "short":"C", "kind":"phong", "x":300, "y":300},
+    {"id":"D", "name":"D", "short":"D", "kind":"phong", "x":500, "y":200}
+  ],
+  "edges": [
+    ["A", "B", 1.0],
+    ["B", "C", 2.0],
+    ["A", "C", 4.0],
+    ["B", "D", 3.0],
+    ["C", "D", 5.0]
+  ]
+}

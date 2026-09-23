@@ -1,0 +1,35 @@
+{
+  "name": "Bài tập Prim (Slide X1-X8)",
+  "isBuilding": false,
+  "directed": false,
+  "algo": "prim",
+  "nodes": [
+    {"id":"x1", "name":"X1", "short":"X1", "kind":"phong", "x":110, "y":220},
+    {"id":"x2", "name":"X2", "short":"X2", "kind":"phong", "x":260, "y":80},
+    {"id":"x3", "name":"X3", "short":"X3", "kind":"phong", "x":260, "y":360},
+    {"id":"x4", "name":"X4", "short":"X4", "kind":"phong", "x":460, "y":80},
+    {"id":"x5", "name":"X5", "short":"X5", "kind":"phong", "x":110, "y":380},
+    {"id":"x6", "name":"X6", "short":"X6", "kind":"phong", "x":660, "y":80},
+    {"id":"x7", "name":"X7", "short":"X7", "kind":"phong", "x":800, "y":220},
+    {"id":"x8", "name":"X8", "short":"X8", "kind":"phong", "x":460, "y":260}
+  ],
+  "edges": [
+    ["x1", "x2", 16.0],
+    ["x1", "x3", 15.0],
+    ["x1", "x4", 23.0],
+    ["x1", "x5", 19.0],
+    ["x1", "x6", 18.0],
+    ["x1", "x7", 32.0],
+    ["x1", "x8", 20.0],
+    ["x3", "x2", 13.0],
+    ["x3", "x4", 13.0],
+    ["x3", "x7", 20.0],
+    ["x3", "x8", 19.0],
+    ["x2", "x7", 19.0],
+    ["x2", "x8", 11.0],
+    ["x8", "x4", 12.0],
+    ["x8", "x6", 14.0],
+    ["x8", "x7", 18.0],
+    ["x6", "x7", 17.0]
+  ]
+}

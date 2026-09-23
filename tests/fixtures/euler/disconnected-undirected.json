@@ -1,0 +1,22 @@
+{
+  "name": "Bài tập Euler (Không có Euler — Không Liên Thông)",
+  "isBuilding": false,
+  "directed": false,
+  "algo": "euler",
+  "nodes": [
+    {"id":"A", "name":"A", "short":"A", "kind":"phong", "x":200, "y":160},
+    {"id":"B", "name":"B", "short":"B", "kind":"phong", "x":360, "y":340},
+    {"id":"C", "name":"C", "short":"C", "kind":"phong", "x":200, "y":340},
+    {"id":"D", "name":"D", "short":"D", "kind":"phong", "x":620, "y":160},
+    {"id":"E", "name":"E", "short":"E", "kind":"phong", "x":780, "y":160},
+    {"id":"F", "name":"F", "short":"F", "kind":"phong", "x":700, "y":340}
+  ],
+  "edges": [
+    ["A", "B", 1.0],
+    ["B", "C", 1.0],
+    ["C", "A", 1.0],
+    ["D", "E", 1.0],
+    ["E", "F", 1.0],
+    ["F", "D", 1.0]
+  ]
+}
