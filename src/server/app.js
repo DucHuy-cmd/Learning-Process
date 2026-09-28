@@ -16,7 +16,7 @@ import { extractBoundary, readRequestBody, parseMultipartData } from './parseMul
 import { isAIConfigured, analyzeGraphFileBackend, executeGeminiChat } from './ai/AIProviderAdapter.js';
 import { validateGraphSpecification, MAX_FILE_SIZE_BYTES } from '../app/ai/GraphVisionAdapter.js';
 
-import { serverUsers, serverAiSessions, serverQuizStats, saveDatabase } from './auth/ServerDataStore.js';
+import { serverUsers, serverAiSessions, serverQuizStats, saveDatabase, isKVConfigured, fetchFromKV } from './auth/ServerDataStore.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -102,11 +102,20 @@ export async function handleRequest(req, res) {
     return;
   }
 
+  // Sync latest data from Vercel KV for Serverless execution
+  if (isKVConfigured()) {
+    try {
+      await fetchFromKV();
+    } catch {}
+  }
+
   // Route: GET /api/health
   if (req.method === 'GET' && (pathname === '/api/health' || pathname.endsWith('/health'))) {
     sendJson(res, 200, {
       status: 'ok',
       aiConfigured: isAIConfigured(),
+      kvConfigured: isKVConfigured(),
+      storageMode: isKVConfigured() ? 'cloud_kv' : (process.env.VERCEL ? 'ephemeral_tmp' : 'local_fs'),
       supportedFormats: BACKEND_SUPPORTED_EXTENSIONS,
     });
     return;
