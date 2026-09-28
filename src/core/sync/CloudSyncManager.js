@@ -170,6 +170,29 @@ export class CloudSyncManager {
   }
 
   /**
+   * Logs in a user via the backend server API.
+   * @param {string} username
+   * @param {string} password
+   * @returns {Promise<{ success: boolean, user?: Object, error?: string }>}
+   */
+  async login(username, password) {
+    if (typeof fetch === 'undefined') {
+      return { success: false, error: 'Không có kết nối mạng.' };
+    }
+    try {
+      const res = await fetch(`${this.baseUrl}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      });
+      const data = await res.json().catch(() => ({ success: false, error: 'Lỗi phản hồi máy chủ.' }));
+      return data;
+    } catch {
+      return { success: false, error: 'Lỗi mạng khi kết nối máy chủ.' };
+    }
+  }
+
+  /**
    * Synchronizes AI history sessions from the server for a user.
    * @param {string} userId
    * @param {Object} aiHistoryManager

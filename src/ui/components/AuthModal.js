@@ -253,19 +253,48 @@ export class AuthModal {
         </form>
       `;
 
-      bodyContainer.querySelector('#formLogin').addEventListener('submit', (e) => {
+      bodyContainer.querySelector('#formLogin').addEventListener('submit', async (e) => {
         e.preventDefault();
         const username = bodyContainer.querySelector('#loginUsername').value;
         const password = bodyContainer.querySelector('#loginPassword').value;
         const alertBox = bodyContainer.querySelector('#authAlert');
 
-        const result = authManager.login(username, password);
-        if (result.success) {
+        // 1. Check local users first
+        const localResult = authManager.login(username, password);
+        if (localResult.success) {
           this.close();
-        } else {
-          alertBox.textContent = result.error;
-          alertBox.style.display = 'block';
+          return;
         }
+
+        // 2. If not found locally, query backend server API
+        try {
+          const remoteResult = await cloudSyncManager.login(username, password);
+          if (remoteResult && remoteResult.success && remoteResult.user) {
+            // Adopt into local storage so subsequent logins are instant
+            const users = authManager.getUsers();
+            if (!users.some(u => u.id === remoteResult.user.id)) {
+              users.push({ ...remoteResult.user, password });
+              if (authManager.storage) {
+                try {
+                  authManager.storage.setItem('trr_registered_users', JSON.stringify(users));
+                } catch {}
+              }
+            }
+            authManager.currentUser = { ...remoteResult.user };
+            authManager._persistCurrent();
+            authManager._notifyListeners('login', authManager.currentUser);
+            this.close();
+            return;
+          }
+          if (remoteResult && remoteResult.error) {
+            alertBox.textContent = remoteResult.error;
+            alertBox.style.display = 'block';
+            return;
+          }
+        } catch {}
+
+        alertBox.textContent = localResult.error;
+        alertBox.style.display = 'block';
       });
       return;
     }

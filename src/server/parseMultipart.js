@@ -21,6 +21,18 @@ export function extractBoundary(contentType) {
  * @returns {Promise<Buffer>}
  */
 export function readRequestBody(req, maxBytes = 16 * 1024 * 1024) {
+  if (req.body !== undefined && req.body !== null) {
+    if (Buffer.isBuffer(req.body)) {
+      return Promise.resolve(req.body);
+    }
+    if (typeof req.body === 'string') {
+      return Promise.resolve(Buffer.from(req.body, 'utf8'));
+    }
+    if (typeof req.body === 'object') {
+      return Promise.resolve(Buffer.from(JSON.stringify(req.body), 'utf8'));
+    }
+  }
+
   return new Promise((resolve, reject) => {
     const chunks = [];
     let totalBytes = 0;
