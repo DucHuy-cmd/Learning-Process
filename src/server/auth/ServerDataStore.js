@@ -63,14 +63,27 @@ export function loadDatabase() {
   }
 }
 
-const KV_URL = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
-const KV_TOKEN = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
+export function getKVConfig() {
+  if (typeof process === 'undefined' || !process.env) return { url: '', token: '' };
+  const env = process.env;
+  const url = env.KV_REST_API_URL ||
+              env.UPSTASH_REDIS_REST_URL ||
+              env.STORAGE_REST_API_URL ||
+              Object.entries(env).find(([k]) => k.endsWith('_REST_API_URL') || k.endsWith('_REDIS_URL'))?.[1] || '';
+  const token = env.KV_REST_API_TOKEN ||
+                env.UPSTASH_REDIS_REST_TOKEN ||
+                env.STORAGE_REST_API_TOKEN ||
+                Object.entries(env).find(([k]) => k.endsWith('_REST_API_TOKEN') || k.endsWith('_REDIS_TOKEN'))?.[1] || '';
+  return { url, token };
+}
 
 export function isKVConfigured() {
-  return Boolean(KV_URL && KV_TOKEN);
+  const { url, token } = getKVConfig();
+  return Boolean(url && token);
 }
 
 export async function fetchFromKV() {
+  const { url: KV_URL, token: KV_TOKEN } = getKVConfig();
   if (!KV_URL || !KV_TOKEN || typeof fetch === 'undefined') return false;
   try {
     const res = await fetch(`${KV_URL}/get/trr:database`, {
@@ -101,6 +114,7 @@ export async function fetchFromKV() {
 }
 
 export async function writeToKV() {
+  const { url: KV_URL, token: KV_TOKEN } = getKVConfig();
   if (!KV_URL || !KV_TOKEN || typeof fetch === 'undefined') return false;
   try {
     const payload = JSON.stringify({
@@ -141,13 +155,13 @@ export function saveDatabase() {
   }
 
   // Also write to Cloud KV if configured
-  if (KV_URL && KV_TOKEN) {
+  if (isKVConfigured()) {
     writeToKV().catch(() => {});
   }
 }
 
 // Initial load
 loadDatabase();
-if (KV_URL && KV_TOKEN) {
+if (isKVConfigured()) {
   fetchFromKV().catch(() => {});
 }
