@@ -436,12 +436,13 @@ export class App {
 
     if (currentUser) {
       btnAuth.classList.add('logged-in');
+      const displayName = (currentUser.fullName || currentUser.username || 'Người dùng').trim();
       if (iconAuth) iconAuth.textContent = currentUser.avatar || (isAdmin ? '👑' : '🎓');
-      lblName.textContent = currentUser.fullName.split(' ').slice(-1)[0] || currentUser.fullName;
-      btnAuth.title = `Tài khoản: ${currentUser.fullName} (${currentUser.className || (isAdmin ? 'Quản trị viên' : 'Sinh viên')}) • Bấm để mở menu cài đặt`;
+      lblName.textContent = displayName;
+      btnAuth.title = `Tài khoản: ${displayName} (${currentUser.className || (isAdmin ? 'Quản trị viên' : 'Sinh viên')}) • Bấm để mở menu cài đặt`;
 
       if (ddAvatar) ddAvatar.textContent = currentUser.avatar || (isAdmin ? '👑' : '👨‍🎓');
-      if (ddName) ddName.textContent = currentUser.fullName;
+      if (ddName) ddName.textContent = displayName;
       if (ddRole) ddRole.textContent = isAdmin ? '👑 Quản trị viên hệ thống' : (currentUser.className || 'Sinh viên');
       if (ddProfileLbl) ddProfileLbl.textContent = 'Hồ sơ cá nhân & Thông tin';
       if (ddLogoutDivider) ddLogoutDivider.style.display = 'block';
