@@ -31,8 +31,11 @@ export function loadDatabase() {
       const data = JSON.parse(raw);
       if (Array.isArray(data.users) && data.users.length > 0) {
         // Filter out legacy dummy users
-        const legacyIds = new Set(['user_nhatvu', 'user_truongvu', 'user_ngochung', 'user_admin']);
-        const validUsers = data.users.filter(u => !legacyIds.has(u.id));
+        const legacyIds = new Set(['user_giangvien', 'user_nhatvu', 'user_truongvu', 'user_ngochung']);
+        let validUsers = data.users.filter(u => !legacyIds.has(u.id));
+        if (!validUsers.some(u => u.username === 'admin' || u.id === 'user_admin')) {
+          validUsers.unshift(DEMO_USERS[0]);
+        }
         serverUsers.length = 0;
         serverUsers.push(...(validUsers.length > 0 ? validUsers : DEMO_USERS));
       }
@@ -42,7 +45,7 @@ export function loadDatabase() {
       }
       if (data.quizStats && typeof data.quizStats === 'object') {
         for (const k of Object.keys(serverQuizStats)) delete serverQuizStats[k];
-        const legacyIds = new Set(['user_nhatvu', 'user_truongvu', 'user_ngochung', 'user_admin']);
+        const legacyIds = new Set(['user_giangvien', 'user_nhatvu', 'user_truongvu', 'user_ngochung']);
         for (const [k, v] of Object.entries(data.quizStats)) {
           if (!legacyIds.has(k)) {
             serverQuizStats[k] = v;
@@ -86,8 +89,13 @@ export async function fetchFromKV() {
     if (json && json.result) {
       const data = typeof json.result === 'string' ? JSON.parse(json.result) : json.result;
       if (Array.isArray(data.users) && data.users.length > 0) {
+        const legacyIds = new Set(['user_giangvien', 'user_nhatvu', 'user_truongvu', 'user_ngochung']);
+        let validUsers = data.users.filter(u => !legacyIds.has(u.id));
+        if (!validUsers.some(u => u.username === 'admin' || u.id === 'user_admin')) {
+          validUsers.unshift(DEMO_USERS[0]);
+        }
         serverUsers.length = 0;
-        serverUsers.push(...data.users);
+        serverUsers.push(...(validUsers.length > 0 ? validUsers : DEMO_USERS));
       }
       if (data.aiSessions && typeof data.aiSessions === 'object') {
         for (const k of Object.keys(serverAiSessions)) delete serverAiSessions[k];

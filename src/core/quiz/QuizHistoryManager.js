@@ -66,6 +66,19 @@ export class QuizHistoryManager {
     }
   }
 
+  /**
+   * Removes a specific user's stats from the leaderboard.
+   * @param {string} userId
+   */
+  removeUserStats(userId) {
+    if (!userId) return;
+    const map = this._readMap();
+    if (map[userId]) {
+      delete map[userId];
+      this._writeMap(map);
+    }
+  }
+
   _readMap() {
     const storage = this._getStorage();
     if (!storage) return {};

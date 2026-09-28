@@ -184,13 +184,28 @@ export class App {
       const teacherBtn = document.getElementById('btnTeacherToolsToggle');
       if (teacherBtn) {
         teacherBtn.addEventListener('click', () => {
-          if (this.teacherTool) {
+          if (this.teacherTool && authManager.isAdmin()) {
             this.teacherTool.toggle();
           }
         });
       }
+      this._updateTeacherToolsVisibility();
+      authManager.onAuthStateChanged(() => {
+        this._updateTeacherToolsVisibility();
+      });
     } catch (err) {
       console.warn('TeacherAnnotationTool initialization deferred or failed:', err);
+    }
+  }
+
+  _updateTeacherToolsVisibility() {
+    const teacherBtn = document.getElementById('btnTeacherToolsToggle');
+    const isAdmin = authManager.isAdmin();
+    if (teacherBtn) {
+      teacherBtn.style.display = isAdmin ? 'inline-flex' : 'none';
+    }
+    if (!isAdmin && this.teacherTool && this.teacherTool.isActive) {
+      this.teacherTool.deactivate();
     }
   }
 
@@ -223,6 +238,10 @@ export class App {
       this.authModal = new AuthModal({
         onAuthChange: (user) => {
           this._updateUserHeaderBadge(user);
+          this._updateTeacherToolsVisibility();
+          if (this.views.quiz && typeof this.views.quiz.render === 'function') {
+            this.views.quiz.render();
+          }
           if (this.views.ai && typeof this.views.ai.onUserChanged === 'function') {
             this.views.ai.onUserChanged(user);
           }
@@ -239,6 +258,7 @@ export class App {
       }
 
       this._updateUserHeaderBadge(authManager.getCurrentUser());
+      this._updateTeacherToolsVisibility();
     } catch (err) {
       console.warn('AuthModal initialization deferred or failed:', err);
     }

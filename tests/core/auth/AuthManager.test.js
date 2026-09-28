@@ -98,8 +98,9 @@ describe('AuthManager & User Accounts', () => {
   });
 
   it('logs out and triggers onAuthStateChanged listener', () => {
-    auth.quickLogin('user_giangvien');
+    auth.quickLogin('user_admin');
     expect(auth.isLoggedIn()).toBe(true);
+    expect(auth.isAdmin()).toBe(true);
 
     let eventFired = null;
     auth.onAuthStateChanged((event) => {
@@ -109,7 +110,37 @@ describe('AuthManager & User Accounts', () => {
     auth.logout();
     expect(auth.isLoggedIn()).toBe(false);
     expect(auth.getCurrentUser()).toBeNull();
+    expect(auth.isAdmin()).toBe(false);
     expect(eventFired).toBe('logout');
+  });
+
+  it('verifies single admin RBAC permissions and user database management', () => {
+    // 1. Student cannot delete users or admin-create accounts
+    auth.quickLogin('user_duchuy');
+    expect(auth.isAdmin()).toBe(false);
+    const failDel = auth.deleteUser('user_admin');
+    expect(failDel.success).toBe(false);
+
+    // 2. Admin can create new student accounts
+    auth.quickLogin('user_admin');
+    expect(auth.isAdmin()).toBe(true);
+
+    const createRes = auth.adminCreateUser({
+      username: 'sv_test_rbac',
+      fullName: 'Sinh Viên Test',
+      password: '123',
+    });
+    expect(createRes.success).toBe(true);
+    expect(auth.getUsers().some(u => u.username === 'sv_test_rbac')).toBe(true);
+
+    // 3. Admin cannot delete the single admin account
+    const delAdminRes = auth.deleteUser('user_admin');
+    expect(delAdminRes.success).toBe(false);
+
+    // 4. Admin can delete the created student account
+    const delRes = auth.deleteUser(createRes.user.id);
+    expect(delRes.success).toBe(true);
+    expect(auth.getUsers().some(u => u.username === 'sv_test_rbac')).toBe(false);
   });
 });
 

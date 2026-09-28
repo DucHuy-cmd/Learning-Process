@@ -327,6 +327,74 @@ export class CloudSyncManager {
       return null;
     }
   }
+  /**
+   * Admin creates a user on the server.
+   * @param {Object} userData
+   */
+  async adminCreateUser(userData) {
+    if (typeof fetch === 'undefined') return null;
+    try {
+      const res = await fetch(`${this.baseUrl}/api/admin/users`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(userData),
+      });
+      if (!res.ok) return null;
+      return await res.json();
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Admin deletes a user on the server.
+   * @param {string} userId
+   */
+  async adminDeleteUser(userId) {
+    if (typeof fetch === 'undefined') return null;
+    try {
+      const res = await fetch(`${this.baseUrl}/api/admin/users/${encodeURIComponent(userId)}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) return null;
+      return await res.json();
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Admin resets the entire quiz leaderboard on the server.
+   */
+  async resetQuizLeaderboard() {
+    if (typeof fetch === 'undefined') return null;
+    try {
+      const res = await fetch(`${this.baseUrl}/api/quiz/leaderboard/reset`, {
+        method: 'POST',
+      });
+      if (!res.ok) return null;
+      return await res.json();
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Admin deletes a single user's score from the quiz leaderboard.
+   * @param {string} userId
+   */
+  async deleteQuizLeaderboardUser(userId) {
+    if (typeof fetch === 'undefined') return null;
+    try {
+      const res = await fetch(`${this.baseUrl}/api/quiz/leaderboard/${encodeURIComponent(userId)}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) return null;
+      return await res.json();
+    } catch {
+      return null;
+    }
+  }
 }
 
 export const cloudSyncManager = new CloudSyncManager();

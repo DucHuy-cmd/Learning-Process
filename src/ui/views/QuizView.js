@@ -199,8 +199,8 @@ export class QuizView {
             <button type="button" class="btn-tab ${this.activeTab === 'practice' ? 'active' : ''}" id="tabBtnPractice" style="padding:8px 16px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;">
               🎮 Đấu Trường Luyện Tập
             </button>
-            <button type="button" class="btn-tab ${this.activeTab === 'studio' ? 'active' : ''}" id="tabBtnStudio" style="padding:8px 16px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;">
-              👩‍🏫 Studio Soạn Đề & In Ấn
+            <button type="button" class="btn-tab ${this.activeTab === 'studio' ? 'active' : ''}" id="tabBtnStudio" style="${authManager.isAdmin() ? '' : 'display:none;'}padding:8px 16px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;">
+              👩‍🏫 Studio Soạn Đề &amp; In Ấn
             </button>
             <button type="button" class="btn-tab ${this.activeTab === 'leaderboard' ? 'active' : ''}" id="tabBtnLeaderboard" style="padding:8px 16px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;">
               🏆 Bảng Xếp Hạng K66
@@ -610,6 +610,7 @@ export class QuizView {
   _renderLeaderboardView() {
     const leaderboard = quizHistoryManager.getLeaderboard();
     const currentUser = authManager.getCurrentUser();
+    const isAdmin = authManager.isAdmin();
     const userStats = currentUser ? quizHistoryManager.getUserStats(currentUser.id) : null;
 
     const rank1 = leaderboard[0] || null;
@@ -636,10 +637,15 @@ export class QuizView {
               Vinh danh các sinh viên xuất sắc nhất K66 có phản xạ nhanh, tỷ lệ trả lời chính xác cao nhất và chuỗi thắng dài nhất qua 4 phân môn Toán Rời Rạc.
             </p>
           </div>
-          <div class="hero-actions">
+          <div class="hero-actions" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
             <button type="button" class="btn-primary" id="btnGoToPracticeFromLb" style="padding:10px 20px;font-size:13.5px;font-weight:700;">
               🎮 Vào Luyện Tập Để Leo Rank Ngay ➔
             </button>
+            ${isAdmin ? `
+              <button type="button" class="btn-danger-outline" id="btnAdminResetLeaderboard" title="Chỉ Quản trị viên (admin): Xóa toàn bộ dữ liệu bảng xếp hạng và làm sạch về 0" style="padding:10px 18px;font-size:13px;font-weight:700;display:inline-flex;align-items:center;gap:6px;border:1px solid #ef4444;color:#ef4444;background:rgba(239,68,68,0.08);border-radius:6px;cursor:pointer;">
+                🗑️ Reset Bảng Xếp Hạng
+              </button>
+            ` : ''}
           </div>
         </div>
 
@@ -793,12 +799,13 @@ export class QuizView {
                   <th style="text-align:center;">Tỷ lệ</th>
                   <th style="text-align:center;">Chuỗi 🔥</th>
                   <th>Danh hiệu</th>
+                  ${isAdmin ? '<th style="text-align:center;width:90px;">Hành động</th>' : ''}
                 </tr>
               </thead>
               <tbody>
                 ${leaderboard.length === 0 ? `
                   <tr>
-                    <td colspan="7" style="text-align:center;padding:36px;color:var(--dim);font-style:italic;font-size:14px;">
+                    <td colspan="${isAdmin ? 8 : 7}" style="text-align:center;padding:36px;color:var(--dim);font-style:italic;font-size:14px;">
                       🌟 Bảng xếp hạng hiện đang trống. Hãy là người đầu tiên hoàn thành bài thi để dẫn đầu Bảng Vàng!
                     </td>
                   </tr>
@@ -835,6 +842,13 @@ export class QuizView {
                       <td>
                         <span class="table-badge-chip">${item.badge || '⭐ Sinh viên K66'}</span>
                       </td>
+                      ${isAdmin ? `
+                        <td style="text-align:center;">
+                          <button type="button" class="btn-delete-lb-row" data-user-id="${item.userId}" data-user-name="${this._escapeHtml(item.fullName)}" title="Xóa kết quả của sinh viên này khỏi bảng xếp hạng" style="background:rgba(239,68,68,0.12);color:#ef4444;border:1px solid rgba(239,68,68,0.3);padding:4px 10px;border-radius:6px;cursor:pointer;font-size:11.5px;font-weight:600;">
+                            🗑️ Xóa
+                          </button>
+                        </td>
+                      ` : ''}
                     </tr>
                   `;
                 }).join('')}
@@ -911,6 +925,44 @@ export class QuizView {
         }
       });
     }
+
+    // Admin Leaderboard Management Events
+    const btnResetLb = this.container.querySelector('#btnAdminResetLeaderboard');
+    if (btnResetLb) {
+      btnResetLb.addEventListener('click', async () => {
+        if (!authManager.isAdmin()) {
+          if (typeof window !== 'undefined' && window.alert) {
+            window.alert('Chỉ Quản trị viên (admin) mới có quyền xóa bảng xếp hạng.');
+          }
+          return;
+        }
+        if (typeof window !== 'undefined' && window.confirm && !window.confirm('⚠️ BẠN CÓ CHẮC MUỐN XÓA TOÀN BỘ BẢNG XẾP HẠNG?\n\nTất cả điểm số và thành tích của sinh viên sẽ được làm sạch về 0.')) {
+          return;
+        }
+        quizHistoryManager.clearLeaderboard();
+        try {
+          await cloudSyncManager.resetQuizLeaderboard();
+        } catch {}
+        this.render();
+      });
+    }
+
+    this.container.querySelectorAll('.btn-delete-lb-row').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        if (!authManager.isAdmin()) return;
+        const targetId = btn.getAttribute('data-user-id');
+        const targetName = btn.getAttribute('data-user-name') || targetId;
+        if (typeof window !== 'undefined' && window.confirm && !window.confirm(`Xóa điểm của sinh viên "${targetName}" khỏi bảng xếp hạng?`)) {
+          return;
+        }
+        quizHistoryManager.removeUserStats(targetId);
+        try {
+          await cloudSyncManager.deleteQuizLeaderboardUser(targetId);
+        } catch {}
+        this.render();
+      });
+    });
 
     // 2. Practice Arena Events
     const selTopic = this.container.querySelector('#selPracticeTopic');

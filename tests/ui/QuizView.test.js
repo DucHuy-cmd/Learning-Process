@@ -335,4 +335,38 @@ describe('QuizView UI Component', () => {
 
     authManager.logout();
   });
+
+  it('restricts Studio tab and Leaderboard reset button based on Admin RBAC', () => {
+    // 1. As normal student: Studio tab is hidden and Leaderboard reset button does not exist
+    authManager.quickLogin('user_duchuy');
+    expect(authManager.isAdmin()).toBe(false);
+
+    const studentQuiz = new QuizView({ container });
+    const tabStudioStudent = container.querySelector('#tabBtnStudio');
+    expect(tabStudioStudent.style.display).toBe('none');
+
+    studentQuiz.setTab('leaderboard');
+    expect(container.querySelector('#btnAdminResetLeaderboard')).toBeNull();
+
+    authManager.logout();
+
+    // 2. As single Admin: Studio tab is visible and Leaderboard reset button is displayed
+    authManager.quickLogin('user_admin');
+    expect(authManager.isAdmin()).toBe(true);
+
+    const adminQuiz = new QuizView({ container });
+    const tabStudioAdmin = container.querySelector('#tabBtnStudio');
+    expect(tabStudioAdmin.style.display).not.toBe('none');
+
+    adminQuiz.setTab('leaderboard');
+    const btnResetLb = container.querySelector('#btnAdminResetLeaderboard');
+    expect(btnResetLb).not.toBeNull();
+
+    // 3. Reset leaderboard clears all scores
+    window.confirm = () => true;
+    btnResetLb.click();
+    expect(quizHistoryManager.getLeaderboard().length).toBe(0);
+
+    authManager.logout();
+  });
 });

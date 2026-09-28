@@ -115,11 +115,17 @@ export class AuthModal {
 
     // 1. Render Tabs
     if (user) {
+      const isAdmin = authManager.isAdmin();
       tabsContainer.innerHTML = `
-        <button type="button" class="auth-tab-btn active" data-tab="profile">
-          👤 Hồ sơ cá nhân
+        <button type="button" class="auth-tab-btn ${this.activeTab === 'profile' ? 'active' : ''}" data-tab="profile">
+          ${isAdmin ? '👑 Hồ sơ Quản trị' : '👤 Hồ sơ cá nhân'}
         </button>
-        <button type="button" class="auth-tab-btn" data-tab="quick">
+        ${isAdmin ? `
+          <button type="button" class="auth-tab-btn ${this.activeTab === 'adminDb' ? 'active' : ''}" data-tab="adminDb">
+            🗄️ Quản trị Database
+          </button>
+        ` : ''}
+        <button type="button" class="auth-tab-btn ${this.activeTab === 'quick' ? 'active' : ''}" data-tab="quick">
           🔄 Đổi tài khoản
         </button>
       `;
@@ -147,12 +153,13 @@ export class AuthModal {
     // 2. Render Body Content based on activeTab
     if (user && this.activeTab === 'profile') {
       const userSessions = aiHistoryManager.getUserSessions(user.id);
+      const isAdmin = authManager.isAdmin();
       bodyContainer.innerHTML = `
         <div class="auth-profile-card">
-          <div class="profile-avatar-large">${user.avatar || '🎓'}</div>
+          <div class="profile-avatar-large">${user.avatar || (isAdmin ? '👑' : '👨‍🎓')}</div>
           <h4 class="profile-name">${user.fullName}</h4>
-          <span class="profile-class-badge">${user.className || 'Khóa 66 Công nghệ thông tin'}</span>
-          <p class="profile-bio">${user.bio || 'Học viên Toán Rời Rạc Platform'}</p>
+          <span class="profile-class-badge">${user.className || 'Toán Rời Rạc Platform'}</span>
+          <p class="profile-bio">${user.bio || (isAdmin ? 'Quản trị viên duy nhất của hệ thống' : 'Sinh viên Toán Rời Rạc')}</p>
           
           <div class="profile-info-grid">
             <div class="profile-info-item">
@@ -165,7 +172,9 @@ export class AuthModal {
             </div>
             <div class="profile-info-item">
               <span class="info-label">Vai trò:</span>
-              <span class="info-val">${user.role === 'author' ? 'Nhóm tác giả K66' : (user.role === 'teacher' ? 'Giảng viên' : 'Sinh viên')}</span>
+              <span class="info-val" style="font-weight:700;color:${isAdmin ? '#f59e0b' : '#3b82f6'};">
+                ${isAdmin ? '👑 Quản Trị Viên (Duy nhất)' : (user.role === 'author' ? 'Nhóm tác giả K66' : '👨‍🎓 Sinh viên')}
+              </span>
             </div>
             <div class="profile-info-item">
               <span class="info-label">Lịch sử chat AI:</span>
@@ -174,6 +183,11 @@ export class AuthModal {
           </div>
 
           <div class="profile-actions">
+            ${isAdmin ? `
+              <button type="button" class="btn-primary" id="btnGoToAdminDb" style="padding:9px 18px;font-size:13px;background:#f59e0b;border-color:#f59e0b;color:#ffffff;">
+                🗄️ Quản Trị Database
+              </button>
+            ` : ''}
             <button type="button" class="btn-primary" id="btnGoToAiFromProfile" style="padding:9px 18px;font-size:13px;">
               💬 Xem Lịch sử AI
             </button>
@@ -190,6 +204,14 @@ export class AuthModal {
         this._renderContent();
       });
 
+      const btnGoToAdmin = bodyContainer.querySelector('#btnGoToAdminDb');
+      if (btnGoToAdmin) {
+        btnGoToAdmin.addEventListener('click', () => {
+          this.activeTab = 'adminDb';
+          this._renderContent();
+        });
+      }
+
       const btnGoToAi = bodyContainer.querySelector('#btnGoToAiFromProfile');
       if (btnGoToAi) {
         btnGoToAi.addEventListener('click', () => {
@@ -201,11 +223,161 @@ export class AuthModal {
       return;
     }
 
+    // 2B. Admin Database Management Tab
+    if (user && this.activeTab === 'adminDb') {
+      if (!authManager.isAdmin()) {
+        this.activeTab = 'profile';
+        this._renderContent();
+        return;
+      }
+
+      const allUsers = authManager.getUsers();
+      bodyContainer.innerHTML = `
+        <div class="admin-db-panel" style="padding:8px 0;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+            <div>
+              <h4 style="margin:0 0 4px;font-size:16px;color:var(--text);font-weight:700;">🗄️ Quản Trị Cơ Sở Dữ Liệu Tài Khoản</h4>
+              <p style="margin:0;font-size:12.5px;color:var(--dim);">
+                Xem danh sách tất cả tài khoản, cấp tài khoản cho sinh viên hoặc xóa tài khoản thử nghiệm.
+              </p>
+            </div>
+            <span style="font-size:12px;background:rgba(245,158,11,0.15);color:#f59e0b;padding:3px 10px;border-radius:12px;font-weight:600;border:1px solid rgba(245,158,11,0.3);">
+              👥 Tổng số: ${allUsers.length} tài khoản
+            </span>
+          </div>
+
+          <div id="adminDbAlert" class="auth-alert" style="display:none;margin-bottom:12px;"></div>
+
+          <!-- Add User Form -->
+          <details style="margin-bottom:16px;background:var(--panel-alt);border:1px solid var(--line);border-radius:8px;padding:10px 14px;">
+            <summary style="font-size:13px;font-weight:700;color:var(--accent);cursor:pointer;">➕ Cấp tài khoản sinh viên mới</summary>
+            <form id="formAdminAddUser" style="margin-top:12px;display:grid;grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));gap:10px;">
+              <div>
+                <label style="font-size:11.5px;color:var(--dim);display:block;margin-bottom:3px;">Tên đăng nhập *</label>
+                <input type="text" id="adminNewUsername" placeholder="Ví dụ: sv_k66..." required style="width:100%;padding:6px 10px;font-size:12.5px;border-radius:6px;border:1px solid var(--line);background:var(--panel);color:var(--text);">
+              </div>
+              <div>
+                <label style="font-size:11.5px;color:var(--dim);display:block;margin-bottom:3px;">Mật khẩu *</label>
+                <input type="password" id="adminNewPassword" placeholder="Mật khẩu..." required style="width:100%;padding:6px 10px;font-size:12.5px;border-radius:6px;border:1px solid var(--line);background:var(--panel);color:var(--text);">
+              </div>
+              <div>
+                <label style="font-size:11.5px;color:var(--dim);display:block;margin-bottom:3px;">Họ và tên sinh viên *</label>
+                <input type="text" id="adminNewFullName" placeholder="Họ và tên..." required style="width:100%;padding:6px 10px;font-size:12.5px;border-radius:6px;border:1px solid var(--line);background:var(--panel);color:var(--text);">
+              </div>
+              <div>
+                <label style="font-size:11.5px;color:var(--dim);display:block;margin-bottom:3px;">Lớp / Đơn vị</label>
+                <input type="text" id="adminNewClass" placeholder="Khóa 66 CNTT" value="Khóa 66 Công nghệ thông tin" style="width:100%;padding:6px 10px;font-size:12.5px;border-radius:6px;border:1px solid var(--line);background:var(--panel);color:var(--text);">
+              </div>
+              <div style="grid-column:1 / -1;display:flex;justify-content:flex-end;">
+                <button type="submit" class="btn-primary" style="padding:7px 16px;font-size:12.5px;font-weight:600;">
+                  ✓ Tạo tài khoản
+                </button>
+              </div>
+            </form>
+          </details>
+
+          <!-- Users Table -->
+          <div style="overflow-x:auto;max-height:280px;border:1px solid var(--line);border-radius:8px;">
+            <table style="width:100%;border-collapse:collapse;font-size:12.5px;text-align:left;">
+              <thead style="background:var(--panel-alt);position:sticky;top:0;z-index:2;">
+                <tr style="border-bottom:1px solid var(--line);">
+                  <th style="padding:8px 10px;">Người dùng</th>
+                  <th style="padding:8px 10px;">Username</th>
+                  <th style="padding:8px 10px;">Vai trò</th>
+                  <th style="padding:8px 10px;">Lớp / Email</th>
+                  <th style="padding:8px 10px;text-align:center;">Hành động</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${allUsers.map(u => {
+                  const isUserAdmin = u.username === 'admin' || u.role === 'admin' || u.id === 'user_admin';
+                  return `
+                    <tr style="border-bottom:1px solid var(--line);background:${isUserAdmin ? 'rgba(245,158,11,0.05)' : 'transparent'};">
+                      <td style="padding:8px 10px;">
+                        <span style="font-size:16px;margin-right:6px;">${u.avatar || '👤'}</span>
+                        <strong>${u.fullName}</strong>
+                      </td>
+                      <td style="padding:8px 10px;"><code>@${u.username}</code></td>
+                      <td style="padding:8px 10px;">
+                        <span style="font-size:11px;padding:2px 6px;border-radius:4px;font-weight:600;background:${isUserAdmin ? 'rgba(245,158,11,0.2)' : 'rgba(59,130,246,0.15)'};color:${isUserAdmin ? '#f59e0b' : '#3b82f6'};">
+                          ${isUserAdmin ? '👑 Admin' : '👨‍🎓 Sinh viên'}
+                        </span>
+                      </td>
+                      <td style="padding:8px 10px;color:var(--dim);font-size:12px;">
+                        ${u.className || u.email}
+                      </td>
+                      <td style="padding:8px 10px;text-align:center;">
+                        ${isUserAdmin ? `
+                          <span style="font-size:11px;color:var(--dim);font-style:italic;">Admin gốc</span>
+                        ` : `
+                          <button type="button" class="btn-admin-delete-user" data-user-id="${u.id}" data-user-name="${u.fullName}" style="padding:3px 8px;font-size:11.5px;color:#ef4444;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:4px;cursor:pointer;">
+                            🗑️ Xóa
+                          </button>
+                        `}
+                      </td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+
+      // Bind Admin DB Events
+      const formAdd = bodyContainer.querySelector('#formAdminAddUser');
+      if (formAdd) {
+        formAdd.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const username = bodyContainer.querySelector('#adminNewUsername').value;
+          const password = bodyContainer.querySelector('#adminNewPassword').value;
+          const fullName = bodyContainer.querySelector('#adminNewFullName').value;
+          const className = bodyContainer.querySelector('#adminNewClass').value;
+          const alertBox = bodyContainer.querySelector('#adminDbAlert');
+
+          const res = authManager.adminCreateUser({ username, fullName, className, password });
+          if (res.success) {
+            try {
+              await cloudSyncManager.adminCreateUser({ username, fullName, className, password });
+            } catch {}
+            this._renderContent();
+          } else {
+            alertBox.textContent = res.error;
+            alertBox.style.display = 'block';
+          }
+        });
+      }
+
+      bodyContainer.querySelectorAll('.btn-admin-delete-user').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const targetId = btn.getAttribute('data-user-id');
+          const targetName = btn.getAttribute('data-user-name') || targetId;
+          if (typeof window !== 'undefined' && window.confirm && !window.confirm(`Xóa tài khoản sinh viên "${targetName}" khỏi hệ thống?`)) {
+            return;
+          }
+          const res = authManager.deleteUser(targetId);
+          if (res.success) {
+            try {
+              await cloudSyncManager.adminDeleteUser(targetId);
+            } catch {}
+            this._renderContent();
+          } else {
+            const alertBox = bodyContainer.querySelector('#adminDbAlert');
+            if (alertBox) {
+              alertBox.textContent = res.error;
+              alertBox.style.display = 'block';
+            }
+          }
+        });
+      });
+      return;
+    }
+
     if (this.activeTab === 'quick') {
       bodyContainer.innerHTML = `
         <div class="auth-quick-section">
           <p class="auth-hint-text">
-            Chọn nhanh tài khoản tác giả Đức Huy hoặc Giảng viên để trải nghiệm ngay mà không cần tạo mới:
+            Chọn nhanh tài khoản Quản trị viên (Admin) hoặc Sinh viên Đức Huy để trải nghiệm:
           </p>
           <div class="demo-accounts-grid">
             ${DEMO_USERS.map(u => `
@@ -213,7 +385,7 @@ export class AuthModal {
                 <span class="demo-avatar">${u.avatar}</span>
                 <div class="demo-meta">
                   <span class="demo-name">${u.fullName}</span>
-                  <span class="demo-sub">${u.role === 'teacher' ? 'Giảng viên' : 'K66 CNTT'}</span>
+                  <span class="demo-sub">${u.role === 'admin' ? '👑 Quản trị viên (admin / admin123)' : '👨‍🎓 Sinh viên (duchuy / 123456)'}</span>
                 </div>
                 ${user && user.id === u.id ? '<span class="demo-check">✓ Đang dùng</span>' : '<span class="demo-arrow">➔</span>'}
               </button>
@@ -237,14 +409,20 @@ export class AuthModal {
         <form class="auth-form" id="formLogin">
           <div id="authAlert" class="auth-alert" style="display:none;"></div>
 
+          <div style="font-size:12px;color:var(--dim);margin-bottom:14px;background:var(--panel-alt);padding:8px 12px;border-radius:6px;border:1px solid var(--line);line-height:1.5;">
+            💡 <strong>Tài khoản hệ thống:</strong><br>
+            • 👑 <strong>Quản trị viên:</strong> <code>admin</code> (mật khẩu: <code>admin123</code>)<br>
+            • 👨‍🎓 <strong>Sinh viên:</strong> <code>duchuy</code> (mật khẩu: <code>123456</code>)
+          </div>
+
           <div class="auth-field">
             <label for="loginUsername">Tên đăng nhập hoặc Email</label>
-            <input type="text" id="loginUsername" placeholder="duchuy hoặc email..." required autocomplete="username">
+            <input type="text" id="loginUsername" placeholder="admin hoặc duchuy hoặc email..." required autocomplete="username">
           </div>
 
           <div class="auth-field">
             <label for="loginPassword">Mật khẩu</label>
-            <input type="password" id="loginPassword" placeholder="Nhập mật khẩu (Demo: 123456)..." required autocomplete="current-password">
+            <input type="password" id="loginPassword" placeholder="Nhập mật khẩu (admin: admin123 | sv: 123456)..." required autocomplete="current-password">
           </div>
 
           <button type="submit" class="btn-primary auth-submit-btn">
