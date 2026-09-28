@@ -15,6 +15,7 @@ import { LogicLabView } from './views/LogicLabView.js';
 import { QuizView } from './views/QuizView.js';
 import { CountingLabView } from './views/CountingLabView.js';
 import { RelationLabView } from './views/RelationLabView.js';
+import { AdminView } from './views/AdminView.js';
 import { TeacherAnnotationTool } from './components/TeacherAnnotationTool.js';
 import { HelpGuideModal } from './components/HelpGuideModal.js';
 import { AuthModal } from './components/AuthModal.js';
@@ -175,6 +176,15 @@ export class App {
         container: relationContainer,
       });
     }
+
+    // 10. Admin Database & Student Management View
+    const adminContainer = document.getElementById('adminView');
+    if (adminContainer) {
+      this.views.admin = new AdminView({
+        container: adminContainer,
+        onNavigate: (viewName) => this.navigate(viewName),
+      });
+    }
   }
 
   _initTeacherTools() {
@@ -200,16 +210,12 @@ export class App {
 
   _updateTeacherToolsVisibility() {
     const teacherBtn = document.getElementById('btnTeacherToolsToggle');
-    const miniBadge = document.getElementById('teacherMiniBadge');
     const isAdmin = authManager.isAdmin();
     if (teacherBtn) {
       teacherBtn.style.display = isAdmin ? 'inline-flex' : 'none';
     }
     if (!isAdmin && this.teacherTool && this.teacherTool.isActive) {
       this.teacherTool.deactivate();
-    }
-    if (miniBadge) {
-      miniBadge.style.display = isAdmin ? 'inline-flex' : 'none';
     }
   }
 
@@ -241,13 +247,19 @@ export class App {
     try {
       this.authModal = new AuthModal({
         onAuthChange: (user) => {
-          this._updateUserHeaderBadge(user);
+          this._updateUserHeaderBadge();
           this._updateTeacherToolsVisibility();
+          if (this.currentView === 'admin' && !authManager.isAdmin()) {
+            this.navigate('home');
+          }
           if (this.views.quiz && typeof this.views.quiz.render === 'function') {
             this.views.quiz.render();
           }
           if (this.views.ai && typeof this.views.ai.onUserChanged === 'function') {
-            this.views.ai.onUserChanged(user);
+            this.views.ai.onUserChanged(authManager.getCurrentUser());
+          }
+          if (this.views.admin && typeof this.views.admin.render === 'function' && this.currentView === 'admin') {
+            this.views.admin.render();
           }
         },
       });
@@ -262,17 +274,23 @@ export class App {
       }
 
       authManager.onAuthStateChanged((event, user) => {
-        this._updateUserHeaderBadge(user);
+        this._updateUserHeaderBadge();
         this._updateTeacherToolsVisibility();
+        if (this.currentView === 'admin' && !authManager.isAdmin()) {
+          this.navigate('home');
+        }
         if (this.views.quiz && typeof this.views.quiz.render === 'function') {
           this.views.quiz.render();
         }
         if (this.views.ai && typeof this.views.ai.onUserChanged === 'function') {
-          this.views.ai.onUserChanged(user);
+          this.views.ai.onUserChanged(authManager.getCurrentUser());
+        }
+        if (this.views.admin && typeof this.views.admin.render === 'function' && this.currentView === 'admin') {
+          this.views.admin.render();
         }
       });
 
-      this._updateUserHeaderBadge(authManager.getCurrentUser());
+      this._updateUserHeaderBadge();
       this._updateTeacherToolsVisibility();
     } catch (err) {
       console.warn('AuthModal initialization deferred or failed:', err);
@@ -306,17 +324,26 @@ export class App {
     }
   }
 
-  _updateUserHeaderBadge(user) {
+  _updateUserHeaderBadge(user = null) {
     const btnAuth = document.getElementById('btnUserAuth');
     const lblName = document.getElementById('lblUserAuthName');
     const iconAuth = document.getElementById('iconUserAuth');
+    const navBtnAdmin = document.getElementById('navBtnAdmin');
+
+    const currentUser = authManager.getCurrentUser();
+    const isAdmin = authManager.isAdmin();
+
+    if (navBtnAdmin) {
+      navBtnAdmin.style.display = isAdmin ? 'inline-flex' : 'none';
+    }
+
     if (!btnAuth || !lblName) return;
 
-    if (user) {
+    if (currentUser) {
       btnAuth.classList.add('logged-in');
-      if (iconAuth) iconAuth.textContent = user.avatar || '🎓';
-      lblName.textContent = user.fullName.split(' ').slice(-1)[0] || user.fullName;
-      btnAuth.title = `Tài khoản: ${user.fullName} (${user.className || 'Sinh viên'}) • Bấm để xem hồ sơ`;
+      if (iconAuth) iconAuth.textContent = currentUser.avatar || (isAdmin ? '👑' : '🎓');
+      lblName.textContent = currentUser.fullName.split(' ').slice(-1)[0] || currentUser.fullName;
+      btnAuth.title = `Tài khoản: ${currentUser.fullName} (${currentUser.className || (isAdmin ? 'Quản trị viên' : 'Sinh viên')}) • Bấm để xem hồ sơ`;
     } else {
       btnAuth.classList.remove('logged-in');
       if (iconAuth) iconAuth.textContent = '👤';
@@ -453,6 +480,10 @@ export class App {
     if (typeof window === 'undefined') return;
     const rawHash = window.location.hash.replace('#', '') || 'home';
     const [viewName, subtab] = rawHash.split('/');
+    if (viewName === 'admin' && !authManager.isAdmin()) {
+      this.navigate('home', false);
+      return;
+    }
     if (rawHash === 'studio' || (viewName === 'quiz' && subtab === 'studio')) {
       if (authManager.isAdmin()) {
         this.openQuizWithTab('studio');
@@ -465,6 +496,9 @@ export class App {
   }
 
   navigate(viewName, updateHash = true, subtab = null) {
+    if (viewName === 'admin' && !authManager.isAdmin()) {
+      viewName = 'home';
+    }
     if (viewName === 'studio') {
       viewName = 'quiz';
       subtab = 'studio';
@@ -518,12 +552,16 @@ export class App {
     }
 
     // Toggle view elements
-    ['home', 'theory', 'lab', 'logic', 'counting', 'relation', 'ai', 'fundamentals', 'quiz'].forEach(v => {
+    ['home', 'theory', 'lab', 'logic', 'counting', 'relation', 'ai', 'fundamentals', 'quiz', 'admin'].forEach(v => {
       const el = document.getElementById(`${v}View`);
       if (el) {
         el.classList.toggle('active', v === viewName);
       }
     });
+
+    if (viewName === 'admin' && this.views.admin && typeof this.views.admin.render === 'function') {
+      this.views.admin.render();
+    }
 
     // Toggle active nav button
     document.querySelectorAll('.nav-btn[data-view]').forEach(btn => {

@@ -46,7 +46,6 @@ export class TeacherAnnotationTool {
     this.canvas = null;
     this.ctx = null;
     this.dockEl = null;
-    this.miniBadgeEl = null;
 
     // Bound listeners for cleanup
     this._handlePointerDown = this._onPointerDown.bind(this);
@@ -120,22 +119,6 @@ export class TeacherAnnotationTool {
       display: none;
     `;
     this.container.appendChild(this.dockEl);
-
-    // 3. Compact Floating Badge (when minimized or inactive)
-    this.miniBadgeEl = document.createElement('button');
-    this.miniBadgeEl.id = 'teacherMiniBadge';
-    this.miniBadgeEl.className = 'teacher-mini-badge';
-    this.miniBadgeEl.type = 'button';
-    this.miniBadgeEl.title = 'Mở Bút vẽ & Laser Giảng dạy (Phím tắt: L / P)';
-    this.miniBadgeEl.innerHTML = `<span>✏️</span><span class="badge-label">Giảng dạy</span>`;
-    this.miniBadgeEl.style.cssText = `
-      position: fixed;
-      bottom: 20px;
-      right: 20px;
-      z-index: 9980;
-      display: ${this._isAdmin() ? 'inline-flex' : 'none'};
-    `;
-    this.container.appendChild(this.miniBadgeEl);
 
     this._renderDockContent();
     this._bindEvents();
@@ -294,14 +277,6 @@ export class TeacherAnnotationTool {
       this.canvas.addEventListener('pointercancel', this._handlePointerUp);
     }
 
-    // Mini badge toggle
-    if (this.miniBadgeEl) {
-      this.miniBadgeEl.addEventListener('click', () => {
-        if (!this._isAdmin()) return;
-        this.toggle();
-      });
-    }
-
     // Enable dragging for dock toolbar
     this._initDockDrag();
   }
@@ -417,9 +392,6 @@ export class TeacherAnnotationTool {
     if (this.dockEl) {
       this.dockEl.style.display = 'flex';
     }
-    if (this.miniBadgeEl) {
-      this.miniBadgeEl.style.display = 'none';
-    }
 
     // Sync header button state if present
     const headerBtn = document.getElementById('btnTeacherToolsToggle');
@@ -441,9 +413,6 @@ export class TeacherAnnotationTool {
     }
     if (this.dockEl) {
       this.dockEl.style.display = 'none';
-    }
-    if (this.miniBadgeEl) {
-      this.miniBadgeEl.style.display = this._isAdmin() ? 'inline-flex' : 'none';
     }
 
     const headerBtn = document.getElementById('btnTeacherToolsToggle');
@@ -950,9 +919,6 @@ export class TeacherAnnotationTool {
     }
     if (this.dockEl && this.dockEl.parentNode) {
       this.dockEl.parentNode.removeChild(this.dockEl);
-    }
-    if (this.miniBadgeEl && this.miniBadgeEl.parentNode) {
-      this.miniBadgeEl.parentNode.removeChild(this.miniBadgeEl);
     }
   }
 }

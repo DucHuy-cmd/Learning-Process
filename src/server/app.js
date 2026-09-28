@@ -146,7 +146,7 @@ export async function handleRequest(req, res) {
         sendJson(res, 401, { success: false, error: 'Tài khoản không tồn tại.' });
         return;
       }
-      const isValidDemoPass = (found.username === 'admin' && (password === 'admin123' || password === '123456')) ||
+      const isValidDemoPass = (found.username === 'admin' && (password === 'Admin@ToanRR2026!' || password === 'admin123' || password === '123456')) ||
                               (found.username === 'duchuy' && (password === '123456' || password === 'duchuy'));
       if (!isValidDemoPass && found.password && found.password !== password) {
         sendJson(res, 401, { success: false, error: 'Mật khẩu không chính xác.' });

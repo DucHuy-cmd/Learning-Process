@@ -13,13 +13,13 @@ export const DEMO_USERS = [
   {
     id: 'user_admin',
     username: 'admin',
-    fullName: 'Quản Trị Viên (Thầy/Cô)',
-    className: 'Khoa CNTT - Giảng viên & Quản trị',
+    fullName: 'Quản Trị Viên',
+    className: 'Quản trị viên',
     email: 'admin@toanrr.edu.vn',
-    password: 'admin123',
+    password: 'Admin@ToanRR2026!',
     avatar: '👑',
     role: 'admin',
-    bio: 'Quản trị viên duy nhất của hệ thống • Giảng viên Toán Rời Rạc',
+    bio: 'Quản trị viên hệ thống',
   },
 ];
 
@@ -64,7 +64,7 @@ export class AuthManager {
             if (adminIdx === -1) {
               filtered.unshift({ ...DEMO_USERS[0] });
             } else {
-              filtered[adminIdx] = { ...DEMO_USERS[0], ...filtered[adminIdx], role: 'admin', username: 'admin' };
+              filtered[adminIdx] = { ...filtered[adminIdx], ...DEMO_USERS[0], role: 'admin', username: 'admin' };
             }
 
             // Ensure no other accounts have admin role
@@ -87,7 +87,8 @@ export class AuthManager {
         try {
           const parsed = JSON.parse(activeUser);
           if (parsed && (parsed.id === 'user_admin' || parsed.username === 'admin')) {
-            this.currentUser = { ...DEMO_USERS[0], ...parsed, role: 'admin', username: 'admin' };
+            this.currentUser = { ...parsed, ...DEMO_USERS[0], role: 'admin', username: 'admin' };
+            delete this.currentUser.password;
             this.storage.setItem(STORAGE_KEY_CURRENT, JSON.stringify(this.currentUser));
           } else if (parsed && parsed.id) {
             // Check if user still exists in registered list
@@ -202,6 +203,17 @@ export class AuthManager {
       }
     }
 
+    // If the active user itself is deleted, immediately clear session and notify logout
+    if (this.currentUser && (this.currentUser.id === userId || this.currentUser.username === userId)) {
+      this.currentUser = null;
+      if (this.storage) {
+        try {
+          this.storage.removeItem(STORAGE_KEY_CURRENT);
+        } catch {}
+      }
+      this._notifyListeners('logout', null);
+    }
+
     this._notifyListeners('user_deleted', { deletedUser: deleted, users });
     return { success: true, deletedUser: deleted };
   }
@@ -281,7 +293,7 @@ export class AuthManager {
     }
 
     // Verify password if stored (demo accounts accept their predefined passwords)
-    const isValidDemoPass = (found.username === 'admin' && (password === 'admin123' || password === '123456')) ||
+    const isValidDemoPass = (found.username === 'admin' && (password === 'Admin@ToanRR2026!' || password === 'admin123' || password === '123456')) ||
                             (found.username === 'duchuy' && (password === '123456' || password === 'duchuy'));
     if (!isValidDemoPass && found.password && found.password !== password) {
       return { success: false, error: 'Mật khẩu không chính xác.' };
@@ -366,7 +378,6 @@ export class AuthManager {
    * Log out current user and return to Guest mode.
    */
   logout() {
-    const prevUser = this.currentUser;
     this.currentUser = null;
     if (this.storage) {
       try {
@@ -375,7 +386,7 @@ export class AuthManager {
         // no-op
       }
     }
-    this._notifyListeners('logout', prevUser);
+    this._notifyListeners('logout', null);
   }
 
   /**

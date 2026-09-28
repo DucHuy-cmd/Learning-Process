@@ -50,23 +50,21 @@ describe('TeacherAnnotationTool (Chế độ Giảng dạy: Bút vẽ & Laser Po
   // 1. DOM INITIALIZATION
   // =========================================================================
   describe('DOM Structure and Setup', () => {
-    it('creates canvas, floating dock toolbar, and mini badge in container', () => {
+    it('creates canvas and floating dock toolbar in container', () => {
       const canvas = document.getElementById('teacherAnnotationCanvas');
       const dock = document.getElementById('teacherToolsDock');
       const badge = document.getElementById('teacherMiniBadge');
 
       expect(canvas).not.toBeNull();
       expect(dock).not.toBeNull();
-      expect(badge).not.toBeNull();
+      expect(badge).toBeNull(); // Floating mini badge was removed per UX requirement
 
       expect(canvas.tagName.toLowerCase()).toBe('canvas');
       expect(dock.getAttribute('role')).toBe('toolbar');
-      expect(badge.tagName.toLowerCase()).toBe('button');
 
       // Default inactive states
       expect(canvas.style.display).toBe('none');
       expect(dock.style.display).toBe('none');
-      expect(badge.style.display).toBe('inline-flex');
     });
 
     it('renders all teaching tools in the dock toolbar', () => {
@@ -124,7 +122,6 @@ describe('TeacherAnnotationTool (Chế độ Giảng dạy: Bút vẽ & Laser Po
       expect(tool.isActive).toBe(true);
       expect(tool.canvas.style.display).toBe('block');
       expect(tool.dockEl.style.display).toBe('flex');
-      expect(tool.miniBadgeEl.style.display).toBe('none');
       expect(headerBtn.classList.contains('active')).toBe(true);
 
       // 2. Deactivate
@@ -132,7 +129,6 @@ describe('TeacherAnnotationTool (Chế độ Giảng dạy: Bút vẽ & Laser Po
       expect(tool.isActive).toBe(false);
       expect(tool.canvas.style.display).toBe('none');
       expect(tool.dockEl.style.display).toBe('none');
-      expect(tool.miniBadgeEl.style.display).toBe('inline-flex');
       expect(headerBtn.classList.contains('active')).toBe(false);
 
       // 3. Toggle back to active
@@ -140,9 +136,10 @@ describe('TeacherAnnotationTool (Chế độ Giảng dạy: Bút vẽ & Laser Po
       expect(tool.isActive).toBe(true);
     });
 
-    it('toggles when clicking the mini badge button', () => {
+    it('toggles when clicking the header toggle button', () => {
       expect(tool.isActive).toBe(false);
-      tool.miniBadgeEl.click();
+      headerBtn.click();
+      tool.toggle(); // simulate app.js toggle on headerBtn click
       expect(tool.isActive).toBe(true);
     });
 
