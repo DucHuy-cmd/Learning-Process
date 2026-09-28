@@ -191,7 +191,7 @@ export class HomeView {
             <div>
               <h4 style="font-size:15px;font-weight:700;color:var(--text);margin:0 0 4px 0;">Studio Soạn đề & In ấn A4</h4>
               <p style="font-size:12.5px;color:var(--dim);margin:0 0 10px 0;line-height:1.4;">
-                Công cụ hỗ trợ Giảng viên xuất đề thi chuẩn giấy in A4, phiếu tô trắc nghiệm chuẩn máy chấm và bảng đáp án.
+                Công cụ hỗ trợ Quản trị viên xuất đề thi chuẩn giấy in A4, phiếu tô trắc nghiệm chuẩn máy chấm và bảng đáp án.
               </p>
               <button type="button" class="btn-sm" id="btnHomeQuizStudio" style="font-size:12px;padding:5px 14px;cursor:pointer;">Vào Studio soạn đề →</button>
             </div>

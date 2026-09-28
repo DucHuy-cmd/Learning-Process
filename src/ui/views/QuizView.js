@@ -206,7 +206,7 @@ export class QuizView {
             </div>
             <h1 style="font-size:24px;font-weight:700;color:var(--text);margin:0;">Luyện Tập & Soạn Đề Thi Trắc Nghiệm</h1>
             <p style="font-size:13.5px;color:var(--dim);margin:4px 0 0;">
-              Đấu trường luyện tập phản xạ cho sinh viên và Studio soạn đề thi, xuất bản A4/PDF & LaTeX dành cho Giảng viên.
+              Đấu trường luyện tập phản xạ cho sinh viên và Studio soạn đề thi, xuất bản A4/PDF & LaTeX dành cho Quản trị viên.
             </p>
           </div>
 
@@ -483,7 +483,7 @@ export class QuizView {
 
           <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-left:auto;color:var(--text);">
             <input type="checkbox" id="chkShowSolutions" ${this.showTeacherSolutions ? 'checked' : ''} />
-            Hiện hướng dẫn giải chi tiết cho Giảng viên
+            Hiện hướng dẫn giải chi tiết cho Quản trị viên
           </label>
         </div>
       </div>

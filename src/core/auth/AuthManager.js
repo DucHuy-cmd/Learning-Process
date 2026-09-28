@@ -64,15 +64,34 @@ export class AuthManager {
             if (adminIdx === -1) {
               filtered.unshift({ ...DEMO_USERS[0] });
             } else {
-              filtered[adminIdx] = { ...filtered[adminIdx], ...DEMO_USERS[0], role: 'admin', username: 'admin' };
+              filtered[adminIdx] = {
+                ...filtered[adminIdx],
+                ...DEMO_USERS[0],
+                fullName: 'Quản Trị Viên',
+                className: 'Quản trị viên',
+                bio: 'Quản trị viên hệ thống',
+                role: 'admin',
+                username: 'admin',
+              };
             }
 
-            // Ensure no other accounts have admin role
+            // Ensure no other accounts have admin role and strip (Thầy/Cô)
             filtered = filtered.map(u => {
-              if (u.username !== 'admin' && u.id !== 'user_admin' && u.role === 'admin') {
-                return { ...u, role: 'student' };
+              if (u.username === 'admin' || u.id === 'user_admin') {
+                return {
+                  ...u,
+                  fullName: 'Quản Trị Viên',
+                  className: 'Quản trị viên',
+                  bio: 'Quản trị viên hệ thống',
+                  role: 'admin',
+                };
               }
-              return u;
+              const clean = { ...u };
+              if (clean.role === 'admin') clean.role = 'student';
+              if (clean.fullName) {
+                clean.fullName = clean.fullName.replace(/\s*\(Thầy\/Cô\)/gi, '').replace(/\s*\(Cô\)/gi, '').replace(/\s*\(Thầy\)/gi, '').trim();
+              }
+              return clean;
             });
 
             this.storage.setItem(STORAGE_KEY_USERS, JSON.stringify(filtered));
@@ -123,7 +142,22 @@ export class AuthManager {
     if (!this.storage) return [...DEMO_USERS];
     try {
       const data = this.storage.getItem(STORAGE_KEY_USERS);
-      return data ? JSON.parse(data) : [...DEMO_USERS];
+      const list = data ? JSON.parse(data) : [...DEMO_USERS];
+      return list.map(u => {
+        if (u.username === 'admin' || u.id === 'user_admin' || u.role === 'admin') {
+          return {
+            ...u,
+            fullName: 'Quản Trị Viên',
+            className: 'Quản trị viên',
+            bio: 'Quản trị viên hệ thống',
+            role: 'admin',
+          };
+        }
+        if (u.fullName) {
+          u.fullName = u.fullName.replace(/\s*\(Thầy\/Cô\)/gi, '').replace(/\s*\(Cô\)/gi, '').replace(/\s*\(Thầy\)/gi, '').trim();
+        }
+        return u;
+      });
     } catch {
       return [...DEMO_USERS];
     }
@@ -134,6 +168,12 @@ export class AuthManager {
    * @returns {Object|null}
    */
   getCurrentUser() {
+    if (this.currentUser && (this.currentUser.username === 'admin' || this.currentUser.id === 'user_admin' || this.currentUser.role === 'admin')) {
+      this.currentUser.fullName = 'Quản Trị Viên';
+      this.currentUser.className = 'Quản trị viên';
+      this.currentUser.bio = 'Quản trị viên hệ thống';
+      this.currentUser.role = 'admin';
+    }
     return this.currentUser;
   }
 

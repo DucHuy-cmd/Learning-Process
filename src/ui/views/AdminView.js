@@ -106,8 +106,7 @@ export class AdminView {
               <span style="font-size:12px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:0.5px;">Tổng Sinh Viên</span>
               <span style="font-size:20px;">👥</span>
             </div>
-            <div style="font-size:26px;font-weight:800;color:var(--text);margin-bottom:4px;">${studentCount}</div>
-            <span style="font-size:11.5px;color:var(--dim);">Tài khoản sinh viên đã đăng ký</span>
+            <div style="font-size:26px;font-weight:800;color:var(--text);">${studentCount}</div>
           </div>
 
           <!-- Card 2: Server Status -->
@@ -116,10 +115,9 @@ export class AdminView {
               <span style="font-size:12px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:0.5px;">Trạng Thái Máy Chủ</span>
               <span style="font-size:20px;">🌐</span>
             </div>
-            <div style="font-size:18px;font-weight:800;color:${this.isServerConnected ? '#10b981' : '#f59e0b'};margin-bottom:4px;display:flex;align-items:center;gap:6px;">
+            <div style="font-size:18px;font-weight:800;color:${this.isServerConnected ? '#10b981' : '#f59e0b'};display:flex;align-items:center;gap:6px;">
               <span>${this.isServerConnected ? '● Đã kết nối' : '○ Chế độ Ngoại tuyến'}</span>
             </div>
-            <span style="font-size:11.5px;color:var(--dim);">${this.isServerConnected ? 'Đồng bộ tự động qua Node.js Server &amp; KV' : 'Lưu trữ cục bộ LocalStorage'}</span>
           </div>
 
           <!-- Card 3: Leaderboard -->
@@ -128,8 +126,7 @@ export class AdminView {
               <span style="font-size:12px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:0.5px;">Bảng Xếp Hạng</span>
               <span style="font-size:20px;">🏆</span>
             </div>
-            <div style="font-size:26px;font-weight:800;color:var(--text);margin-bottom:4px;">${leaderboard.length}</div>
-            <span style="font-size:11.5px;color:var(--dim);">Thành tích sinh viên ghi nhận</span>
+            <div style="font-size:26px;font-weight:800;color:var(--text);">${leaderboard.length}</div>
           </div>
 
           <!-- Card 4: System Admin -->
@@ -138,8 +135,7 @@ export class AdminView {
               <span style="font-size:12px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:0.5px;">Quản Trị Hệ Thống</span>
               <span style="font-size:20px;">👑</span>
             </div>
-            <div style="font-size:18px;font-weight:800;color:#f59e0b;margin-bottom:4px;">@admin</div>
-            <span style="font-size:11.5px;color:var(--dim);">Quyền Quản trị viên duy nhất</span>
+            <div style="font-size:18px;font-weight:800;color:#f59e0b;">@admin</div>
           </div>
         </div>
 
@@ -150,7 +146,6 @@ export class AdminView {
               <span>➕</span>
               <span>Cấp Tài Khoản Sinh Viên Mới</span>
             </h3>
-            <span style="font-size:12px;color:var(--dim);">Tài khoản được tạo có thể đăng nhập ngay lập tức</span>
           </div>
 
           <form id="adminViewAddUserForm" style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:14px;margin-top:12px;">
@@ -315,13 +310,19 @@ export class AdminView {
 
     return filtered.map(u => {
       const isUserAdmin = u.username === 'admin' || u.role === 'admin' || u.id === 'user_admin';
+      const cleanFullName = isUserAdmin 
+        ? 'Quản Trị Viên' 
+        : (u.fullName || '').replace(/\s*\(Thầy\/Cô\)/gi, '').replace(/\s*\(Cô\)/gi, '').replace(/\s*\(Thầy\)/gi, '').trim();
+      const cleanClassName = isUserAdmin
+        ? 'Quản trị viên'
+        : (u.className || 'Sinh viên').replace(/Khoa CNTT\s*-\s*Giảng viên & Quản trị/gi, 'Sinh viên').replace(/\s*\(Thầy\/Cô\)/gi, '').trim();
       return `
         <tr style="border-bottom:1px solid var(--line);background:${isUserAdmin ? 'rgba(245,158,11,0.04)' : 'transparent'};">
           <td style="padding:10px 14px;">
             <div style="display:flex;align-items:center;gap:10px;">
               <span style="font-size:20px;">${u.avatar || '👤'}</span>
               <div>
-                <strong style="color:var(--text);font-weight:700;">${u.fullName}</strong>
+                <strong style="color:var(--text);font-weight:700;">${cleanFullName}</strong>
                 ${isUserAdmin ? '<span style="margin-left:6px;font-size:11px;color:#f59e0b;font-weight:700;">(Hệ thống)</span>' : ''}
               </div>
             </div>
@@ -335,7 +336,7 @@ export class AdminView {
             </span>
           </td>
           <td style="padding:10px 14px;color:var(--dim);font-size:12.5px;">
-            <div>${u.className || 'Sinh viên'}</div>
+            <div>${cleanClassName}</div>
             <div style="font-size:11px;color:var(--dim);">${u.email || ''}</div>
           </td>
           <td style="padding:10px 14px;text-align:center;">
