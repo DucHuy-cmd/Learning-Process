@@ -343,7 +343,7 @@ export class AdminView {
             ${isUserAdmin ? `
               <span style="font-size:11.5px;color:var(--dim);font-style:italic;">Admin gốc</span>
             ` : `
-              <button type="button" class="btn-admin-delete-user" data-user-id="${u.id}" data-user-name="${u.fullName}" style="padding:4px 10px;font-size:12px;font-weight:600;color:#ef4444;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.3);border-radius:6px;cursor:pointer;transition:all 0.15s;">
+              <button type="button" class="btn-admin-delete-user" data-user-id="${u.id}" data-username="${u.username}" data-user-name="${cleanFullName}" style="padding:4px 10px;font-size:12px;font-weight:600;color:#ef4444;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.3);border-radius:6px;cursor:pointer;transition:all 0.15s;">
                 🗑️ Xóa tài khoản
               </button>
             `}
@@ -411,7 +411,7 @@ export class AdminView {
         const res = authManager.adminCreateUser({ username, fullName, className, email, password });
         if (res.success) {
           try {
-            await cloudSyncManager.adminCreateUser({ username, fullName, className, email, password });
+            await cloudSyncManager.adminCreateUser({ id: res.user?.id, username, fullName, className, email, password });
           } catch {}
           formAdd.reset();
           await this.render();
@@ -471,17 +471,20 @@ export class AdminView {
     this.container.querySelectorAll('.btn-admin-delete-user').forEach(btn => {
       btn.addEventListener('click', async () => {
         const targetId = btn.getAttribute('data-user-id');
-        const targetName = btn.getAttribute('data-user-name') || targetId;
+        const targetUsername = btn.getAttribute('data-username') || '';
+        const targetName = btn.getAttribute('data-user-name') || targetUsername || targetId;
         if (typeof window !== 'undefined' && window.confirm && !window.confirm(`Xác nhận xóa tài khoản sinh viên "${targetName}" khỏi hệ thống?`)) {
           return;
         }
 
-        const res = authManager.deleteUser(targetId);
+        const res = authManager.deleteUser(targetId, targetUsername);
         if (res.success) {
           try {
-            await cloudSyncManager.adminDeleteUser(targetId);
+            await cloudSyncManager.adminDeleteUser(targetId, targetUsername);
+            await cloudSyncManager.syncUsers(authManager);
             // Also clean from local leaderboard
             quizHistoryManager.removeUserStats(targetId);
+            if (targetUsername) quizHistoryManager.removeUserStats(targetUsername);
           } catch {}
           await this.render();
           this._showAlert(`✓ Đã xóa vĩnh viễn tài khoản "${targetName}".`, 'success');

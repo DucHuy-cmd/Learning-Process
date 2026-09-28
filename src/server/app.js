@@ -176,7 +176,7 @@ export async function handleRequest(req, res) {
         return;
       }
       const newUser = {
-        id: `user_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        id: data.id || `user_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
         username: data.username.toLowerCase(),
         fullName: data.fullName,
         className: data.className || 'Sinh viên',
@@ -225,7 +225,7 @@ export async function handleRequest(req, res) {
         return;
       }
       const newUser = {
-        id: `user_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        id: data.id || `user_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
         username: cleanUsername,
         fullName: data.fullName,
         className: data.className || 'Sinh viên',
@@ -269,24 +269,38 @@ export async function handleRequest(req, res) {
 
   // Route: DELETE /api/admin/users/:id (Quản trị viên xóa tài khoản)
   if (req.method === 'DELETE' && pathname.startsWith('/api/admin/users/')) {
-    const targetId = pathname.replace('/api/admin/users/', '').trim();
-    if (targetId === 'user_admin' || targetId === 'admin') {
+    const rawTarget = decodeURIComponent(pathname.replace('/api/admin/users/', '')).trim();
+    const queryUsername = parsedUrl.searchParams.get('username') 
+      ? decodeURIComponent(parsedUrl.searchParams.get('username')).trim().toLowerCase() 
+      : '';
+    if (rawTarget === 'user_admin' || rawTarget === 'admin' || queryUsername === 'admin') {
       sendJson(res, 400, { success: false, error: 'Không thể xóa tài khoản Quản trị viên duy nhất.' });
       return;
     }
-    const idx = serverUsers.findIndex(u => u.id === targetId || u.username === targetId);
-    if (idx !== -1) {
-      const deleted = serverUsers.splice(idx, 1)[0];
-      // Clean up quiz stats and AI sessions for this deleted user
-      delete serverQuizStats[deleted.id];
-      delete serverQuizStats[targetId];
-      if (serverAiSessions[deleted.id]) delete serverAiSessions[deleted.id];
-      if (serverAiSessions[targetId]) delete serverAiSessions[targetId];
+
+    const targetLower = rawTarget.toLowerCase();
+    const toDelete = serverUsers.filter(u => 
+      u.id === rawTarget || 
+      u.username.toLowerCase() === targetLower ||
+      (queryUsername && u.username.toLowerCase() === queryUsername)
+    );
+
+    if (toDelete.length > 0) {
+      for (const del of toDelete) {
+        const i = serverUsers.indexOf(del);
+        if (i !== -1) serverUsers.splice(i, 1);
+        delete serverQuizStats[del.id];
+        delete serverQuizStats[del.username];
+        if (serverAiSessions[del.id]) delete serverAiSessions[del.id];
+        if (serverAiSessions[del.username]) delete serverAiSessions[del.username];
+      }
+      delete serverQuizStats[rawTarget];
+      if (queryUsername) delete serverQuizStats[queryUsername];
       saveDatabase();
       if (isKVConfigured()) {
         writeToKV().catch(() => {});
       }
-      sendJson(res, 200, { success: true, deletedUser: deleted });
+      sendJson(res, 200, { success: true, deletedUsers: toDelete });
     } else {
       sendJson(res, 404, { success: false, error: 'Không tìm thấy tài khoản.' });
     }

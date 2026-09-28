@@ -395,11 +395,13 @@ export class CloudSyncManager {
   /**
    * Admin deletes a user on the server.
    * @param {string} userId
+   * @param {string} [username]
    */
-  async adminDeleteUser(userId) {
+  async adminDeleteUser(userId, username = '') {
     if (typeof fetch === 'undefined') return null;
     try {
-      const res = await fetch(`${this.baseUrl}/api/admin/users/${encodeURIComponent(userId)}`, {
+      const q = username ? `?username=${encodeURIComponent(username)}` : '';
+      const res = await fetch(`${this.baseUrl}/api/admin/users/${encodeURIComponent(userId)}${q}`, {
         method: 'DELETE',
       });
       if (!res.ok) return null;

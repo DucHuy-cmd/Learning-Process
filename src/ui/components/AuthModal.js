@@ -255,43 +255,54 @@ export class AuthModal {
 
       bodyContainer.querySelector('#formLogin').addEventListener('submit', async (e) => {
         e.preventDefault();
-        const username = bodyContainer.querySelector('#loginUsername').value;
+        const username = bodyContainer.querySelector('#loginUsername').value.trim();
         const password = bodyContainer.querySelector('#loginPassword').value;
         const alertBox = bodyContainer.querySelector('#authAlert');
 
-        // 1. Check local users first
+        // 1. If not admin and server is connected, verify against authoritative server first
+        if (username.toLowerCase() !== 'admin') {
+          try {
+            const isOnline = await cloudSyncManager.checkConnection();
+            if (isOnline) {
+              const remoteResult = await cloudSyncManager.login(username, password);
+              if (remoteResult && remoteResult.success && remoteResult.user) {
+                // Verified active user on server -> sync into local
+                const users = authManager.getUsers();
+                const idx = users.findIndex(u => u.id === remoteResult.user.id || u.username.toLowerCase() === username.toLowerCase());
+                if (idx === -1) {
+                  users.push({ ...remoteResult.user, password });
+                } else {
+                  users[idx] = { ...users[idx], ...remoteResult.user, password };
+                }
+                if (authManager.storage) {
+                  try {
+                    authManager.storage.setItem('trr_registered_users', JSON.stringify(users));
+                  } catch {}
+                }
+                authManager.currentUser = { ...remoteResult.user };
+                authManager._persistCurrent();
+                authManager._notifyListeners('login', authManager.currentUser);
+                this.close();
+                return;
+              } else if (remoteResult && remoteResult.error) {
+                // Server rejected -> if user was deleted on server, purge locally as well
+                if (remoteResult.error.includes('không tồn tại')) {
+                  authManager.deleteUser(username, username);
+                }
+                alertBox.textContent = remoteResult.error;
+                alertBox.style.display = 'block';
+                return;
+              }
+            }
+          } catch {}
+        }
+
+        // 2. Local check (for admin or offline mode)
         const localResult = authManager.login(username, password);
         if (localResult.success) {
           this.close();
           return;
         }
-
-        // 2. If not found locally, query backend server API
-        try {
-          const remoteResult = await cloudSyncManager.login(username, password);
-          if (remoteResult && remoteResult.success && remoteResult.user) {
-            // Adopt into local storage so subsequent logins are instant
-            const users = authManager.getUsers();
-            if (!users.some(u => u.id === remoteResult.user.id)) {
-              users.push({ ...remoteResult.user, password });
-              if (authManager.storage) {
-                try {
-                  authManager.storage.setItem('trr_registered_users', JSON.stringify(users));
-                } catch {}
-              }
-            }
-            authManager.currentUser = { ...remoteResult.user };
-            authManager._persistCurrent();
-            authManager._notifyListeners('login', authManager.currentUser);
-            this.close();
-            return;
-          }
-          if (remoteResult && remoteResult.error) {
-            alertBox.textContent = remoteResult.error;
-            alertBox.style.display = 'block';
-            return;
-          }
-        } catch {}
 
         alertBox.textContent = localResult.error;
         alertBox.style.display = 'block';
@@ -341,7 +352,7 @@ export class AuthModal {
         const result = authManager.register({ fullName, username, email, password });
         if (result.success) {
           try {
-            cloudSyncManager.pushRegister({ fullName, username, email, password });
+            cloudSyncManager.pushRegister({ id: result.user?.id, fullName, username, email, password });
           } catch {}
           this.close();
         } else {

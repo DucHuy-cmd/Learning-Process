@@ -218,33 +218,51 @@ export class AuthManager {
    * Deletes a user account from LocalStorage database.
    * Restricted to Admin only. Cannot delete the single Admin account.
    * @param {string} userId
+   * @param {string} [username]
    * @returns {{ success: boolean, error?: string, deletedUser?: Object }}
    */
-  deleteUser(userId) {
+  deleteUser(userId, username = '') {
     if (!this.isAdmin()) {
       return { success: false, error: 'Chỉ có Quản trị viên (admin) mới có quyền xóa tài khoản.' };
     }
-    if (userId === 'user_admin' || userId === 'admin') {
+    if (userId === 'user_admin' || userId === 'admin' || username === 'admin') {
       return { success: false, error: 'Không thể xóa tài khoản Quản trị viên duy nhất.' };
     }
 
+    const targetLower = String(userId || '').trim().toLowerCase();
+    const userLower = String(username || '').trim().toLowerCase();
     const users = this.getUsers();
-    const index = users.findIndex(u => u.id === userId || u.username === userId);
-    if (index === -1) {
+
+    const matched = users.filter(u => 
+      u.id === userId || 
+      u.username.toLowerCase() === targetLower ||
+      (userLower && u.username.toLowerCase() === userLower)
+    );
+
+    if (matched.length === 0) {
       return { success: false, error: 'Không tìm thấy tài khoản cần xóa.' };
     }
 
-    const deleted = users.splice(index, 1)[0];
+    const remaining = users.filter(u => 
+      u.id !== userId && 
+      u.username.toLowerCase() !== targetLower &&
+      (!userLower || u.username.toLowerCase() !== userLower)
+    );
+
     if (this.storage) {
       try {
-        this.storage.setItem(STORAGE_KEY_USERS, JSON.stringify(users));
+        this.storage.setItem(STORAGE_KEY_USERS, JSON.stringify(remaining));
       } catch {
         return { success: false, error: 'Lỗi cập nhật bộ nhớ trình duyệt.' };
       }
     }
 
     // If the active user itself is deleted, immediately clear session and notify logout
-    if (this.currentUser && (this.currentUser.id === userId || this.currentUser.username === userId)) {
+    if (this.currentUser && (
+      this.currentUser.id === userId || 
+      this.currentUser.username.toLowerCase() === targetLower ||
+      (userLower && this.currentUser.username.toLowerCase() === userLower)
+    )) {
       this.currentUser = null;
       if (this.storage) {
         try {
@@ -254,8 +272,8 @@ export class AuthManager {
       this._notifyListeners('logout', null);
     }
 
-    this._notifyListeners('user_deleted', { deletedUser: deleted, users });
-    return { success: true, deletedUser: deleted };
+    this._notifyListeners('user_deleted', { deletedUser: matched[0], users: remaining });
+    return { success: true, deletedUser: matched[0] };
   }
 
   /**
