@@ -297,10 +297,8 @@ describe('QuizView UI Component', () => {
     expect(container.querySelector('.podium-rank-2')).not.toBeNull();
     expect(container.querySelector('.podium-rank-3')).not.toBeNull();
 
-    // Contains authors in podium or table
-    expect(container.textContent).toContain('Đức Huy');
-    expect(container.textContent).toContain('Nhất Vũ');
-    expect(container.textContent).toContain('Trường Vũ');
+    // Empty state message when freshly initialized
+    expect(container.textContent).toContain('Bảng xếp hạng hiện đang trống');
 
     // Rankings table
     expect(container.querySelector('.leaderboard-table')).not.toBeNull();

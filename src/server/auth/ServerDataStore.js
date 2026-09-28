@@ -17,23 +17,7 @@ const DB_DIR = process.env.VERCEL
 const DB_FILE = path.join(DB_DIR, 'server_db.json');
 
 function getDefaultStats() {
-  const statsMap = {};
-  for (const item of INITIAL_LEADERBOARD) {
-    statsMap[item.userId] = {
-      ...item,
-      history: [
-        {
-          id: `quiz_init_${item.userId}`,
-          examTitle: 'Đề thi tổng hợp 4 phân môn Toán Rời Rạc',
-          score: item.score / 100,
-          maxScore: 30,
-          accuracy: item.accuracy,
-          date: new Date(Date.now() - 3600 * 1000 * 24).toISOString(),
-        },
-      ],
-    };
-  }
-  return statsMap;
+  return {};
 }
 
 export const serverUsers = [...DEMO_USERS];
@@ -46,8 +30,11 @@ export function loadDatabase() {
       const raw = fs.readFileSync(DB_FILE, 'utf8');
       const data = JSON.parse(raw);
       if (Array.isArray(data.users) && data.users.length > 0) {
+        // Filter out legacy dummy users
+        const legacyIds = new Set(['user_nhatvu', 'user_truongvu', 'user_ngochung', 'user_admin']);
+        const validUsers = data.users.filter(u => !legacyIds.has(u.id));
         serverUsers.length = 0;
-        serverUsers.push(...data.users);
+        serverUsers.push(...(validUsers.length > 0 ? validUsers : DEMO_USERS));
       }
       if (data.aiSessions && typeof data.aiSessions === 'object') {
         for (const k of Object.keys(serverAiSessions)) delete serverAiSessions[k];
@@ -55,7 +42,12 @@ export function loadDatabase() {
       }
       if (data.quizStats && typeof data.quizStats === 'object') {
         for (const k of Object.keys(serverQuizStats)) delete serverQuizStats[k];
-        Object.assign(serverQuizStats, data.quizStats);
+        const legacyIds = new Set(['user_nhatvu', 'user_truongvu', 'user_ngochung', 'user_admin']);
+        for (const [k, v] of Object.entries(data.quizStats)) {
+          if (!legacyIds.has(k)) {
+            serverQuizStats[k] = v;
+          }
+        }
       }
     }
   } catch {

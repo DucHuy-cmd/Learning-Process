@@ -98,7 +98,7 @@ describe('AuthManager & User Accounts', () => {
   });
 
   it('logs out and triggers onAuthStateChanged listener', () => {
-    auth.quickLogin('user_nhatvu');
+    auth.quickLogin('user_giangvien');
     expect(auth.isLoggedIn()).toBe(true);
 
     let eventFired = null;

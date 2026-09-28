@@ -764,12 +764,12 @@ export class QuizView {
                 <div>
                   <h4 style="margin:0 0 4px;font-size:16px;color:var(--text);font-weight:700;">Bạn đang làm bài dưới tư cách Khách</h4>
                   <p style="margin:0;font-size:13px;color:var(--dim);">
-                    Đăng nhập hoặc chọn nhanh tài khoản K66 CNTT (Đức Huy, Nhất Vũ, Trường Vũ, Ngọc Hưng...) để hệ thống tự động ghi nhận điểm và đưa bạn lên Bảng Vàng!
+                    Đăng nhập hoặc đăng ký tài khoản để hệ thống tự động ghi nhận điểm và đưa bạn lên Bảng Vàng!
                   </p>
                 </div>
               </div>
               <button type="button" class="btn-primary" id="btnLeaderboardLogin" style="padding:10px 18px;font-size:13px;font-weight:600;white-space:nowrap;">
-                🔑 Đăng Nhập / Chọn Tài Khoản Ngay
+                🔑 Đăng Nhập / Đăng Ký Ngay
               </button>
             </div>
           `}
@@ -778,7 +778,7 @@ export class QuizView {
         <!-- Full Class Ranking Table -->
         <div class="leaderboard-table-card">
           <div class="table-card-header">
-            <h3 class="table-card-title">📋 Bảng Xếp Hạng Toàn Khóa K66 CNTT</h3>
+            <h3 class="table-card-title">📋 Bảng Xếp Hạng Luyện Tập &amp; Thi Thử</h3>
             <span class="table-card-count">${leaderboard.length} thành viên đã tham gia</span>
           </div>
 
@@ -796,7 +796,13 @@ export class QuizView {
                 </tr>
               </thead>
               <tbody>
-                ${leaderboard.map(item => {
+                ${leaderboard.length === 0 ? `
+                  <tr>
+                    <td colspan="7" style="text-align:center;padding:36px;color:var(--dim);font-style:italic;font-size:14px;">
+                      🌟 Bảng xếp hạng hiện đang trống. Hãy là người đầu tiên hoàn thành bài thi để dẫn đầu Bảng Vàng!
+                    </td>
+                  </tr>
+                ` : leaderboard.map(item => {
                   const isCurrent = currentUser && item.userId === currentUser.id;
                   return `
                     <tr class="${isCurrent ? 'row-current-user' : ''}">

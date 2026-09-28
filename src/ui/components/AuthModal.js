@@ -205,7 +205,7 @@ export class AuthModal {
       bodyContainer.innerHTML = `
         <div class="auth-quick-section">
           <p class="auth-hint-text">
-            Chọn nhanh một tài khoản tác giả K66 CNTT hoặc Giảng viên để trải nghiệm ngay mà không cần tạo mới:
+            Chọn nhanh tài khoản tác giả Đức Huy hoặc Giảng viên để trải nghiệm ngay mà không cần tạo mới:
           </p>
           <div class="demo-accounts-grid">
             ${DEMO_USERS.map(u => `

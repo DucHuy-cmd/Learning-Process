@@ -33,40 +33,34 @@ describe('QuizHistoryManager & Leaderboard', () => {
     manager = new QuizHistoryManager({ storage });
   });
 
-  it('initializes with pre-seeded K66 CNTT team leaderboard', () => {
+  it('initializes with clean empty leaderboard ready for fresh attempts', () => {
     const leaderboard = manager.getLeaderboard();
-    expect(leaderboard.length).toBeGreaterThanOrEqual(INITIAL_LEADERBOARD.length);
-    expect(leaderboard[0].rankBadge).toBe('🥇');
-    expect(leaderboard[0].fullName).toBe('Đức Huy');
-    expect(leaderboard[1].rankBadge).toBe('🥈');
-    expect(leaderboard[1].fullName).toBe('Nhất Vũ');
-    expect(leaderboard[2].rankBadge).toBe('🥉');
-    expect(leaderboard[2].fullName).toBe('Trường Vũ');
+    expect(leaderboard.length).toBe(0);
   });
 
   it('records correct answer and increases score and streak', () => {
     const stats = manager.recordAnswer('user_duchuy', true);
-    expect(stats.totalAnswered).toBe(41);
-    expect(stats.correctCount).toBe(39);
-    expect(stats.score).toBe(2950);
+    expect(stats.totalAnswered).toBe(1);
+    expect(stats.correctCount).toBe(1);
+    expect(stats.score).toBe(100);
   });
 
   it('records incorrect answer and resets current streak', () => {
-    manager.recordAnswer('user_nhatvu', false);
-    const stats = manager.getUserStats('user_nhatvu');
+    manager.recordAnswer('user_giangvien', false);
+    const stats = manager.getUserStats('user_giangvien');
     expect(stats.currentStreak).toBe(0);
-    expect(stats.totalAnswered).toBe(39);
+    expect(stats.totalAnswered).toBe(1);
   });
 
   it('records completed exam and stores in user history', () => {
-    manager.recordExam('user_truongvu', {
+    manager.recordExam('user_duchuy', {
       title: 'Đề thi kiểm tra 15 phút Logic Boole',
       score: 9,
       maxScore: 10,
       topic: 'logic',
     });
 
-    const stats = manager.getUserStats('user_truongvu');
+    const stats = manager.getUserStats('user_duchuy');
     expect(stats.history.length).toBeGreaterThan(0);
     expect(stats.history[0].examTitle).toContain('Logic Boole');
     expect(stats.history[0].accuracy).toBe(90);

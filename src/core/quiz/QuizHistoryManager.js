@@ -10,60 +10,7 @@
 
 const STORAGE_KEY_QUIZ_STATS = 'trr_quiz_stats_v1';
 
-export const INITIAL_LEADERBOARD = [
-  {
-    userId: 'user_duchuy',
-    username: 'duchuy',
-    fullName: 'Đức Huy',
-    className: 'Khóa 66 Công nghệ thông tin',
-    avatar: '👨‍🎓',
-    score: 2850,
-    totalAnswered: 40,
-    correctCount: 38,
-    accuracy: 95,
-    maxStreak: 18,
-    badge: '🏆 Thủ Khoa K66',
-  },
-  {
-    userId: 'user_nhatvu',
-    username: 'nhatvu',
-    fullName: 'Nhất Vũ',
-    className: 'Khóa 66 Công nghệ thông tin',
-    avatar: '👨‍💻',
-    score: 2720,
-    totalAnswered: 38,
-    correctCount: 35,
-    accuracy: 92,
-    maxStreak: 15,
-    badge: '🥈 Á Khoa K66',
-  },
-  {
-    userId: 'user_truongvu',
-    username: 'truongvu',
-    fullName: 'Trường Vũ',
-    className: 'Khóa 66 Công nghệ thông tin',
-    avatar: '👨‍🔬',
-    score: 2590,
-    totalAnswered: 35,
-    correctCount: 31,
-    accuracy: 89,
-    maxStreak: 14,
-    badge: '🥉 Hạng Ba K66',
-  },
-  {
-    userId: 'user_ngochung',
-    username: 'ngochung',
-    fullName: 'Ngọc Hưng',
-    className: 'Khóa 66 Công nghệ thông tin',
-    avatar: '👨‍🏫',
-    score: 2480,
-    totalAnswered: 34,
-    correctCount: 30,
-    accuracy: 88,
-    maxStreak: 12,
-    badge: '🎖️ Top 4 K66',
-  },
-];
+export const INITIAL_LEADERBOARD = [];
 
 export class QuizHistoryManager {
   /**
@@ -85,26 +32,37 @@ export class QuizHistoryManager {
     try {
       const existing = storage.getItem(STORAGE_KEY_QUIZ_STATS);
       if (!existing) {
-        const statsMap = {};
-        for (const item of INITIAL_LEADERBOARD) {
-          statsMap[item.userId] = {
-            ...item,
-            history: [
-              {
-                id: `quiz_init_${item.userId}`,
-                examTitle: 'Đề thi tổng hợp 4 phân môn Toán Rời Rạc',
-                score: item.score / 100,
-                maxScore: 30,
-                accuracy: item.accuracy,
-                date: new Date(Date.now() - 3600 * 1000 * 24).toISOString(),
-              },
-            ],
-          };
-        }
-        storage.setItem(STORAGE_KEY_QUIZ_STATS, JSON.stringify(statsMap));
+        storage.setItem(STORAGE_KEY_QUIZ_STATS, JSON.stringify({}));
+      } else {
+        // Clean out legacy demo leaderboard users if present
+        try {
+          const map = JSON.parse(existing);
+          let changed = false;
+          for (const key of ['user_nhatvu', 'user_truongvu', 'user_ngochung', 'user_admin']) {
+            if (map[key]) {
+              delete map[key];
+              changed = true;
+            }
+          }
+          if (changed) {
+            storage.setItem(STORAGE_KEY_QUIZ_STATS, JSON.stringify(map));
+          }
+        } catch {}
       }
     } catch {
       // fallback
+    }
+  }
+
+  /**
+   * Resets all leaderboard stats.
+   */
+  clearLeaderboard() {
+    const storage = this._getStorage();
+    if (storage) {
+      try {
+        storage.setItem(STORAGE_KEY_QUIZ_STATS, JSON.stringify({}));
+      } catch {}
     }
   }
 
