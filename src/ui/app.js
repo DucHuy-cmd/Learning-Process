@@ -45,6 +45,7 @@ export class App {
     this._initTeacherTools();
     this._initHelpGuide();
     this._initAuthModal();
+    this._initUserDropdown();
     this._initCloudSync();
     this._bindNavigation();
     this._handleInitialRoute();
@@ -58,9 +59,19 @@ export class App {
       } else {
         document.body.classList.remove('theme-light');
       }
-      const themeBtn = document.getElementById('btnThemeToggle');
-      if (themeBtn) {
-        themeBtn.textContent = theme === 'light' ? '🌙 Tối' : '☀️ Sáng';
+
+      const iconMenu = document.getElementById('iconThemeToggleMenu');
+      const titleMenu = document.getElementById('lblThemeToggleMenuTitle');
+      const subMenu = document.getElementById('lblThemeToggleMenuSub');
+      if (iconMenu && titleMenu && subMenu) {
+        iconMenu.textContent = theme === 'light' ? '🌙' : '☀️';
+        titleMenu.textContent = theme === 'light' ? 'Chế độ Tối' : 'Chế độ Sáng';
+        subMenu.textContent = theme === 'light' ? 'Đang bật chế độ Sáng' : 'Đang bật chế độ Tối';
+      } else {
+        const themeBtn = document.getElementById('btnThemeToggle');
+        if (themeBtn) {
+          themeBtn.textContent = theme === 'light' ? '🌙 Tối' : '☀️ Sáng';
+        }
       }
     }
 
@@ -196,6 +207,13 @@ export class App {
         teacherBtn.addEventListener('click', () => {
           if (this.teacherTool && authManager.isAdmin()) {
             this.teacherTool.toggle();
+            this._updateTeacherToolsVisibility();
+            const wrap = document.getElementById('userDropdownWrap');
+            if (wrap) {
+              wrap.classList.remove('open');
+              const btnAuth = document.getElementById('btnUserAuth');
+              if (btnAuth) btnAuth.setAttribute('aria-expanded', 'false');
+            }
           }
         });
       }
@@ -210,9 +228,16 @@ export class App {
 
   _updateTeacherToolsVisibility() {
     const teacherBtn = document.getElementById('btnTeacherToolsToggle');
+    const statusLbl = document.getElementById('lblTeacherToolStatus');
     const isAdmin = authManager.isAdmin();
     if (teacherBtn) {
-      teacherBtn.style.display = isAdmin ? 'inline-flex' : 'none';
+      teacherBtn.style.display = isAdmin ? 'flex' : 'none';
+      if (statusLbl) {
+        const active = Boolean(this.teacherTool && this.teacherTool.isActive);
+        statusLbl.textContent = active ? 'Đang bật' : 'Tắt';
+        statusLbl.style.background = active ? 'rgba(16, 185, 129, 0.2)' : 'rgba(245, 158, 11, 0.15)';
+        statusLbl.style.color = active ? '#10b981' : 'var(--accent)';
+      }
     }
     if (!isAdmin && this.teacherTool && this.teacherTool.isActive) {
       this.teacherTool.deactivate();
@@ -232,6 +257,8 @@ export class App {
       const btnHelp = document.getElementById('btnHelpGuideToggle');
       if (btnHelp) {
         btnHelp.addEventListener('click', () => {
+          const wrap = document.getElementById('userDropdownWrap');
+          if (wrap) wrap.classList.remove('open');
           if (this.helpModal) {
             this.helpModal.open();
           }
@@ -264,15 +291,6 @@ export class App {
         },
       });
 
-      const btnAuth = document.getElementById('btnUserAuth');
-      if (btnAuth) {
-        btnAuth.addEventListener('click', () => {
-          if (this.authModal) {
-            this.authModal.open();
-          }
-        });
-      }
-
       authManager.onAuthStateChanged((event, user) => {
         this._updateUserHeaderBadge();
         this._updateTeacherToolsVisibility();
@@ -294,6 +312,76 @@ export class App {
       this._updateTeacherToolsVisibility();
     } catch (err) {
       console.warn('AuthModal initialization deferred or failed:', err);
+    }
+  }
+
+  _initUserDropdown() {
+    if (typeof document === 'undefined' || !document.body) return;
+    try {
+      const wrap = document.getElementById('userDropdownWrap');
+      const btnAuth = document.getElementById('btnUserAuth');
+      const menu = document.getElementById('userDropdownMenu');
+      if (!wrap || !btnAuth || !menu) return;
+
+      const toggleDropdown = (forceState = null) => {
+        const isOpen = forceState !== null ? forceState : !wrap.classList.contains('open');
+        wrap.classList.toggle('open', isOpen);
+        btnAuth.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+        if (isOpen) {
+          this._updateTeacherToolsVisibility();
+        }
+      };
+
+      btnAuth.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleDropdown();
+      });
+
+      let leaveTimeout = null;
+      wrap.addEventListener('mouseenter', () => {
+        if (leaveTimeout) {
+          clearTimeout(leaveTimeout);
+          leaveTimeout = null;
+        }
+      });
+
+      wrap.addEventListener('mouseleave', () => {
+        leaveTimeout = setTimeout(() => {
+          toggleDropdown(false);
+        }, 300);
+      });
+
+      document.addEventListener('click', (e) => {
+        if (!wrap.contains(e.target)) {
+          toggleDropdown(false);
+        }
+      });
+
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          toggleDropdown(false);
+        }
+      });
+
+      const btnProfile = document.getElementById('btnUserDropdownProfile');
+      if (btnProfile) {
+        btnProfile.addEventListener('click', () => {
+          toggleDropdown(false);
+          if (this.authModal) {
+            this.authModal.open();
+          }
+        });
+      }
+
+      const btnLogout = document.getElementById('btnUserDropdownLogout');
+      if (btnLogout) {
+        btnLogout.addEventListener('click', () => {
+          toggleDropdown(false);
+          authManager.logout();
+        });
+      }
+    } catch (err) {
+      console.warn('User dropdown initialization deferred or failed:', err);
     }
   }
 
@@ -337,18 +425,39 @@ export class App {
       navBtnAdmin.style.display = isAdmin ? 'inline-flex' : 'none';
     }
 
+    const ddAvatar = document.getElementById('userDropdownAvatar');
+    const ddName = document.getElementById('userDropdownFullName');
+    const ddRole = document.getElementById('userDropdownRole');
+    const ddProfileLbl = document.getElementById('lblUserDropdownProfile');
+    const ddLogoutDivider = document.getElementById('userDropdownLogoutDivider');
+    const ddLogoutBtn = document.getElementById('btnUserDropdownLogout');
+
     if (!btnAuth || !lblName) return;
 
     if (currentUser) {
       btnAuth.classList.add('logged-in');
       if (iconAuth) iconAuth.textContent = currentUser.avatar || (isAdmin ? '👑' : '🎓');
       lblName.textContent = currentUser.fullName.split(' ').slice(-1)[0] || currentUser.fullName;
-      btnAuth.title = `Tài khoản: ${currentUser.fullName} (${currentUser.className || (isAdmin ? 'Quản trị viên' : 'Sinh viên')}) • Bấm để xem hồ sơ`;
+      btnAuth.title = `Tài khoản: ${currentUser.fullName} (${currentUser.className || (isAdmin ? 'Quản trị viên' : 'Sinh viên')}) • Bấm để mở menu cài đặt`;
+
+      if (ddAvatar) ddAvatar.textContent = currentUser.avatar || (isAdmin ? '👑' : '👨‍🎓');
+      if (ddName) ddName.textContent = currentUser.fullName;
+      if (ddRole) ddRole.textContent = isAdmin ? '👑 Quản trị viên hệ thống' : (currentUser.className || 'Sinh viên');
+      if (ddProfileLbl) ddProfileLbl.textContent = 'Hồ sơ cá nhân & Thông tin';
+      if (ddLogoutDivider) ddLogoutDivider.style.display = 'block';
+      if (ddLogoutBtn) ddLogoutBtn.style.display = 'flex';
     } else {
       btnAuth.classList.remove('logged-in');
       if (iconAuth) iconAuth.textContent = '👤';
       lblName.textContent = 'Đăng nhập';
-      btnAuth.title = 'Hệ thống tài khoản & Lịch sử AI';
+      btnAuth.title = 'Bấm để mở menu cài đặt & đăng nhập';
+
+      if (ddAvatar) ddAvatar.textContent = '👤';
+      if (ddName) ddName.textContent = 'Khách (Guest)';
+      if (ddRole) ddRole.textContent = 'Chưa đăng nhập';
+      if (ddProfileLbl) ddProfileLbl.textContent = 'Đăng nhập / Đăng ký';
+      if (ddLogoutDivider) ddLogoutDivider.style.display = 'none';
+      if (ddLogoutBtn) ddLogoutBtn.style.display = 'none';
     }
   }
 

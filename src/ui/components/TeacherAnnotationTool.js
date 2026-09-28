@@ -398,6 +398,12 @@ export class TeacherAnnotationTool {
     if (headerBtn) {
       headerBtn.classList.add('active');
     }
+    const statusLbl = document.getElementById('lblTeacherToolStatus');
+    if (statusLbl) {
+      statusLbl.textContent = 'Đang bật';
+      statusLbl.style.background = 'rgba(16, 185, 129, 0.2)';
+      statusLbl.style.color = '#10b981';
+    }
 
     this._startLaserLoop();
   }
@@ -418,6 +424,12 @@ export class TeacherAnnotationTool {
     const headerBtn = document.getElementById('btnTeacherToolsToggle');
     if (headerBtn) {
       headerBtn.classList.remove('active');
+    }
+    const statusLbl = document.getElementById('lblTeacherToolStatus');
+    if (statusLbl) {
+      statusLbl.textContent = 'Tắt';
+      statusLbl.style.background = 'rgba(245, 158, 11, 0.15)';
+      statusLbl.style.color = 'var(--accent)';
     }
 
     this._stopLaserLoop();

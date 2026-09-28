@@ -178,11 +178,6 @@ export class AuthModal {
           </div>
 
           <div class="profile-actions">
-            ${isAdmin ? `
-              <button type="button" class="btn-primary" id="btnGoToAdminDb" style="padding:9px 18px;font-size:13px;background:#f59e0b;border-color:#f59e0b;color:#ffffff;">
-                🗄️ Quản Trị Database &amp; Sinh Viên
-              </button>
-            ` : ''}
             <button type="button" class="btn-primary" id="btnGoToAiFromProfile" style="padding:9px 18px;font-size:13px;">
               💬 Xem Lịch sử AI
             </button>
@@ -198,15 +193,6 @@ export class AuthModal {
         this.activeTab = 'quick';
         this._renderContent();
       });
-
-      const btnGoToAdmin = bodyContainer.querySelector('#btnGoToAdminDb');
-      if (btnGoToAdmin) {
-        btnGoToAdmin.addEventListener('click', () => {
-          this.close();
-          const navBtnAdmin = document.getElementById('navBtnAdmin');
-          if (navBtnAdmin) navBtnAdmin.click();
-        });
-      }
 
       const btnGoToAi = bodyContainer.querySelector('#btnGoToAiFromProfile');
       if (btnGoToAi) {

@@ -86,21 +86,76 @@
       </nav>
     </div>
 
-    <!-- Header Actions -->
+    <!-- Header Actions: Unified User & Quick Settings Dropdown -->
     <div class="header-actions">
-      <button class="btn-icon" id="btnHelpGuideToggle" title="Hướng dẫn sử dụng &amp; Phím tắt (Phím ?)">
-        ❓ Hướng dẫn
-      </button>
-      <button class="btn-icon" id="btnTeacherToolsToggle" style="display: none;" title="Bật/Tắt Chế độ Giảng dạy (Bút vẽ, Laser, Ghi chú)">
-        ✏️ Bút giảng dạy
-      </button>
-      <button class="btn-icon" id="btnThemeToggle" title="Chuyển đổi giao diện Sáng / Tối">
-        ☀️ Sáng
-      </button>
-      <button class="btn-auth-user" id="btnUserAuth" title="Hệ thống tài khoản &amp; Lịch sử AI">
-        <span class="auth-btn-icon" id="iconUserAuth">👤</span>
-        <span class="auth-btn-label" id="lblUserAuthName">Đăng nhập</span>
-      </button>
+      <div class="user-dropdown-wrap" id="userDropdownWrap">
+        <button class="btn-auth-user" id="btnUserAuth" aria-haspopup="true" aria-expanded="false" title="Menu tài khoản &amp; cài đặt nhanh">
+          <span class="auth-btn-icon" id="iconUserAuth">👤</span>
+          <span class="auth-btn-label" id="lblUserAuthName">Đăng nhập</span>
+          <span class="auth-btn-caret" id="caretUserAuth">▾</span>
+        </button>
+
+        <!-- Dropdown Menu -->
+        <div class="user-dropdown-menu" id="userDropdownMenu" role="menu">
+          <!-- Mini Profile Header -->
+          <div class="user-dropdown-header" id="userDropdownHeader">
+            <span class="user-dropdown-avatar" id="userDropdownAvatar">👤</span>
+            <div class="user-dropdown-info">
+              <strong class="user-dropdown-name" id="userDropdownFullName">Khách</strong>
+              <span class="user-dropdown-role" id="userDropdownRole">Chưa đăng nhập</span>
+            </div>
+          </div>
+
+          <div class="user-dropdown-divider"></div>
+
+          <!-- 1. Account / Profile Item -->
+          <button type="button" class="user-dropdown-item" id="btnUserDropdownProfile" role="menuitem">
+            <span class="dropdown-item-icon">👤</span>
+            <div class="dropdown-item-text">
+              <span class="dropdown-item-title" id="lblUserDropdownProfile">Hồ sơ &amp; Đăng nhập</span>
+              <span class="dropdown-item-sub">Quản lý tài khoản, lịch sử AI</span>
+            </div>
+          </button>
+
+          <!-- 2. Teaching Pen & Laser (Admin only) -->
+          <button type="button" class="user-dropdown-item" id="btnTeacherToolsToggle" style="display: none;" role="menuitem">
+            <span class="dropdown-item-icon">✏️</span>
+            <div class="dropdown-item-text">
+              <span class="dropdown-item-title">Bút giảng dạy &amp; Laser</span>
+              <span class="dropdown-item-sub">Vẽ, laser pointer, ghi chú bài giảng</span>
+            </div>
+            <span class="dropdown-item-badge" id="lblTeacherToolStatus">Tắt</span>
+          </button>
+
+          <!-- 3. Help Guide -->
+          <button type="button" class="user-dropdown-item" id="btnHelpGuideToggle" role="menuitem">
+            <span class="dropdown-item-icon">❓</span>
+            <div class="dropdown-item-text">
+              <span class="dropdown-item-title">Hướng dẫn sử dụng</span>
+              <span class="dropdown-item-sub">Phím tắt &amp; hướng dẫn các phòng Lab</span>
+            </div>
+          </button>
+
+          <!-- 4. Theme Toggle -->
+          <button type="button" class="user-dropdown-item" id="btnThemeToggle" role="menuitem">
+            <span class="dropdown-item-icon" id="iconThemeToggleMenu">☀️</span>
+            <div class="dropdown-item-text">
+              <span class="dropdown-item-title" id="lblThemeToggleMenuTitle">Chế độ Sáng</span>
+              <span class="dropdown-item-sub" id="lblThemeToggleMenuSub">Đang bật chế độ Tối</span>
+            </div>
+          </button>
+
+          <!-- 5. Logout Item (only when logged in) -->
+          <div class="user-dropdown-divider" id="userDropdownLogoutDivider" style="display: none;"></div>
+          <button type="button" class="user-dropdown-item user-dropdown-item-danger" id="btnUserDropdownLogout" style="display: none;" role="menuitem">
+            <span class="dropdown-item-icon">🚪</span>
+            <div class="dropdown-item-text">
+              <span class="dropdown-item-title">Đăng xuất</span>
+              <span class="dropdown-item-sub">Trở về chế độ khách</span>
+            </div>
+          </button>
+        </div>
+      </div>
     </div>
   </header>
 
