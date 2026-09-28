@@ -18,8 +18,9 @@ export class TeacherAnnotationTool {
    * @param {Object} [options={}]
    * @param {HTMLElement} [options.container] - Root container (default: document.body)
    */
-  constructor({ container = null } = {}) {
+  constructor({ container = null, authManager = null } = {}) {
     this.container = container || (typeof document !== 'undefined' ? document.body : null);
+    this.authManager = authManager || (typeof window !== 'undefined' && window.authManager ? window.authManager : null);
     
     // Core State
     this.isActive = false;
@@ -57,6 +58,19 @@ export class TeacherAnnotationTool {
     if (this.container && typeof document !== 'undefined') {
       this._initDOM();
     }
+  }
+
+  /**
+   * Checks if user has permission to use Teacher Presentation Tools.
+   * Defaults to true in standalone or unit test environments without AuthManager.
+   * @private
+   */
+  _isAdmin() {
+    if (!this.authManager) return true;
+    if (typeof this.authManager.isAdmin === 'function') {
+      return this.authManager.isAdmin();
+    }
+    return true;
   }
 
   _initDOM() {
@@ -119,7 +133,7 @@ export class TeacherAnnotationTool {
       bottom: 20px;
       right: 20px;
       z-index: 9980;
-      display: inline-flex;
+      display: ${this._isAdmin() ? 'inline-flex' : 'none'};
     `;
     this.container.appendChild(this.miniBadgeEl);
 
@@ -283,6 +297,7 @@ export class TeacherAnnotationTool {
     // Mini badge toggle
     if (this.miniBadgeEl) {
       this.miniBadgeEl.addEventListener('click', () => {
+        if (!this._isAdmin()) return;
         this.toggle();
       });
     }
@@ -393,6 +408,7 @@ export class TeacherAnnotationTool {
    * Activates presentation drawing & laser mode.
    */
   activate() {
+    if (!this._isAdmin()) return;
     this.isActive = true;
     if (this.canvas) {
       this.canvas.style.display = 'block';
@@ -427,7 +443,7 @@ export class TeacherAnnotationTool {
       this.dockEl.style.display = 'none';
     }
     if (this.miniBadgeEl) {
-      this.miniBadgeEl.style.display = 'inline-flex';
+      this.miniBadgeEl.style.display = this._isAdmin() ? 'inline-flex' : 'none';
     }
 
     const headerBtn = document.getElementById('btnTeacherToolsToggle');
@@ -442,6 +458,7 @@ export class TeacherAnnotationTool {
    * Toggles active state.
    */
   toggle() {
+    if (!this._isAdmin()) return;
     if (this.isActive) {
       this.deactivate();
     } else {
@@ -880,6 +897,7 @@ export class TeacherAnnotationTool {
   }
 
   _onKeyDown(e) {
+    if (!this._isAdmin()) return;
     // Only capture shortcuts when active or to toggle
     const targetTag = e.target && e.target.tagName ? e.target.tagName.toLowerCase() : '';
     if (targetTag === 'input' || targetTag === 'textarea' || targetTag === 'select') {

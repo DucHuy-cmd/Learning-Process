@@ -180,7 +180,7 @@ export class App {
   _initTeacherTools() {
     if (typeof document === 'undefined' || !document.body) return;
     try {
-      this.teacherTool = new TeacherAnnotationTool();
+      this.teacherTool = new TeacherAnnotationTool({ authManager });
       const teacherBtn = document.getElementById('btnTeacherToolsToggle');
       if (teacherBtn) {
         teacherBtn.addEventListener('click', () => {
@@ -200,12 +200,16 @@ export class App {
 
   _updateTeacherToolsVisibility() {
     const teacherBtn = document.getElementById('btnTeacherToolsToggle');
+    const miniBadge = document.getElementById('teacherMiniBadge');
     const isAdmin = authManager.isAdmin();
     if (teacherBtn) {
       teacherBtn.style.display = isAdmin ? 'inline-flex' : 'none';
     }
     if (!isAdmin && this.teacherTool && this.teacherTool.isActive) {
       this.teacherTool.deactivate();
+    }
+    if (miniBadge) {
+      miniBadge.style.display = isAdmin ? 'inline-flex' : 'none';
     }
   }
 
@@ -292,7 +296,7 @@ export class App {
       btnAuth.classList.add('logged-in');
       if (iconAuth) iconAuth.textContent = user.avatar || '🎓';
       lblName.textContent = user.fullName.split(' ').slice(-1)[0] || user.fullName;
-      btnAuth.title = `Tài khoản: ${user.fullName} (${user.className || 'K66 CNTT'}) • Bấm để xem hồ sơ`;
+      btnAuth.title = `Tài khoản: ${user.fullName} (${user.className || 'Sinh viên'}) • Bấm để xem hồ sơ`;
     } else {
       btnAuth.classList.remove('logged-in');
       if (iconAuth) iconAuth.textContent = '👤';
@@ -430,7 +434,11 @@ export class App {
     const rawHash = window.location.hash.replace('#', '') || 'home';
     const [viewName, subtab] = rawHash.split('/');
     if (rawHash === 'studio' || (viewName === 'quiz' && subtab === 'studio')) {
-      this.openQuizWithTab('studio');
+      if (authManager.isAdmin()) {
+        this.openQuizWithTab('studio');
+      } else {
+        this.openQuizWithTab('practice');
+      }
     } else {
       this.navigate(viewName || rawHash, false, subtab);
     }
@@ -440,6 +448,9 @@ export class App {
     if (viewName === 'studio') {
       viewName = 'quiz';
       subtab = 'studio';
+    }
+    if (subtab === 'studio' && !authManager.isAdmin()) {
+      subtab = 'practice';
     }
     if (!this.views[viewName]) viewName = 'home';
     if (updateHash && typeof window !== 'undefined') {
@@ -549,6 +560,9 @@ export class App {
   }
 
   openQuizWithTab(subtab = 'practice', topic = null) {
+    if (subtab === 'studio' && !authManager.isAdmin()) {
+      subtab = 'practice';
+    }
     this.navigate('quiz', true, subtab);
     if (this.views.quiz) {
       if (typeof this.views.quiz.setTab === 'function') {

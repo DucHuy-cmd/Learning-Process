@@ -4,7 +4,7 @@
  * 
  * Features:
  * - Offline-first LocalStorage persistence with optional backend synchronization.
- * - Pre-configured 1-click Demo Accounts for K66 CNTT Author Team & Lecturers.
+ * - Pre-configured accounts for author & system administration.
  * - Registration, Login, Logout, Profile update.
  * - Reactive event subscriptions (onAuthStateChanged).
  */
@@ -25,12 +25,12 @@ export const DEMO_USERS = [
     id: 'user_duchuy',
     username: 'duchuy',
     fullName: 'Đức Huy',
-    className: 'Khóa 66 Công nghệ thông tin',
-    email: 'duchuy.k66@toanrr.edu.vn',
+    className: 'Sinh viên',
+    email: 'duchuy@toanrr.edu.vn',
     password: '123456',
     avatar: '👨‍🎓',
     role: 'student',
-    bio: 'Tác giả • K66 Công nghệ thông tin',
+    bio: 'Tác giả • Sinh viên Toán Rời Rạc',
   },
 ];
 
@@ -204,7 +204,7 @@ export class AuthManager {
    * @param {Object} data
    * @returns {{ success: boolean, error?: string, user?: Object }}
    */
-  adminCreateUser({ username, fullName, className = 'Khóa 66 Công nghệ thông tin', email, password = '123', avatar = '👤' }) {
+  adminCreateUser({ username, fullName, className = 'Sinh viên', email, password = '123', avatar = '👤' }) {
     if (!this.isAdmin()) {
       return { success: false, error: 'Chỉ có Quản trị viên (admin) mới có quyền cấp tài khoản.' };
     }
@@ -299,7 +299,7 @@ export class AuthManager {
    * @param {string} [data.avatar]
    * @returns {{ success: boolean, user?: Object, error?: string }}
    */
-  register({ username, fullName, className = 'Khóa 66 Công nghệ thông tin', email, password, avatar = '👤' }) {
+  register({ username, fullName, className = 'Sinh viên', email, password, avatar = '👤' }) {
     if (!username || username.trim().length < 3) {
       return { success: false, error: 'Tên đăng nhập phải có ít nhất 3 ký tự.' };
     }

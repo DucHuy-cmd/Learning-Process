@@ -42,11 +42,11 @@ describe('AuthManager & User Accounts', () => {
     expect(users.some(u => u.fullName === 'Đức Huy')).toBe(true);
   });
 
-  it('performs 1-click quick login for author Đức Huy (K66 CNTT)', () => {
+  it('performs 1-click quick login for author Đức Huy', () => {
     const res = auth.quickLogin('user_duchuy');
     expect(res.success).toBe(true);
     expect(res.user.fullName).toBe('Đức Huy');
-    expect(res.user.className).toBe('Khóa 66 Công nghệ thông tin');
+    expect(res.user.className).toBe('Sinh viên');
     expect(auth.isLoggedIn()).toBe(true);
   });
 

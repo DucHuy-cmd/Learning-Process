@@ -3,12 +3,12 @@
  * User Authentication & Profile Modal Dialog.
  * 
  * Provides:
- * - 1-Click Fast Login for K66 CNTT team members (Đức Huy, Nhất Vũ, Trường Vũ, Ngọc Hưng) & Teachers.
+ * - Guest mode quick start without account registration.
  * - Standard Login & Registration forms with validation.
  * - User Profile details and Account Switcher.
  */
 
-import { authManager, DEMO_USERS } from '../../core/auth/AuthManager.js';
+import { authManager } from '../../core/auth/AuthManager.js';
 import { aiHistoryManager } from '../../core/ai/AiHistoryManager.js';
 import { cloudSyncManager } from '../../core/sync/CloudSyncManager.js';
 
@@ -74,7 +74,7 @@ export class AuthModal {
             <span class="auth-modal-icon">🔐</span>
             <div>
               <h3 class="auth-modal-title" id="authModalTitle">Hệ Thống Tài Khoản</h3>
-              <span class="auth-modal-sub">Toán Rời Rạc Platform • K66 CNTT</span>
+              <span class="auth-modal-sub">Toán Rời Rạc Platform</span>
             </div>
           </div>
           <button type="button" class="btn-close-modal" id="btnCloseAuthModal" title="Đóng (Esc)">✕</button>
@@ -126,13 +126,13 @@ export class AuthModal {
           </button>
         ` : ''}
         <button type="button" class="auth-tab-btn ${this.activeTab === 'quick' ? 'active' : ''}" data-tab="quick">
-          🔄 Đổi tài khoản
+          👤 Chế độ Khách
         </button>
       `;
     } else {
       tabsContainer.innerHTML = `
         <button type="button" class="auth-tab-btn ${this.activeTab === 'quick' ? 'active' : ''}" data-tab="quick">
-          ⚡ Đăng nhập 1 chạm
+          👤 Trải nghiệm Khách
         </button>
         <button type="button" class="auth-tab-btn ${this.activeTab === 'login' ? 'active' : ''}" data-tab="login">
           🔑 Đăng nhập
@@ -173,7 +173,7 @@ export class AuthModal {
             <div class="profile-info-item">
               <span class="info-label">Vai trò:</span>
               <span class="info-val" style="font-weight:700;color:${isAdmin ? '#f59e0b' : '#3b82f6'};">
-                ${isAdmin ? '👑 Quản Trị Viên (Duy nhất)' : (user.role === 'author' ? 'Nhóm tác giả K66' : '👨‍🎓 Sinh viên')}
+                ${isAdmin ? '👑 Quản Trị Viên (Duy nhất)' : (user.role === 'author' ? 'Nhóm tác giả' : '👨‍🎓 Sinh viên')}
               </span>
             </div>
             <div class="profile-info-item">
@@ -254,7 +254,7 @@ export class AuthModal {
             <form id="formAdminAddUser" style="margin-top:12px;display:grid;grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));gap:10px;">
               <div>
                 <label style="font-size:11.5px;color:var(--dim);display:block;margin-bottom:3px;">Tên đăng nhập *</label>
-                <input type="text" id="adminNewUsername" placeholder="Ví dụ: sv_k66..." required style="width:100%;padding:6px 10px;font-size:12.5px;border-radius:6px;border:1px solid var(--line);background:var(--panel);color:var(--text);">
+                <input type="text" id="adminNewUsername" placeholder="Ví dụ: sv01, user..." required style="width:100%;padding:6px 10px;font-size:12.5px;border-radius:6px;border:1px solid var(--line);background:var(--panel);color:var(--text);">
               </div>
               <div>
                 <label style="font-size:11.5px;color:var(--dim);display:block;margin-bottom:3px;">Mật khẩu *</label>
@@ -266,7 +266,7 @@ export class AuthModal {
               </div>
               <div>
                 <label style="font-size:11.5px;color:var(--dim);display:block;margin-bottom:3px;">Lớp / Đơn vị</label>
-                <input type="text" id="adminNewClass" placeholder="Khóa 66 CNTT" value="Khóa 66 Công nghệ thông tin" style="width:100%;padding:6px 10px;font-size:12.5px;border-radius:6px;border:1px solid var(--line);background:var(--panel);color:var(--text);">
+                <input type="text" id="adminNewClass" placeholder="Sinh viên / Lớp học" value="Sinh viên" style="width:100%;padding:6px 10px;font-size:12.5px;border-radius:6px;border:1px solid var(--line);background:var(--panel);color:var(--text);">
               </div>
               <div style="grid-column:1 / -1;display:flex;justify-content:flex-end;">
                 <button type="submit" class="btn-primary" style="padding:7px 16px;font-size:12.5px;font-weight:600;">
@@ -375,32 +375,28 @@ export class AuthModal {
 
     if (this.activeTab === 'quick') {
       bodyContainer.innerHTML = `
-        <div class="auth-quick-section">
-          <p class="auth-hint-text">
-            Chọn nhanh tài khoản Quản trị viên (Admin) hoặc Sinh viên Đức Huy để trải nghiệm:
+        <div class="auth-quick-section" style="text-align:center;padding:12px 6px;">
+          <div style="font-size:46px;margin-bottom:10px;">👤</div>
+          <h4 style="font-size:16px;font-weight:700;color:var(--text);margin:0 0 8px 0;">Trải Nghiệm Chế Độ Khách (Guest Mode)</h4>
+          <p class="auth-hint-text" style="font-size:13px;color:var(--dim);margin:0 auto 16px auto;max-width:380px;line-height:1.5;">
+            Sử dụng đầy đủ mọi tính năng: 4 phòng Lab thực nghiệm, mô phỏng thuật toán đồ thị và hỏi đáp AI không cần đăng nhập.
           </p>
-          <div class="demo-accounts-grid">
-            ${DEMO_USERS.map(u => `
-              <button type="button" class="demo-account-pill ${user && user.id === u.id ? 'current' : ''}" data-user-id="${u.id}">
-                <span class="demo-avatar">${u.avatar}</span>
-                <div class="demo-meta">
-                  <span class="demo-name">${u.fullName}</span>
-                  <span class="demo-sub">${u.role === 'admin' ? '👑 Quản trị viên (admin / admin123)' : '👨‍🎓 Sinh viên (duchuy / 123456)'}</span>
-                </div>
-                ${user && user.id === u.id ? '<span class="demo-check">✓ Đang dùng</span>' : '<span class="demo-arrow">➔</span>'}
-              </button>
-            `).join('')}
+          <div style="background:rgba(245,158,11,0.08);border:1px dashed rgba(245,158,11,0.35);border-radius:8px;padding:10px 14px;margin:0 auto 20px auto;max-width:380px;font-size:12px;color:var(--accent);line-height:1.5;text-align:left;">
+            ⚠️ <strong>Lưu ý:</strong> Chế độ khách sẽ <strong>không lưu lại lịch sử thi trắc nghiệm và điểm số</strong> lên bảng xếp hạng hệ thống.
           </div>
+          <button type="button" class="btn-primary" id="btnGuestContinue" style="width:100%;max-width:380px;padding:10px 20px;font-size:13.5px;font-weight:700;border-radius:8px;cursor:pointer;">
+            ${user ? 'Chuyển sang Chế độ Khách →' : 'Tiếp tục với Chế độ Khách →'}
+          </button>
         </div>
       `;
 
-      bodyContainer.querySelectorAll('.demo-account-pill').forEach(pill => {
-        pill.addEventListener('click', () => {
-          const userId = pill.getAttribute('data-user-id');
-          authManager.quickLogin(userId);
+      const btnGuest = bodyContainer.querySelector('#btnGuestContinue');
+      if (btnGuest) {
+        btnGuest.addEventListener('click', () => {
+          authManager.logout();
           this.close();
         });
-      });
+      }
       return;
     }
 
@@ -409,20 +405,14 @@ export class AuthModal {
         <form class="auth-form" id="formLogin">
           <div id="authAlert" class="auth-alert" style="display:none;"></div>
 
-          <div style="font-size:12px;color:var(--dim);margin-bottom:14px;background:var(--panel-alt);padding:8px 12px;border-radius:6px;border:1px solid var(--line);line-height:1.5;">
-            💡 <strong>Tài khoản hệ thống:</strong><br>
-            • 👑 <strong>Quản trị viên:</strong> <code>admin</code> (mật khẩu: <code>admin123</code>)<br>
-            • 👨‍🎓 <strong>Sinh viên:</strong> <code>duchuy</code> (mật khẩu: <code>123456</code>)
-          </div>
-
           <div class="auth-field">
             <label for="loginUsername">Tên đăng nhập hoặc Email</label>
-            <input type="text" id="loginUsername" placeholder="admin hoặc duchuy hoặc email..." required autocomplete="username">
+            <input type="text" id="loginUsername" placeholder="Nhập tên đăng nhập hoặc email..." required autocomplete="username">
           </div>
 
           <div class="auth-field">
             <label for="loginPassword">Mật khẩu</label>
-            <input type="password" id="loginPassword" placeholder="Nhập mật khẩu (admin: admin123 | sv: 123456)..." required autocomplete="current-password">
+            <input type="password" id="loginPassword" placeholder="Nhập mật khẩu..." required autocomplete="current-password">
           </div>
 
           <button type="submit" class="btn-primary auth-submit-btn">
@@ -494,7 +484,7 @@ export class AuthModal {
 
           <div class="auth-field">
             <label for="regEmail">Email</label>
-            <input type="email" id="regEmail" placeholder="sinhvien@k66.edu.vn" required>
+            <input type="email" id="regEmail" placeholder="sinhvien@email.edu.vn" required>
           </div>
 
           <div class="auth-field">

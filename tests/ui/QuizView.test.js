@@ -29,6 +29,7 @@ describe('QuizView UI Component', () => {
   });
 
   afterEach(() => {
+    authManager.logout();
     delete global.window;
     delete global.document;
   });
@@ -161,6 +162,7 @@ describe('QuizView UI Component', () => {
   });
 
   it('switches to Teacher Exam Studio and renders printable A4 sheet with Exam Code', () => {
+    authManager.login('admin', 'admin123');
     const quizView = new QuizView({ container });
 
     const tabStudio = container.querySelector('#tabBtnStudio');
@@ -259,7 +261,8 @@ describe('QuizView UI Component', () => {
     expect(document.body.classList.contains('is-printing-exam')).toBe(false);
   });
 
-  it('switches between tabs via setTab method', () => {
+  it('switches between tabs via setTab method for admin', () => {
+    authManager.login('admin', 'admin123');
     const quizView = new QuizView({ container });
     expect(quizView.activeTab).toBe('practice');
 
@@ -280,7 +283,14 @@ describe('QuizView UI Component', () => {
     expect(container.querySelector('#paneStudio').style.display).toBe('none');
   });
 
-  it('renders K66 Leaderboard tab with Podium, Rankings Table, and Guest prompt', () => {
+  it('blocks non-admin users from accessing Teacher Exam Studio', () => {
+    authManager.logout(); // Guest mode
+    const quizView = new QuizView({ container });
+    quizView.setTab('studio');
+    expect(quizView.activeTab).toBe('practice');
+  });
+
+  it('renders Leaderboard tab with Podium, Rankings Table, and Guest prompt', () => {
     const quizView = new QuizView({ container });
     const tabLeaderboard = container.querySelector('#tabBtnLeaderboard');
     expect(tabLeaderboard).not.toBeNull();
@@ -291,7 +301,7 @@ describe('QuizView UI Component', () => {
 
     // Header & Podium
     expect(container.textContent).toContain('BẢNG VÀNG THÀNH TÍCH');
-    expect(container.textContent).toContain('Khóa 66 Công nghệ thông tin');
+    expect(container.textContent).toContain('Sinh viên Toán Rời Rạc');
     expect(container.querySelector('.leaderboard-podium-row')).not.toBeNull();
     expect(container.querySelector('.podium-rank-1')).not.toBeNull();
     expect(container.querySelector('.podium-rank-2')).not.toBeNull();

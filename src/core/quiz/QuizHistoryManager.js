@@ -1,11 +1,11 @@
 /**
  * @file QuizHistoryManager.js
- * Manages Quiz History, User Statistics, and K66 CNTT Class Leaderboard.
+ * Manages Quiz History, User Statistics, and Class Leaderboard.
  * 
  * Features:
  * - Persistent score, accuracy, streak, and exam results indexed by userId.
  * - Dynamic leaderboard ranking (Top 1, 2, 3 with gold, silver, bronze medals).
- * - Pre-seeded benchmark data for K66 CNTT author team members.
+ * - Real-time client & cloud sync for leaderboard scores.
  */
 
 const STORAGE_KEY_QUIZ_STATS = 'trr_quiz_stats_v1';
@@ -117,7 +117,7 @@ export class QuizHistoryManager {
       userId,
       username: userId,
       fullName: userId === 'guest' ? 'Khách' : userId,
-      className: 'Khóa 66 Công nghệ thông tin',
+      className: 'Sinh viên',
       avatar: '👤',
       score: 0,
       totalAnswered: 0,
@@ -140,7 +140,7 @@ export class QuizHistoryManager {
       userId,
       username: userInfo.username || userId,
       fullName: userInfo.fullName || (userId === 'guest' ? 'Khách' : userId),
-      className: userInfo.className || 'Khóa 66 Công nghệ thông tin',
+      className: userInfo.className || 'Sinh viên',
       avatar: userInfo.avatar || '👤',
       score: 0,
       totalAnswered: 0,

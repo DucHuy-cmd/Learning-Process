@@ -370,7 +370,7 @@ Tôi là gia sư AI học thuật được tích hợp trực tiếp vào hệ t
             <span class="user-avatar-tiny">${currentUser ? (currentUser.avatar || '🎓') : '👤'}</span>
             <div class="user-meta-tiny">
               <span class="user-name-tiny">${currentUser ? currentUser.fullName : 'Chế độ Khách'}</span>
-              <span class="user-status-tiny">${currentUser ? (currentUser.className || 'Khóa 66 CNTT') : 'Đăng nhập để đồng bộ lịch sử'}</span>
+              <span class="user-status-tiny">${currentUser ? (currentUser.className || 'Sinh viên') : 'Đăng nhập để đồng bộ lịch sử'}</span>
             </div>
             ${currentUser 
               ? '<button type="button" class="btn-user-switch-tiny" id="btnAiSwitchAccount" title="Quản lý tài khoản">⚙️</button>' 

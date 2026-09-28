@@ -10,6 +10,8 @@
  * + Academic & Teaching Suite (Đấu trường trắc nghiệm, Studio Soạn đề, AI Vision)
  */
 
+import { authManager } from '../../core/auth/AuthManager.js';
+
 export class HomeView {
   /**
    * @param {Object} options
@@ -19,6 +21,12 @@ export class HomeView {
   constructor({ container = null, onNavigate = null } = {}) {
     this.container = container;
     this.onNavigate = onNavigate || (() => {});
+
+    authManager.onAuthStateChanged(() => {
+      if (this.container) {
+        this.render();
+      }
+    });
 
     if (this.container) {
       this.render();
@@ -178,7 +186,7 @@ export class HomeView {
             </div>
           </div>
 
-          <div style="display:flex;gap:14px;align-items:flex-start;">
+          <div style="display:${authManager.isAdmin() ? 'flex' : 'none'};gap:14px;align-items:flex-start;">
             <div style="font-size:28px;">👩‍🏫</div>
             <div>
               <h4 style="font-size:15px;font-weight:700;color:var(--text);margin:0 0 4px 0;">Studio Soạn đề & In ấn A4</h4>
@@ -186,6 +194,17 @@ export class HomeView {
                 Công cụ hỗ trợ Giảng viên xuất đề thi chuẩn giấy in A4, phiếu tô trắc nghiệm chuẩn máy chấm và bảng đáp án.
               </p>
               <button type="button" class="btn-sm" id="btnHomeQuizStudio" style="font-size:12px;padding:5px 14px;cursor:pointer;">Vào Studio soạn đề →</button>
+            </div>
+          </div>
+
+          <div style="display:${authManager.isAdmin() ? 'none' : 'flex'};gap:14px;align-items:flex-start;">
+            <div style="font-size:28px;">🏆</div>
+            <div>
+              <h4 style="font-size:15px;font-weight:700;color:var(--text);margin:0 0 4px 0;">Bảng Vàng Thành Tích</h4>
+              <p style="font-size:12.5px;color:var(--dim);margin:0 0 10px 0;line-height:1.4;">
+                Theo dõi bảng xếp hạng sinh viên xuất sắc, điểm số và thành tích rèn luyện qua các bài thi trắc nghiệm Toán Rời Rạc.
+              </p>
+              <button type="button" class="btn-sm" id="btnHomeLeaderboard" style="font-size:12px;padding:5px 14px;cursor:pointer;">Xem bảng xếp hạng →</button>
             </div>
           </div>
 
@@ -207,7 +226,7 @@ export class HomeView {
             <span class="footer-brand-icon">⚡</span>
             <span class="footer-brand-title">Toán Rời Rạc Platform</span>
             <span class="footer-brand-badge">Đại Học</span>
-            <span class="footer-class-badge">Khóa 66 • Công nghệ Thông tin</span>
+            <span class="footer-class-badge">Học phần Toán Rời Rạc</span>
           </div>
 
           <p class="footer-desc">
@@ -226,7 +245,7 @@ export class HomeView {
 
           <div class="footer-bottom-bar">
             <span>© 2026 Toán Rời Rạc Platform. All rights reserved.</span>
-            <span class="footer-version-tag">K66 CNTT • Discrete Mathematics</span>
+            <span class="footer-version-tag">Sinh viên • Discrete Mathematics</span>
           </div>
         </footer>
 
@@ -285,6 +304,9 @@ export class HomeView {
 
     const btnHomeQuizStudio = this.container.querySelector('#btnHomeQuizStudio');
     if (btnHomeQuizStudio) btnHomeQuizStudio.addEventListener('click', () => this.onNavigate('quiz', 'studio'));
+
+    const btnHomeLeaderboard = this.container.querySelector('#btnHomeLeaderboard');
+    if (btnHomeLeaderboard) btnHomeLeaderboard.addEventListener('click', () => this.onNavigate('quiz', 'leaderboard'));
 
     const btnHomeAiVision = this.container.querySelector('#btnHomeAiVision');
     if (btnHomeAiVision) btnHomeAiVision.addEventListener('click', () => this.onNavigate('ai'));

@@ -724,7 +724,7 @@ describe('Phase 4: New UI & Application Integration Suite (Day 1, Day 2, Day 2.5
       expect(footer.textContent).toContain('Nhất Vũ');
       expect(footer.textContent).toContain('Trường Vũ');
       expect(footer.textContent).toContain('Ngọc Hưng');
-      expect(footer.textContent).toContain('Khóa 66');
+      expect(footer.textContent).toContain('Học phần Toán Rời Rạc');
       expect(footer.textContent).toContain('© 2026 Toán Rời Rạc Platform');
     });
 

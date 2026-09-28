@@ -3550,7 +3550,7 @@ body.theme-light .dock-btn-action:hover {
   bottom: 20px;
   right: 20px;
   z-index: 9980;
-  display: inline-flex;
+  display: none;
   align-items: center;
   gap: 6px;
   padding: 8px 14px;
@@ -4081,18 +4081,32 @@ body.theme-light .syntax-item {
 /* =====================================================================
    AI Assistant & Interactive Lab Bridge Styles
    ===================================================================== */
+#aiView.active {
+  display: block;
+  height: calc(100vh - 56px);
+  max-height: calc(100vh - 56px);
+  overflow: hidden;
+}
+
 .ai-assistant-layout {
   display: grid;
   grid-template-columns: 310px 1fr;
-  height: calc(100vh - 60px);
+  height: 100%;
+  max-height: 100%;
   overflow: hidden;
   background: var(--bg);
 }
 
 @media (max-width: 900px) {
+  #aiView.active {
+    height: auto;
+    max-height: none;
+    overflow: visible;
+  }
   .ai-assistant-layout {
     grid-template-columns: 1fr;
     height: auto;
+    max-height: none;
   }
 }
 
@@ -4102,6 +4116,9 @@ body.theme-light .syntax-item {
   border-right: 1px solid var(--line);
   display: flex;
   flex-direction: column;
+  height: 100%;
+  max-height: 100%;
+  min-height: 0;
   overflow-y: auto;
   padding: 16px;
   gap: 14px;
@@ -4384,11 +4401,14 @@ body.theme-light .prompt-chip:hover {
   display: flex;
   flex-direction: column;
   height: 100%;
+  max-height: 100%;
+  min-height: 0;
   overflow: hidden;
   background: var(--bg);
 }
 
 .ai-canvas-header {
+  flex-shrink: 0;
   padding: 12px 20px;
   background: var(--panel);
   border-bottom: 1px solid var(--line);
@@ -4446,8 +4466,10 @@ body.theme-light .prompt-chip:hover {
 
 /* Messages Stream */
 .ai-messages-scroll {
-  flex: 1;
+  flex: 1 1 0%;
+  min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 20px;
   display: flex;
   flex-direction: column;
@@ -4808,6 +4830,7 @@ body.theme-light .ai-code-block {
 
 /* Bottom Input Area */
 .ai-input-wrapper {
+  flex-shrink: 0;
   padding: 12px 20px 16px;
   background: var(--panel);
   border-top: 1px solid var(--line);
@@ -5849,7 +5872,7 @@ body.theme-light .btn-auth-user.logged-in {
 }
 
 /* =========================================================================
-   QUIZ LEADERBOARD & K66 CNTT HALL OF FAME
+   QUIZ LEADERBOARD & HALL OF FAME
    ========================================================================= */
 
 .quiz-leaderboard-container {

@@ -112,6 +112,9 @@ export class QuizView {
    * @param {'practice' | 'studio' | 'leaderboard'} tabName
    */
   setTab(tabName) {
+    if (tabName === 'studio' && !authManager.isAdmin()) {
+      tabName = 'practice';
+    }
     if (tabName === 'practice' || tabName === 'studio' || tabName === 'leaderboard') {
       this.activeTab = tabName;
       if (this.container) {
@@ -176,6 +179,10 @@ export class QuizView {
     }
     if (!this.container) return;
 
+    if (this.activeTab === 'studio' && !authManager.isAdmin()) {
+      this.activeTab = 'practice';
+    }
+
     this.container.innerHTML = `
       <div class="quiz-view-container" style="max-width:1300px;margin:0 auto;padding:20px 24px 60px;">
         
@@ -203,7 +210,7 @@ export class QuizView {
               👩‍🏫 Studio Soạn Đề &amp; In Ấn
             </button>
             <button type="button" class="btn-tab ${this.activeTab === 'leaderboard' ? 'active' : ''}" id="tabBtnLeaderboard" style="padding:8px 16px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;">
-              🏆 Bảng Xếp Hạng K66
+              🏆 Bảng Xếp Hạng
             </button>
           </div>
         </div>
@@ -218,7 +225,7 @@ export class QuizView {
           ${this._renderStudioView()}
         </div>
 
-        <!-- TAB 3: K66 CNTT LEADERBOARD & USER STATS -->
+        <!-- TAB 3: LEADERBOARD & USER STATS -->
         <div id="paneLeaderboard" style="display:${this.activeTab === 'leaderboard' ? 'block' : 'none'};">
           ${this._renderLeaderboardView()}
         </div>
@@ -604,7 +611,7 @@ export class QuizView {
   }
 
   // =========================================================================
-  // SUB-VIEW 3: K66 CNTT LEADERBOARD & USER STATS
+  // SUB-VIEW 3: LEADERBOARD & USER STATS
   // =========================================================================
 
   _renderLeaderboardView() {
@@ -626,7 +633,7 @@ export class QuizView {
             <div class="hero-tag">
               <span>🏆 BẢNG VÀNG THÀNH TÍCH</span>
               <span class="dot-sep">•</span>
-              <span>Khóa 66 Công nghệ thông tin</span>
+              <span>Sinh viên Toán Rời Rạc</span>
               <span class="dot-sep">•</span>
               <span class="hero-cloud-badge" id="heroCloudBadge" title="Trạng thái máy chủ. Dữ liệu của bạn luôn được lưu an toàn 100% trong trình duyệt (Offline-First) và tự động đồng bộ khi có kết nối backend." style="font-size:11px;padding:2px 8px;border-radius:10px;background:${cloudSyncManager.isConnected ? 'rgba(16,185,129,0.15)' : 'rgba(245,158,11,0.15)'};color:${cloudSyncManager.isConnected ? '#10b981' : '#f59e0b'};border:1px solid ${cloudSyncManager.isConnected ? 'rgba(16,185,129,0.3)' : 'rgba(245,158,11,0.3)'};cursor:help;">
                 ${cloudSyncManager.isConnected ? '🟢 Đã kết nối Máy chủ (Live)' : '💾 Lưu trữ Trình duyệt (Offline)'}
@@ -634,7 +641,7 @@ export class QuizView {
             </div>
             <h2 class="hero-title">Đấu Trường Trắc Nghiệm Toán Rời Rạc</h2>
             <p class="hero-desc">
-              Vinh danh các sinh viên xuất sắc nhất K66 có phản xạ nhanh, tỷ lệ trả lời chính xác cao nhất và chuỗi thắng dài nhất qua 4 phân môn Toán Rời Rạc.
+              Vinh danh các sinh viên xuất sắc nhất có phản xạ nhanh, tỷ lệ trả lời chính xác cao nhất và chuỗi thắng dài nhất qua 4 phân môn Toán Rời Rạc.
             </p>
           </div>
           <div class="hero-actions" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
@@ -657,8 +664,8 @@ export class QuizView {
             <div class="podium-medal">🥈</div>
             <div class="podium-avatar">${rank2 ? rank2.avatar : '👨‍💻'}</div>
             <h3 class="podium-name">${rank2 ? this._escapeHtml(rank2.fullName) : 'Chưa có'}</h3>
-            <span class="podium-class">${rank2 ? this._escapeHtml(rank2.className) : 'Khóa 66 CNTT'}</span>
-            <div class="podium-badge">${rank2 ? (rank2.badge || '🥈 Á Khoa K66') : 'Đang đua top'}</div>
+            <span class="podium-class">${rank2 ? this._escapeHtml(rank2.className) : 'Sinh viên'}</span>
+            <div class="podium-badge">${rank2 ? (rank2.badge || '🥈 Á Khoa') : 'Đang đua top'}</div>
             <div class="podium-stat-pill">
               <span class="stat-score">${rank2 ? rank2.score.toLocaleString() : 0} điểm</span>
               <span class="stat-acc">Đúng: ${rank2 ? rank2.accuracy : 0}%</span>
@@ -675,8 +682,8 @@ export class QuizView {
             <div class="podium-medal">🥇</div>
             <div class="podium-avatar">${rank1 ? rank1.avatar : '👨‍🎓'}</div>
             <h3 class="podium-name">${rank1 ? this._escapeHtml(rank1.fullName) : 'Chưa có'}</h3>
-            <span class="podium-class">${rank1 ? this._escapeHtml(rank1.className) : 'Khóa 66 CNTT'}</span>
-            <div class="podium-badge">${rank1 ? (rank1.badge || '🏆 Thủ Khoa K66') : 'Đang dẫn đầu'}</div>
+            <span class="podium-class">${rank1 ? this._escapeHtml(rank1.className) : 'Sinh viên'}</span>
+            <div class="podium-badge">${rank1 ? (rank1.badge || '🏆 Thủ Khoa') : 'Đang dẫn đầu'}</div>
             <div class="podium-stat-pill gold">
               <span class="stat-score">${rank1 ? rank1.score.toLocaleString() : 0} điểm</span>
               <span class="stat-acc">Đúng: ${rank1 ? rank1.accuracy : 0}%</span>
@@ -692,8 +699,8 @@ export class QuizView {
             <div class="podium-medal">🥉</div>
             <div class="podium-avatar">${rank3 ? rank3.avatar : '👨‍🔬'}</div>
             <h3 class="podium-name">${rank3 ? this._escapeHtml(rank3.fullName) : 'Chưa có'}</h3>
-            <span class="podium-class">${rank3 ? this._escapeHtml(rank3.className) : 'Khóa 66 CNTT'}</span>
-            <div class="podium-badge">${rank3 ? (rank3.badge || '🥉 Hạng Ba K66') : 'Đang đua top'}</div>
+            <span class="podium-class">${rank3 ? this._escapeHtml(rank3.className) : 'Sinh viên'}</span>
+            <div class="podium-badge">${rank3 ? (rank3.badge || '🥉 Hạng Ba') : 'Đang đua top'}</div>
             <div class="podium-stat-pill">
               <span class="stat-score">${rank3 ? rank3.score.toLocaleString() : 0} điểm</span>
               <span class="stat-acc">Đúng: ${rank3 ? rank3.accuracy : 0}%</span>
@@ -714,7 +721,7 @@ export class QuizView {
                 <span class="my-card-avatar">${currentUser.avatar || '👤'}</span>
                 <div>
                   <h4 class="my-card-name">${this._escapeHtml(currentUser.fullName)}</h4>
-                  <span class="my-card-subtitle">${this._escapeHtml(currentUser.className || 'Khóa 66 Công nghệ thông tin')} • @${this._escapeHtml(currentUser.username)}</span>
+                  <span class="my-card-subtitle">${this._escapeHtml(currentUser.className || 'Sinh viên')} • @${this._escapeHtml(currentUser.username)}</span>
                 </div>
               </div>
               <div class="my-card-rank-badge">
@@ -821,7 +828,7 @@ export class QuizView {
                           <span class="cell-avatar">${item.avatar || '👤'}</span>
                           <div>
                             <span class="cell-name">${this._escapeHtml(item.fullName)} ${isCurrent ? '<span class="tag-you">(Bạn)</span>' : ''}</span>
-                            <span class="cell-class">${this._escapeHtml(item.className || 'Khóa 66 CNTT')}</span>
+                            <span class="cell-class">${this._escapeHtml(item.className || 'Sinh viên')}</span>
                           </div>
                         </div>
                       </td>
@@ -840,7 +847,7 @@ export class QuizView {
                         🔥 ${item.maxStreak}
                       </td>
                       <td>
-                        <span class="table-badge-chip">${item.badge || '⭐ Sinh viên K66'}</span>
+                        <span class="table-badge-chip">${item.badge || '⭐ Sinh viên'}</span>
                       </td>
                       ${isAdmin ? `
                         <td style="text-align:center;">
