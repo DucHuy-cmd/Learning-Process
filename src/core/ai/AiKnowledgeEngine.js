@@ -27,7 +27,7 @@ export class AiKnowledgeEngine {
    * @returns {Promise<{ text: string, labAction?: Object, isFromApi: boolean }>}
    */
   async ask(prompt, options = {}) {
-    const { mode = 'bridge', apiKey = '', model = 'gemini-1.5-flash' } = options;
+    const { mode = 'bridge', apiKey = '', model = 'gemini-3.1-flash-lite' } = options;
     const cleanPrompt = (prompt || '').trim();
 
     if (!cleanPrompt) {
@@ -42,23 +42,19 @@ export class AiKnowledgeEngine {
 
     // 1. Try Gemini API if client explicit key is present
     if (apiKey) {
-      if (apiKey.startsWith('AQ.')) {
-        apiErrorReason = 'Khóa API có tiền tố "AQ." (Google Cloud OAuth) không tương thích với Gemini REST API. Vui lòng lấy Key chuẩn "AIzaSy..." miễn phí tại Google AI Studio (https://aistudio.google.com/app/apikey).';
-      } else {
-        try {
-          const apiResponse = await this._callGeminiApi(cleanPrompt, apiKey, model, mode);
-          if (apiResponse && apiResponse.text) {
-            return {
-              text: apiResponse.text,
-              labAction: apiResponse.labAction || this._detectLabActionFallback(cleanPrompt),
-              isFromApi: true,
-              source: 'gemini_client',
-            };
-          }
-        } catch (err) {
-          console.warn('Client Gemini API query failed, falling back to server/local engine:', err);
-          apiErrorReason = err.message || 'Lỗi khi gọi Gemini API với Key cá nhân.';
+      try {
+        const apiResponse = await this._callGeminiApi(cleanPrompt, apiKey, model, mode);
+        if (apiResponse && apiResponse.text) {
+          return {
+            text: apiResponse.text,
+            labAction: apiResponse.labAction || this._detectLabActionFallback(cleanPrompt),
+            isFromApi: true,
+            source: 'gemini_client',
+          };
         }
+      } catch (err) {
+        console.warn('Client Gemini API query failed, falling back to server/local engine:', err);
+        apiErrorReason = err.message || 'Lỗi khi gọi Gemini API với Key cá nhân.';
       }
     }
 
@@ -149,12 +145,21 @@ Nếu câu hỏi của người dùng liên quan đến 1 trong 4 phòng lab sau
 Chế độ phản hồi hiện tại: ${mode === 'hint' ? 'Gợi ý từng bước (không giải hộ toàn bộ ngay)' : mode === 'theory' ? 'Giải thích lý thuyết sâu sắc' : 'Gia sư thực nghiệm (kèm dữ liệu nạp vào Lab)'}.
 `;
 
-    const candidateModels = Array.from(new Set([model, 'gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-flash-latest', 'gemini-pro-latest']));
+    const candidateModels = Array.from(new Set([
+      model,
+      'gemini-3.1-flash-lite',
+      'gemini-flash-latest',
+      'gemini-3.8-flash',
+      'gemini-3.7-flash',
+      'gemini-3.6-flash',
+      'gemini-3.5-flash',
+      'gemini-pro-latest',
+    ]));
     let lastError = null;
 
     for (const candModel of candidateModels) {
       try {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(candModel)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(candModel)}:generateContent`;
 
         const res = await fetch(url, {
           method: 'POST',

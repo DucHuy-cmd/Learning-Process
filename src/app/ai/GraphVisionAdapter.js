@@ -543,13 +543,15 @@ let cachedWorkingDirectModel = null;
  * Supports both v1beta (preview/experimental) and v1 (GA/stable).
  */
 export const FALLBACK_GEMINI_MODELS = [
-  // 1. Latest Generation Gemini Models (2026 Multimodal GA)
+  // 1. Latest Generation Gemini Models
+  { name: 'gemini-3.1-flash-lite', apiVersion: 'v1beta' },
+  { name: 'gemini-3.1-flash-lite', apiVersion: 'v1' },
+  { name: 'gemini-flash-latest', apiVersion: 'v1beta' },
+  { name: 'gemini-flash-latest', apiVersion: 'v1' },
   { name: 'gemini-3.8-flash', apiVersion: 'v1beta' },
   { name: 'gemini-3.7-flash', apiVersion: 'v1beta' },
   { name: 'gemini-3.6-flash', apiVersion: 'v1beta' },
   { name: 'gemini-3.5-flash', apiVersion: 'v1beta' },
-  { name: 'gemini-flash-latest', apiVersion: 'v1beta' },
-  { name: 'gemini-flash-latest', apiVersion: 'v1' },
   { name: 'gemini-pro-latest', apiVersion: 'v1beta' },
   { name: 'gemini-flash-lite-latest', apiVersion: 'v1beta' },
 
@@ -760,7 +762,7 @@ export async function callDirectGeminiVision(file, apiKey, options = {}) {
   let response = null;
 
   for (const cand of candidateList) {
-    const url = `https://generativelanguage.googleapis.com/${cand.apiVersion}/models/${encodeURIComponent(cand.name)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+    const url = `https://generativelanguage.googleapis.com/${cand.apiVersion}/models/${encodeURIComponent(cand.name)}:generateContent`;
     try {
       const res = await fetch(url, {
         method: 'POST',
@@ -787,24 +789,6 @@ export async function callDirectGeminiVision(file, apiKey, options = {}) {
       } catch {}
 
       const msgLower = msg.toLowerCase();
-
-      // Case 0: Key kiểu AQ./OAuth không được REST API chấp nhận -> FAIL FAST, không thử model khác
-      const isOAuthTokenTypeError =
-        res.status === 401 ||
-        errorStatus === 'UNAUTHENTICATED' ||
-        msgLower.includes('oauth 2 access token') ||
-        msgLower.includes('access_token_type_unsupported');
-      if (isOAuthTokenTypeError) {
-        throw new Error(
-          'API Key của bạn không được API này chấp nhận (lỗi xác thực OAuth). Nguyên nhân thường gặp: ' +
-          'Google gần đây cấp một số Key mới có tiền tố "AQ." thay vì "AIzaSy..." cổ điển, và loại Key "AQ." ' +
-          'này hiện KHÔNG dùng được với cách gọi API Key trực tiếp. Vui lòng kiểm tra: Key của bạn có bắt đầu ' +
-          'bằng "AIzaSy" không? Nếu Key bắt đầu bằng "AQ." thì hãy thử tạo Key mới tại ' +
-          'https://aistudio.google.com/app/apikey bằng một tài khoản/dự án Google khác (dự án cũ hơn, chưa ' +
-          'bị chuyển sang loại Key mới), hoặc dùng tài khoản Google Cloud có bật sẵn "Generative Language API" ' +
-          'theo cách truyền thống.'
-        );
-      }
 
       // Case 1: Invalid API Key -> FAIL FAST
       if (

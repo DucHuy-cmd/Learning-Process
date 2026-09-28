@@ -101,11 +101,11 @@ describe('AiKnowledgeEngine (Academic Discrete Math Engine)', () => {
     expect(res.labAction.graphSpec.nodes.length).toBe(4);
   });
 
-  it('warns about AQ. API keys and falls back gracefully', async () => {
+  it('handles invalid API keys gracefully and falls back to local engine', async () => {
     const res = await engine.ask('tối giản bìa K 2 biến', { apiKey: 'AQ.fakekey12345' });
     expect(res.isFromApi).toBe(false);
     expect(res.source).toBe('local');
-    expect(res.apiErrorReason).toContain('AQ.');
+    expect(res.apiErrorReason).toBeDefined();
     expect(res.labAction.expr).toBe('(~a & b) | (a & ~b)');
   });
 

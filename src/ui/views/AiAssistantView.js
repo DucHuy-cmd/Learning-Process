@@ -411,7 +411,7 @@ Tôi là gia sư AI học thuật được tích hợp trực tiếp vào hệ t
                 ${this.apiKey || this.serverAiConfigured ? '⚙️ Quản lý API Key' : '🔑 Cài đặt Gemini API Key'}
               </button>
               <div class="api-key-input-box" id="apiKeyInputBox" style="display:none;">
-                <input type="password" id="inputGeminiApiKey" class="input-api-key" placeholder="Dán Gemini Key chuẩn (bắt đầu bằng AIzaSy...)" value="${this.apiKey}">
+                <input type="password" id="inputGeminiApiKey" class="input-api-key" placeholder="Dán Gemini Key (bắt đầu bằng AQ. hoặc AIzaSy...)" value="${this.apiKey}">
                 <div class="api-key-btn-row">
                   <button type="button" class="btn-sm btn-save-key" id="btnSaveApiKey">Lưu Key</button>
                   <button type="button" class="btn-sm btn-clear-key" id="btnClearApiKey">Xóa Key</button>
@@ -419,7 +419,7 @@ Tôi là gia sư AI học thuật được tích hợp trực tiếp vào hệ t
                 </div>
                 <span class="api-key-hint">${this.serverAiConfigured 
                   ? '✅ Máy chủ Vercel đã kết nối sẵn Gemini AI vĩnh viễn! Bạn không cần dán key nữa, nhưng vẫn có thể dán key riêng nếu muốn ghi đè.' 
-                  : '💡 Key chuẩn tạo tại Google AI Studio luôn bắt đầu bằng "AIzaSy...". Không dùng key "AQ." của Google Cloud vì REST API không hỗ trợ.'}</span>
+                  : '💡 Hệ thống hỗ trợ đầy đủ cả chuẩn khóa mới "AQ...." và chuẩn "AIzaSy..." từ Google AI Studio.'}</span>
               </div>
             </div>
 
@@ -1074,9 +1074,6 @@ Tôi là gia sư AI học thuật được tích hợp trực tiếp vào hệ t
     if (btnSaveKey && inputKey) {
       btnSaveKey.addEventListener('click', () => {
         const val = inputKey.value.trim();
-        if (val && val.startsWith('AQ.')) {
-          alert('⚠️ Lưu ý: API Key của bạn bắt đầu bằng "AQ." (Google Cloud OAuth/Vertex).\n\nLoại Key này không tương thích với Gemini REST API. Vui lòng truy cập https://aistudio.google.com/app/apikey để tạo Key miễn phí bắt đầu bằng "AIzaSy...".');
-        }
         this.apiKey = val;
         setStoredApiKey(val);
         this.render();
