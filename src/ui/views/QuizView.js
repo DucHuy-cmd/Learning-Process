@@ -120,6 +120,15 @@ export class QuizView {
       if (this.container) {
         this.render();
       }
+      if (tabName === 'leaderboard') {
+        try {
+          cloudSyncManager.syncQuizLeaderboard(quizHistoryManager).then(() => {
+            if (this.activeTab === 'leaderboard' && this.container) {
+              this.render();
+            }
+          }).catch(() => {});
+        } catch {}
+      }
     }
   }
 

@@ -261,6 +261,17 @@ export class App {
         });
       }
 
+      authManager.onAuthStateChanged((event, user) => {
+        this._updateUserHeaderBadge(user);
+        this._updateTeacherToolsVisibility();
+        if (this.views.quiz && typeof this.views.quiz.render === 'function') {
+          this.views.quiz.render();
+        }
+        if (this.views.ai && typeof this.views.ai.onUserChanged === 'function') {
+          this.views.ai.onUserChanged(user);
+        }
+      });
+
       this._updateUserHeaderBadge(authManager.getCurrentUser());
       this._updateTeacherToolsVisibility();
     } catch (err) {
@@ -275,12 +286,21 @@ export class App {
         if (connected) {
           cloudSyncManager.syncUsers(authManager);
           cloudSyncManager.syncQuizLeaderboard(quizHistoryManager);
+          cloudSyncManager.verifyCurrentUser(authManager);
           const user = authManager.getCurrentUser();
           if (user) {
             cloudSyncManager.syncAiHistory(user.id, aiHistoryManager);
           }
         }
       }).catch(() => {});
+
+      // Heartbeat session check: periodically checks if user account was deleted on server
+      if (this._syncHeartbeatTimer) clearInterval(this._syncHeartbeatTimer);
+      this._syncHeartbeatTimer = setInterval(() => {
+        if (authManager.isLoggedIn() && !authManager.isAdmin()) {
+          cloudSyncManager.verifyCurrentUser(authManager);
+        }
+      }, 12000);
     } catch {
       // offline
     }
@@ -465,6 +485,37 @@ export class App {
   _activateView(viewName) {
     this.currentView = viewName;
     if (typeof document === 'undefined') return;
+
+    // Reset window and body scroll position on any view switch
+    if (typeof window !== 'undefined' && typeof window.scrollTo === 'function') {
+      try {
+        if (!navigator.userAgent?.includes('jsdom')) {
+          window.scrollTo(0, 0);
+        }
+      } catch {}
+    }
+    if (typeof document !== 'undefined') {
+      try {
+        if (document.body) document.body.scrollTop = 0;
+        if (document.documentElement) document.documentElement.scrollTop = 0;
+      } catch {}
+    }
+
+    // Lock page in AI view to eliminate scroll displacement & black void
+    if (viewName === 'ai') {
+      document.documentElement.classList.add('view-ai-active');
+      document.body.classList.add('view-ai-active');
+    } else {
+      document.documentElement.classList.remove('view-ai-active');
+      document.body.classList.remove('view-ai-active');
+    }
+
+    // Verify session validity when navigating between views
+    if (authManager.isLoggedIn() && !authManager.isAdmin()) {
+      try {
+        cloudSyncManager.verifyCurrentUser(authManager);
+      } catch {}
+    }
 
     // Toggle view elements
     ['home', 'theory', 'lab', 'logic', 'counting', 'relation', 'ai', 'fundamentals', 'quiz'].forEach(v => {

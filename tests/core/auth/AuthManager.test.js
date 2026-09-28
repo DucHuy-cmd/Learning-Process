@@ -34,26 +34,26 @@ describe('AuthManager & User Accounts', () => {
     auth = new AuthManager({ storage });
   });
 
-  it('initializes with guest mode and default demo users', () => {
+  it('initializes with guest mode and single admin account', () => {
     expect(auth.isLoggedIn()).toBe(false);
     expect(auth.getCurrentUser()).toBeNull();
     const users = auth.getUsers();
-    expect(users.length).toBeGreaterThanOrEqual(DEMO_USERS.length);
-    expect(users.some(u => u.fullName === 'Đức Huy')).toBe(true);
+    expect(users.length).toBe(1);
+    expect(users[0].username).toBe('admin');
   });
 
-  it('performs 1-click quick login for author Đức Huy', () => {
-    const res = auth.quickLogin('user_duchuy');
+  it('performs 1-click quick login for admin', () => {
+    const res = auth.quickLogin('user_admin');
     expect(res.success).toBe(true);
-    expect(res.user.fullName).toBe('Đức Huy');
-    expect(res.user.className).toBe('Sinh viên');
+    expect(res.user.username).toBe('admin');
+    expect(res.user.role).toBe('admin');
     expect(auth.isLoggedIn()).toBe(true);
   });
 
-  it('allows logging in with username and password', () => {
-    const res = auth.login('duchuy', '123456');
+  it('allows logging in with admin credentials', () => {
+    const res = auth.login('admin', 'admin123');
     expect(res.success).toBe(true);
-    expect(auth.getCurrentUser().username).toBe('duchuy');
+    expect(auth.getCurrentUser().username).toBe('admin');
   });
 
   it('rejects invalid credentials with informative error message', () => {
@@ -116,7 +116,12 @@ describe('AuthManager & User Accounts', () => {
 
   it('verifies single admin RBAC permissions and user database management', () => {
     // 1. Student cannot delete users or admin-create accounts
-    auth.quickLogin('user_duchuy');
+    auth.register({
+      username: 'student_rbac',
+      fullName: 'Sinh Viên',
+      email: 'student@toanrr.edu.vn',
+      password: 'password123',
+    });
     expect(auth.isAdmin()).toBe(false);
     const failDel = auth.deleteUser('user_admin');
     expect(failDel.success).toBe(false);

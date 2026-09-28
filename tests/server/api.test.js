@@ -671,24 +671,46 @@ describe('Phase 5A: Backend AI Vision Service & Input Pipeline', () => {
       expect(res.statusCode).toBe(200);
       const data = JSON.parse(res.body);
       expect(data.success).toBe(true);
-      expect(data.users.length).toBeGreaterThanOrEqual(4);
-      expect(data.users.some(u => u.fullName === 'Đức Huy')).toBe(true);
+      expect(data.users.length).toBeGreaterThanOrEqual(1);
+      expect(data.users.some(u => u.username === 'admin')).toBe(true);
       expect(data.users[0].password).toBeUndefined();
     });
 
-    it('POST /api/auth/login authenticates demo user and returns user info', async () => {
+    it('GET /api/auth/verify checks validity of user session', async () => {
+      // 1. Valid admin user
+      const validReq = createMockHttp({
+        method: 'GET',
+        url: '/api/auth/verify?username=admin',
+      });
+      await handleRequest(validReq.req, validReq.res);
+      expect(validReq.res.statusCode).toBe(200);
+      const validData = JSON.parse(validReq.res.body);
+      expect(validData.valid).toBe(true);
+
+      // 2. Deleted / non-existent user returns 404
+      const invalidReq = createMockHttp({
+        method: 'GET',
+        url: '/api/auth/verify?userId=deleted_user_xyz',
+      });
+      await handleRequest(invalidReq.req, invalidReq.res);
+      expect(invalidReq.res.statusCode).toBe(404);
+      const invalidData = JSON.parse(invalidReq.res.body);
+      expect(invalidData.valid).toBe(false);
+    });
+
+    it('POST /api/auth/login authenticates admin and returns user info', async () => {
       const { req, res } = createMockHttp({
         method: 'POST',
         url: '/api/auth/login',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ username: 'duchuy', password: '123' }),
+        body: JSON.stringify({ username: 'admin', password: 'admin123' }),
       });
       await handleRequest(req, res);
 
       expect(res.statusCode).toBe(200);
       const data = JSON.parse(res.body);
       expect(data.success).toBe(true);
-      expect(data.user.fullName).toBe('Đức Huy');
+      expect(data.user.username).toBe('admin');
     });
 
     it('POST /api/auth/register creates new student account', async () => {
@@ -719,7 +741,7 @@ describe('Phase 5A: Backend AI Vision Service & Input Pipeline', () => {
         url: '/api/ai/history',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          userId: 'user_duchuy',
+          userId: 'user_admin',
           title: 'Hỏi về Dijkstra',
           mode: 'bridge',
           messages: [{ role: 'user', text: 'Giải thích Dijkstra' }],
@@ -734,7 +756,7 @@ describe('Phase 5A: Backend AI Vision Service & Input Pipeline', () => {
       // 2. Get sessions for user
       const getReq = createMockHttp({
         method: 'GET',
-        url: '/api/ai/history?userId=user_duchuy',
+        url: '/api/ai/history?userId=user_admin',
       });
       await handleRequest(getReq.req, getReq.res);
       expect(getReq.res.statusCode).toBe(200);
@@ -753,7 +775,7 @@ describe('Phase 5A: Backend AI Vision Service & Input Pipeline', () => {
     it('GET /api/quiz/leaderboard, GET /api/quiz/stats, POST /api/quiz/answer, and POST /api/quiz/exam work end-to-end', async () => {
       const testUserId = `user_sync_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
 
-      // 1. Get initial leaderboard
+      // 1. Get initial leaderboard (starts clean and empty)
       const lbReq = createMockHttp({
         method: 'GET',
         url: '/api/quiz/leaderboard',
@@ -762,8 +784,23 @@ describe('Phase 5A: Backend AI Vision Service & Input Pipeline', () => {
       expect(lbReq.res.statusCode).toBe(200);
       const lbData = JSON.parse(lbReq.res.body);
       expect(lbData.success).toBe(true);
-      expect(lbData.leaderboard.length).toBeGreaterThan(0);
-      expect(lbData.leaderboard[0].rankBadge).toBe('🥇');
+      expect(Array.isArray(lbData.leaderboard)).toBe(true);
+
+      // Register student so they exist in server database
+      const regReq = createMockHttp({
+        method: 'POST',
+        url: '/api/auth/register',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          username: testUserId,
+          fullName: 'Sinh viên Server Test',
+          email: `${testUserId}@toanrr.edu.vn`,
+          password: 'password123',
+        }),
+      });
+      await handleRequest(regReq.req, regReq.res);
+      expect(regReq.res.statusCode).toBe(200);
+      const actualUserId = JSON.parse(regReq.res.body).user.id;
 
       // 2. Post answer for user
       const ansReq = createMockHttp({
@@ -771,7 +808,7 @@ describe('Phase 5A: Backend AI Vision Service & Input Pipeline', () => {
         url: '/api/quiz/answer',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          userId: testUserId,
+          userId: actualUserId,
           isCorrect: true,
           userInfo: { fullName: 'Sinh viên Server Test', username: testUserId },
         }),
@@ -783,13 +820,25 @@ describe('Phase 5A: Backend AI Vision Service & Input Pipeline', () => {
       expect(ansData.stats.score).toBe(100);
       expect(ansData.stats.correctCount).toBe(1);
 
+      // Verify user now ranks on leaderboard
+      const lbReq2 = createMockHttp({
+        method: 'GET',
+        url: '/api/quiz/leaderboard',
+      });
+      await handleRequest(lbReq2.req, lbReq2.res);
+      expect(lbReq2.res.statusCode).toBe(200);
+      const lbData2 = JSON.parse(lbReq2.res.body);
+      expect(lbData2.success).toBe(true);
+      expect(lbData2.leaderboard.length).toBeGreaterThan(0);
+      expect(lbData2.leaderboard[0].rankBadge).toBe('🥇');
+
       // 3. Post exam record
       const examReq = createMockHttp({
         method: 'POST',
         url: '/api/quiz/exam',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          userId: testUserId,
+          userId: actualUserId,
           examResult: { title: 'Bài thi thử nghiệm Cloud', score: 10, maxScore: 10 },
           userInfo: { fullName: 'Sinh viên Server Test' },
         }),
@@ -803,12 +852,12 @@ describe('Phase 5A: Backend AI Vision Service & Input Pipeline', () => {
       // 4. Get stats for this user
       const statsReq = createMockHttp({
         method: 'GET',
-        url: `/api/quiz/stats?userId=${testUserId}`,
+        url: `/api/quiz/stats?userId=${actualUserId}`,
       });
       await handleRequest(statsReq.req, statsReq.res);
       expect(statsReq.res.statusCode).toBe(200);
       const statsData = JSON.parse(statsReq.res.body);
-      expect(statsData.stats.userId).toBe(testUserId);
+      expect(statsData.stats.userId).toBe(actualUserId);
       expect(statsData.stats.score).toBe(100);
     });
   });

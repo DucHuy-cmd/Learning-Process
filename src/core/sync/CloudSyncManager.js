@@ -121,6 +121,7 @@ export class CloudSyncManager {
 
   /**
    * Synchronizes registered users from the server into AuthManager.
+   * Purges deleted users and auto-logs out deleted accounts.
    * @param {Object} authManager
    */
   async syncUsers(authManager) {
@@ -131,16 +132,24 @@ export class CloudSyncManager {
       if (!res.ok) return;
       const data = await res.json();
       if (data.success && Array.isArray(data.users)) {
-        const localUsers = authManager.getUsers();
-        const userMap = new Map();
-        for (const u of localUsers) userMap.set(u.username.toLowerCase(), u);
-        for (const u of data.users) userMap.set(u.username.toLowerCase(), u);
-
-        const merged = Array.from(userMap.values());
+        const serverUsers = data.users;
         if (authManager.storage) {
           try {
-            authManager.storage.setItem('trr_registered_users', JSON.stringify(merged));
+            authManager.storage.setItem('trr_registered_users', JSON.stringify(serverUsers));
           } catch {}
+        }
+
+        // Verify if currently logged-in user still exists on server
+        const currentUser = authManager.getCurrentUser();
+        if (currentUser && currentUser.username !== 'admin' && currentUser.id !== 'user_admin') {
+          const stillExists = serverUsers.some(u => u.id === currentUser.id || u.username === currentUser.username);
+          if (!stillExists) {
+            console.warn('[CloudSync] Current user was removed from server. Logging out immediately.');
+            authManager.logout();
+            if (typeof window !== 'undefined' && window.alert) {
+              window.alert('⚠️ Tài khoản của bạn đã bị Quản trị viên xóa khỏi hệ thống. Bạn đã được tự động chuyển về chế độ Khách.');
+            }
+          }
         }
         this.lastSyncTime = new Date().toISOString();
         this._notify();
@@ -148,6 +157,45 @@ export class CloudSyncManager {
     } catch {
       // offline fallback
     }
+  }
+
+  /**
+   * Directly verifies if the currently logged-in user still exists on the server.
+   * Logs out immediately if deleted.
+   * @param {Object} authManager
+   * @returns {Promise<boolean>}
+   */
+  async verifyCurrentUser(authManager) {
+    if (!authManager || typeof fetch === 'undefined') return true;
+    const currentUser = authManager.getCurrentUser();
+    if (!currentUser) return true;
+    if (currentUser.id === 'user_admin' || currentUser.username === 'admin') return true;
+
+    try {
+      const url = `${this.baseUrl}/api/auth/verify?userId=${encodeURIComponent(currentUser.id)}&username=${encodeURIComponent(currentUser.username)}`;
+      const res = await fetch(url);
+      if (res.status === 404 || res.status === 401) {
+        console.warn('[CloudSync] Session verification failed. User does not exist on server. Logging out.');
+        authManager.logout();
+        if (typeof window !== 'undefined' && window.alert) {
+          window.alert('⚠️ Tài khoản của bạn đã bị Quản trị viên xóa khỏi hệ thống. Bạn đã được tự động chuyển về chế độ Khách.');
+        }
+        return false;
+      }
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.valid === false) {
+          authManager.logout();
+          if (typeof window !== 'undefined' && window.alert) {
+            window.alert('⚠️ Tài khoản của bạn đã bị Quản trị viên xóa khỏi hệ thống. Bạn đã được tự động chuyển về chế độ Khách.');
+          }
+          return false;
+        }
+      }
+    } catch {
+      // network fallback
+    }
+    return true;
   }
 
   /**
@@ -258,6 +306,7 @@ export class CloudSyncManager {
 
   /**
    * Synchronizes Quiz Leaderboard & stats from the server.
+   * Overwrites local cache with authoritative server records.
    * @param {Object} quizHistoryManager
    */
   async syncQuizLeaderboard(quizHistoryManager) {
@@ -268,16 +317,13 @@ export class CloudSyncManager {
       if (!res.ok) return;
       const data = await res.json();
       if (data.success && Array.isArray(data.leaderboard)) {
-        const localMap = quizHistoryManager._readMap();
+        const cleanMap = {};
         for (const item of data.leaderboard) {
-          if (!localMap[item.userId] || (item.score > (localMap[item.userId].score || 0))) {
-            localMap[item.userId] = {
-              ...(localMap[item.userId] || {}),
-              ...item,
-            };
+          if (item && item.userId && item.userId !== 'user_admin' && item.username !== 'admin') {
+            cleanMap[item.userId] = item;
           }
         }
-        quizHistoryManager._writeMap(localMap);
+        quizHistoryManager._writeMap(cleanMap);
         this.lastSyncTime = new Date().toISOString();
         this._notify();
       }

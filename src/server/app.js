@@ -247,6 +247,26 @@ export async function handleRequest(req, res) {
     }
   }
 
+  // Route: GET /api/auth/verify
+  if (req.method === 'GET' && pathname === '/api/auth/verify') {
+    const userId = parsedUrl.searchParams.get('userId');
+    const username = parsedUrl.searchParams.get('username');
+    if (!userId && !username) {
+      sendJson(res, 400, { valid: false, error: 'Thiếu thông tin người dùng.' });
+      return;
+    }
+    const exists = serverUsers.some(u =>
+      (userId && u.id === userId) ||
+      (username && u.username.toLowerCase() === username.toLowerCase())
+    );
+    if (!exists) {
+      sendJson(res, 404, { valid: false, error: 'Tài khoản không tồn tại trên hệ thống.' });
+    } else {
+      sendJson(res, 200, { valid: true });
+    }
+    return;
+  }
+
   // Route: DELETE /api/admin/users/:id (Quản trị viên xóa tài khoản)
   if (req.method === 'DELETE' && pathname.startsWith('/api/admin/users/')) {
     const targetId = pathname.replace('/api/admin/users/', '').trim();
@@ -257,7 +277,15 @@ export async function handleRequest(req, res) {
     const idx = serverUsers.findIndex(u => u.id === targetId || u.username === targetId);
     if (idx !== -1) {
       const deleted = serverUsers.splice(idx, 1)[0];
+      // Clean up quiz stats and AI sessions for this deleted user
+      delete serverQuizStats[deleted.id];
+      delete serverQuizStats[targetId];
+      if (serverAiSessions[deleted.id]) delete serverAiSessions[deleted.id];
+      if (serverAiSessions[targetId]) delete serverAiSessions[targetId];
       saveDatabase();
+      if (isKVConfigured()) {
+        writeToKV().catch(() => {});
+      }
       sendJson(res, 200, { success: true, deletedUser: deleted });
     } else {
       sendJson(res, 404, { success: false, error: 'Không tìm thấy tài khoản.' });
@@ -353,7 +381,25 @@ export async function handleRequest(req, res) {
 
   // Route: GET /api/quiz/leaderboard
   if (req.method === 'GET' && pathname === '/api/quiz/leaderboard') {
-    const list = Object.values(serverQuizStats).filter(u => u.userId !== 'guest' && u.totalAnswered > 0);
+    const activeUserMap = new Map();
+    for (const u of serverUsers) {
+      activeUserMap.set(u.id, u);
+      if (u.username) activeUserMap.set(u.username.toLowerCase(), u);
+    }
+    // Clean out obsolete user stats if user is no longer in serverUsers or is admin
+    for (const k of Object.keys(serverQuizStats)) {
+      const isObs = !activeUserMap.has(k) && !activeUserMap.has(k.toLowerCase());
+      if (isObs || k === 'user_admin' || serverQuizStats[k].username === 'admin') {
+        delete serverQuizStats[k];
+      }
+    }
+    const list = Object.values(serverQuizStats).filter(u => 
+      u.userId !== 'guest' && 
+      u.userId !== 'user_admin' && 
+      u.username !== 'admin' && 
+      (activeUserMap.has(u.userId) || activeUserMap.has((u.username || '').toLowerCase())) && 
+      u.totalAnswered > 0
+    );
     list.sort((a, b) => {
       if (b.score !== a.score) return b.score - a.score;
       return b.accuracy - a.accuracy;
@@ -373,6 +419,9 @@ export async function handleRequest(req, res) {
       delete serverQuizStats[k];
     }
     saveDatabase();
+    if (isKVConfigured()) {
+      writeToKV().catch(() => {});
+    }
     sendJson(res, 200, { success: true, message: 'Bảng xếp hạng đã được làm sạch.' });
     return;
   }
@@ -383,6 +432,9 @@ export async function handleRequest(req, res) {
     if (serverQuizStats[targetUserId]) {
       delete serverQuizStats[targetUserId];
       saveDatabase();
+      if (isKVConfigured()) {
+        writeToKV().catch(() => {});
+      }
       sendJson(res, 200, { success: true });
     } else {
       sendJson(res, 404, { success: false, error: 'Không tìm thấy người dùng trong bảng xếp hạng.' });

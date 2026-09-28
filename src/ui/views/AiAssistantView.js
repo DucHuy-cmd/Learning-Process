@@ -1055,6 +1055,22 @@ Tôi là gia sư AI học thuật được tích hợp trực tiếp vào hệ t
     });
   }
 
+  _safeScrollToTop() {
+    if (typeof window !== 'undefined' && typeof window.scrollTo === 'function') {
+      try {
+        if (!navigator.userAgent?.includes('jsdom')) {
+          window.scrollTo(0, 0);
+        }
+      } catch {}
+    }
+    if (typeof document !== 'undefined') {
+      try {
+        if (document.body) document.body.scrollTop = 0;
+        if (document.documentElement) document.documentElement.scrollTop = 0;
+      } catch {}
+    }
+  }
+
   _bindEvents() {
     if (!this.container) return;
 
@@ -1110,6 +1126,10 @@ Tôi là gia sư AI học thuật được tích hợp trực tiếp vào hệ t
     const textarea = this.container.querySelector('#aiPromptInput');
 
     if (textarea) {
+      textarea.addEventListener('focus', () => {
+        this._safeScrollToTop();
+      });
+
       textarea.addEventListener('input', () => {
         textarea.style.height = 'auto';
         textarea.style.height = Math.min(textarea.scrollHeight, 140) + 'px';
@@ -1120,6 +1140,7 @@ Tôi là gia sư AI học thuật được tích hợp trực tiếp vào hệ t
           e.preventDefault();
           const text = textarea.value.trim();
           if (text) {
+            this._safeScrollToTop();
             this._handleUserPrompt(text);
             textarea.value = '';
             textarea.style.height = 'auto';
@@ -1134,6 +1155,7 @@ Tôi là gia sư AI học thuật được tích hợp trực tiếp vào hệ t
         if (textarea) {
           const text = textarea.value.trim();
           if (text) {
+            this._safeScrollToTop();
             this._handleUserPrompt(text);
             textarea.value = '';
             textarea.style.height = 'auto';
@@ -1408,6 +1430,7 @@ Tôi là gia sư AI học thuật được tích hợp trực tiếp vào hệ t
     if (stream) {
       setTimeout(() => {
         stream.scrollTop = stream.scrollHeight;
+        this._safeScrollToTop();
       }, 50);
     }
   }

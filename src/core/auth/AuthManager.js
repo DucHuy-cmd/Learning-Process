@@ -21,17 +21,6 @@ export const DEMO_USERS = [
     role: 'admin',
     bio: 'Quản trị viên duy nhất của hệ thống • Giảng viên Toán Rời Rạc',
   },
-  {
-    id: 'user_duchuy',
-    username: 'duchuy',
-    fullName: 'Đức Huy',
-    className: 'Sinh viên',
-    email: 'duchuy@toanrr.edu.vn',
-    password: '123456',
-    avatar: '👨‍🎓',
-    role: 'student',
-    bio: 'Tác giả • Sinh viên Toán Rời Rạc',
-  },
 ];
 
 const STORAGE_KEY_CURRENT = 'trr_current_user';
@@ -66,22 +55,16 @@ export class AuthManager {
         try {
           const list = JSON.parse(storedUsers);
           if (Array.isArray(list)) {
-            // Clean out legacy demo accounts
-            const legacyIds = new Set(['user_giangvien', 'user_nhatvu', 'user_truongvu', 'user_ngochung']);
-            let filtered = list.filter(u => !legacyIds.has(u.id));
+            // Clean out legacy accounts and ensure only valid accounts
+            const legacyIds = new Set(['user_duchuy', 'user_giangvien', 'user_nhatvu', 'user_truongvu', 'user_ngochung']);
+            let filtered = list.filter(u => !legacyIds.has(u.id) && u.username !== 'duchuy');
 
             // Ensure single admin is always present
             const adminIdx = filtered.findIndex(u => u.username === 'admin' || u.id === 'user_admin' || u.role === 'admin');
             if (adminIdx === -1) {
               filtered.unshift({ ...DEMO_USERS[0] });
             } else {
-              // Guarantee role is 'admin' and username is 'admin'
               filtered[adminIdx] = { ...DEMO_USERS[0], ...filtered[adminIdx], role: 'admin', username: 'admin' };
-            }
-
-            // Ensure author duchuy is present
-            if (!filtered.some(u => u.username === 'duchuy' || u.id === 'user_duchuy')) {
-              filtered.push({ ...DEMO_USERS[1] });
             }
 
             // Ensure no other accounts have admin role
@@ -94,12 +77,36 @@ export class AuthManager {
 
             this.storage.setItem(STORAGE_KEY_USERS, JSON.stringify(filtered));
           }
-        } catch {}
+        } catch {
+          this.storage.setItem(STORAGE_KEY_USERS, JSON.stringify(DEMO_USERS));
+        }
       }
 
       const activeUser = this.storage.getItem(STORAGE_KEY_CURRENT);
       if (activeUser) {
-        this.currentUser = JSON.parse(activeUser);
+        try {
+          const parsed = JSON.parse(activeUser);
+          if (parsed && (parsed.id === 'user_admin' || parsed.username === 'admin')) {
+            this.currentUser = { ...DEMO_USERS[0], ...parsed, role: 'admin', username: 'admin' };
+            this.storage.setItem(STORAGE_KEY_CURRENT, JSON.stringify(this.currentUser));
+          } else if (parsed && parsed.id) {
+            // Check if user still exists in registered list
+            const currentUsers = JSON.parse(this.storage.getItem(STORAGE_KEY_USERS) || '[]');
+            const stillValid = Array.isArray(currentUsers) && currentUsers.some(u => u.id === parsed.id || u.username === parsed.username);
+            if (stillValid && parsed.id !== 'user_duchuy' && parsed.username !== 'duchuy') {
+              this.currentUser = parsed;
+            } else {
+              this.currentUser = null;
+              this.storage.removeItem(STORAGE_KEY_CURRENT);
+            }
+          } else {
+            this.currentUser = null;
+            this.storage.removeItem(STORAGE_KEY_CURRENT);
+          }
+        } catch {
+          this.currentUser = null;
+          this.storage.removeItem(STORAGE_KEY_CURRENT);
+        }
       }
     } catch {
       // Fallback for restricted storage environments

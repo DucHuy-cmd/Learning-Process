@@ -322,8 +322,8 @@ describe('QuizView UI Component', () => {
   });
 
   it('records practice answers into quizHistoryManager for logged-in user', () => {
-    // Log in as duchuy
-    authManager.quickLogin('user_duchuy');
+    // Register and log in as student
+    authManager.register({ username: 'sv_practice_test', fullName: 'Sinh Viên Test', email: 'sv_prac@toanrr.edu.vn', password: '123456' });
     const user = authManager.getCurrentUser();
     expect(user).not.toBeNull();
 
@@ -348,7 +348,7 @@ describe('QuizView UI Component', () => {
 
   it('restricts Studio tab and Leaderboard reset button based on Admin RBAC', () => {
     // 1. As normal student: Studio tab is hidden and Leaderboard reset button does not exist
-    authManager.quickLogin('user_duchuy');
+    authManager.register({ username: 'sv_rbac_test', fullName: 'Sinh Viên RBAC', email: 'sv_rbac@toanrr.edu.vn', password: '123456' });
     expect(authManager.isAdmin()).toBe(false);
 
     const studentQuiz = new QuizView({ container });

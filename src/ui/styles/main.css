@@ -4081,32 +4081,52 @@ body.theme-light .syntax-item {
 /* =====================================================================
    AI Assistant & Interactive Lab Bridge Styles
    ===================================================================== */
+/* Lock outer window and body to prevent black void layout breakage */
+html.view-ai-active,
+body.view-ai-active {
+  height: 100vh !important;
+  max-height: 100vh !important;
+  overflow: hidden !important;
+}
+
+body.view-ai-active #app,
+body.view-ai-active .app-main {
+  height: calc(100vh - 56px) !important;
+  max-height: calc(100vh - 56px) !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
 #aiView.active {
   display: block;
-  height: calc(100vh - 56px);
-  max-height: calc(100vh - 56px);
-  overflow: hidden;
+  height: calc(100vh - 56px) !important;
+  max-height: calc(100vh - 56px) !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
 }
 
 .ai-assistant-layout {
   display: grid;
   grid-template-columns: 310px 1fr;
-  height: 100%;
-  max-height: 100%;
-  overflow: hidden;
+  height: 100% !important;
+  max-height: 100% !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
   background: var(--bg);
 }
 
 @media (max-width: 900px) {
   #aiView.active {
-    height: auto;
-    max-height: none;
-    overflow: visible;
+    height: calc(100vh - 56px) !important;
+    max-height: calc(100vh - 56px) !important;
+    overflow: hidden !important;
   }
   .ai-assistant-layout {
-    grid-template-columns: 1fr;
-    height: auto;
-    max-height: none;
+    grid-template-columns: 1fr !important;
+    grid-template-rows: auto 1fr !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    overflow: hidden !important;
   }
 }
 
@@ -4128,7 +4148,7 @@ body.theme-light .syntax-item {
   .ai-sidebar {
     border-right: none;
     border-bottom: 1px solid var(--line);
-    max-height: 380px;
+    max-height: 160px !important;
   }
 }
 
