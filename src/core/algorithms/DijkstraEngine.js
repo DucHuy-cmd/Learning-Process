@@ -134,7 +134,7 @@ export function dijkstra(graph, startNodeId, targetNodeId = null) {
   const steps = [];
   let stepCounter = 0;
 
-  function recordStep(action, description, highlights = {}) {
+  function recordStep(action, description, highlights = {}, extraState = {}) {
     stepCounter++;
     steps.push(createStep({
       stepNumber: stepCounter,
@@ -144,6 +144,7 @@ export function dijkstra(graph, startNodeId, targetNodeId = null) {
         dist: { ...dist },
         prev: { ...prev },
         visited: Array.from(visited),
+        ...extraState,
       },
       highlights,
     }));
@@ -170,7 +171,8 @@ export function dijkstra(graph, startNodeId, targetNodeId = null) {
     recordStep(
       AlgorithmAction.FINISH,
       `Hoàn tất! Đỉnh đích ${targetNodeId} trùng với đỉnh bắt đầu ${startNodeId}. Tổng khoảng cách = 0.`,
-      { nodes: [startNodeId], edges: [] }
+      { nodes: [startNodeId], edges: [] },
+      { totalWeight: 0 }
     );
 
     return {
@@ -218,6 +220,10 @@ export function dijkstra(graph, startNodeId, targetNodeId = null) {
 
     // Inspect outgoing / incident neighbors
     const neighbors = graph.getNeighbors(u);
+    const relaxed = [];
+    const rejectedList = [];
+    const allTouchedEdgeIds = [];
+
     for (const neighbor of neighbors) {
       const v = neighbor.node;
       const edgeId = neighbor.edgeId;
@@ -228,13 +234,10 @@ export function dijkstra(graph, startNodeId, targetNodeId = null) {
       }
 
       statistics.edgeInspections++;
+      if (edgeId && !allTouchedEdgeIds.includes(edgeId)) {
+        allTouchedEdgeIds.push(edgeId);
+      }
       const candidateDist = dist[u] + weight;
-
-      recordStep(
-        AlgorithmAction.INSPECT_EDGE,
-        `Kiểm tra cạnh (${u} → ${v}, w=${weight}). Khoảng cách mới: dist[${u}] + ${weight} = ${candidateDist}.`,
-        { nodes: [u, v], edges: [edgeId] }
-      );
 
       if (candidateDist < dist[v]) {
         const oldDist = dist[v];
@@ -243,20 +246,31 @@ export function dijkstra(graph, startNodeId, targetNodeId = null) {
         heap.push({ distance: candidateDist, node: v });
         statistics.heapPushes++;
         statistics.relaxationCount++;
-
-        recordStep(
-          AlgorithmAction.RELAX_EDGE,
-          `Nới lỏng thành công (${u} → ${v}): dist[${v}] giảm từ ${oldDist === Infinity ? '∞' : oldDist} xuống ${candidateDist}.`,
-          { nodes: [v], edges: [edgeId] }
-        );
+        relaxed.push({ node: v, oldDist, newDist: candidateDist });
       } else {
-        recordStep(
-          AlgorithmAction.REJECT_EDGE,
-          `Bỏ qua (${u} → ${v}): khoảng cách mới ${candidateDist} không tối ưu hơn dist[${v}] (${dist[v]}).`,
-          { nodes: [v], edges: [edgeId] }
-        );
+        rejectedList.push({ node: v, candidateDist, currentDist: dist[v] });
       }
     }
+
+    // Xây mô tả tổng hợp, liệt kê từng đỉnh kề đã xét (1 hàng duy nhất cho đỉnh u)
+    const parts = [];
+    for (const r of relaxed) {
+      parts.push(`${r.node}: ${r.oldDist === Infinity ? '∞' : r.oldDist} → ${r.newDist} (qua ${u})`);
+    }
+    for (const rj of rejectedList) {
+      parts.push(`${rj.node}: giữ nguyên ${rj.currentDist} (không tốt hơn)`);
+    }
+
+    const desc = parts.length > 0
+      ? `Xét các đỉnh kề của ${u}: ${parts.join('; ')}.`
+      : `Xét các đỉnh kề của ${u}: không có cạnh kề nào để xét.`;
+
+    recordStep(
+      AlgorithmAction.RELAX_EDGE,
+      desc,
+      { nodes: [u, ...relaxed.map(r => r.node), ...rejectedList.map(r => r.node)], edges: allTouchedEdgeIds },
+      { updatedNodes: relaxed.map(r => r.node) }
+    );
   }
 
   // 5. PATH RECONSTRUCTION & RESULT GENERATION
@@ -309,7 +323,8 @@ export function dijkstra(graph, startNodeId, targetNodeId = null) {
       recordStep(
         AlgorithmAction.FINISH,
         `Hoàn tất! Đường đi ngắn nhất từ ${startNodeId} đến ${targetNodeId}: ${path.join(' → ')}. Tổng khoảng cách: ${totalDistance}.`,
-        { nodes: [...path], edges: [...pathEdges] }
+        { nodes: [...path], edges: [...pathEdges] },
+        { totalWeight: totalDistance }
       );
 
       return {

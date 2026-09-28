@@ -451,6 +451,9 @@ export function euler(graph, startNodeId = null) {
     finalConclusion = reason;
   }
 
+  const isSuccess = (type === "circuit" || type === "path");
+  const totalWeight = fullEdges.reduce((sum, e) => sum + (typeof e.weight === 'number' ? e.weight : 0), 0);
+
   steps.push(createStep({
     stepNumber: stepCount++,
     action: AlgorithmAction.FINISH,
@@ -461,15 +464,13 @@ export function euler(graph, startNodeId = null) {
       isDirected,
       circuit: [...fullCircuitNodeIds],
       edgeCount: fullEdges.length,
+      totalWeight,
     },
     highlights: {
       nodes: [...fullCircuitNodeIds],
       edges: fullEdges.map(e => e.id),
     },
   }));
-
-  const isSuccess = (type === "circuit" || type === "path");
-  const totalWeight = fullEdges.reduce((sum, e) => sum + (typeof e.weight === 'number' ? e.weight : 0), 0);
 
   return {
     status: isSuccess ? AlgorithmStatus.SUCCESS : AlgorithmStatus.FAILURE,

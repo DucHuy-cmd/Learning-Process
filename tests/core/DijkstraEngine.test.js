@@ -215,7 +215,7 @@ describe('DijkstraEngine Headless Core', () => {
   });
 
   describe('Step Generation & Snapshot Isolation', () => {
-    it('13. - 17. generates standard INITIALIZE, SELECT_NODE, INSPECT_EDGE, RELAX_EDGE steps', () => {
+    it('13. - 17. generates standard INITIALIZE, SELECT_NODE, RELAX_EDGE steps', () => {
       const g = new Graph({ directed: false, weighted: true });
       g.addNode('A');
       g.addNode('B');
@@ -226,7 +226,6 @@ describe('DijkstraEngine Headless Core', () => {
 
       expect(actions).toContain(AlgorithmAction.INITIALIZE);
       expect(actions).toContain(AlgorithmAction.SELECT_NODE);
-      expect(actions).toContain(AlgorithmAction.INSPECT_EDGE);
       expect(actions).toContain(AlgorithmAction.RELAX_EDGE);
       expect(actions).toContain(AlgorithmAction.FINISH);
 

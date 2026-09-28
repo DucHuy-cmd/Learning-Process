@@ -229,6 +229,29 @@ export class Graph {
   }
 
   /**
+   * Retrieves the weight of the edge between u and v.
+   * @param {string} u
+   * @param {string} v
+   * @returns {number|null}
+   */
+  getWeight(u, v) {
+    if (!this._incidentEdges.has(u)) return null;
+    for (const edgeId of this._incidentEdges.get(u)) {
+      const edge = this._edges.get(edgeId);
+      if (!edge) continue;
+      if (this._directed) {
+        if (edge.from === u && edge.to === v) return edge.weight;
+      } else {
+        if ((edge.from === u && edge.to === v) || (edge.from === v && edge.to === u)) {
+          return edge.weight;
+        }
+      }
+    }
+    return null;
+  }
+
+
+  /**
    * Retrieves outgoing/incident neighbors for a given node.
    * 
    * In a directed graph: returns edges where from === nodeId, neighbor is edge.to.

@@ -51,7 +51,7 @@ export function prim(graph, startNodeId = null) {
     return {
       status: AlgorithmStatus.UNSUPPORTED,
       type: 'prim',
-      message: 'Prim algorithm only supports undirected graphs',
+      message: 'Thuật toán Prim chỉ hỗ trợ đồ thị vô hướng (Prim algorithm only supports undirected graphs)',
       edges: [],
       edgeIds: [],
       totalWeight: 0,
@@ -204,7 +204,7 @@ export function prim(graph, startNodeId = null) {
   const steps = [];
   let stepCounter = 0;
 
-  function recordStep(action, description, highlights = {}) {
+  function recordStep(action, description, highlights = {}, extraState = {}) {
     stepCounter++;
     steps.push(createStep({
       stepNumber: stepCounter,
@@ -216,6 +216,7 @@ export function prim(graph, startNodeId = null) {
         inMST: Array.from(inMST),
         acceptedEdges: acceptedEdges.map(e => ({ ...e })),
         totalWeight,
+        ...extraState,
       },
       highlights,
     }));
@@ -299,6 +300,10 @@ export function prim(graph, startNodeId = null) {
 
     // Inspect neighbors of u
     const neighbors = graph.getNeighbors(u);
+    const relaxed = [];
+    const rejectedList = [];
+    const allTouchedEdgeIds = [];
+
     for (const neighbor of neighbors) {
       const v = neighbor.node;
       const w = neighbor.weight;
@@ -310,12 +315,9 @@ export function prim(graph, startNodeId = null) {
       }
 
       statistics.edgeInspections++;
-
-      recordStep(
-        AlgorithmAction.INSPECT_EDGE,
-        `Kiểm tra cạnh (${u} - ${v}, w=${w}). Key hiện tại của ${v} là ${key[v] === Infinity ? '∞' : key[v]}.`,
-        { nodes: [u, v], edges: [edgeObj.id] }
-      );
+      if (edgeObj && edgeObj.id && !allTouchedEdgeIds.includes(edgeObj.id)) {
+        allTouchedEdgeIds.push(edgeObj.id);
+      }
 
       if (w < key[v]) {
         const oldKey = key[v];
@@ -329,22 +331,32 @@ export function prim(graph, startNodeId = null) {
           edge: edgeObj,
         });
         statistics.heapPushes++;
-
-        recordStep(
-          AlgorithmAction.RELAX_EDGE,
-          `Cập nhật key của đỉnh ${v}: giảm từ ${oldKey === Infinity ? '∞' : oldKey} xuống ${w} (nối từ ${u}).`,
-          { nodes: [v], edges: [edgeObj.id] }
-        );
+        relaxed.push({ node: v, oldKey, newKey: w });
       } else {
         statistics.edgesRejected++;
-
-        recordStep(
-          AlgorithmAction.REJECT_EDGE,
-          `Bỏ qua cạnh (${u} - ${v}): trọng số ${w} không nhỏ hơn key hiện tại của ${v} (${key[v]}).`,
-          { nodes: [v], edges: [edgeObj.id] }
-        );
+        rejectedList.push({ node: v, weight: w, currentKey: key[v] });
       }
     }
+
+    // Xây mô tả tổng hợp, liệt kê từng đỉnh kề đã xét (1 hàng duy nhất cho đỉnh u)
+    const parts = [];
+    for (const r of relaxed) {
+      parts.push(`${r.node}: key ${r.oldKey === Infinity ? '∞' : r.oldKey} → ${r.newKey} (nối từ ${u})`);
+    }
+    for (const rj of rejectedList) {
+      parts.push(`${rj.node}: giữ nguyên key ${rj.currentKey} (w=${rj.weight} không tốt hơn)`);
+    }
+
+    const desc = parts.length > 0
+      ? `Xét các đỉnh kề của ${u}: ${parts.join('; ')}.`
+      : `Xét các đỉnh kề của ${u}: không có cạnh kề nào để xét.`;
+
+    recordStep(
+      AlgorithmAction.RELAX_EDGE,
+      desc,
+      { nodes: [u, ...relaxed.map(r => r.node), ...rejectedList.map(r => r.node)], edges: allTouchedEdgeIds },
+      { updatedNodes: relaxed.map(r => r.node) }
+    );
   }
 
   // 5. CONNECTIVITY & COMPONENT PARTITION

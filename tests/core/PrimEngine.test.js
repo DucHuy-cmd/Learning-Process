@@ -190,15 +190,18 @@ describe('PrimEngine Headless Core', () => {
       const badStart = prim(g, 'NON_EXISTENT');
       expect(badStart.status).toBe(AlgorithmStatus.INVALID_INPUT);
 
-      g.addNode('B');
-      g.addEdge('A', 'B', NaN);
-      const badWeight = prim(g, 'A');
+      const badWeightGraph = {
+        hasNode: () => true,
+        getNeighbors: () => [],
+        getEdges: () => [{ id: 'e_bad', from: 'A', to: 'B', weight: NaN }],
+      };
+      const badWeight = prim(badWeightGraph, 'A');
       expect(badWeight.status).toBe(AlgorithmStatus.INVALID_INPUT);
     });
   });
 
   describe('Step Generation & Replay Snapshots', () => {
-    it('15. - 20. generates standard INITIALIZE, SELECT_NODE, INSPECT_EDGE, ACCEPT_EDGE, and FINISH steps', () => {
+    it('15. - 20. generates standard INITIALIZE, SELECT_NODE, ACCEPT_EDGE, RELAX_EDGE, and FINISH steps', () => {
       const g = new Graph({ directed: false, weighted: true });
       ['A', 'B', 'C'].forEach(id => g.addNode(id));
       g.addEdge('A', 'B', 1, 'e1');
@@ -210,8 +213,8 @@ describe('PrimEngine Headless Core', () => {
 
       expect(actions[0]).toBe(AlgorithmAction.INITIALIZE);
       expect(actions).toContain(AlgorithmAction.SELECT_NODE);
-      expect(actions).toContain(AlgorithmAction.INSPECT_EDGE);
       expect(actions).toContain(AlgorithmAction.ACCEPT_EDGE);
+      expect(actions).toContain(AlgorithmAction.RELAX_EDGE);
       expect(actions[actions.length - 1]).toBe(AlgorithmAction.FINISH);
 
       // Verify Step 0 / INITIALIZE state

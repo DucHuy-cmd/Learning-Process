@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+.vite/
+
+# Server data & databases
+data/
+*.db
+*.sqlite
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Vercel
+.vercel
+
+# Test results & coverage
+vitest_results.json
+all_vitest_results.json
+coverage/
+
+# OS metadata
+.DS_Store
+Thumbs.db
+
+# Scratch & Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*

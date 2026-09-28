@@ -5,6 +5,8 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "start": "node src/server/server.js",
+    "server": "node src/server/server.js",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"

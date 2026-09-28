@@ -174,10 +174,11 @@ describe('KruskalEngine Headless Core', () => {
 
   describe('Edge Cases & Validation', () => {
     it('9. rejects invalid non-numeric weights', () => {
-      const g = new Graph({ directed: false, weighted: false });
-      g.addNode('A');
-      g.addNode('B');
-      g.addEdge('A', 'B', NaN);
+      const g = {
+        isDirected: false,
+        hasNode: () => true,
+        getEdges: () => [{ id: 'e_bad', from: 'A', to: 'B', weight: NaN }],
+      };
 
       const result = kruskal(g);
       expect(result.status).toBe(AlgorithmStatus.INVALID_INPUT);

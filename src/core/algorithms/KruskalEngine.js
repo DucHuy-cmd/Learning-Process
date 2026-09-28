@@ -48,7 +48,7 @@ export function kruskal(graph) {
     return {
       status: AlgorithmStatus.UNSUPPORTED,
       type: 'kruskal',
-      message: 'Kruskal algorithm only supports undirected graphs',
+      message: 'Thuật toán Kruskal chỉ hỗ trợ đồ thị vô hướng (Kruskal algorithm only supports undirected graphs)',
       edges: [],
       edgeIds: [],
       totalWeight: 0,
