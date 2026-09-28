@@ -37,7 +37,7 @@ export class AiKnowledgeEngine {
       };
     }
 
-    // Try Gemini API if key is present
+    // 1. Try Gemini API if client explicit key is present
     if (apiKey) {
       try {
         const apiResponse = await this._callGeminiApi(cleanPrompt, apiKey, model, mode);
@@ -49,17 +49,68 @@ export class AiKnowledgeEngine {
           };
         }
       } catch (err) {
-        console.warn('Gemini API query failed, falling back to Local Knowledge Engine:', err);
+        console.warn('Client Gemini API query failed, falling back to server/local engine:', err);
       }
     }
 
-    // Fallback: Smart Local Knowledge Engine
+    // 2. Try Backend Serverless AI (/api/ai/chat) which has Vercel GEMINI_API_KEY
+    try {
+      const serverResponse = await this._callServerAiChat(cleanPrompt, mode, model);
+      if (serverResponse && serverResponse.text) {
+        return {
+          text: serverResponse.text,
+          labAction: serverResponse.labAction || this._detectLabActionFallback(cleanPrompt),
+          isFromApi: true,
+        };
+      }
+    } catch {}
+
+    // 3. Fallback: Smart Local Knowledge Engine
     const localResult = this._solveLocally(cleanPrompt, mode);
     return {
       text: localResult.text,
       labAction: localResult.labAction,
       isFromApi: false,
     };
+  }
+
+  /**
+   * Calls the backend server AI chat endpoint if reachable.
+   * @param {string} prompt
+   * @param {string} mode
+   * @param {string} model
+   * @returns {Promise<{ text: string, labAction: Object|null }|null>}
+   */
+  async _callServerAiChat(prompt, mode, model) {
+    if (typeof fetch === 'undefined') return null;
+    const candidates = ['/api/ai/chat'];
+    if (typeof window !== 'undefined' && window.location) {
+      const hostname = window.location.hostname;
+      const port = window.location.port;
+      if ((hostname === 'localhost' || hostname === '127.0.0.1') && port !== '3000') {
+        candidates.push('http://localhost:3000/api/ai/chat');
+      }
+    }
+
+    for (const url of candidates) {
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt, mode, model }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.success && data.text) {
+            return {
+              text: data.text,
+              labAction: data.labAction || null,
+            };
+          }
+        }
+      } catch {}
+    }
+    return null;
   }
 
   /**

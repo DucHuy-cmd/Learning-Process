@@ -50,6 +50,7 @@ export class CloudSyncManager {
       isConnected: this.isConnected,
       isSyncing: this.isSyncing,
       lastSyncTime: this.lastSyncTime,
+      serverAiConfigured: Boolean(this.serverAiConfigured),
     };
   }
 
@@ -94,6 +95,14 @@ export class CloudSyncManager {
         if (timer) clearTimeout(timer);
         if (res.ok) {
           this.isConnected = true;
+          try {
+            if (typeof res.json === 'function') {
+              const data = await res.json();
+              if (data && typeof data.aiConfigured === 'boolean') {
+                this.serverAiConfigured = data.aiConfigured;
+              }
+            }
+          } catch {}
           if (url.startsWith('http://localhost:3000')) {
             this.baseUrl = 'http://localhost:3000';
           }

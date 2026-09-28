@@ -505,3 +505,96 @@ export async function analyzeGraphFileBackend(file, options = {}) {
   // Default to Gemini Vision (Google Generative AI)
   return await callGeminiVision(file, options);
 }
+
+/**
+ * Executes an AI chat prompt on the server using Gemini API.
+ * @param {string} prompt
+ * @param {string} apiKey
+ * @param {string} [model='gemini-1.5-flash']
+ * @param {string} [mode='bridge']
+ * @returns {Promise<{ text: string, labAction: Object|null }>}
+ */
+export async function executeGeminiChat(prompt, apiKey, model = 'gemini-1.5-flash', mode = 'bridge') {
+  if (!apiKey) {
+    throw new Error('Thiếu API Key cho Google Gemini AI.');
+  }
+
+  const systemInstruction = `
+Bạn là Trợ lý AI Chuyên gia Giảng dạy & Thực nghiệm môn Toán Rời Rạc (Discrete Mathematics) cấp Đại học.
+Mục tiêu của bạn:
+1. Giải thích cặn kẽ, chính xác về mặt toán học, sử dụng các ký hiệu rõ ràng: p ∧ q, p ∨ q, p → q, ¬p, C(n,k), A(n,k), M_R, v.v.
+2. Trình bày bài giải rõ ràng theo từng bước (Step-by-step reasoning).
+3. ĐẶC BIỆT (TÍNH NĂNG LAB BRIDGE):
+Nếu câu hỏi của người dùng liên quan đến 1 trong 4 phòng lab sau đây, hãy đính kèm ở CUỐI CÙNG phản hồi một khối JSON độc lập (bọc trong \`\`\`json ... \`\`\`) với định dạng:
+{
+  "labAction": {
+    "type": "logic" | "counting" | "relation" | "graph",
+    "title": "Tên bài toán / Đồ thị",
+    "subtab": "table" | "kmap" | "circuit" (nếu là logic) HOẶC "mapping" | "dirichlet" | "pascal" | "recurrence" (nếu là counting) HOẶC "matrix" | "properties" | "warshall" | "hasse" (nếu là relation),
+    "algo": "dijkstra" | "prim" | "kruskal" | "euler" | "hamilton" (nếu là graph),
+    "expr": "(p -> q) & r" (nếu là logic),
+    "graphSpec": { "directed": false, "weighted": true, "nodes": [{"id":"A"}, {"id":"B"}], "edges": [{"from":"A","to":"B","weight":5}] } (nếu là graph)
+  }
+}
+Chế độ phản hồi hiện tại: ${mode === 'hint' ? 'Gợi ý từng bước (không giải hộ toàn bộ ngay)' : mode === 'theory' ? 'Giải thích lý thuyết sâu sắc' : 'Gia sư thực nghiệm (kèm dữ liệu nạp vào Lab)'}.
+`;
+
+  const candidateModels = Array.from(new Set([
+    model,
+    'gemini-1.5-flash',
+    'gemini-2.0-flash',
+    'gemini-1.5-flash-latest',
+    'gemini-1.5-pro',
+  ]));
+
+  let lastError = null;
+
+  for (const candModel of candidateModels) {
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(candModel)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': apiKey,
+        },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          systemInstruction: { parts: [{ text: systemInstruction }] },
+          generationConfig: {
+            temperature: 0.3,
+            maxOutputTokens: 2048,
+          },
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const candidateText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        let labAction = null;
+        let cleanText = candidateText;
+
+        const jsonMatch = candidateText.match(/```json\s*(\{[\s\S]*?"labAction"[\s\S]*?\})\s*```/i);
+        if (jsonMatch) {
+          try {
+            const parsed = JSON.parse(jsonMatch[1]);
+            if (parsed.labAction) {
+              labAction = parsed.labAction;
+              cleanText = candidateText.replace(jsonMatch[0], '').trim();
+            }
+          } catch {}
+        }
+
+        return { text: cleanText, labAction };
+      } else {
+        const errText = await res.text();
+        lastError = new Error(`Gemini API error [${res.status}]: ${errText}`);
+      }
+    } catch (err) {
+      lastError = err;
+    }
+  }
+
+  throw lastError || new Error('Không thể kết nối đến Gemini AI trên máy chủ.');
+}

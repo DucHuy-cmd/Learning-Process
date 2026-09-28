@@ -304,6 +304,11 @@ export class AiAssistantView {
 
     // Shared API key with Graph Lab Vision from localStorage
     this.apiKey = getStoredApiKey();
+    this.serverAiConfigured = cloudSyncManager.getStatus().serverAiConfigured || false;
+    this.unsubscribeSync = cloudSyncManager.subscribe((status) => {
+      this.serverAiConfigured = Boolean(status.serverAiConfigured);
+      this._updateStatusBadge();
+    });
 
     // Message History
     this.messages = [
@@ -395,13 +400,13 @@ Tôi là gia sư AI học thuật được tích hợp trực tiếp vào hệ t
           <!-- Prompts Panel Container -->
           <div class="ai-prompts-panel" id="aiPromptsPanel" style="${this.sidebarTab === 'prompts' ? 'display:block;' : 'display:none;'}">
             <!-- API Key Status Bar -->
-            <div class="ai-api-status-card">
+            <div class="ai-api-status-card" id="aiApiStatusCard">
               <div class="status-top">
-                <span class="status-indicator ${this.apiKey ? 'status-online' : 'status-local'}"></span>
-                <span class="status-label">${this.apiKey ? 'Gemini 3.8 Flash (Online)' : 'Smart Knowledge Engine (Offline)'}</span>
+                <span class="status-indicator ${this.apiKey || this.serverAiConfigured ? 'status-online' : 'status-local'}"></span>
+                <span class="status-label">${this.apiKey ? 'Gemini 3.8 Flash (Online)' : (this.serverAiConfigured ? 'Gemini Cloud (Online)' : 'Smart Knowledge Engine (Offline)')}</span>
               </div>
               <button type="button" class="btn-api-config" id="btnToggleApiConfig">
-                ${this.apiKey ? '⚙️ Quản lý API Key' : '🔑 Cài đặt Gemini API Key'}
+                ${this.apiKey || this.serverAiConfigured ? '⚙️ Quản lý API Key' : '🔑 Cài đặt Gemini API Key'}
               </button>
               <div class="api-key-input-box" id="apiKeyInputBox" style="display:none;">
                 <input type="password" id="inputGeminiApiKey" class="input-api-key" placeholder="Dán Gemini API Key tại đây..." value="${this.apiKey}">
@@ -409,7 +414,9 @@ Tôi là gia sư AI học thuật được tích hợp trực tiếp vào hệ t
                   <button type="button" class="btn-sm btn-save-key" id="btnSaveApiKey">Lưu Key</button>
                   <button type="button" class="btn-sm btn-clear-key" id="btnClearApiKey">Xóa Key</button>
                 </div>
-                <span class="api-key-hint">API Key được lưu an toàn trong trình duyệt (LocalStorage). Không bắt buộc có key vì hệ thống luôn có sẵn bộ não suy luận Offline!</span>
+                <span class="api-key-hint">${this.serverAiConfigured 
+                  ? '✅ Máy chủ Vercel đã kết nối sẵn Gemini AI vĩnh viễn! Bạn không cần dán key nữa, nhưng vẫn có thể dán key riêng nếu muốn ghi đè.' 
+                  : 'API Key được lưu an toàn trong trình duyệt (LocalStorage). Không bắt buộc có key vì hệ thống luôn có sẵn bộ não suy luận Offline!'}</span>
               </div>
             </div>
 
@@ -1195,6 +1202,32 @@ Tôi là gia sư AI học thuật được tích hợp trực tiếp vào hệ t
 
     // 11. Bind History Item Clicks
     this._bindHistoryEvents();
+  }
+
+  _updateStatusBadge() {
+    if (!this.container) return;
+    const isAiOnline = Boolean(this.apiKey || this.serverAiConfigured);
+    const indicator = this.container.querySelector('.status-indicator');
+    const label = this.container.querySelector('.status-label');
+    const btnToggle = this.container.querySelector('#btnToggleApiConfig');
+    const hint = this.container.querySelector('.api-key-hint');
+
+    if (indicator) {
+      indicator.className = `status-indicator ${isAiOnline ? 'status-online' : 'status-local'}`;
+    }
+    if (label) {
+      label.textContent = this.apiKey
+        ? 'Gemini 3.8 Flash (Online)'
+        : (this.serverAiConfigured ? 'Gemini Cloud (Online)' : 'Smart Knowledge Engine (Offline)');
+    }
+    if (btnToggle) {
+      btnToggle.textContent = isAiOnline ? '⚙️ Quản lý API Key' : '🔑 Cài đặt Gemini API Key';
+    }
+    if (hint) {
+      hint.textContent = this.serverAiConfigured 
+        ? '✅ Máy chủ Vercel đã kết nối sẵn Gemini AI vĩnh viễn! Bạn không cần dán key nữa, nhưng vẫn có thể dán key riêng nếu muốn ghi đè.' 
+        : 'API Key được lưu an toàn trong trình duyệt (LocalStorage). Không bắt buộc có key vì hệ thống luôn có sẵn bộ não suy luận Offline!';
+    }
   }
 
   _bindHistoryEvents() {

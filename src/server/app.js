@@ -13,7 +13,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { extractBoundary, readRequestBody, parseMultipartData } from './parseMultipart.js';
-import { isAIConfigured, analyzeGraphFileBackend } from './ai/AIProviderAdapter.js';
+import { isAIConfigured, analyzeGraphFileBackend, executeGeminiChat } from './ai/AIProviderAdapter.js';
 import { validateGraphSpecification, MAX_FILE_SIZE_BYTES } from '../app/ai/GraphVisionAdapter.js';
 
 import { serverUsers, serverAiSessions, serverQuizStats, saveDatabase } from './auth/ServerDataStore.js';
@@ -182,6 +182,42 @@ export async function handleRequest(req, res) {
       return;
     } catch {
       sendJson(res, 400, { success: false, error: 'Dữ liệu không hợp lệ.' });
+      return;
+    }
+  }
+
+  // Route: POST /api/ai/chat
+  if (req.method === 'POST' && pathname === '/api/ai/chat') {
+    try {
+      const bodyBuffer = await readRequestBody(req);
+      const data = JSON.parse(bodyBuffer.toString('utf8') || '{}');
+      const prompt = (data.prompt || '').trim();
+      const mode = data.mode || 'bridge';
+      const model = data.model || process.env.GEMINI_MODEL || 'gemini-1.5-flash';
+      const apiKey = data.apiKey || process.env.GEMINI_API_KEY || process.env.AI_API_KEY;
+
+      if (!apiKey) {
+        sendJson(res, 503, {
+          success: false,
+          error: 'AI_NOT_CONFIGURED',
+          message: 'Máy chủ chưa được cấu hình GEMINI_API_KEY.',
+        });
+        return;
+      }
+
+      const result = await executeGeminiChat(prompt, apiKey, model, mode);
+      sendJson(res, 200, {
+        success: true,
+        text: result.text,
+        labAction: result.labAction,
+        isFromApi: true,
+      });
+      return;
+    } catch (err) {
+      sendJson(res, 500, {
+        success: false,
+        error: err.message || 'Lỗi xử lý AI chat trên máy chủ.',
+      });
       return;
     }
   }
