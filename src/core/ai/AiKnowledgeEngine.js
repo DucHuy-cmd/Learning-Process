@@ -27,29 +27,38 @@ export class AiKnowledgeEngine {
    * @returns {Promise<{ text: string, labAction?: Object, isFromApi: boolean }>}
    */
   async ask(prompt, options = {}) {
-    const { mode = 'bridge', apiKey = '', model = 'gemini-3.8-flash' } = options;
+    const { mode = 'bridge', apiKey = '', model = 'gemini-1.5-flash' } = options;
     const cleanPrompt = (prompt || '').trim();
 
     if (!cleanPrompt) {
       return {
         text: 'Xin chào! Bạn có thể đặt câu hỏi về bất kỳ chủ đề Toán Rời Rạc nào (Logic, Phép đếm, Quan hệ, Đồ thị), hoặc yêu cầu tôi tạo bài toán để thực nghiệm ngay trên các phòng Lab.',
         isFromApi: false,
+        source: 'local',
       };
     }
 
+    let apiErrorReason = null;
+
     // 1. Try Gemini API if client explicit key is present
     if (apiKey) {
-      try {
-        const apiResponse = await this._callGeminiApi(cleanPrompt, apiKey, model, mode);
-        if (apiResponse && apiResponse.text) {
-          return {
-            text: apiResponse.text,
-            labAction: apiResponse.labAction || this._detectLabActionFallback(cleanPrompt),
-            isFromApi: true,
-          };
+      if (apiKey.startsWith('AQ.')) {
+        apiErrorReason = 'Khóa API có tiền tố "AQ." (Google Cloud OAuth) không tương thích với Gemini REST API. Vui lòng lấy Key chuẩn "AIzaSy..." miễn phí tại Google AI Studio (https://aistudio.google.com/app/apikey).';
+      } else {
+        try {
+          const apiResponse = await this._callGeminiApi(cleanPrompt, apiKey, model, mode);
+          if (apiResponse && apiResponse.text) {
+            return {
+              text: apiResponse.text,
+              labAction: apiResponse.labAction || this._detectLabActionFallback(cleanPrompt),
+              isFromApi: true,
+              source: 'gemini_client',
+            };
+          }
+        } catch (err) {
+          console.warn('Client Gemini API query failed, falling back to server/local engine:', err);
+          apiErrorReason = err.message || 'Lỗi khi gọi Gemini API với Key cá nhân.';
         }
-      } catch (err) {
-        console.warn('Client Gemini API query failed, falling back to server/local engine:', err);
       }
     }
 
@@ -61,6 +70,7 @@ export class AiKnowledgeEngine {
           text: serverResponse.text,
           labAction: serverResponse.labAction || this._detectLabActionFallback(cleanPrompt),
           isFromApi: true,
+          source: 'gemini_cloud',
         };
       }
     } catch {}
@@ -71,6 +81,8 @@ export class AiKnowledgeEngine {
       text: localResult.text,
       labAction: localResult.labAction,
       isFromApi: false,
+      source: 'local',
+      apiErrorReason,
     };
   }
 
@@ -489,6 +501,97 @@ Khi nhìn vào ma trận nhị phân $n \\times n$, bạn có thể xác định
     // 1. GRAPH LAB: DIJKSTRA SHORTEST PATH
     // -----------------------------------------------------------------------
     if (q.includes('dijkstra') || (q.includes('ngắn nhất') && (q.includes('đồ thị') || q.includes('đường đi')))) {
+      const is3Node = /\b(3\s*đỉnh|ba\s*đỉnh|3\s*nodes?)\b/i.test(q);
+      const is4Node = /\b(4\s*đỉnh|bốn\s*đỉnh|bon\s*đỉnh|4\s*nodes?)\b/i.test(q);
+      const is5Node = /\b(5\s*đỉnh|năm\s*đỉnh|nam\s*đỉnh|5\s*nodes?)\b/i.test(q);
+
+      let title = 'Đồ thị mẫu Dijkstra (6 đỉnh, có trọng số)';
+      let nodeDesc = 'mạng giao thông 6 đỉnh mẫu';
+      let graphSpec = {
+        directed: false,
+        weighted: true,
+        nodes: [
+          { id: 'A', name: 'Đỉnh A (Nguồn)' },
+          { id: 'B', name: 'Đỉnh B' },
+          { id: 'C', name: 'Đỉnh C' },
+          { id: 'D', name: 'Đỉnh D' },
+          { id: 'E', name: 'Đỉnh E' },
+          { id: 'F', name: 'Đỉnh F (Đích)' },
+        ],
+        edges: [
+          { from: 'A', to: 'B', weight: 4 },
+          { from: 'A', to: 'C', weight: 2 },
+          { from: 'B', to: 'C', weight: 1 },
+          { from: 'B', to: 'D', weight: 5 },
+          { from: 'C', to: 'D', weight: 8 },
+          { from: 'C', to: 'E', weight: 10 },
+          { from: 'D', to: 'E', weight: 2 },
+          { from: 'D', to: 'F', weight: 6 },
+          { from: 'E', to: 'F', weight: 3 },
+        ],
+      };
+
+      if (is3Node) {
+        title = 'Đồ thị Dijkstra 3 đỉnh (Nguồn: A, Đích: C)';
+        nodeDesc = 'đồ thị tam giác 3 đỉnh (A, B, C)';
+        graphSpec = {
+          directed: false,
+          weighted: true,
+          nodes: [
+            { id: 'A', name: 'Đỉnh A (Nguồn)' },
+            { id: 'B', name: 'Đỉnh B' },
+            { id: 'C', name: 'Đỉnh C (Đích)' },
+          ],
+          edges: [
+            { from: 'A', to: 'B', weight: 3 },
+            { from: 'A', to: 'C', weight: 6 },
+            { from: 'B', to: 'C', weight: 2 },
+          ],
+        };
+      } else if (is4Node) {
+        title = 'Đồ thị Dijkstra 4 đỉnh (Nguồn: A, Đích: D)';
+        nodeDesc = 'đồ thị tứ giác 4 đỉnh (A, B, C, D)';
+        graphSpec = {
+          directed: false,
+          weighted: true,
+          nodes: [
+            { id: 'A', name: 'Đỉnh A (Nguồn)' },
+            { id: 'B', name: 'Đỉnh B' },
+            { id: 'C', name: 'Đỉnh C' },
+            { id: 'D', name: 'Đỉnh D (Đích)' },
+          ],
+          edges: [
+            { from: 'A', to: 'B', weight: 2 },
+            { from: 'A', to: 'C', weight: 5 },
+            { from: 'B', to: 'C', weight: 1 },
+            { from: 'B', to: 'D', weight: 4 },
+            { from: 'C', to: 'D', weight: 2 },
+          ],
+        };
+      } else if (is5Node) {
+        title = 'Đồ thị Dijkstra 5 đỉnh (Nguồn: A, Đích: E)';
+        nodeDesc = 'đồ thị 5 đỉnh (A, B, C, D, E)';
+        graphSpec = {
+          directed: false,
+          weighted: true,
+          nodes: [
+            { id: 'A', name: 'Đỉnh A (Nguồn)' },
+            { id: 'B', name: 'Đỉnh B' },
+            { id: 'C', name: 'Đỉnh C' },
+            { id: 'D', name: 'Đỉnh D' },
+            { id: 'E', name: 'Đỉnh E (Đích)' },
+          ],
+          edges: [
+            { from: 'A', to: 'B', weight: 4 },
+            { from: 'A', to: 'C', weight: 2 },
+            { from: 'B', to: 'D', weight: 5 },
+            { from: 'C', to: 'D', weight: 1 },
+            { from: 'C', to: 'E', weight: 7 },
+            { from: 'D', to: 'E', weight: 3 },
+          ],
+        };
+      }
+
       return {
         text: `### 🌐 Thuật toán Dijkstra – Tìm đường đi ngắn nhất
 
@@ -502,34 +605,12 @@ Khi nhìn vào ma trận nhị phân $n \\times n$, bạn có thể xác định
 - Thuật toán Dijkstra **không** chạy đúng trên đồ thị có trọng số âm (khi đó phải dùng thuật toán Bellman-Ford hoặc Floyd-Warshall).
 - Khi có nhiều đỉnh cùng khoảng cách nhỏ nhất, thứ tự chọn phụ thuộc vào quy ước duyệt đỉnh (thường theo thứ tự từ điển).
 
-Tôi đã chuẩn bị sẵn một đồ thị mạng giao thông 6 đỉnh mẫu. Bạn có thể mở trực tiếp trong Graph Lab để xem bảng trạng thái cập nhật từng bước!`,
+Tôi đã chuẩn bị sẵn ${nodeDesc}. Bạn có thể mở trực tiếp trong Graph Lab để xem bảng trạng thái cập nhật từng bước!`,
         labAction: {
           type: 'graph',
-          title: 'Đồ thị mẫu Dijkstra (6 đỉnh, có trọng số)',
+          title,
           algo: 'dijkstra',
-          graphSpec: {
-            directed: false,
-            weighted: true,
-            nodes: [
-              { id: 'A', name: 'Đỉnh A (Nguồn)' },
-              { id: 'B', name: 'Đỉnh B' },
-              { id: 'C', name: 'Đỉnh C' },
-              { id: 'D', name: 'Đỉnh D' },
-              { id: 'E', name: 'Đỉnh E' },
-              { id: 'F', name: 'Đỉnh F (Đích)' },
-            ],
-            edges: [
-              { from: 'A', to: 'B', weight: 4 },
-              { from: 'A', to: 'C', weight: 2 },
-              { from: 'B', to: 'C', weight: 1 },
-              { from: 'B', to: 'D', weight: 5 },
-              { from: 'C', to: 'D', weight: 8 },
-              { from: 'C', to: 'E', weight: 10 },
-              { from: 'D', to: 'E', weight: 2 },
-              { from: 'D', to: 'F', weight: 6 },
-              { from: 'E', to: 'F', weight: 3 },
-            ],
-          },
+          graphSpec,
         },
       };
     }
@@ -591,6 +672,72 @@ Hãy bấm nút dưới đây để nạp ngay đồ thị mẫu vào Graph Lab 
     // -----------------------------------------------------------------------
     if (q.includes('euler') || q.includes('hamilton')) {
       const isEuler = q.includes('euler');
+      const is4Node = /\b(4\s*đỉnh|bốn\s*đỉnh|bon\s*đỉnh|4\s*nodes?)\b/i.test(q);
+      const is6Node = /\b(6\s*đỉnh|sáu\s*đỉnh|sau\s*đỉnh|6\s*nodes?)\b/i.test(q);
+
+      let nodes, edges, title, desc;
+      if (is4Node) {
+        title = isEuler ? 'Đồ thị Euler 4 đỉnh (Chu trình C4 - mọi đỉnh bậc 2)' : 'Đồ thị Hamilton 4 đỉnh (Chu trình C4)';
+        desc = 'đồ thị 4 đỉnh (A, B, C, D) có chu trình khép kín';
+        nodes = [
+          { id: 'A', name: 'Đỉnh A' },
+          { id: 'B', name: 'Đỉnh B' },
+          { id: 'C', name: 'Đỉnh C' },
+          { id: 'D', name: 'Đỉnh D' },
+        ];
+        edges = [
+          { from: 'A', to: 'B', weight: 1 },
+          { from: 'B', to: 'C', weight: 1 },
+          { from: 'C', to: 'D', weight: 1 },
+          { from: 'D', to: 'A', weight: 1 },
+        ];
+      } else if (is6Node) {
+        title = isEuler ? 'Đồ thị Euler 6 đỉnh (Mọi đỉnh bậc 4)' : 'Đồ thị Hamilton 6 đỉnh (Đầy đủ chu trình)';
+        desc = 'đồ thị 6 đỉnh (A, B, C, D, E, F) với các bậc chẵn';
+        nodes = [
+          { id: 'A', name: 'Đỉnh A' },
+          { id: 'B', name: 'Đỉnh B' },
+          { id: 'C', name: 'Đỉnh C' },
+          { id: 'D', name: 'Đỉnh D' },
+          { id: 'E', name: 'Đỉnh E' },
+          { id: 'F', name: 'Đỉnh F' },
+        ];
+        edges = [
+          { from: 'A', to: 'B', weight: 1 },
+          { from: 'B', to: 'C', weight: 1 },
+          { from: 'C', to: 'D', weight: 1 },
+          { from: 'D', to: 'E', weight: 1 },
+          { from: 'E', to: 'F', weight: 1 },
+          { from: 'F', to: 'A', weight: 1 },
+          { from: 'A', to: 'D', weight: 1 },
+          { from: 'B', to: 'E', weight: 1 },
+          { from: 'C', to: 'F', weight: 1 },
+          { from: 'A', to: 'C', weight: 1 },
+          { from: 'C', to: 'E', weight: 1 },
+          { from: 'E', to: 'A', weight: 1 },
+        ];
+      } else {
+        title = isEuler ? 'Đồ thị Euler mẫu (Tất cả đỉnh bậc chẵn)' : 'Đồ thị Hamilton mẫu';
+        desc = 'đồ thị 5 đỉnh mẫu đã được tối ưu';
+        nodes = [
+          { id: 'A', name: 'Đỉnh A' },
+          { id: 'B', name: 'Đỉnh B' },
+          { id: 'C', name: 'Đỉnh C' },
+          { id: 'D', name: 'Đỉnh D' },
+          { id: 'E', name: 'Đỉnh E' },
+        ];
+        edges = [
+          { from: 'A', to: 'B', weight: 1 },
+          { from: 'B', to: 'C', weight: 1 },
+          { from: 'C', to: 'D', weight: 1 },
+          { from: 'D', to: 'E', weight: 1 },
+          { from: 'E', to: 'A', weight: 1 },
+          { from: 'A', to: 'C', weight: 1 },
+          { from: 'B', to: 'D', weight: 1 },
+          { from: 'C', to: 'E', weight: 1 },
+        ];
+      }
+
       return {
         text: `### 🌐 Chu trình Euler vs Chu trình Hamilton
 
@@ -604,31 +751,16 @@ Hãy bấm nút dưới đây để nạp ngay đồ thị mẫu vào Graph Lab 
 - **Định lý Dirac:** Nếu đồ thị đơn vô hướng có $n \\ge 3$ đỉnh và mọi đỉnh đều có $deg(v) \\ge n/2$ thì đồ thị có chu trình Hamilton.
 - **Định lý Ore:** Nếu $deg(u) + deg(v) \\ge n$ với mọi cặp đỉnh $u, v$ không kề nhau thì đồ thị có chu trình Hamilton.
 
-Dưới đây là đồ thị mẫu đã được tối ưu để bạn quan sát thuật toán tìm chu trình!`,
+Dưới đây là ${desc} để bạn quan sát thuật toán tìm chu trình!`,
         labAction: {
           type: 'graph',
-          title: isEuler ? 'Đồ thị Euler mẫu (Tất cả đỉnh bậc chẵn)' : 'Đồ thị Hamilton mẫu',
+          title,
           algo: isEuler ? 'euler' : 'hamilton',
           graphSpec: {
             directed: false,
             weighted: false,
-            nodes: [
-              { id: 'A', name: 'Đỉnh A' },
-              { id: 'B', name: 'Đỉnh B' },
-              { id: 'C', name: 'Đỉnh C' },
-              { id: 'D', name: 'Đỉnh D' },
-              { id: 'E', name: 'Đỉnh E' },
-            ],
-            edges: [
-              { from: 'A', to: 'B', weight: 1 },
-              { from: 'B', to: 'C', weight: 1 },
-              { from: 'C', to: 'D', weight: 1 },
-              { from: 'D', to: 'E', weight: 1 },
-              { from: 'E', to: 'A', weight: 1 },
-              { from: 'A', to: 'C', weight: 1 },
-              { from: 'B', to: 'D', weight: 1 },
-              { from: 'C', to: 'E', weight: 1 },
-            ],
+            nodes,
+            edges,
           },
         },
       };
@@ -666,22 +798,94 @@ Bấm nút bên dưới để nạp biểu thức này vào Logic Lab và tự �
     // 5. LOGIC LAB: KARNAUGH MAP (K-MAP)
     // -----------------------------------------------------------------------
     if (q.includes('kmap') || q.includes('karnaugh') || q.includes('bìa') || q.includes('rút gọn hàm boole')) {
-      return {
-        text: `### ⚡ Tối Giản Hàm Boole Bằng Bìa Karnaugh (K-Map)
+      const is2Var = /\b(2\s*biến|hai\s*biến|2\s*vars?|2\s*variables?)\b/i.test(q) || (q.includes('2') && (q.includes('biến') || q.includes('variable')));
+      const is3Var = /\b(3\s*biến|ba\s*biến|3\s*vars?|3\s*variables?)\b/i.test(q) || (q.includes('3') && (q.includes('biến') || q.includes('variable')));
+      const is4Var = /\b(4\s*biến|bốn\s*biến|bon\s*biến|4\s*vars?|4\s*variables?)\b/i.test(q) || (q.includes('4') && (q.includes('biến') || q.includes('variable')));
 
-**1. Nguyên tắc cốt lõi của K-Map:**
-- **Mã Gray (Gray Code):** Các ô liền kề nhau chỉ khác biệt duy nhất 1 bit (theo thứ tự: $00, 01, 11, 10$). Điều này cho phép áp dụng luật kết hợp $x \\cdot y + x \\cdot \\neg y = x$.
+      // 2-Variable K-Map
+      if (is2Var && !is3Var && !is4Var) {
+        return {
+          text: `### ⚡ Tối Giản Hàm Boole Bằng Bìa Karnaugh 2 Biến (K-Map 2-Variable)
+
+**1. Cấu trúc Bìa K-Map 2 biến:**
+- **Số ô:** Với $n = 2$ biến ($A, B$), bìa K có $2^2 = 4$ ô tương ứng với 4 minterm $m_0, m_1, m_2, m_3$.
+- **Mã Gray:**
+  - Hàng: Biến $A \\in \\{0, 1\\}$
+  - Cột: Biến $B \\in \\{0, 1\\}$
+  - Các ô minterm:
+    - Hàng $A=0$: Ô $(0,0) = m_0 (\\neg A \\land \\neg B)$, Ô $(0,1) = m_1 (\\neg A \\land B)$
+    - Hàng $A=1$: Ô $(1,0) = m_2 (A \\land \\neg B)$, Ô $(1,1) = m_3 (A \\land B)$
+
+**2. Ví dụ thực nghiệm hàm 2 biến:**
+- **Bài toán:** Tối giản hàm $f(A, B) = \\sum m(1, 2) = \\neg A \\cdot B + A \\cdot \\neg B$ (Cổng XOR $A \\oplus B$):
+  - Ô $m_1 = (0, 1)$ có giá trị 1.
+  - Ô $m_2 = (1, 0)$ có giá trị 1.
+  - Hai ô này nằm chéo nhau, không kề nhau nên không thể gom nhóm $\\implies$ Biểu thức tối giản:
+    $$f(A, B) = \\neg A \\cdot B + A \\cdot \\neg B = A \\oplus B$$
+- **Trường hợp gom nhóm 2 ô kề nhau:** Nếu hàm là $f(A, B) = \\sum m(0, 1) = \\neg A \\cdot \\neg B + \\neg A \\cdot B$, hai ô cùng nằm ở hàng $A=0$ gom thành nhóm 2 ô $\\rightarrow$ triệt tiêu biến $B$, kết quả $f = \\neg A$.
+
+Bấm nút bên dưới để nạp biểu thức 2 biến vào Logic Lab và trực tiếp tương tác với bìa K-Map 4 ô nhé!`,
+          labAction: {
+            type: 'logic',
+            title: 'Tối giản K-Map 2 biến',
+            subtab: 'kmap',
+            expr: '(~a & b) | (a & ~b)',
+          },
+        };
+      }
+
+      // 3-Variable K-Map
+      if (is3Var && !is4Var) {
+        return {
+          text: `### ⚡ Tối Giản Hàm Boole Bằng Bìa Karnaugh 3 Biến (K-Map 3-Variable)
+
+**1. Cấu trúc Bìa K-Map 3 biến:**
+- **Số ô:** Với $n = 3$ biến ($A, B, C$), bìa K có $2^3 = 8$ ô tổ chức thành lưới $2 \\times 4$.
+- **Mã Gray (Gray Code):**
+  - Hàng: Biến $A \\in \\{0, 1\\}$
+  - Cột: Cặp biến $BC \\in \\{00, 01, 11, 10\\}$ (Đặc biệt: 2 cột mép $00$ và $10$ là liền kề vòng quanh *Wrap-around*).
+  - Tọa độ minterm:
+    - Hàng 0 ($A=0$): $m_0(000), m_1(001), m_3(011), m_2(010)$
+    - Hàng 1 ($A=1$): $m_4(100), m_5(101), m_7(111), m_6(110)$
+
+**2. Ví dụ thực nghiệm hàm 3 biến:**
+- **Bài toán:** Tối giản hàm $f(A, B, C) = \\sum m(1, 3, 4, 6)$:
+  - Ở hàng $A=0$: Ô $m_1(0, 01)$ và $m_3(0, 11)$ kề nhau $\\rightarrow$ Gom thành nhóm 2 ô: $\\neg A \\cdot C$ (biến $B$ triệt tiêu).
+  - Ở hàng $A=1$: Ô $m_4(1, 00)$ và $m_6(1, 10)$ là 2 mép ngoài cùng kề nhau $\\rightarrow$ Gom thành nhóm 2 ô: $A \\cdot \\neg C$ (biến $B$ triệt tiêu).
+  - Kết quả tối giản:
+    $$f(A, B, C) = \\neg A \\cdot C + A \\cdot \\neg C = A \\oplus C$$
+- **Trường hợp nhóm 4 ô:** Nếu có 4 ô $m(0, 2, 4, 6)$ ở 2 mép của cả 2 hàng, gom thành nhóm kích thước 4 $\\rightarrow$ triệt tiêu cả $A$ và $B$, chỉ còn lại $\\neg C$!
+
+Bấm nút bên dưới để nạp biểu thức 3 biến vào Logic Lab và xem các tế bào bao phủ trực quan!`,
+          labAction: {
+            type: 'logic',
+            title: 'Tối giản K-Map 3 biến',
+            subtab: 'kmap',
+            expr: '(a & ~c) | (~a & c)',
+          },
+        };
+      }
+
+      // Default or 4-Variable K-Map
+      return {
+        text: `### ⚡ Tối Giản Hàm Boole Bằng Bìa Karnaugh 4 Biến (K-Map 4-Variable)
+
+**1. Nguyên tắc cốt lõi của K-Map 4 biến:**
+- **Cấu trúc lưới:** Với $n = 4$ biến ($A, B, C, D$), bìa K gồm $2^4 = 16$ ô tổ chức dạng lưới $4 \\times 4$.
+- **Mã Gray 2 chiều:**
+  - Hàng: $AB \\in \\{00, 01, 11, 10\\}$
+  - Cột: $CD \\in \\{00, 01, 11, 10\\}$
 - **Quy tắc tạo nhóm ô (Tế bào lớn):**
   - Số lượng ô trong một nhóm phải là **lũy thừa của 2** ($1, 2, 4, 8, 16$).
   - Nhóm càng lớn thì biểu thức rút gọn được càng nhiều biến.
-  - Các ô ở mép bìa (biên trái - biên phải, biên trên - biên dưới) được coi là liền kề nhau (*Wrap-around*).
+  - Các ô ở mép bìa (4 góc, biên trái - biên phải, biên trên - biên dưới) được coi là liền kề nhau (*Wrap-around*).
 
 **2. Ví dụ hàm 4 biến $f(A, B, C, D) = \\sum m(0, 2, 5, 7, 8, 10, 13, 15)$:**
 - 4 góc: $m(0, 2, 8, 10)$ gom thành nhóm kích thước 4 $\\rightarrow \\neg B \\cdot \\neg D$.
 - 4 ô giữa: $m(5, 7, 13, 15)$ gom thành nhóm kích thước 4 $\\rightarrow B \\cdot D$.
 - Kết quả tối giản: $f = \\neg B \\cdot \\neg D + B \\cdot D$ (Chính là cổng XNOR $\\overline{A \\oplus B}$).
 
-Hãy mở ngay Logic Lab để xem trực quan các nhóm bao phủ trên bìa K-Map!`,
+Hãy mở ngay Logic Lab để xem trực quan các nhóm bao phủ trên bìa K-Map 16 ô!`,
         labAction: {
           type: 'logic',
           title: 'Tối giản K-Map 4 biến',
@@ -782,13 +986,34 @@ Mở ngay Bộ giải Hệ thức truy hồi trong Counting Lab để nhập h�
     // 9. COUNTING LAB: COMBINATORICS & PASCAL
     // -----------------------------------------------------------------------
     if (q.includes('tổ hợp') || q.includes('chỉnh hợp') || q.includes('hoán vị') || q.includes('pascal') || q.includes('nhị thức')) {
-      return {
-        text: `### 🧮 Đại Số Tổ Hợp & Tam Giác Pascal
+      const isPerm = q.includes('hoán vị') && !q.includes('tổ hợp') && !q.includes('chỉnh hợp');
+      const isArr = q.includes('chỉnh hợp') && !q.includes('tổ hợp');
 
-**1. Các công thức đếm nền tảng:**
+      let intro = '';
+      if (isPerm) {
+        intro = `**1. Trọng tâm Hoán vị (Permutation - $P_n$):**
+- **Định nghĩa:** Mỗi cách sắp xếp có thứ tự $n$ phần tử của tập hợp được gọi là một hoán vị.
+- **Công thức:** $P_n = n! = n \\cdot (n-1) \\cdots 2 \\cdot 1$.
+- **Ví dụ kinh điển:** Có bao nhiêu cách xếp 5 bạn học sinh thành 1 hàng dọc?
+  Đáp án: $P_5 = 5! = 120$ cách.`;
+      } else if (isArr) {
+        intro = `**1. Trọng tâm Chỉnh hợp (Variation - $A_n^k$):**
+- **Định nghĩa:** Một chỉnh hợp chập $k$ của $n$ phần tử là một bộ gồm $k$ phần tử được sắp xếp theo một thứ tự nhất định ($1 \\le k \\le n$).
+- **Công thức:** $A_n^k = \\frac{n!}{(n - k)!}$.
+- **Ví dụ kinh điển:** Một lớp có 20 học sinh, cần bầu ra 1 Lớp trưởng, 1 Lớp phó, 1 Bí thư. Do 3 chức vụ phân biệt thứ tự, số cách bầu là:
+  $$A_{20}^3 = \\frac{20!}{(20 - 3)!} = 20 \\cdot 19 \\cdot 18 = 6840 \\text{ cách}.$$`;
+      } else {
+        intro = `**1. Các công thức đếm nền tảng:**
 - **Hoán vị (Permutation):** $P_n = n!$ (xếp thứ tự $n$ phần tử phân biệt).
 - **Chỉnh hợp (Variation):** $A_n^k = \\frac{n!}{(n - k)!}$ (chọn $k$ phần tử và có phân biệt thứ tự).
 - **Tổ hợp (Combination):** $C_n^k = \\binom{n}{k} = \\frac{n!}{k!(n - k)!}$ (chọn $k$ phần tử không kể thứ tự).
+- **Mối liên hệ:** $A_n^k = k! \\cdot C_n^k$.`;
+      }
+
+      return {
+        text: `### 🧮 Đại Số Tổ Hợp, Chỉnh Hợp & Tam Giác Pascal
+
+${intro}
 
 **2. Hệ thức Pascal & Nhị thức Newton:**
 - **Hệ thức Pascal:** $C_n^k = C_{n-1}^{k-1} + C_{n-1}^k$ (Mỗi ô trong tam giác Pascal bằng tổng 2 ô ngay phía trên nó).
@@ -797,7 +1022,7 @@ Mở ngay Bộ giải Hệ thức truy hồi trong Counting Lab để nhập h�
 Hãy khám phá Tam giác Pascal tương tác và máy tính tổ hợp chi tiết trong Counting Lab!`,
         labAction: {
           type: 'counting',
-          title: 'Tam giác Pascal & Máy tính Tổ hợp',
+          title: isArr ? 'Máy tính Chỉnh hợp & Tổ hợp' : 'Tam giác Pascal & Máy tính Tổ hợp',
           subtab: 'pascal',
         },
       };
@@ -876,11 +1101,22 @@ Tôi có thể hỗ trợ bạn học tập và thực hành toàn diện cả 4
     if (q.includes('prim')) return { type: 'graph', algo: 'prim', title: 'Thuật toán Prim MST' };
     if (q.includes('kruskal')) return { type: 'graph', algo: 'kruskal', title: 'Thuật toán Kruskal MST' };
     if (q.includes('euler')) return { type: 'graph', algo: 'euler', title: 'Đồ thị Euler' };
-    if (q.includes('kmap') || q.includes('karnaugh')) return { type: 'logic', subtab: 'kmap', title: 'Bìa Karnaugh' };
+    if (q.includes('hamilton')) return { type: 'graph', algo: 'hamilton', title: 'Đồ thị Hamilton' };
+    if (q.includes('kmap') || q.includes('karnaugh') || q.includes('bìa')) {
+      const has2 = /\b(2\s*biến|hai\s*biến|2\s*vars?)\b/i.test(q) || (q.includes('2') && q.includes('biến'));
+      const has3 = /\b(3\s*biến|ba\s*biến|3\s*vars?)\b/i.test(q) || (q.includes('3') && q.includes('biến'));
+      if (has2) return { type: 'logic', subtab: 'kmap', title: 'Tối giản K-Map 2 biến', expr: '(~a & b) | (a & ~b)' };
+      if (has3) return { type: 'logic', subtab: 'kmap', title: 'Tối giản K-Map 3 biến', expr: '(a & ~c) | (~a & c)' };
+      return { type: 'logic', subtab: 'kmap', title: 'Tối giản K-Map 4 biến', expr: '(~b & ~d) | (b & d)' };
+    }
     if (q.includes('chân trị') || q.includes('mệnh đề')) return { type: 'logic', subtab: 'table', title: 'Bảng chân trị' };
-    if (q.includes('dirichlet') || q.includes('chuồng bồ câu')) return { type: 'counting', subtab: 'dirichlet', title: 'Nguyên lý Dirichlet' };
-    if (q.includes('truy hồi')) return { type: 'counting', subtab: 'recurrence', title: 'Hệ thức truy hồi' };
-    if (q.includes('quan hệ') || q.includes('hasse') || q.includes('poset')) return { type: 'relation', subtab: 'hasse', title: 'Quan hệ thứ tự Poset' };
+    if (q.includes('mạch') || q.includes('cổng')) return { type: 'logic', subtab: 'circuit', title: 'Mạch logic' };
+    if (q.includes('dirichlet') || q.includes('chuồng')) return { type: 'counting', subtab: 'dirichlet', title: 'Nguyên lý Dirichlet' };
+    if (q.includes('truy hồi') || q.includes('fibonacci')) return { type: 'counting', subtab: 'recurrence', title: 'Hệ thức truy hồi' };
+    if (q.includes('tổ hợp') || q.includes('chỉnh hợp') || q.includes('hoán vị') || q.includes('pascal')) return { type: 'counting', subtab: 'pascal', title: 'Tổ hợp & Pascal' };
+    if (q.includes('poset') || q.includes('hasse')) return { type: 'relation', subtab: 'hasse', title: 'Biểu đồ Hasse' };
+    if (q.includes('warshall')) return { type: 'relation', subtab: 'warshall', title: 'Bao đóng Warshall' };
+    if (q.includes('quan hệ')) return { type: 'relation', subtab: 'properties', title: 'Tính chất quan hệ' };
     return null;
   }
 }

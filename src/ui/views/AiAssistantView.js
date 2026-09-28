@@ -329,6 +329,8 @@ Tôi là gia sư AI học thuật được tích hợp trực tiếp vào hệ t
           title: 'Đồ thị mẫu Dijkstra (6 đỉnh có trọng số)',
           algo: 'dijkstra',
         },
+        source: 'local',
+        isFromApi: false,
       },
     ];
 
@@ -403,20 +405,21 @@ Tôi là gia sư AI học thuật được tích hợp trực tiếp vào hệ t
             <div class="ai-api-status-card" id="aiApiStatusCard">
               <div class="status-top">
                 <span class="status-indicator ${this.apiKey || this.serverAiConfigured ? 'status-online' : 'status-local'}"></span>
-                <span class="status-label">${this.apiKey ? 'Gemini 3.8 Flash (Online)' : (this.serverAiConfigured ? 'Gemini Cloud (Online)' : 'Smart Knowledge Engine (Offline)')}</span>
+                <span class="status-label">${this.apiKey ? 'Gemini Flash (Key Cá Nhân Online)' : (this.serverAiConfigured ? 'Gemini Cloud (Server Vercel Online)' : 'Smart Knowledge Engine (Offline)')}</span>
               </div>
               <button type="button" class="btn-api-config" id="btnToggleApiConfig">
                 ${this.apiKey || this.serverAiConfigured ? '⚙️ Quản lý API Key' : '🔑 Cài đặt Gemini API Key'}
               </button>
               <div class="api-key-input-box" id="apiKeyInputBox" style="display:none;">
-                <input type="password" id="inputGeminiApiKey" class="input-api-key" placeholder="Dán Gemini API Key tại đây..." value="${this.apiKey}">
+                <input type="password" id="inputGeminiApiKey" class="input-api-key" placeholder="Dán Gemini Key chuẩn (bắt đầu bằng AIzaSy...)" value="${this.apiKey}">
                 <div class="api-key-btn-row">
                   <button type="button" class="btn-sm btn-save-key" id="btnSaveApiKey">Lưu Key</button>
                   <button type="button" class="btn-sm btn-clear-key" id="btnClearApiKey">Xóa Key</button>
+                  <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" class="btn-sm btn-get-key" style="text-decoration:none; display:inline-flex; align-items:center; color:var(--blue-light);">🔗 Lấy Key Google AI Studio</a>
                 </div>
                 <span class="api-key-hint">${this.serverAiConfigured 
                   ? '✅ Máy chủ Vercel đã kết nối sẵn Gemini AI vĩnh viễn! Bạn không cần dán key nữa, nhưng vẫn có thể dán key riêng nếu muốn ghi đè.' 
-                  : 'API Key được lưu an toàn trong trình duyệt (LocalStorage). Không bắt buộc có key vì hệ thống luôn có sẵn bộ não suy luận Offline!'}</span>
+                  : '💡 Key chuẩn tạo tại Google AI Studio luôn bắt đầu bằng "AIzaSy...". Không dùng key "AQ." của Google Cloud vì REST API không hỗ trợ.'}</span>
               </div>
             </div>
 
@@ -537,6 +540,8 @@ Tôi là gia sư AI học thuật được tích hợp trực tiếp vào hệ t
           title: 'Đồ thị mẫu Dijkstra (6 đỉnh có trọng số)',
           algo: 'dijkstra',
         },
+        source: 'local',
+        isFromApi: false,
       },
     ];
     this.render();
@@ -649,7 +654,19 @@ Tôi là gia sư AI học thuật được tích hợp trực tiếp vào hệ t
             ${isUser ? '👤' : '🤖'}
           </div>
           <div class="message-bubble">
-            <div class="message-author">${isUser ? 'Bạn' : 'Trợ lý AI Toán Rời Rạc'}</div>
+            <div class="message-author-row">
+              <span class="message-author">${isUser ? 'Bạn' : 'Trợ lý AI Toán Rời Rạc'}</span>
+              ${!isUser && msg.source ? `
+                <span class="ai-source-badge ${msg.isFromApi ? 'badge-api' : 'badge-local'}">
+                  ${msg.isFromApi ? '⚡ Gemini Cloud (Online)' : '🧠 Tri thức Cục bộ (Offline)'}
+                </span>
+              ` : ''}
+            </div>
+            ${!isUser && msg.apiErrorReason ? `
+              <div class="ai-api-notice">
+                <span>⚠️ ${msg.apiErrorReason}</span>
+              </div>
+            ` : ''}
             <div class="message-body">
               ${this._formatMarkdown(msg.text)}
             </div>
@@ -1057,6 +1074,9 @@ Tôi là gia sư AI học thuật được tích hợp trực tiếp vào hệ t
     if (btnSaveKey && inputKey) {
       btnSaveKey.addEventListener('click', () => {
         const val = inputKey.value.trim();
+        if (val && val.startsWith('AQ.')) {
+          alert('⚠️ Lưu ý: API Key của bạn bắt đầu bằng "AQ." (Google Cloud OAuth/Vertex).\n\nLoại Key này không tương thích với Gemini REST API. Vui lòng truy cập https://aistudio.google.com/app/apikey để tạo Key miễn phí bắt đầu bằng "AIzaSy...".');
+        }
         this.apiKey = val;
         setStoredApiKey(val);
         this.render();
@@ -1327,6 +1347,9 @@ Tôi là gia sư AI học thuật được tích hợp trực tiếp vào hệ t
         role: 'assistant',
         text: result.text,
         labAction: result.labAction,
+        isFromApi: Boolean(result.isFromApi),
+        source: result.source || (result.isFromApi ? 'gemini_cloud' : 'local'),
+        apiErrorReason: result.apiErrorReason || null,
       });
 
       // 4. Automatically save/update session in AiHistoryManager

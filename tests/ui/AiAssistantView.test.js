@@ -67,6 +67,48 @@ describe('AiKnowledgeEngine (Academic Discrete Math Engine)', () => {
     expect(res.labAction.subtab).toBe('kmap');
   });
 
+  it('generates 2-variable Karnaugh Map when requested', async () => {
+    const res = await engine.ask('tạo 2 biến bìa K');
+    expect(res.text).toContain('2 Biến');
+    expect(res.labAction.type).toBe('logic');
+    expect(res.labAction.subtab).toBe('kmap');
+    expect(res.labAction.title).toContain('2 biến');
+    expect(res.labAction.expr).toBe('(~a & b) | (a & ~b)');
+  });
+
+  it('generates 3-variable Karnaugh Map when requested', async () => {
+    const res = await engine.ask('tạo 3 biến bìa K');
+    expect(res.text).toContain('3 Biến');
+    expect(res.labAction.type).toBe('logic');
+    expect(res.labAction.subtab).toBe('kmap');
+    expect(res.labAction.title).toContain('3 biến');
+    expect(res.labAction.expr).toBe('(a & ~c) | (~a & c)');
+  });
+
+  it('generates 4-variable Karnaugh Map when requested', async () => {
+    const res = await engine.ask('tạo 4 biến bìa K');
+    expect(res.text).toContain('4 Biến');
+    expect(res.labAction.type).toBe('logic');
+    expect(res.labAction.subtab).toBe('kmap');
+    expect(res.labAction.title).toContain('4 biến');
+    expect(res.labAction.expr).toBe('(~b & ~d) | (b & d)');
+  });
+
+  it('generates Dijkstra with 4 nodes when specified', async () => {
+    const res = await engine.ask('dijkstra đồ thị 4 đỉnh');
+    expect(res.labAction.type).toBe('graph');
+    expect(res.labAction.algo).toBe('dijkstra');
+    expect(res.labAction.graphSpec.nodes.length).toBe(4);
+  });
+
+  it('warns about AQ. API keys and falls back gracefully', async () => {
+    const res = await engine.ask('tối giản bìa K 2 biến', { apiKey: 'AQ.fakekey12345' });
+    expect(res.isFromApi).toBe(false);
+    expect(res.source).toBe('local');
+    expect(res.apiErrorReason).toContain('AQ.');
+    expect(res.labAction.expr).toBe('(~a & b) | (a & ~b)');
+  });
+
   it('generates Dirichlet pigeonhole principle reasoning with counting action', async () => {
     const res = await engine.ask('Bài toán chia kẹo và nguyên lý chuồng bồ câu Dirichlet');
     expect(res.text).toContain('Dirichlet');
