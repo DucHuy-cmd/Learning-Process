@@ -59,6 +59,7 @@ export class QuizView {
    * @param {Function} [options.onOpenLogicWithExpr] - Callback(expression)
    * @param {Function} [options.onOpenCounting] - Callback(tab)
    * @param {Function} [options.onOpenRelation] - Callback(tab, subtab)
+   * @param {Function} [options.onOpenAuth] - Callback(tab)
    */
   constructor({
     container = null,
@@ -66,12 +67,14 @@ export class QuizView {
     onOpenLogicWithExpr = null,
     onOpenCounting = null,
     onOpenRelation = null,
+    onOpenAuth = null,
   } = {}) {
     this.container = container;
     this.onOpenLabWithAlgo = onOpenLabWithAlgo || (() => {});
     this.onOpenLogicWithExpr = onOpenLogicWithExpr || (() => {});
     this.onOpenCounting = onOpenCounting || (() => {});
     this.onOpenRelation = onOpenRelation || (() => {});
+    this.onOpenAuth = onOpenAuth || null;
 
     // Active primary tab: 'practice' | 'myExams' | 'leaderboard' | 'studio'
     this.activeTab = 'practice';
@@ -144,6 +147,8 @@ export class QuizView {
         cloudSyncManager.syncExamSubmissions(examManager).catch(() => {});
       } catch {}
     }
+
+    this._initKeyboardNavigation();
 
     if (this.container) {
       this.render();
@@ -274,7 +279,7 @@ export class QuizView {
               🎮 Đấu Trường Luyện Tập
             </button>
             <button type="button" class="btn-tab ${this.activeTab === 'myExams' ? 'active' : ''}" id="tabBtnMyExams" style="padding:8px 14px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;position:relative;">
-              📝 Đề Thi Của Tôi ${myPendingCount > 0 ? `<span style="background:#ef4444;color:#fff;font-size:10px;padding:1px 6px;border-radius:10px;margin-left:4px;font-weight:700;">${myPendingCount}</span>` : ''}
+              📝 ${isAdmin ? 'Quản Lý Đề Thi' : 'Đề Thi Của Tôi'} ${myPendingCount > 0 ? `<span style="background:#ef4444;color:#fff;font-size:10px;padding:1px 6px;border-radius:10px;margin-left:4px;font-weight:700;">${myPendingCount}</span>` : ''}
             </button>
             <button type="button" class="btn-tab ${this.activeTab === 'leaderboard' ? 'active' : ''}" id="tabBtnLeaderboard" style="padding:8px 14px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;">
               🏆 Bảng Xếp Hạng
@@ -538,13 +543,15 @@ export class QuizView {
       <div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px 24px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px;">
         <div>
           <div style="font-size:12px;color:var(--accent);font-weight:700;text-transform:uppercase;margin-bottom:4px;">
-            🎓 Cổng Khảo Thí &amp; Kiểm Tra Định Kỳ
+            ${isAdmin ? '🛠️ Quản Lý Đề Thi &amp; Khảo Thí' : '🎓 Cổng Khảo Thí &amp; Kiểm Tra Định Kỳ'}
           </div>
           <h2 style="font-size:20px;font-weight:700;color:var(--text);margin:0;">
-            Xin chào, ${this._escapeHtml(currentUser.fullName)} ${isAdmin ? '<span class="pill-badge" style="background:rgba(245,158,11,0.2);color:var(--accent);font-size:11px;padding:2px 8px;border-radius:8px;vertical-align:middle;">Quản Trị Viên</span>' : ''}
+            ${isAdmin ? 'Quản Lý Danh Sách Đề Thi' : `Xin chào, ${this._escapeHtml(currentUser.fullName)}`} ${isAdmin ? '<span class="pill-badge" style="background:rgba(245,158,11,0.2);color:var(--accent);font-size:11px;padding:2px 8px;border-radius:8px;vertical-align:middle;">Quản Trị Viên</span>' : ''}
           </h2>
           <p style="font-size:13px;color:var(--dim);margin:4px 0 0;">
-            Quy chế thi trực tuyến: Mỗi đề thi chỉ được làm <strong>1 lần duy nhất</strong>. Thang điểm 10. Điểm trung bình các đề thi sẽ quyết định thứ hạng trên Bảng Vàng.
+            ${isAdmin 
+              ? 'Xem tất cả các đề thi được tạo trong hệ thống, theo dõi tiến độ thi của sinh viên hoặc làm bài thi thử.' 
+              : 'Quy chế thi trực tuyến: Mỗi đề thi chỉ được làm <strong>1 lần duy nhất</strong>. Thang điểm 10. Điểm trung bình các đề thi sẽ quyết định thứ hạng trên Bảng Vàng.'}
           </p>
         </div>
 
@@ -1808,16 +1815,14 @@ export class QuizView {
     const btnLbLogin = this.container.querySelector('#btnLeaderboardLogin');
     if (btnLbLogin) {
       btnLbLogin.addEventListener('click', () => {
-        const globalAuthBtn = document.getElementById('btnUserAuth');
-        if (globalAuthBtn) globalAuthBtn.click();
+        this._openAuthModal('login');
       });
     }
 
     const btnMyExamsLogin = this.container.querySelector('#btnMyExamsLogin');
     if (btnMyExamsLogin) {
       btnMyExamsLogin.addEventListener('click', () => {
-        const globalAuthBtn = document.getElementById('btnUserAuth');
-        if (globalAuthBtn) globalAuthBtn.click();
+        this._openAuthModal('login');
       });
     }
 
@@ -2304,5 +2309,164 @@ export class QuizView {
         }
       });
     }
+  }
+
+  /**
+   * Helper to open the authentication modal directly.
+   * @param {'login'|'register'|'quick'} [tab]
+   */
+  _openAuthModal(tab = 'login') {
+    if (typeof this.onOpenAuth === 'function') {
+      this.onOpenAuth(tab);
+      return;
+    }
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('app:open-auth', { detail: { tab } }));
+    }
+    const btnProfile = document.getElementById('btnUserDropdownProfile');
+    if (btnProfile) {
+      btnProfile.click();
+      return;
+    }
+    const globalAuthBtn = document.getElementById('btnUserAuth');
+    if (globalAuthBtn) {
+      globalAuthBtn.click();
+    }
+  }
+
+  /**
+   * Initializes intuitive keyboard shortcuts for quiz navigation and answer selection.
+   * - ArrowRight: Move to next question
+   * - ArrowLeft: Move to previous question
+   * - Enter / Space: Move to next question if current question is already answered
+   * - A / B / C / D or 1 / 2 / 3 / 4: Select corresponding answer option
+   * Note: Purely silent interaction, no visual annotations per user design.
+   */
+  _initKeyboardNavigation() {
+    if (typeof window === 'undefined') return;
+
+    window.addEventListener('keydown', (e) => {
+      // 1. Only respond when QuizView is active and mounted
+      if (!this.container || !this.container.classList.contains('active')) return;
+
+      // 2. Ignore if modal dialog is open
+      if (document.body.classList.contains('modal-open') || document.querySelector('.auth-modal-overlay.open')) {
+        return;
+      }
+
+      // 3. Ignore if user is typing into input, textarea, or select
+      const activeEl = document.activeElement;
+      if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'SELECT' || activeEl.isContentEditable)) {
+        return;
+      }
+
+      // Context 1: Practice Arena Mode
+      if (this.activeTab === 'practice' && this.practiceQuestions && this.practiceQuestions.length > 0) {
+        const q = this.practiceQuestions[this.currentIndex];
+
+        // Arrow Right: Next question
+        if (e.key === 'ArrowRight') {
+          if (this.currentIndex < this.practiceQuestions.length - 1) {
+            e.preventDefault();
+            this.currentIndex++;
+            this.render();
+          }
+          return;
+        }
+
+        // Arrow Left: Previous question
+        if (e.key === 'ArrowLeft') {
+          if (this.currentIndex > 0) {
+            e.preventDefault();
+            this.currentIndex--;
+            this.render();
+          }
+          return;
+        }
+
+        // Enter or Space: Advance to next question if answered
+        if ((e.key === 'Enter' || e.key === ' ') && q && this.userAnswers[q.id]) {
+          if (this.currentIndex < this.practiceQuestions.length - 1) {
+            e.preventDefault();
+            this.currentIndex++;
+            this.render();
+          }
+          return;
+        }
+
+        // Option selection keys: A, B, C, D or 1, 2, 3, 4
+        const keyMap = {
+          'a': 'A', 'A': 'A', '1': 'A',
+          'b': 'B', 'B': 'B', '2': 'B',
+          'c': 'C', 'C': 'C', '3': 'C',
+          'd': 'D', 'D': 'D', '4': 'D',
+        };
+        const optId = keyMap[e.key];
+        if (optId && q && !this.userAnswers[q.id]) {
+          const optExists = q.options && q.options.some(opt => opt.id === optId);
+          if (optExists) {
+            e.preventDefault();
+            this.userAnswers[q.id] = optId;
+            this.answeredCount++;
+            const isCorrect = optId === q.correctId;
+            if (isCorrect) {
+              this.score += 10;
+              this.streak++;
+              if (this.streak > this.maxStreak) {
+                this.maxStreak = this.streak;
+              }
+            } else {
+              this.streak = 0;
+            }
+            this.render();
+          }
+          return;
+        }
+      }
+
+      // Context 2: Active Timed Exam Session
+      if (this.activeTab === 'myExams' && this.activeExamSession && this.activeExamSession.questions) {
+        const session = this.activeExamSession;
+        const currentQ = session.questions[session.currentQIndex];
+
+        // Arrow Right: Next question in exam
+        if (e.key === 'ArrowRight') {
+          if (session.currentQIndex < session.questions.length - 1) {
+            e.preventDefault();
+            session.currentQIndex++;
+            this.render();
+          }
+          return;
+        }
+
+        // Arrow Left: Previous question in exam
+        if (e.key === 'ArrowLeft') {
+          if (session.currentQIndex > 0) {
+            e.preventDefault();
+            session.currentQIndex--;
+            this.render();
+          }
+          return;
+        }
+
+        // Option selection keys: A, B, C, D or 1, 2, 3, 4
+        const keyMap = {
+          'a': 'A', 'A': 'A', '1': 'A',
+          'b': 'B', 'B': 'B', '2': 'B',
+          'c': 'C', 'C': 'C', '3': 'C',
+          'd': 'D', 'D': 'D', '4': 'D',
+        };
+        const optId = keyMap[e.key];
+        if (optId && currentQ) {
+          const optExists = currentQ.options && currentQ.options.some(opt => opt.id === optId);
+          if (optExists) {
+            e.preventDefault();
+            session.answers[currentQ.id] = optId;
+            this.render();
+          }
+          return;
+        }
+      }
+    });
   }
 }

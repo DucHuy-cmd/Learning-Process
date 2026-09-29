@@ -5535,6 +5535,48 @@ body.theme-light .user-dropdown-item:hover {
   color: var(--dim);
 }
 
+.btn-close-modal {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--panel-alt);
+  border: 1px solid var(--line);
+  color: var(--dim);
+  font-size: 15px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  padding: 0;
+  line-height: 1;
+  flex-shrink: 0;
+  outline: none;
+}
+
+.btn-close-modal:hover {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #ef4444;
+  transform: rotate(90deg);
+}
+
+.btn-close-modal:active {
+  transform: rotate(90deg) scale(0.92);
+}
+
+body.theme-light .btn-close-modal {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  color: #64748b;
+}
+
+body.theme-light .btn-close-modal:hover {
+  background: #fee2e2;
+  border-color: #fca5a5;
+  color: #ef4444;
+}
+
 .auth-modal-tabs {
   display: flex;
   border-bottom: 1px solid var(--line);
@@ -6779,5 +6821,260 @@ body.theme-light .user-dropdown-item:hover {
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4);
   overflow: hidden;
 }
+
+/* =====================================================================
+   MOBILE RESPONSIVENESS (< 768px & < 480px)
+   ===================================================================== */
+@media (max-width: 768px) {
+  /* 1. Header & Global Navigation */
+  .app-header {
+    height: 52px;
+    padding: 0 10px;
+    gap: 8px;
+  }
+
+  .brand-wrap {
+    gap: 6px;
+  }
+
+  .brand-icon {
+    font-size: 18px;
+  }
+
+  .brand-name {
+    font-size: 13.5px;
+    max-width: 130px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .brand-badge {
+    display: none !important;
+  }
+
+  .header-left {
+    gap: 8px !important;
+    max-width: calc(100% - 120px);
+    overflow: hidden;
+  }
+
+  .nav-links {
+    overflow-x: auto;
+    flex-wrap: nowrap !important;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 1px;
+    gap: 4px;
+    max-width: 100%;
+  }
+
+  .nav-links::-webkit-scrollbar {
+    display: none;
+  }
+
+  .nav-btn {
+    padding: 5px 8px !important;
+    font-size: 12px !important;
+    gap: 4px !important;
+    flex-shrink: 0;
+  }
+
+  .header-right {
+    gap: 4px !important;
+    flex-shrink: 0;
+  }
+
+  .btn-icon {
+    padding: 5px 8px !important;
+    font-size: 11.5px !important;
+  }
+
+  #userHeaderBadge {
+    padding: 4px 8px !important;
+  }
+
+  #lblUserHeaderName {
+    display: none !important;
+  }
+
+  /* 2. Home View */
+  .home-container {
+    padding: 16px 12px 60px !important;
+  }
+
+  .hero-section {
+    padding: 24px 14px 28px !important;
+    margin-bottom: 24px !important;
+  }
+
+  .hero-section h1 {
+    font-size: 21px !important;
+    line-height: 1.35 !important;
+  }
+
+  .pillar-cards-grid {
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+  }
+
+  .academic-suite {
+    grid-template-columns: 1fr !important;
+    padding: 16px !important;
+    gap: 16px !important;
+  }
+
+  /* 3. Quiz & Exam System */
+  .quiz-view-container {
+    padding: 12px 10px 50px !important;
+  }
+
+  .quiz-header {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 12px !important;
+    margin-bottom: 16px !important;
+  }
+
+  .quiz-header h1 {
+    font-size: 19px !important;
+  }
+
+  .quiz-main-tabs {
+    width: 100%;
+    overflow-x: auto;
+    flex-wrap: nowrap !important;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding: 3px !important;
+    justify-content: flex-start !important;
+  }
+
+  .quiz-main-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .quiz-main-tabs .btn-tab {
+    flex-shrink: 0;
+    padding: 6px 10px !important;
+    font-size: 12px !important;
+  }
+
+  .exam-cards-grid {
+    grid-template-columns: 1fr !important;
+    gap: 14px !important;
+  }
+
+  .exam-card {
+    padding: 16px !important;
+  }
+
+  .active-exam-room {
+    padding: 14px 12px !important;
+    border-radius: 10px !important;
+  }
+
+  .active-exam-topbar {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 10px !important;
+  }
+
+  .active-exam-timer-box {
+    justify-content: center;
+    font-size: 18px !important;
+    padding: 6px 14px !important;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .exam-q-jump-grid {
+    gap: 5px !important;
+    padding: 8px !important;
+  }
+
+  .exam-q-jump-btn {
+    width: 32px !important;
+    height: 32px !important;
+    font-size: 12px !important;
+  }
+
+  .btn-quiz-option {
+    width: 100% !important;
+    text-align: left !important;
+    padding: 12px 14px !important;
+    font-size: 13.5px !important;
+  }
+
+  /* 4. Admin Database View */
+  .admin-dashboard-wrap {
+    padding: 12px 10px 40px !important;
+  }
+
+  .admin-header-banner {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    padding: 14px 16px !important;
+    gap: 12px !important;
+  }
+
+  .admin-header-banner > div:last-child {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .admin-header-banner button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .admin-stats-grid {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 10px !important;
+  }
+
+  .admin-create-user-section,
+  .admin-users-table-section,
+  .admin-leaderboard-section {
+    padding: 14px !important;
+  }
+
+  /* 5. Auth Modal */
+  .auth-modal-dialog {
+    max-width: 95vw !important;
+    margin: 10px auto;
+    border-radius: 12px !important;
+  }
+
+  .auth-modal-header {
+    padding: 14px 16px !important;
+  }
+
+  .auth-modal-body {
+    padding: 16px 14px !important;
+    max-height: 80vh !important;
+  }
+
+  .profile-info-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .admin-stats-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .brand-name {
+    max-width: 100px;
+    font-size: 13px;
+  }
+
+  .auth-tab-btn {
+    padding: 8px 10px !important;
+    font-size: 12px !important;
+  }
+}
+
 
 

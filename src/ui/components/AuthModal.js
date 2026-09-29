@@ -99,8 +99,20 @@ export class AuthModal {
     });
 
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && this.isOpen) {
+      if (!this.isOpen) return;
+      if (e.key === 'Escape') {
         this.close();
+      } else if (e.key === 'Enter') {
+        const activeTag = document.activeElement ? document.activeElement.tagName : '';
+        if (activeTag !== 'BUTTON' && activeTag !== 'A') {
+          const activeForm = this.domElement.querySelector('form');
+          if (activeForm) {
+            const submitBtn = activeForm.querySelector('button[type="submit"]');
+            if (submitBtn) {
+              submitBtn.click();
+            }
+          }
+        }
       }
     });
   }
@@ -307,6 +319,9 @@ export class AuthModal {
         alertBox.textContent = localResult.error;
         alertBox.style.display = 'block';
       });
+
+      const firstInp = bodyContainer.querySelector('#loginUsername');
+      if (firstInp) setTimeout(() => firstInp.focus(), 60);
       return;
     }
 
@@ -360,6 +375,9 @@ export class AuthModal {
           alertBox.style.display = 'block';
         }
       });
+
+      const firstInp = bodyContainer.querySelector('#regFullName');
+      if (firstInp) setTimeout(() => firstInp.focus(), 60);
     }
   }
 }

@@ -169,6 +169,7 @@ export class App {
         onOpenLogicWithExpr: (expr) => this.openLogicWithExpression(expr),
         onOpenCounting: (tab) => this.openCountingWithTab(tab),
         onOpenRelation: (tab, subtab) => this.openRelationWithTab(tab, subtab),
+        onOpenAuth: (tab = 'login') => this.openAuthModal(tab),
       });
     }
 
@@ -540,6 +541,27 @@ export class App {
           }
         }
       });
+    }
+
+    // Global auth modal opener event
+    if (typeof window !== 'undefined') {
+      window.addEventListener('app:open-auth', (e) => {
+        const tab = e?.detail?.tab || 'login';
+        this.openAuthModal(tab);
+      });
+    }
+  }
+
+  /**
+   * Opens the authentication modal on a specific tab ('login' | 'register' | 'quick' | 'profile').
+   * @param {'login'|'register'|'quick'|'profile'} [tab]
+   */
+  openAuthModal(tab = 'login') {
+    if (this.authModal) {
+      this.authModal.open(tab);
+    } else {
+      const btnProfile = document.getElementById('btnUserDropdownProfile');
+      if (btnProfile) btnProfile.click();
     }
   }
 
