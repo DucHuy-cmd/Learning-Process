@@ -657,11 +657,6 @@ export class QuizView {
             <button type="button" class="btn-primary" id="btnGoToPracticeFromLb" style="padding:10px 20px;font-size:13.5px;font-weight:700;">
               🎮 Vào Luyện Tập Để Leo Rank Ngay ➔
             </button>
-            ${isAdmin ? `
-              <button type="button" class="btn-danger-outline" id="btnAdminResetLeaderboard" title="Chỉ Quản trị viên (admin): Xóa toàn bộ dữ liệu bảng xếp hạng và làm sạch về 0" style="padding:10px 18px;font-size:13px;font-weight:700;display:inline-flex;align-items:center;gap:6px;border:1px solid #ef4444;color:#ef4444;background:rgba(239,68,68,0.08);border-radius:6px;cursor:pointer;">
-                🗑️ Reset Bảng Xếp Hạng
-              </button>
-            ` : ''}
           </div>
         </div>
 
@@ -939,27 +934,6 @@ export class QuizView {
         if (globalAuthBtn) {
           globalAuthBtn.click();
         }
-      });
-    }
-
-    // Admin Leaderboard Management Events
-    const btnResetLb = this.container.querySelector('#btnAdminResetLeaderboard');
-    if (btnResetLb) {
-      btnResetLb.addEventListener('click', async () => {
-        if (!authManager.isAdmin()) {
-          if (typeof window !== 'undefined' && window.alert) {
-            window.alert('Chỉ Quản trị viên (admin) mới có quyền xóa bảng xếp hạng.');
-          }
-          return;
-        }
-        if (typeof window !== 'undefined' && window.confirm && !window.confirm('⚠️ BẠN CÓ CHẮC MUỐN XÓA TOÀN BỘ BẢNG XẾP HẠNG?\n\nTất cả điểm số và thành tích của sinh viên sẽ được làm sạch về 0.')) {
-          return;
-        }
-        quizHistoryManager.clearLeaderboard();
-        try {
-          await cloudSyncManager.resetQuizLeaderboard();
-        } catch {}
-        this.render();
       });
     }
 

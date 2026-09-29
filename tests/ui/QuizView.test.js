@@ -360,7 +360,7 @@ describe('QuizView UI Component', () => {
 
     authManager.logout();
 
-    // 2. As single Admin: Studio tab is visible and Leaderboard reset button is displayed
+    // 2. As single Admin: Studio tab is visible, but redundant leaderboard reset is consolidated in AdminView
     authManager.quickLogin('user_admin');
     expect(authManager.isAdmin()).toBe(true);
 
@@ -369,13 +369,8 @@ describe('QuizView UI Component', () => {
     expect(tabStudioAdmin.style.display).not.toBe('none');
 
     adminQuiz.setTab('leaderboard');
-    const btnResetLb = container.querySelector('#btnAdminResetLeaderboard');
-    expect(btnResetLb).not.toBeNull();
-
-    // 3. Reset leaderboard clears all scores
-    window.confirm = () => true;
-    btnResetLb.click();
-    expect(quizHistoryManager.getLeaderboard().length).toBe(0);
+    // Leaderboard reset button was consolidated into AdminView, so it is null here
+    expect(container.querySelector('#btnAdminResetLeaderboard')).toBeNull();
 
     authManager.logout();
   });
