@@ -459,6 +459,119 @@ export class CloudSyncManager {
       return null;
     }
   }
+
+  /**
+   * Synchronizes exams from server to local ExamManager.
+   * @param {Object} examManager
+   */
+  async syncExams(examManager) {
+    if (typeof fetch === 'undefined') return;
+    try {
+      const res = await fetch(`${this.baseUrl}/api/exams`);
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.success && Array.isArray(data.exams)) {
+        if (examManager && examManager.storage) {
+          const localExams = examManager.getExams();
+          const serverMap = new Map();
+          data.exams.forEach(e => serverMap.set(e.id, e));
+          localExams.forEach(e => {
+            if (!serverMap.has(e.id)) serverMap.set(e.id, e);
+          });
+          const merged = Array.from(serverMap.values());
+          examManager.storage.setItem('trr_assigned_exams_v1', JSON.stringify(merged));
+          examManager._notifyListeners('exams_synced', merged);
+        }
+      }
+    } catch {}
+  }
+
+  /**
+   * Pushes exam creation to server.
+   * @param {Object} examData
+   */
+  async serverCreateExam(examData) {
+    if (typeof fetch === 'undefined') return null;
+    try {
+      const res = await fetch(`${this.baseUrl}/api/exams`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(examData),
+      });
+      if (!res.ok) return null;
+      return await res.json();
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Deletes an exam on server.
+   * @param {string} examId
+   */
+  async serverDeleteExam(examId) {
+    if (typeof fetch === 'undefined') return null;
+    try {
+      const res = await fetch(`${this.baseUrl}/api/exams/${encodeURIComponent(examId)}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) return null;
+      return await res.json();
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Synchronizes exam submissions from server to local ExamManager.
+   * @param {Object} examManager
+   */
+  async syncExamSubmissions(examManager) {
+    if (typeof fetch === 'undefined') return;
+    try {
+      const res = await fetch(`${this.baseUrl}/api/exam-submissions`);
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.success && Array.isArray(data.submissions)) {
+        if (examManager && examManager.storage) {
+          const localSubs = examManager.getSubmissions();
+          const subMap = new Map();
+          localSubs.forEach(s => subMap.set(`${s.examId}_${s.userId}`, s));
+          data.submissions.forEach(s => subMap.set(`${s.examId}_${s.userId}`, s));
+          const merged = Array.from(subMap.values());
+          examManager.storage.setItem('trr_exam_submissions_v1', JSON.stringify(merged));
+          examManager._notifyListeners('submissions_synced', merged);
+        }
+      }
+    } catch {}
+  }
+
+  /**
+   * Pushes an exam submission to server.
+   * @param {Object} submissionData
+   */
+  async serverSubmitExam(submissionData) {
+    if (typeof fetch === 'undefined') return null;
+    try {
+      const { examId, userId, username, fullName, className, avatar, answers, optionOrder, timeSpentSeconds } = submissionData;
+      const res = await fetch(`${this.baseUrl}/api/exam-submissions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          examId,
+          userId,
+          userInfo: { username, fullName, className, avatar },
+          answers,
+          optionOrder,
+          timeSpentSeconds,
+        }),
+      });
+      if (!res.ok) return null;
+      return await res.json();
+    } catch {
+      return null;
+    }
+  }
 }
 
 export const cloudSyncManager = new CloudSyncManager();

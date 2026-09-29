@@ -3,6 +3,8 @@ import { JSDOM } from 'jsdom';
 import { QuizView } from '../../src/ui/views/QuizView.js';
 import { authManager } from '../../src/core/auth/AuthManager.js';
 import { quizHistoryManager } from '../../src/core/quiz/QuizHistoryManager.js';
+import { examManager } from '../../src/core/quiz/ExamManager.js';
+import { cloudSyncManager } from '../../src/core/sync/CloudSyncManager.js';
 
 describe('QuizView UI Component', () => {
   let dom;
@@ -22,6 +24,8 @@ describe('QuizView UI Component', () => {
 
     window = dom.window;
     document = window.document;
+    window.alert = () => {};
+    window.confirm = () => true;
     global.window = window;
     global.document = document;
 
@@ -30,6 +34,7 @@ describe('QuizView UI Component', () => {
 
   afterEach(() => {
     authManager.logout();
+    vi.restoreAllMocks();
     delete global.window;
     delete global.document;
   });
@@ -321,7 +326,7 @@ describe('QuizView UI Component', () => {
     expect(container.querySelector('#panePractice').style.display).not.toBe('none');
   });
 
-  it('records practice answers into quizHistoryManager for logged-in user', () => {
+  it('keeps practice answers out of the official leaderboard and server sync', () => {
     // Register and log in as student
     authManager.register({ username: 'sv_practice_test', fullName: 'Sinh Viên Test', email: 'sv_prac@toanrr.edu.vn', password: '123456' });
     const user = authManager.getCurrentUser();
@@ -334,16 +339,43 @@ describe('QuizView UI Component', () => {
     const initialStats = quizHistoryManager.getUserStats(user.id);
     const prevAnswered = initialStats.totalAnswered;
     const prevCorrect = initialStats.correctCount;
+    const pushQuizAnswer = vi.spyOn(cloudSyncManager, 'pushQuizAnswer').mockResolvedValue(null);
 
     // Click correct answer
     const btnOpt = container.querySelector(`.btn-quiz-option[data-opt-id="${correctId}"]`);
     btnOpt.click();
 
     const updatedStats = quizHistoryManager.getUserStats(user.id);
-    expect(updatedStats.totalAnswered).toBe(prevAnswered + 1);
-    expect(updatedStats.correctCount).toBe(prevCorrect + 1);
+    expect(updatedStats.totalAnswered).toBe(prevAnswered);
+    expect(updatedStats.correctCount).toBe(prevCorrect);
+    expect(pushQuizAnswer).not.toHaveBeenCalled();
 
     authManager.logout();
+  });
+
+  it('lets admins select exact questions and configure question and option shuffling', () => {
+    authManager.quickLogin('user_admin');
+    const quizView = new QuizView({ container });
+    quizView.setTab('studio');
+
+    const mode = container.querySelector('#selAssignSelectionMode');
+    mode.value = 'manual';
+    mode.dispatchEvent(new window.Event('change'));
+    expect(container.querySelector('#manualQuestionList').style.display).toBe('block');
+
+    const selectedQuestionIds = ['logic_q01', 'logic_q03'];
+    selectedQuestionIds.forEach(id => {
+      container.querySelector(`.chk-assign-question[value="${id}"]`).checked = true;
+    });
+    container.querySelector('#chkShuffleQuestions').checked = false;
+    container.querySelector('#chkShuffleOptions').checked = false;
+    container.querySelector('#txtAssignTitle').value = 'Đề thi chọn câu thủ công';
+    container.querySelector('#btnCreateAndAssignExam').click();
+
+    const createdExam = examManager.getExams().find(exam => exam.title === 'Đề thi chọn câu thủ công');
+    expect(createdExam.questionIds).toEqual(selectedQuestionIds);
+    expect(createdExam.shuffleQuestions).toBe(false);
+    expect(createdExam.shuffleOptions).toBe(false);
   });
 
   it('restricts Studio tab and Leaderboard reset button based on Admin RBAC', () => {
@@ -371,6 +403,116 @@ describe('QuizView UI Component', () => {
     adminQuiz.setTab('leaderboard');
     // Leaderboard reset button was consolidated into AdminView, so it is null here
     expect(container.querySelector('#btnAdminResetLeaderboard')).toBeNull();
+
+    authManager.logout();
+  });
+
+  it('renders My Exams tab and prompts login for guest', () => {
+    authManager.logout();
+    const quizView = new QuizView({ container });
+    const tabMyExams = container.querySelector('#tabBtnMyExams');
+    expect(tabMyExams).not.toBeNull();
+
+    tabMyExams.click();
+    expect(quizView.activeTab).toBe('myExams');
+    expect(container.querySelector('#paneMyExams').style.display).not.toBe('none');
+    expect(container.textContent).toContain('Đăng Nhập Tài Khoản Sinh Viên Để Làm Đề Thi');
+  });
+
+  it('renders assigned exams for logged-in student and allows starting and submitting timed exam', () => {
+    // 1. Log in student
+    authManager.register({ username: 'sv_exam_taker', fullName: 'Thí Sinh A', email: 'tsa@toanrr.edu.vn', password: '123456' });
+    const user = authManager.getCurrentUser();
+    expect(user).not.toBeNull();
+
+    // Reset exams for clean test
+    examManager.clearAllData();
+
+    const quizView = new QuizView({ container });
+    quizView.setTab('myExams');
+
+    expect(container.textContent).toContain('Cổng Khảo Thí');
+    expect(container.textContent).toContain('Thí Sinh A');
+    expect(container.querySelector('.exam-card')).not.toBeNull();
+
+    // 2. Start exam
+    window.confirm = () => true;
+    window.alert = () => {};
+
+    const btnStart = container.querySelector('.btn-start-exam');
+    expect(btnStart).not.toBeNull();
+    btnStart.click();
+
+    expect(quizView.activeExamSession).not.toBeNull();
+    expect(container.querySelector('.active-exam-room')).not.toBeNull();
+    expect(container.querySelector('#activeExamTimer')).not.toBeNull();
+
+    // 3. Jump to question and answer
+    const qButtons = container.querySelectorAll('.exam-q-jump-btn');
+    expect(qButtons.length).toBeGreaterThan(0);
+
+    const firstOpt = container.querySelector('.btn-active-exam-opt');
+    expect(firstOpt).not.toBeNull();
+    firstOpt.click();
+
+    const currQ = quizView.activeExamSession.questions[quizView.activeExamSession.currentQIndex];
+    expect(quizView.activeExamSession.answers[currQ.id]).not.toBeNull();
+
+    // 4. Submit exam
+    const btnSubmit = container.querySelector('#btnSubmitActiveExam');
+    expect(btnSubmit).not.toBeNull();
+    btnSubmit.click();
+
+    // Exam session should be cleared, review shown
+    expect(quizView.activeExamSession).toBeNull();
+    expect(quizView.reviewSubmission).not.toBeNull();
+    expect(container.textContent).toContain('Chi Tiết Bài Làm');
+    expect(container.textContent).toContain('/ 10 điểm');
+
+    // 5. Check official Leaderboard has the student ranked by GPA
+    quizView.setTab('leaderboard');
+    expect(container.textContent).toContain('Bảng Xếp Hạng Đề Thi Chính Thức (Thang Điểm 10)');
+    expect(container.textContent).toContain('Thí Sinh A');
+
+    authManager.logout();
+  });
+
+  it('allows Admin to create new exam, assign to students, and view gradebook in Studio', () => {
+    authManager.quickLogin('user_admin');
+    const quizView = new QuizView({ container });
+    quizView.setTab('studio');
+
+    // Tab sub-switch to assign
+    const tabAssign = container.querySelector('#tabStudioAssign');
+    expect(tabAssign).not.toBeNull();
+    tabAssign.click();
+    expect(quizView.studioSubTab).toBe('assign');
+
+    window.alert = () => {};
+
+    // Fill form and create exam
+    const txtTitle = container.querySelector('#txtAssignTitle');
+    txtTitle.value = 'Đề Thi Kiểm Tra 15 Phút Unit Test';
+
+    const btnCreate = container.querySelector('#btnCreateAndAssignExam');
+    expect(btnCreate).not.toBeNull();
+    btnCreate.click();
+
+    expect(container.textContent).toContain('Đề Thi Kiểm Tra 15 Phút Unit Test');
+
+    // View gradebook
+    const btnGradebook = container.querySelector('.btn-view-gradebook');
+    expect(btnGradebook).not.toBeNull();
+    btnGradebook.click();
+
+    expect(quizView.gradebookExamId).not.toBeNull();
+    expect(container.querySelector('.gradebook-modal-card')).not.toBeNull();
+    expect(container.textContent).toContain('Sổ Điểm Điện Tử');
+
+    // Close gradebook
+    const btnClose = container.querySelector('#btnCloseGradebook');
+    btnClose.click();
+    expect(quizView.gradebookExamId).toBeNull();
 
     authManager.logout();
   });

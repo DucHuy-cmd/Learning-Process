@@ -16,7 +16,9 @@ import { extractBoundary, readRequestBody, parseMultipartData } from './parseMul
 import { isAIConfigured, analyzeGraphFileBackend, executeGeminiChat } from './ai/AIProviderAdapter.js';
 import { validateGraphSpecification, MAX_FILE_SIZE_BYTES } from '../app/ai/GraphVisionAdapter.js';
 
-import { serverUsers, serverAiSessions, serverQuizStats, saveDatabase, isKVConfigured, fetchFromKV } from './auth/ServerDataStore.js';
+import { serverUsers, serverAiSessions, serverQuizStats, serverExams, serverExamSubmissions, saveDatabase, isKVConfigured, fetchFromKV } from './auth/ServerDataStore.js';
+import { DEFAULT_EXAMS } from '../core/quiz/ExamManager.js';
+import { STATIC_QUESTION_BANK } from '../core/quiz/QuizBank.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -324,6 +326,9 @@ export async function handleRequest(req, res) {
     serverUsers.push({ ...adminUser, fullName: 'Quản Trị Viên', className: 'Quản trị viên', role: 'admin' });
     for (const k of Object.keys(serverQuizStats)) delete serverQuizStats[k];
     for (const k of Object.keys(serverAiSessions)) delete serverAiSessions[k];
+    serverExams.length = 0;
+    serverExams.push(...DEFAULT_EXAMS);
+    serverExamSubmissions.length = 0;
     saveDatabase();
     if (isKVConfigured()) {
       writeToKV().catch(() => {});
@@ -583,6 +588,179 @@ export async function handleRequest(req, res) {
       return;
     } catch {
       sendJson(res, 400, { success: false, error: 'Dữ liệu không hợp lệ.' });
+      return;
+    }
+  }
+
+  // Route: GET /api/exams
+  if (req.method === 'GET' && pathname === '/api/exams') {
+    sendJson(res, 200, { success: true, exams: serverExams });
+    return;
+  }
+
+  // Route: POST /api/exams (Admin creates an assigned exam)
+  if (req.method === 'POST' && pathname === '/api/exams') {
+    try {
+      const bodyBuffer = await readRequestBody(req);
+      const data = JSON.parse(bodyBuffer.toString('utf8') || '{}');
+      const title = (data.title || '').trim();
+      const questionIds = Array.isArray(data.questionIds) ? data.questionIds : [];
+      const durationMinutes = Number(data.durationMinutes);
+      const validQuestionIds = new Set(STATIC_QUESTION_BANK.map(question => question.id));
+      const assignedTo = Array.isArray(data.assignedTo) ? data.assignedTo : ['all'];
+      if (
+        title.length < 3 ||
+        questionIds.length === 0 ||
+        questionIds.length !== new Set(questionIds).size ||
+        questionIds.some(id => !validQuestionIds.has(id)) ||
+        !Number.isInteger(durationMinutes) ||
+        durationMinutes < 1 ||
+        durationMinutes > 180 ||
+        assignedTo.length === 0 ||
+        assignedTo.some(id => typeof id !== 'string' || (id !== 'all' && !serverUsers.some(user => user.id === id)))
+      ) {
+        sendJson(res, 400, { success: false, error: 'Thông tin đề thi, thời lượng, câu hỏi hoặc danh sách sinh viên không hợp lệ.' });
+        return;
+      }
+      const examId = typeof data.id === 'string' && data.id.trim()
+        ? data.id.trim()
+        : `exam_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+      if (serverExams.some(exam => exam.id === examId)) {
+        sendJson(res, 409, { success: false, error: 'Mã đề thi đã tồn tại trên máy chủ.' });
+        return;
+      }
+      const exam = {
+        id: examId,
+        title,
+        description: typeof data.description === 'string' ? data.description.trim() : '',
+        durationMinutes,
+        questionIds,
+        assignedTo,
+        createdAt: new Date().toISOString(),
+        createdBy: data.createdBy || 'user_admin',
+        shuffleQuestions: Boolean(data.shuffleQuestions),
+        shuffleOptions: Boolean(data.shuffleOptions),
+      };
+      serverExams.unshift(exam);
+      saveDatabase();
+      sendJson(res, 201, { success: true, exam });
+      return;
+    } catch {
+      sendJson(res, 400, { success: false, error: 'Dữ liệu không hợp lệ.' });
+      return;
+    }
+  }
+
+  // Route: DELETE /api/exams/:id
+  if (req.method === 'DELETE' && pathname.startsWith('/api/exams/')) {
+    const examId = pathname.replace('/api/exams/', '').trim();
+    const idx = serverExams.findIndex(e => e.id === examId);
+    if (idx !== -1) {
+      serverExams.splice(idx, 1);
+      const remainingSubs = serverExamSubmissions.filter(s => s.examId !== examId);
+      serverExamSubmissions.length = 0;
+      serverExamSubmissions.push(...remainingSubs);
+      saveDatabase();
+      sendJson(res, 200, { success: true });
+    } else {
+      sendJson(res, 404, { success: false, error: 'Không tìm thấy đề thi.' });
+    }
+    return;
+  }
+
+  // Route: GET /api/exam-submissions
+  if (req.method === 'GET' && pathname === '/api/exam-submissions') {
+    const examId = parsedUrl.searchParams.get('examId');
+    const userId = parsedUrl.searchParams.get('userId');
+    let list = [...serverExamSubmissions];
+    if (examId) list = list.filter(s => s.examId === examId);
+    if (userId) list = list.filter(s => s.userId === userId);
+    sendJson(res, 200, { success: true, submissions: list });
+    return;
+  }
+
+  // Route: POST /api/exam-submissions (1 Attempt Only, Scale 10)
+  if (req.method === 'POST' && pathname === '/api/exam-submissions') {
+    try {
+      const bodyBuffer = await readRequestBody(req);
+      const data = JSON.parse(bodyBuffer.toString('utf8') || '{}');
+      const { examId, userId, userInfo = {}, answers = {}, optionOrder = {}, timeSpentSeconds = 0 } = data;
+
+      if (!userId || userId === 'guest') {
+        sendJson(res, 400, { success: false, error: 'Yêu cầu đăng nhập tài khoản sinh viên.' });
+        return;
+      }
+
+      const existing = serverExamSubmissions.find(s => s.examId === examId && s.userId === userId);
+      if (existing) {
+        sendJson(res, 409, {
+          success: false,
+          error: 'Bạn đã nộp bài thi này rồi. Mỗi đề thi chỉ được làm 1 lần duy nhất.',
+          submission: existing,
+        });
+        return;
+      }
+
+      const exam = serverExams.find(e => e.id === examId);
+      if (!exam) {
+        sendJson(res, 404, { success: false, error: 'Không tìm thấy đề thi.' });
+        return;
+      }
+      if (!Array.isArray(exam.assignedTo) || (!exam.assignedTo.includes('all') && !exam.assignedTo.includes(userId))) {
+        sendJson(res, 403, { success: false, error: 'Đề thi này không được giao cho tài khoản của bạn.' });
+        return;
+      }
+      if (!answers || typeof answers !== 'object' || Array.isArray(answers)) {
+        sendJson(res, 400, { success: false, error: 'Danh sách đáp án không hợp lệ.' });
+        return;
+      }
+
+      const qMap = new Map();
+      STATIC_QUESTION_BANK.forEach(q => qMap.set(q.id, q));
+      const totalQuestions = exam.questionIds.length;
+      let correctCount = 0;
+      const normalizedOptionOrder = {};
+      exam.questionIds.forEach(qId => {
+        const q = qMap.get(qId);
+        if (q && answers[qId] === q.correctId) correctCount++;
+        const validOptionIds = q ? q.options.map(option => option.id) : [];
+        const requestedOrder = optionOrder && typeof optionOrder === 'object' && !Array.isArray(optionOrder)
+          ? optionOrder[qId]
+          : null;
+        const isValidOrder = Array.isArray(requestedOrder) &&
+          requestedOrder.length === validOptionIds.length &&
+          new Set(requestedOrder).size === validOptionIds.length &&
+          requestedOrder.every(optionId => validOptionIds.includes(optionId));
+        normalizedOptionOrder[qId] = isValidOrder ? [...requestedOrder] : validOptionIds;
+      });
+
+      const rawScore = totalQuestions > 0 ? (correctCount / totalQuestions) * 10 : 0;
+      const score = Math.round(rawScore * 10) / 10;
+
+      const submission = {
+        id: `sub_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        examId,
+        examTitle: exam.title,
+        userId,
+        username: userInfo.username || data.username || userId,
+        fullName: userInfo.fullName || data.fullName || userInfo.username || userId,
+        className: userInfo.className || data.className || 'Sinh viên',
+        avatar: userInfo.avatar || data.avatar || '👤',
+        answers: { ...answers },
+        optionOrder: normalizedOptionOrder,
+        score,
+        correctCount,
+        totalQuestions,
+        timeSpentSeconds: Number.isFinite(Number(timeSpentSeconds)) ? Math.max(0, Math.round(Number(timeSpentSeconds))) : 0,
+        submittedAt: new Date().toISOString(),
+      };
+
+      serverExamSubmissions.push(submission);
+      saveDatabase();
+      sendJson(res, 201, { success: true, submission });
+      return;
+    } catch {
+      sendJson(res, 400, { success: false, error: 'Dữ liệu nộp bài không hợp lệ.' });
       return;
     }
   }

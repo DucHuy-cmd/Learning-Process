@@ -4,16 +4,19 @@ Nền tảng trực quan hóa và mô phỏng từng bước các thuật toán 
 
 ---
 
-## 1. TRẠNG THÁI HIỆN TẠI: PHASE 1 COMPLETED
+## 1. TỔNG QUAN HIỆN TẠI
 
-- **Phase 1: Project Foundation + Golden Master + Regression Test Safety Net** đã hoàn thành 100%.
-- File gốc `index.html` được **bảo toàn nguyên vẹn**.
-- Bản sao Golden Master được lưu trữ tại `legacy/index.html`.
-- Toàn bộ hành vi hiện tại của hệ thống được bảo vệ bởi **18 ca kiểm thử hồi quy tự động (REG-01 đến REG-18)**.
+Dự án hiện đã tách ứng dụng thành các module `src/core`, `src/app`, `src/ui` và `src/server`. Ngoài các bài học và phòng thí nghiệm thuật toán, nền tảng có đăng nhập, trợ lý AI, ngân hàng câu hỏi, đề thi được giao và bộ kiểm thử Vitest.
 
----
+## 2. LUYỆN TẬP VÀ ĐỀ THI CHÍNH THỨC
 
-## 2. CẤU TRÚC THƯ MỤC DỰ ÁN
+- **Tự luyện tập**: làm câu hỏi và xem lời giải ngay; kết quả luyện tập không được ghi vào bảng xếp hạng thi chính thức.
+- **Studio ra đề (Admin)**: tạo đề bằng cách bốc câu hỏi ngẫu nhiên theo chuyên đề hoặc chọn câu hỏi thủ công; giao cho toàn bộ sinh viên hoặc các tài khoản được chọn.
+- **Đề thi được giao**: giới hạn thời gian, xáo trộn câu hỏi/đáp án theo cấu hình, nộp một lần và chấm thang điểm 10.
+- **Bảng xếp hạng chính thức**: xếp theo điểm trung bình các đề đã nộp, số đề hoàn thành, tỷ lệ đúng và thời gian làm bài.
+- Dữ liệu đề thi và bài nộp được lưu cục bộ hoặc đồng bộ qua backend; cấu hình KV lưu cả đề thi và bài nộp.
+
+## 3. CẤU TRÚC THƯ MỤC DỰ ÁN
 
 ```text
 d:/Nam2_ky1/Dijktra-demo/
@@ -55,31 +58,24 @@ d:/Nam2_ky1/Dijktra-demo/
 
 ---
 
-## 3. HƯỚNG DẪN VẬN HÀNH
+## 4. HƯỚNG DẪN VẬN HÀNH
 
-### 3.1 Chạy ứng dụng web
-Mở trực tiếp file `index.html` trong bất kỳ trình duyệt web hiện đại nào (Chrome, Edge, Firefox, Safari) hoặc phục vụ qua extension Live Server:
+### 4.1 Chạy ứng dụng web
+Chạy backend phục vụ ứng dụng tại `http://localhost:3000`:
 ```bash
-# Không cần build hay bundler ở Phase 1
-start index.html
+npm start
 ```
 
-### 3.2 Chạy bộ kiểm thử hồi quy tự động (Regression Tests)
-Cài đặt các gói phụ thuộc kiểm thử và thực thi Vitest:
+### 4.2 Chạy kiểm thử
 ```bash
-# 1. Cài đặt dependencies (vitest, jsdom)
 npm install
-
-# 2. Chạy toàn bộ 18 ca kiểm thử hồi quy (REG-01 đến REG-18)
 npm test
-
-# 3. Chạy ở chế độ theo dõi thay đổi (Watch mode)
 npm run test:watch
 ```
 
 ---
 
-## 4. QUY TRÌNH THIẾT LẬP GIT BASELINE
+## 5. QUY TRÌNH THIẾT LẬP GIT BASELINE
 Để khóa baseline v1.0.0 trên Git repository cục bộ của bạn, thực hiện các lệnh sau:
 ```bash
 git init
@@ -90,6 +86,5 @@ git tag -a v1.0.0-golden-master -m "Baseline v1.0.0 Golden Master freeze"
 
 ---
 
-## 5. BƯỚC TIẾP THEO
-Sau khi bạn nghiệm thu và phê duyệt Phase 1, dự án sẽ sẵn sàng bước vào:
-- **Phase 2: Core Architecture & Headless Engine Migration** (Thiết lập Vite + TypeScript, bóc tách module `src/core`, bảo đảm 100% test REG-01 -> REG-18 tiếp tục pass).
+## 6. LỊCH SỬ KIẾN TRÚC
+`legacy/index.html` và bộ kiểm thử regression được giữ lại làm tài liệu/baseline của giai đoạn đầu dự án. Ứng dụng đang hoạt động hiện được khởi chạy qua server Node.js.

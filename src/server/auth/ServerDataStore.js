@@ -8,6 +8,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DEMO_USERS } from '../../core/auth/AuthManager.js';
 import { INITIAL_LEADERBOARD } from '../../core/quiz/QuizHistoryManager.js';
+import { DEFAULT_EXAMS } from '../../core/quiz/ExamManager.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -25,6 +26,8 @@ function getDefaultStats() {
 export const serverUsers = [...DEMO_USERS];
 export const serverAiSessions = {};
 export const serverQuizStats = getDefaultStats();
+export const serverExams = [...DEFAULT_EXAMS];
+export const serverExamSubmissions = [];
 
 export function loadDatabase() {
   try {
@@ -53,6 +56,14 @@ export function loadDatabase() {
             serverQuizStats[k] = v;
           }
         }
+      }
+      if (Array.isArray(data.exams)) {
+        serverExams.length = 0;
+        serverExams.push(...(data.exams.length > 0 ? data.exams : DEFAULT_EXAMS));
+      }
+      if (Array.isArray(data.examSubmissions)) {
+        serverExamSubmissions.length = 0;
+        serverExamSubmissions.push(...data.examSubmissions);
       }
     }
   } catch {
@@ -112,6 +123,14 @@ export async function fetchFromKV() {
           }
         }
       }
+      if (Array.isArray(data.exams)) {
+        serverExams.length = 0;
+        serverExams.push(...(data.exams.length > 0 ? data.exams : DEFAULT_EXAMS));
+      }
+      if (Array.isArray(data.examSubmissions)) {
+        serverExamSubmissions.length = 0;
+        serverExamSubmissions.push(...data.examSubmissions);
+      }
       return true;
     }
   } catch (err) {
@@ -128,6 +147,8 @@ export async function writeToKV() {
       users: serverUsers,
       aiSessions: serverAiSessions,
       quizStats: serverQuizStats,
+      exams: serverExams,
+      examSubmissions: serverExamSubmissions,
       lastUpdated: new Date().toISOString(),
     });
     const res = await fetch(KV_URL, {
@@ -154,6 +175,8 @@ export function saveDatabase() {
       users: serverUsers,
       aiSessions: serverAiSessions,
       quizStats: serverQuizStats,
+      exams: serverExams,
+      examSubmissions: serverExamSubmissions,
       lastUpdated: new Date().toISOString(),
     };
     fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf8');
