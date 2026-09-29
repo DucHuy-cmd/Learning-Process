@@ -307,6 +307,31 @@ export async function handleRequest(req, res) {
     return;
   }
 
+  // Route: POST /api/admin/database/reset (Quản trị viên xóa sạch toàn bộ dữ liệu database)
+  if (req.method === 'POST' && pathname === '/api/admin/database/reset') {
+    const adminUser = serverUsers.find(u => u.username === 'admin' || u.id === 'user_admin') || {
+      id: 'user_admin',
+      username: 'admin',
+      fullName: 'Quản Trị Viên',
+      className: 'Quản trị viên',
+      email: 'admin@toanrr.edu.vn',
+      password: 'Admin@ToanRR2026!',
+      avatar: '👑',
+      role: 'admin',
+      bio: 'Quản trị viên hệ thống',
+    };
+    serverUsers.length = 0;
+    serverUsers.push({ ...adminUser, fullName: 'Quản Trị Viên', className: 'Quản trị viên', role: 'admin' });
+    for (const k of Object.keys(serverQuizStats)) delete serverQuizStats[k];
+    for (const k of Object.keys(serverAiSessions)) delete serverAiSessions[k];
+    saveDatabase();
+    if (isKVConfigured()) {
+      writeToKV().catch(() => {});
+    }
+    sendJson(res, 200, { success: true, message: 'Đã xóa toàn bộ database thành công.' });
+    return;
+  }
+
   // Route: POST /api/ai/chat
   if (req.method === 'POST' && pathname === '/api/ai/chat') {
     try {

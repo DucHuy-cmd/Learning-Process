@@ -14,6 +14,7 @@
 import { authManager } from '../../core/auth/AuthManager.js';
 import { cloudSyncManager } from '../../core/sync/CloudSyncManager.js';
 import { quizHistoryManager } from '../../core/quiz/QuizHistoryManager.js';
+import { aiHistoryManager } from '../../core/ai/AiHistoryManager.js';
 
 export class AdminView {
   /**
@@ -58,6 +59,10 @@ export class AdminView {
     // Check cloud connection state
     try {
       this.isServerConnected = await cloudSyncManager.checkConnection();
+      if (this.isServerConnected) {
+        await cloudSyncManager.syncUsers(authManager);
+        await cloudSyncManager.syncQuizLeaderboard(quizHistoryManager);
+      }
     } catch {
       this.isServerConnected = false;
     }
@@ -91,6 +96,10 @@ export class AdminView {
             <button type="button" class="btn-danger-outline" id="btnAdminResetLeaderboard" style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;font-size:12.5px;font-weight:600;border-radius:8px;cursor:pointer;color:#ef4444;border-color:rgba(239,68,68,0.4);">
               <span>🏆</span>
               <span>Reset Bảng Xếp Hạng</span>
+            </button>
+            <button type="button" class="btn-danger" id="btnAdminFullDatabaseReset" style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;font-size:12.5px;font-weight:700;border-radius:8px;cursor:pointer;background:#ef4444;color:#fff;border:none;">
+              <span>🔥</span>
+              <span>Xóa Sạch &amp; Reset Database</span>
             </button>
           </div>
         </header>
@@ -456,6 +465,37 @@ export class AdminView {
         } catch {}
         await this.render();
         this._showAlert('✓ Bảng xếp hạng trắc nghiệm đã được reset sạch sẽ.', 'success');
+      });
+    }
+
+    // 5. Full Database Reset Button (Nuclear option: clears users, scores, AI chat)
+    const btnFullReset = this.container.querySelector('#btnAdminFullDatabaseReset');
+    if (btnFullReset) {
+      btnFullReset.addEventListener('click', async () => {
+        if (typeof window !== 'undefined' && window.confirm) {
+          const c1 = window.confirm('⚠️ CẢNH BÁO NGUY HIỂM:\n\nBạn có chắc chắn muốn XÓA TOÀN BỘ DỮ LIỆU DATABASE?\n- Xóa sạch toàn bộ tài khoản sinh viên (chỉ giữ lại admin)\n- Xóa sạch toàn bộ điểm số & bảng xếp hạng\n- Xóa sạch toàn bộ lịch sử AI\n\nHành động này áp dụng cho cả LocalStorage và Máy chủ Cloud!');
+          if (!c1) return;
+          const c2 = window.confirm('XÁC NHẬN LẦN 2:\nHành động này KHÔNG THỂ HOÀN TÁC. Bạn chắc chắn muốn xóa sạch 100% dữ liệu ngay bây giờ?');
+          if (!c2) return;
+        }
+
+        btnFullReset.disabled = true;
+        btnFullReset.textContent = '⏳ Đang xóa database...';
+
+        authManager.resetUsersToDefault();
+        quizHistoryManager.clearLeaderboard();
+        if (aiHistoryManager && typeof aiHistoryManager._writeAll === 'function') {
+          aiHistoryManager._writeAll({});
+        }
+
+        try {
+          await cloudSyncManager.adminResetDatabase();
+          await cloudSyncManager.syncUsers(authManager);
+          await cloudSyncManager.syncQuizLeaderboard(quizHistoryManager);
+        } catch {}
+
+        await this.render();
+        this._showAlert('✓ Toàn bộ Database đã được xóa sạch và khôi phục về trạng thái ban đầu!', 'success');
       });
     }
 

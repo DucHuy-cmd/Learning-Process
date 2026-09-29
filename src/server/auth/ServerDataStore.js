@@ -14,7 +14,9 @@ const __dirname = path.dirname(__filename);
 const DB_DIR = process.env.VERCEL 
   ? '/tmp/data' 
   : path.resolve(__dirname, '../../../data');
-const DB_FILE = path.join(DB_DIR, 'server_db.json');
+const DB_FILE = process.env.VITEST 
+  ? path.join(DB_DIR, 'server_db_test.json')
+  : path.join(DB_DIR, 'server_db.json');
 
 function getDefaultStats() {
   return {};

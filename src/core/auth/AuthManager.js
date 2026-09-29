@@ -277,6 +277,25 @@ export class AuthManager {
   }
 
   /**
+   * Resets users list to only the default admin account.
+   * @returns {{ success: boolean, error?: string }}
+   */
+  resetUsersToDefault() {
+    if (!this.isAdmin()) {
+      return { success: false, error: 'Chỉ có Quản trị viên mới có quyền reset dữ liệu tài khoản.' };
+    }
+    const admin = this.getUsers().find(u => u.username === 'admin' || u.id === 'user_admin') || DEMO_USERS[0];
+    const defaultList = [{ ...admin, fullName: 'Quản Trị Viên', className: 'Quản trị viên', role: 'admin' }];
+    if (this.storage) {
+      try {
+        this.storage.setItem(STORAGE_KEY_USERS, JSON.stringify(defaultList));
+      } catch {}
+    }
+    this._notifyListeners('users_reset', { users: defaultList });
+    return { success: true };
+  }
+
+  /**
    * Admin creates a new student account.
    * @param {Object} data
    * @returns {{ success: boolean, error?: string, user?: Object }}

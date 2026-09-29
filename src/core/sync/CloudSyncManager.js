@@ -443,6 +443,22 @@ export class CloudSyncManager {
       return null;
     }
   }
+
+  /**
+   * Admin resets entire database on server (keeps only admin).
+   */
+  async adminResetDatabase() {
+    if (typeof fetch === 'undefined') return null;
+    try {
+      const res = await fetch(`${this.baseUrl}/api/admin/database/reset`, {
+        method: 'POST',
+      });
+      if (!res.ok) return null;
+      return await res.json();
+    } catch {
+      return null;
+    }
+  }
 }
 
 export const cloudSyncManager = new CloudSyncManager();
