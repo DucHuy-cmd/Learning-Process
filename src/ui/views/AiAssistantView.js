@@ -365,19 +365,6 @@ Tôi là gia sư AI học thuật được tích hợp trực tiếp vào hệ t
             </div>
           </div>
 
-          <!-- Account Status Badge in AI Workspace -->
-          <div class="ai-user-profile-badge ${currentUser ? '' : 'guest'}" id="aiUserProfileBadge">
-            <span class="user-avatar-tiny">${currentUser ? (currentUser.avatar || '🎓') : '👤'}</span>
-            <div class="user-meta-tiny">
-              <span class="user-name-tiny">${currentUser ? currentUser.fullName : 'Chế độ Khách'}</span>
-              <span class="user-status-tiny">${currentUser ? (currentUser.className || 'Sinh viên') : 'Đăng nhập để đồng bộ lịch sử'}</span>
-            </div>
-            ${currentUser 
-              ? '<button type="button" class="btn-user-switch-tiny" id="btnAiSwitchAccount" title="Quản lý tài khoản">⚙️</button>' 
-              : '<button type="button" class="btn-user-login-tiny" id="btnAiLoginAccount" title="Đăng nhập tài khoản">Đăng nhập</button>'
-            }
-          </div>
-
           <!-- New Chat Button -->
           <button type="button" class="btn-ai-new-chat" id="btnAiNewChat" title="Bắt đầu phiên hỏi đáp bài toán mới">
             <span>＋</span>
@@ -1227,19 +1214,7 @@ Tôi là gia sư AI học thuật được tích hợp trực tiếp vào hệ t
       });
     }
 
-    // 10. Account Switcher / Login Buttons
-    const btnSwitchAcc = this.container.querySelector('#btnAiSwitchAccount');
-    const btnLoginAcc = this.container.querySelector('#btnAiLoginAccount');
-    const globalAuthBtn = document.getElementById('btnUserAuth');
-
-    if (btnSwitchAcc && globalAuthBtn) {
-      btnSwitchAcc.addEventListener('click', () => globalAuthBtn.click());
-    }
-    if (btnLoginAcc && globalAuthBtn) {
-      btnLoginAcc.addEventListener('click', () => globalAuthBtn.click());
-    }
-
-    // 11. Bind History Item Clicks
+    // 10. Bind History Item Clicks
     this._bindHistoryEvents();
   }
 
