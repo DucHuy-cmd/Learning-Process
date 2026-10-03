@@ -478,7 +478,7 @@ describe('QuizView UI Component', () => {
   });
 
   it('allows Admin to create new exam, assign to students, and view gradebook in Studio', () => {
-    authManager.quickLogin('user_admin');
+    authManager.login('admin', 'admin123');
     const quizView = new QuizView({ container });
     quizView.setTab('studio');
 
