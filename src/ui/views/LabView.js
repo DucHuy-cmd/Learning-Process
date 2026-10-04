@@ -141,6 +141,7 @@ export class LabView {
                   <button type="button" class="algo-switch-btn btn-tab" data-algo="prim">🌿 Prim</button>
                   <button type="button" class="algo-switch-btn btn-tab" data-algo="euler">🔄 Euler</button>
                   <button type="button" class="algo-switch-btn btn-tab" data-algo="hamilton">🔁 Hamilton</button>
+                  <button type="button" class="algo-switch-btn btn-tab" data-algo="bellman_ford">📉 Bellman-Ford</button>
                 </div>
               </div>
 
@@ -768,7 +769,7 @@ export class LabView {
     const endSelect = this.container.querySelector('#endNodeSelect');
 
     const startNodeId = (this.currentAlgo !== 'kruskal' && startSelect) ? startSelect.value : null;
-    const targetNodeId = (this.currentAlgo === 'dijkstra' && endSelect) ? endSelect.value : null;
+    const targetNodeId = ((this.currentAlgo === 'dijkstra' || this.currentAlgo === 'bellman_ford' || this.currentAlgo === 'bellmanford') && endSelect) ? endSelect.value : null;
 
     this.graphCanvas.setSelectionRoles({ startNodeId, targetNodeId });
   }
@@ -809,7 +810,7 @@ export class LabView {
       }
     }
 
-    if (algoKey === 'dijkstra') {
+    if (algoKey === 'dijkstra' || algoKey === 'bellman_ford' || algoKey === 'bellmanford') {
       if (endWrap) {
         endWrap.style.display = 'flex';
         endWrap.style.visibility = 'visible';
@@ -839,6 +840,8 @@ export class LabView {
         helpEl.textContent = '💡 Euler duyệt qua mỗi cạnh đúng một lần bắt đầu từ đỉnh nguồn.';
       } else if (algoKey === 'hamilton') {
         helpEl.textContent = '💡 Hamilton duyệt qua mỗi đỉnh đúng một lần bắt đầu từ đỉnh nguồn.';
+      } else if (algoKey === 'bellman_ford' || algoKey === 'bellmanford') {
+        helpEl.textContent = '💡 Bellman-Ford tìm đường đi ngắn nhất từ đỉnh nguồn, hỗ trợ trọng số âm và phát hiện chu trình âm.';
       } else {
         helpEl.textContent = '💡 Tìm đường đi có tổng trọng số ngắn nhất từ đỉnh nguồn tới đích.';
       }
@@ -877,7 +880,7 @@ export class LabView {
     const startSelect = this.container.querySelector('#startNodeSelect');
     const endSelect = this.container.querySelector('#endNodeSelect');
 
-    if (this.currentAlgo === 'dijkstra') {
+    if (this.currentAlgo === 'dijkstra' || this.currentAlgo === 'bellman_ford' || this.currentAlgo === 'bellmanford') {
       if (!startSelect.value || startSelect.value === nodeId) {
         startSelect.value = nodeId;
       } else if (!endSelect.value || endSelect.value !== nodeId) {
@@ -903,7 +906,7 @@ export class LabView {
 
     const options = {};
     if (startSelect && startSelect.value) options.startNodeId = startSelect.value;
-    if (this.currentAlgo === 'dijkstra' && endSelect && endSelect.value) {
+    if ((this.currentAlgo === 'dijkstra' || this.currentAlgo === 'bellman_ford' || this.currentAlgo === 'bellmanford') && endSelect && endSelect.value) {
       options.endNodeId = endSelect.value;
     }
     if (this.currentAlgo === 'hamilton') {
@@ -1156,3 +1159,4 @@ export class LabView {
     }
   }
 }
+
