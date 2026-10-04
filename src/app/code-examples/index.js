@@ -32,6 +32,11 @@ import { pythonHamilton } from './hamilton/python.js';
 import { cHamilton } from './hamilton/c.js';
 import { javaHamilton } from './hamilton/java.js';
 
+import { cppBellmanFord } from './bellman-ford/cpp.js';
+import { pythonBellmanFord } from './bellman-ford/python.js';
+import { cBellmanFord } from './bellman-ford/c.js';
+import { javaBellmanFord } from './bellman-ford/java.js';
+
 export const CODE_EXAMPLES = {
   dijkstra: {
     cpp: cppDijkstra,
@@ -63,6 +68,18 @@ export const CODE_EXAMPLES = {
     c: cHamilton,
     java: javaHamilton,
   },
+  bellman_ford: {
+    cpp: cppBellmanFord,
+    python: pythonBellmanFord,
+    c: cBellmanFord,
+    java: javaBellmanFord,
+  },
+  bellmanford: {
+    cpp: cppBellmanFord,
+    python: pythonBellmanFord,
+    c: cBellmanFord,
+    java: javaBellmanFord,
+  },
 };
 
 export const SUPPORTED_LANGUAGES = [
@@ -78,6 +95,8 @@ export const SUPPORTED_ALGORITHMS = [
   'prim',
   'euler',
   'hamilton',
+  'bellman_ford',
+  'bellmanford',
 ];
 
 /**
@@ -110,3 +129,4 @@ export function getCodeExample(algorithm = 'dijkstra', language = 'cpp', graph =
     lines: source.split('\n'),
   };
 }
+
