@@ -107,6 +107,7 @@ export class GraphSourceModal {
                     <option value="prim">Prim (Cây khung nhỏ nhất)</option>
                     <option value="euler">Euler (Chu trình / Đường đi)</option>
                     <option value="hamilton">Hamilton (Chu trình / Đường đi)</option>
+                    <option value="bellman_ford">Bellman-Ford (Đường đi ngắn nhất / Trọng số âm)</option>
                   </select>
                 </div>
               </div>
@@ -1029,3 +1030,4 @@ export class GraphSourceModal {
     this._hideError();
   }
 }
+
