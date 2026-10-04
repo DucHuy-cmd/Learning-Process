@@ -122,7 +122,7 @@ function deriveFormula(step, graph, context = {}, algoKey = 'dijkstra') {
   if (!step || !step.action) return null;
   const inf = context.infinitySymbol || '∞';
 
-  if (algoKey === 'dijkstra') {
+  if (algoKey === 'dijkstra' || algoKey === 'bellman_ford' || algoKey === 'bellmanford') {
     if (step.action === AlgorithmAction.INITIALIZE) {
       const state = step.state || {};
       const dist = state.dist || {};
@@ -360,6 +360,121 @@ export function formatTable(step, graph, context = {}) {
       summary: hasFinishWeight
         ? (lang === 'en' ? `Total shortest path weight: ${state.totalWeight}` : `Tổng trọng số đường đi ngắn nhất: ${state.totalWeight}`)
         : null,
+    };
+  }
+
+  if (algoKey === 'bellman_ford' || algoKey === 'bellmanford') {
+    if (nodes.length === 0) return null;
+
+    // Textbook layout: one row per inspected edge (x,y) with weight w, one column per node.
+    // A cell is filled with (dist,prev) only on the row where that node is relaxed.
+    // Each pass is introduced by a "Lần k:" band and closed by a "KQ" row.
+    const dist = state.dist || {};
+    const prev = state.prev || {};
+    const nodeIds = nodes.map((n) => n.id || n.name);
+
+    const headers = ['(x,y)', 'w', ...nodeIds.map((id) => getNodeLabel(id, graph, context))];
+    const passWord = lang === 'en' ? 'Pass' : 'Lần';
+
+    const distCell = (nodeId, type = 'normal') => {
+      const d = dist[nodeId];
+      if (d === undefined || d === Infinity) {
+        return { nodeId, val: `(${inf},-)`, type: type === 'normal' ? 'init' : type };
+      }
+      const p = prev[nodeId];
+      const pLabel = p ? getNodeLabel(p, graph, context) : '-';
+      return { nodeId, val: `(${d},${pLabel})`, type };
+    };
+
+    const fullWidthRow = (label, text, extra = {}) => ({
+      stepLabel: label,
+      fullWidth: true,
+      summaryText: text,
+      cells: [{ val: text, type: 'summary', colSpan: headers.length }],
+      ...extra,
+    });
+
+    const rows = [];
+    const pass = typeof state.iteration === 'number' ? state.iteration : 0;
+
+    if (step.action === AlgorithmAction.INITIALIZE) {
+      rows.push({
+        noStepCell: true,
+        cells: [
+          { val: lang === 'en' ? 'Initialize' : 'Khởi tạo', type: 'bf-kq', colSpan: 2 },
+          ...nodeIds.map((id) => distCell(id)),
+        ],
+      });
+    } else if (state.roundStart) {
+      rows.push({
+        isPassBand: true,
+        passLabel: `${passWord} ${pass}:`,
+        cells: [],
+      });
+    } else if (state.passEnd) {
+      rows.push({
+        noStepCell: true,
+        isKQ: true,
+        cells: [
+          { val: 'KQ', type: 'bf-kq', colSpan: 2 },
+          ...nodeIds.map((id) => distCell(id, 'bf-kq-val')),
+        ],
+      });
+      if (state.earlyStop) {
+        rows.push(fullWidthRow(
+          '★',
+          lang === 'en'
+            ? `No edge relaxed in pass ${pass} → distances are final, stop early.`
+            : `Lần ${pass} không còn cạnh nào được giãn → bảng khoảng cách đã tối ưu, dừng sớm.`,
+          { noStepCell: true }
+        ));
+      }
+    } else if (state.edge && (step.action === AlgorithmAction.RELAX_EDGE || step.action === AlgorithmAction.INSPECT_EDGE)) {
+      const { from, to, weight } = state.edge;
+      const relaxed = Boolean(state.relaxed);
+      const colNode = nodeIds.indexOf(to);
+      rows.push({
+        noStepCell: true,
+        bfPass: pass,
+        bfCol: colNode >= 0 ? colNode + 2 : -1,
+        cells: [
+          { val: `(${getNodeLabel(from, graph, context)},${getNodeLabel(to, graph, context)})`, type: 'bf-edge' },
+          { val: String(weight), type: 'bf-weight' },
+          ...nodeIds.map((id) => {
+            if (relaxed && id === to) {
+              return distCell(id, 'bf-update');
+            }
+            return { nodeId: id, val: '', type: 'bf-empty' };
+          }),
+        ],
+      });
+    } else if (step.action === AlgorithmAction.FINISH) {
+      const hasWeight = typeof state.totalWeight === 'number';
+      const msg = hasWeight
+        ? (lang === 'en'
+          ? `Total shortest path weight: ${state.totalWeight}`
+          : `Tổng trọng số đường đi ngắn nhất: ${state.totalWeight}`)
+        : (lang === 'en' ? 'Finished.' : 'Hoàn tất thuật toán.');
+      rows.push(fullWidthRow('★', msg, { noStepCell: true }));
+    } else if (step.action === AlgorithmAction.ERROR) {
+      const msg = state.hasNegativeCycle
+        ? (lang === 'en'
+          ? 'Negative weight cycle detected! Shortest path is undefined.'
+          : '⚠️ Phát hiện chu trình âm! Chi phí đường đi có thể giảm vô hạn.')
+        : (step.description || 'Error');
+      rows.push(fullWidthRow('⚠️', msg, { noStepCell: true }));
+    } else {
+      rows.push(fullWidthRow(stepLabel, step.description || '', { noStepCell: true }));
+    }
+
+    const hasFinishWeight = (step.action === AlgorithmAction.FINISH && typeof state.totalWeight === 'number');
+    return {
+      type: 'bellman_ford',
+      headers,
+      rows,
+      summary: hasFinishWeight
+        ? (lang === 'en' ? `Total shortest path weight: ${state.totalWeight}` : `Tổng trọng số đường đi ngắn nhất: ${state.totalWeight}`)
+        : (state.hasNegativeCycle ? 'Chu trình âm' : null),
     };
   }
 
@@ -765,3 +880,4 @@ export class StepFormatter {
 }
 
 export default StepFormatter;
+
