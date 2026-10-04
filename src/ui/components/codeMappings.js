@@ -13,4 +13,6 @@ export const ALGORITHM_CODE = {
   prim: getCodeExample('prim', 'cpp'),
   euler: getCodeExample('euler', 'cpp'),
   hamilton: getCodeExample('hamilton', 'cpp'),
+  bellman_ford: getCodeExample('bellman_ford', 'cpp'),
+  bellmanford: getCodeExample('bellman_ford', 'cpp'),
 };
