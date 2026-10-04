@@ -25,6 +25,8 @@ export const CANONICAL_PRESET_KEYS = Object.freeze([
   'euler_path',
   'euler_none',
   'euler_disconnected',
+  'bellman_sample',
+  'bellman_neg_cycle',
 ]);
 
 /**
@@ -217,6 +219,50 @@ const CANONICAL_PRESETS = {
       ["F", "D", 1.0],
     ],
   },
+
+  bellman_sample: {
+    name: "Bài tập Bellman-Ford (Trọng số âm)",
+    isBuilding: false,
+    directed: true,
+    algo: "bellman_ford",
+    nodes: [
+      { id: "S", name: "S", short: "S", kind: "phong", x: 120, y: 220 },
+      { id: "A", name: "A", short: "A", kind: "phong", x: 320, y: 100 },
+      { id: "B", name: "B", short: "B", kind: "phong", x: 320, y: 340 },
+      { id: "C", name: "C", short: "C", kind: "phong", x: 580, y: 100 },
+      { id: "D", name: "D", short: "D", kind: "phong", x: 580, y: 340 },
+      { id: "T", name: "T", short: "T", kind: "phong", x: 780, y: 220 },
+    ],
+    edges: [
+      ["S", "A", 10.0],
+      ["S", "B", 8.0],
+      ["B", "A", 1.0],
+      ["A", "C", 2.0],
+      ["B", "D", 1.0],
+      ["C", "D", -2.0],
+      ["C", "T", -1.0],
+      ["D", "T", 3.0],
+    ],
+  },
+
+  bellman_neg_cycle: {
+    name: "Bài tập Bellman-Ford (Chu trình âm)",
+    isBuilding: false,
+    directed: true,
+    algo: "bellman_ford",
+    nodes: [
+      { id: "S", name: "S", short: "S", kind: "phong", x: 150, y: 220 },
+      { id: "A", name: "A", short: "A", kind: "phong", x: 380, y: 120 },
+      { id: "B", name: "B", short: "B", kind: "phong", x: 620, y: 120 },
+      { id: "C", name: "C", short: "C", kind: "phong", x: 500, y: 340 },
+    ],
+    edges: [
+      ["S", "A", 4.0],
+      ["A", "B", 1.0],
+      ["B", "C", -3.0],
+      ["C", "A", 1.0],
+    ],
+  },
 };
 
 /**
@@ -309,3 +355,4 @@ export function listPresets() {
     };
   });
 }
+
