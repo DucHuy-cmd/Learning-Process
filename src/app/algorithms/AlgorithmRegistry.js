@@ -20,6 +20,7 @@ import { kruskal } from '../../core/algorithms/KruskalEngine.js';
 import { prim } from '../../core/algorithms/PrimEngine.js';
 import { euler } from '../../core/algorithms/EulerEngine.js';
 import { hamilton } from '../../core/algorithms/HamiltonEngine.js';
+import { bellmanFord } from '../../core/algorithms/BellmanFordEngine.js';
 
 /**
  * Metadata definitions for the 5 supported core algorithms.
@@ -86,6 +87,36 @@ const ALGORITHM_METADATA = Object.freeze({
       Object.freeze({ name: 'start', type: 'string', required: false, description: 'Alias for startNodeId' }),
       Object.freeze({ name: 'wantCycle', type: 'boolean', required: false, default: true, description: 'Canonical flag for cycle (true) vs path (false)' }),
       Object.freeze({ name: 'mode', type: 'string', required: false, description: 'Alias for wantCycle ("cycle" -> true, "path" -> false)' }),
+    ]),
+  }),
+  bellman_ford: Object.freeze({
+    key: 'bellman_ford',
+    name: 'Bellman-Ford Shortest Path',
+    description: 'Finds shortest paths from a start vertex, supporting negative edge weights and detecting negative weight cycles.',
+    requiresStartNode: true,
+    supportsTargetNode: true,
+    requiresUndirected: false,
+    options: Object.freeze([
+      Object.freeze({ name: 'startNodeId', type: 'string', required: true, description: 'Source node identifier (canonical)' }),
+      Object.freeze({ name: 'start', type: 'string', required: false, description: 'Alias for startNodeId' }),
+      Object.freeze({ name: 'endNodeId', type: 'string', required: false, default: null, description: 'Destination node identifier (canonical)' }),
+      Object.freeze({ name: 'end', type: 'string', required: false, description: 'Alias for endNodeId' }),
+      Object.freeze({ name: 'target', type: 'string', required: false, description: 'Alias for endNodeId' }),
+    ]),
+  }),
+  bellmanford: Object.freeze({
+    key: 'bellmanford',
+    name: 'Bellman-Ford Shortest Path',
+    description: 'Alias for bellman_ford',
+    requiresStartNode: true,
+    supportsTargetNode: true,
+    requiresUndirected: false,
+    options: Object.freeze([
+      Object.freeze({ name: 'startNodeId', type: 'string', required: true, description: 'Source node identifier (canonical)' }),
+      Object.freeze({ name: 'start', type: 'string', required: false, description: 'Alias for startNodeId' }),
+      Object.freeze({ name: 'endNodeId', type: 'string', required: false, default: null, description: 'Destination node identifier (canonical)' }),
+      Object.freeze({ name: 'end', type: 'string', required: false, description: 'Alias for endNodeId' }),
+      Object.freeze({ name: 'target', type: 'string', required: false, description: 'Alias for endNodeId' }),
     ]),
   }),
 });
@@ -326,6 +357,34 @@ export function run(algoKey, graph, options = {}) {
       break;
     }
 
+    case 'bellman_ford':
+    case 'bellmanford': {
+      const startNodeId =
+        opts.startNodeId !== undefined
+          ? opts.startNodeId
+          : opts.start !== undefined
+            ? opts.start
+            : opts.startNode !== undefined
+              ? opts.startNode
+              : null;
+
+      const endNodeId =
+        opts.endNodeId !== undefined
+          ? opts.endNodeId
+          : opts.end !== undefined
+            ? opts.end
+            : opts.target !== undefined
+              ? opts.target
+              : opts.endNode !== undefined
+                ? opts.endNode
+                : opts.targetNode !== undefined
+                  ? opts.targetNode
+                  : null;
+
+      result = bellmanFord(adaptedGraph, startNodeId, endNodeId);
+      break;
+    }
+
     default:
       throw new Error(`Unhandled algorithm: ${normalized}`);
   }
@@ -334,7 +393,7 @@ export function run(algoKey, graph, options = {}) {
     if (!result.algorithm) {
       result.algorithm = normalized;
     }
-    if (normalized === 'dijkstra' && !result.distances && Array.isArray(result.steps)) {
+    if ((normalized === 'dijkstra' || normalized === 'bellman_ford' || normalized === 'bellmanford') && !result.distances && Array.isArray(result.steps)) {
       const lastDistStep = [...result.steps].reverse().find(s => s.state && s.state.dist);
       if (lastDistStep) {
         result.distances = { ...lastDistStep.state.dist };
@@ -377,3 +436,4 @@ export class AlgorithmRegistry {
 }
 
 export default AlgorithmRegistry;
+
