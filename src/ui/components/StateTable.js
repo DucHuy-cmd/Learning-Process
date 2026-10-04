@@ -368,6 +368,43 @@ export class StateTable {
       const rowClass = isActive ? 'active-row' : '';
 
       return rowGroup.map(formattedRow => {
+        const colCount = this.tableHeaders.length;
+
+        // Bellman-Ford: "Lần k:" band introducing a pass
+        if (formattedRow.isPassBand) {
+          return `
+            <tr class="bf-pass-band ${rowClass}" data-step-index="${stepIdx}" style="cursor:pointer;" title="Nhấn để nhảy đến bước ${stepIdx + 1}">
+              <td colspan="2"></td>
+              <td colspan="${Math.max(1, colCount - 2)}" class="cell-bf-pass">${escapeHtml(formattedRow.passLabel || '')}</td>
+            </tr>
+          `;
+        }
+
+        // Bellman-Ford: full-width message row (no step column)
+        if (formattedRow.fullWidth) {
+          return `
+            <tr class="summary-row ${rowClass}" data-step-index="${stepIdx}" style="cursor:pointer;background:rgba(245,158,11,0.08);font-weight:600;">
+              <td colspan="${colCount}" style="padding:8px 12px;color:var(--accent);text-align:left;font-weight:700;">
+                ${escapeHtml(formattedRow.stepLabel && formattedRow.stepLabel !== '★' ? formattedRow.stepLabel + ' ' : '')}${escapeHtml(formattedRow.summaryText || '')}
+              </td>
+            </tr>
+          `;
+        }
+
+        // Bellman-Ford: edge row / KQ row / init row (cells already cover every column)
+        if (formattedRow.noStepCell) {
+          const isEdgeRow = typeof formattedRow.bfCol === 'number';
+          const bfClass = isEdgeRow ? ' bf-edge-row' : (formattedRow.isKQ ? ' bf-kq-row' : '');
+          const activeClass = isEdgeRow && isActive ? ' bf-active' : '';
+          const dataAttrs = isEdgeRow ? ` data-bf-pass="${formattedRow.bfPass}" data-bf-col="${formattedRow.bfCol}"` : '';
+          const cellsHtml = (formattedRow.cells || []).map(cell => this._formatCell(cell)).join('');
+          return `
+            <tr class="${rowClass}${bfClass}${activeClass}" data-step-index="${stepIdx}"${dataAttrs} style="cursor:pointer;" title="Nhấn để nhảy đến bước ${stepIdx + 1}">
+              ${cellsHtml}
+            </tr>
+          `;
+        }
+
         if (formattedRow.isSummary) {
           return `
             <tr class="summary-row ${rowClass}" style="background:rgba(245,158,11,0.08);font-weight:600;">
@@ -393,6 +430,8 @@ export class StateTable {
 
     this.tableBody.innerHTML = rowsHtml;
 
+    this._highlightBellmanFordCross();
+
     // Update Step Indicator in Header
     if (this.tableStepIndicator) {
       if (isPrim && this.mode !== 'current') {
@@ -412,6 +451,35 @@ export class StateTable {
     }
   }
 
+  /**
+   * Bellman-Ford textbook highlight: the active edge row is yellow, and the column of its
+   * target node y is yellow from the header down to the active row (within the same pass).
+   */
+  _highlightBellmanFordCross() {
+    if (!this.tableBody || !this.tableHead) return;
+    this.tableHead.querySelectorAll('th.bf-col-hl').forEach(th => th.classList.remove('bf-col-hl'));
+
+    const activeRow = this.tableBody.querySelector('tr.bf-active');
+    if (!activeRow) return;
+
+    const col = parseInt(activeRow.getAttribute('data-bf-col'), 10);
+    if (isNaN(col) || col < 0) return;
+
+    const headerCells = this.tableHead.querySelectorAll('th');
+    if (headerCells[col]) headerCells[col].classList.add('bf-col-hl');
+
+    let row = activeRow;
+    while (row) {
+      if (row.classList.contains('bf-edge-row')) {
+        const td = row.children[col];
+        if (td) td.classList.add('bf-col-hl');
+      } else if (row.classList.contains('bf-pass-band')) {
+        break;
+      }
+      row = row.previousElementSibling;
+    }
+  }
+
   _formatCell(cell) {
     const val = typeof cell === 'object' && cell !== null ? cell.val : String(cell);
     const type = typeof cell === 'object' && cell !== null ? cell.type : 'normal';
@@ -425,6 +493,12 @@ export class StateTable {
     else if (type === 'te') cellClass = 'cell-te';
     else if (type === 'weight') cellClass = 'cell-weight';
     else if (type === 'summary') cellClass = 'cell-summary';
+    else if (type === 'bf-edge') cellClass = 'cell-bf-edge';
+    else if (type === 'bf-weight') cellClass = 'cell-bf-weight';
+    else if (type === 'bf-update') cellClass = 'cell-bf-update';
+    else if (type === 'bf-kq') cellClass = 'cell-bf-kq';
+    else if (type === 'bf-kq-val') cellClass = 'cell-bf-kq-val';
+    else if (type === 'bf-empty') cellClass = 'cell-bf-empty';
 
     return `<td class="${cellClass}"${colSpan}>${escapeHtml(val)}</td>`;
   }
@@ -438,3 +512,4 @@ function escapeHtml(str) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
 }
+
