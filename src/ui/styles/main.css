@@ -1981,6 +1981,60 @@ td.cell-visited {
   color: #4e6173;
 }
 
+/* ---- Bellman-Ford textbook table: (x,y) | w | node columns ---- */
+table.state-table tr.bf-pass-band td {
+  background: #2f9be0 !important;
+  color: #fff;
+  font-weight: 800;
+  text-align: left;
+  border-color: #19567e;
+  font-family: inherit;
+  font-size: 12.5px;
+}
+
+table.state-table td.cell-bf-edge,
+table.state-table td.cell-bf-weight {
+  font-weight: 600;
+}
+
+table.state-table td.cell-bf-update {
+  color: #1d4ed8;
+  font-weight: 800;
+}
+
+body:not(.theme-light) table.state-table td.cell-bf-update {
+  color: #60a5fa;
+}
+
+table.state-table td.cell-bf-kq {
+  color: #dc2626;
+  font-weight: 800;
+  text-align: left;
+}
+
+table.state-table td.cell-bf-kq-val {
+  font-weight: 700;
+}
+
+table.state-table tr.bf-kq-row td {
+  border-top: 2px solid #dc2626;
+}
+
+table.state-table tr.bf-active td {
+  background: #fde047 !important;
+  color: #1f2937 !important;
+}
+
+table.state-table td.bf-col-hl,
+table.state-table th.bf-col-hl {
+  background: #fde047 !important;
+  color: #1f2937 !important;
+}
+
+table.state-table tr.bf-edge-row.active-row {
+  outline: 2px solid #ca8a04;
+}
+
 td.cell-tv {
   color: var(--blue-light);
   font-weight: 600;
@@ -7075,6 +7129,7 @@ body.theme-light .btn-close-modal:hover {
     font-size: 12px !important;
   }
 }
+
 
 
 
