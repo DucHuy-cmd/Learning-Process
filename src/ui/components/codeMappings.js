@@ -15,4 +15,5 @@ export const ALGORITHM_CODE = {
   hamilton: getCodeExample('hamilton', 'cpp'),
   bellman_ford: getCodeExample('bellman_ford', 'cpp'),
   bellmanford: getCodeExample('bellman_ford', 'cpp'),
+  johnson: getCodeExample('johnson', 'cpp'),
 };
