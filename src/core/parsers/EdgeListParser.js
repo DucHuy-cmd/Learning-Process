@@ -8,10 +8,11 @@
  * 
  * Preserves 100% legacy behavior:
  * - Line filtering (skips empty lines and lines starting with '#' or '//')
- * - Syntax 1: /^([A-Za-z0-9_À-ỹ]+)\s*(?:->|-->|→|=>|<->|↔|[-–—,])\s*([A-Za-z0-9_À-ỹ]+)(?:\s*[:=,]\s*([0-9.]+))?/i
- * - Syntax 2: /^([A-Za-z0-9_À-ỹ]+)\s+([A-Za-z0-9_À-ỹ]+)(?:\s*[:=,]\s*([0-9.]+))?/i
+ * - Syntax 1: /^([A-Za-z0-9_À-ỹ]+)\s*(?:->|-->|→|=>|<->|↔|[-–—,])\s*([A-Za-z0-9_À-ỹ]+)(?:\s*[:=,]\s*([-+]?[0-9.]+))?/i
+ * - Syntax 2: /^([A-Za-z0-9_À-ỹ]+)\s+([A-Za-z0-9_À-ỹ]+)(?:\s*[:=,]\s*([-+]?[0-9.]+))?/i
  * - Directed latching: /->|-->|→|=>/.test(line) latches isDirected to true
  * - Preserves BUG-PARSER-001 defect in Syntax 2: missing [:=,] leaves weight undefined, falling back to default 1.0
+ * - Weight accepts an optional sign (negative weights, e.g. "B -> C: -4")
  * - Default weight: 1.0 if unspecified or NaN
  * - Node creation: first appearance order in Map
  * - Edge ordering: line encounter order
@@ -37,11 +38,11 @@ export function parseEdgeList(text, defaultDirected = false) {
     if (!line || line.startsWith("#") || line.startsWith("//")) return;
     
     // Cú pháp 1: A -> B: 1 hoặc A - B: 1 hoặc A -> B = 1 hoặc A → B : 1
-    let match = line.match(/^([A-Za-z0-9_À-ỹ]+)\s*(?:->|-->|→|=>|<->|↔|[-–—,])\s*([A-Za-z0-9_À-ỹ]+)(?:\s*[:=,]\s*([0-9.]+))?/i);
+    let match = line.match(/^([A-Za-z0-9_À-ỹ]+)\s*(?:->|-->|→|=>|<->|↔|[-–—,])\s*([A-Za-z0-9_À-ỹ]+)(?:\s*[:=,]\s*([-+]?[0-9.]+))?/i);
     
     // Cú pháp 2: A B: 1 hoặc A B 1 (không có dấu -)
     if (!match) {
-      match = line.match(/^([A-Za-z0-9_À-ỹ]+)\s+([A-Za-z0-9_À-ỹ]+)(?:\s*[:=,]\s*([0-9.]+))?/i);
+      match = line.match(/^([A-Za-z0-9_À-ỹ]+)\s+([A-Za-z0-9_À-ỹ]+)(?:\s*[:=,]\s*([-+]?[0-9.]+))?/i);
     }
 
     if (match) {
