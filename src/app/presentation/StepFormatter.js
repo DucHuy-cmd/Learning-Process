@@ -14,6 +14,11 @@
  */
 
 import { AlgorithmAction } from '../../core/models/Types.js';
+import {
+  formatJohnsonTable,
+  deriveJohnsonFormula,
+  resolveJohnsonPhase,
+} from './JohnsonTableFormatter.js';
 
 /**
  * Standard Action-to-Phase mapping table for Vietnamese and English locales.
@@ -121,6 +126,10 @@ export function resolvePhase(action, algorithmKey = 'dijkstra', language = 'vi')
 function deriveFormula(step, graph, context = {}, algoKey = 'dijkstra') {
   if (!step || !step.action) return null;
   const inf = context.infinitySymbol || '∞';
+
+  if (algoKey === 'johnson') {
+    return deriveJohnsonFormula(step, { getNodeLabel, graph }, context);
+  }
 
   if (algoKey === 'dijkstra' || algoKey === 'bellman_ford' || algoKey === 'bellmanford') {
     if (step.action === AlgorithmAction.INITIALIZE) {
@@ -269,6 +278,13 @@ export function formatTable(step, graph, context = {}) {
     } catch {
       nodes = [];
     }
+  }
+
+  if (algoKey === 'johnson') {
+    return formatJohnsonTable(step, graph, context, {
+      getNodeLabel,
+      formatBellmanFord: (s, g, c) => formatTable(s, g, c),
+    });
   }
 
   if (algoKey === 'dijkstra') {
@@ -827,7 +843,7 @@ export function formatStep(step, graph, context = {}) {
   const action = step.action || 'UNKNOWN';
 
   // 3. phase
-  const phase = resolvePhase(action, algoKey, lang);
+  const phase = (algoKey === 'johnson' && resolveJohnsonPhase(step, lang)) || resolvePhase(action, algoKey, lang);
 
   // 4. description
   const description = typeof step.description === 'string' ? step.description : '';
@@ -880,4 +896,3 @@ export class StepFormatter {
 }
 
 export default StepFormatter;
-
