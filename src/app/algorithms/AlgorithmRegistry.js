@@ -21,6 +21,7 @@ import { prim } from '../../core/algorithms/PrimEngine.js';
 import { euler } from '../../core/algorithms/EulerEngine.js';
 import { hamilton } from '../../core/algorithms/HamiltonEngine.js';
 import { bellmanFord } from '../../core/algorithms/BellmanFordEngine.js';
+import { johnson } from '../../core/algorithms/JohnsonEngine.js';
 
 /**
  * Metadata definitions for the 5 supported core algorithms.
@@ -103,6 +104,15 @@ const ALGORITHM_METADATA = Object.freeze({
       Object.freeze({ name: 'end', type: 'string', required: false, description: 'Alias for endNodeId' }),
       Object.freeze({ name: 'target', type: 'string', required: false, description: 'Alias for endNodeId' }),
     ]),
+  }),
+  johnson: Object.freeze({
+    key: 'johnson',
+    name: 'Johnson All-Pairs Shortest Paths',
+    description: 'Finds shortest paths between every pair of vertices on a directed graph with negative edge weights (no negative cycles) using Bellman-Ford potentials, reweighting and Dijkstra from each vertex.',
+    requiresStartNode: false,
+    supportsTargetNode: false,
+    requiresUndirected: false,
+    options: Object.freeze([]),
   }),
   bellmanford: Object.freeze({
     key: 'bellmanford',
@@ -385,6 +395,11 @@ export function run(algoKey, graph, options = {}) {
       break;
     }
 
+    case 'johnson': {
+      result = johnson(adaptedGraph);
+      break;
+    }
+
     default:
       throw new Error(`Unhandled algorithm: ${normalized}`);
   }
@@ -436,4 +451,3 @@ export class AlgorithmRegistry {
 }
 
 export default AlgorithmRegistry;
-
