@@ -108,6 +108,7 @@ export class GraphSourceModal {
                     <option value="euler">Euler (Chu trình / Đường đi)</option>
                     <option value="hamilton">Hamilton (Chu trình / Đường đi)</option>
                     <option value="bellman_ford">Bellman-Ford (Đường đi ngắn nhất / Trọng số âm)</option>
+                    <option value="johnson">Johnson (Mọi cặp đỉnh / Trọng số âm)</option>
                   </select>
                 </div>
               </div>
@@ -930,8 +931,8 @@ export class GraphSourceModal {
         for (const rawLine of lines) {
           const line = rawLine.trim();
           if (!line || line.startsWith('#') || line.startsWith('//')) continue;
-          const match1 = line.match(/^([A-Za-z0-9_À-ỹ]+)\s*(?:->|-->|→|=>|<->|↔|[-–—,])\s*([A-Za-z0-9_À-ỹ]+)(?:\s*[:=,]\s*([0-9.]+))?$/i);
-          const match2 = line.match(/^([A-Za-z0-9_À-ỹ]+)\s+([A-Za-z0-9_À-ỹ]+)(?:\s*[:=,]?\s*([0-9.]+))?$/i);
+          const match1 = line.match(/^([A-Za-z0-9_À-ỹ]+)\s*(?:->|-->|→|=>|<->|↔|[-–—,])\s*([A-Za-z0-9_À-ỹ]+)(?:\s*[:=,]\s*([-+]?[0-9.]+))?$/i);
+          const match2 = line.match(/^([A-Za-z0-9_À-ỹ]+)\s+([A-Za-z0-9_À-ỹ]+)(?:\s*[:=,]?\s*([-+]?[0-9.]+))?$/i);
           if (!match1 && !match2) {
             throw new Error(`Cú pháp dòng không hợp lệ: "${line}"`);
           }
@@ -1030,4 +1031,3 @@ export class GraphSourceModal {
     this._hideError();
   }
 }
-
