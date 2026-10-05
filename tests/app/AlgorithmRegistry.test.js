@@ -81,9 +81,9 @@ describe('Phase 3A: AlgorithmRegistry', () => {
   // SUITE 1: KEY NORMALIZATION & VALIDATION
   // =========================================================================
   describe('Suite 1: Key Normalization & Validation', () => {
-    it('getSupportedKeys returns the exact 5 canonical keys', () => {
+    it('getSupportedKeys returns the exact canonical keys (incl. bellman_ford, johnson, alias bellmanford)', () => {
       const keys = getSupportedKeys();
-      expect(keys).toEqual(['dijkstra', 'kruskal', 'prim', 'euler', 'hamilton']);
+      expect(keys).toEqual(['dijkstra', 'kruskal', 'prim', 'euler', 'hamilton', 'bellman_ford', 'johnson', 'bellmanford']);
       expect(AlgorithmRegistry.getSupportedKeys()).toEqual(keys);
     });
 
@@ -191,11 +191,11 @@ describe('Phase 3A: AlgorithmRegistry', () => {
       expect(getMetadata(123)).toBeNull();
     });
 
-    it('getAllMetadata returns all 5 algorithm metadata objects', () => {
+    it('getAllMetadata returns all 8 algorithm metadata objects', () => {
       const all = getAllMetadata();
-      expect(all).toHaveLength(5);
+      expect(all).toHaveLength(8);
       const keys = all.map((m) => m.key);
-      expect(keys).toEqual(['dijkstra', 'kruskal', 'prim', 'euler', 'hamilton']);
+      expect(keys).toEqual(['dijkstra', 'kruskal', 'prim', 'euler', 'hamilton', 'bellman_ford', 'johnson', 'bellmanford']);
     });
   });
 
