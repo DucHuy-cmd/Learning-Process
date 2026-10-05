@@ -142,6 +142,7 @@ export class LabView {
                   <button type="button" class="algo-switch-btn btn-tab" data-algo="euler">🔄 Euler</button>
                   <button type="button" class="algo-switch-btn btn-tab" data-algo="hamilton">🔁 Hamilton</button>
                   <button type="button" class="algo-switch-btn btn-tab" data-algo="bellman_ford">📉 Bellman-Ford</button>
+                  <button type="button" class="algo-switch-btn btn-tab" data-algo="johnson">🧭 Johnson</button>
                 </div>
               </div>
 
