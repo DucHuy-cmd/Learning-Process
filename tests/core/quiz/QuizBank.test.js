@@ -39,12 +39,20 @@ describe('QuizBank Core Engine & Exam Generator', () => {
       const relationQs = STATIC_QUESTION_BANK.filter(q => q.topic === 'relation');
       const graphQs = STATIC_QUESTION_BANK.filter(q => q.topic === 'graph');
 
-      expect(STATIC_QUESTION_BANK.length).toBe(125);
-      expect(logicQs.length).toBe(25);
-      expect(booleanQs.length).toBe(25);
-      expect(countingQs.length).toBe(25);
-      expect(relationQs.length).toBe(25);
-      expect(graphQs.length).toBe(25);
+      expect(STATIC_QUESTION_BANK.length).toBe(150);
+      expect(logicQs.length).toBe(30);
+      expect(booleanQs.length).toBe(30);
+      expect(countingQs.length).toBe(30);
+      expect(relationQs.length).toBe(30);
+      expect(graphQs.length).toBe(30);
+    });
+
+    it('ensures questions and explanations use academic phrasing without slide or page number references', () => {
+      STATIC_QUESTION_BANK.forEach(q => {
+        expect(q.question.toLowerCase()).not.toMatch(/slide|trang \d+/);
+        expect(q.explanation.toLowerCase()).not.toMatch(/slide|trang \d+/);
+        expect(q.topicName.toLowerCase()).not.toMatch(/slide|trang \d+/);
+      });
     });
   });
 
@@ -82,6 +90,18 @@ describe('QuizBank Core Engine & Exam Generator', () => {
       easyExam.questions.forEach(q => {
         expect(q.difficulty).toBe('easy');
       });
+    });
+
+    it('allocates strictly 10% hard questions in standard exam paper', () => {
+      // 10 questions -> exactly 1 hard question
+      const exam10 = generateExamPaper({ count: 10 });
+      const hard10 = exam10.questions.filter(q => q.difficulty === 'hard');
+      expect(hard10.length).toBe(1);
+
+      // 20 questions -> exactly 2 hard questions
+      const exam20 = generateExamPaper({ count: 20 });
+      const hard20 = exam20.questions.filter(q => q.difficulty === 'hard');
+      expect(hard20.length).toBe(2);
     });
   });
 

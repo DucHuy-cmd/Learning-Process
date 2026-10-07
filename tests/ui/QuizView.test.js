@@ -671,7 +671,7 @@ describe('QuizView UI Component', () => {
 
     const rows = Array.from(container.querySelectorAll('.manual-q-row'));
     const visibleLogicRows = rows.filter(r => r.style.display !== 'none');
-    expect(visibleLogicRows.length).toBe(25);
+    expect(visibleLogicRows.length).toBe(30);
     visibleLogicRows.forEach(r => expect(r.getAttribute('data-topic')).toBe('logic'));
 
     // Batch select visible questions
@@ -679,8 +679,8 @@ describe('QuizView UI Component', () => {
     btnSelectVisible.click();
 
     const checkedBoxes = Array.from(container.querySelectorAll('.chk-assign-question:checked'));
-    expect(checkedBoxes.length).toBe(25);
-    expect(container.querySelector('#manualSelectedCounter').textContent).toContain('Đã chọn: 25 câu');
+    expect(checkedBoxes.length).toBe(30);
+    expect(container.querySelector('#manualSelectedCounter').textContent).toContain('Đã chọn: 30 câu');
 
     // Deselect all
     const btnDeselectAll = container.querySelector('#btnManualDeselectAll');

@@ -278,7 +278,7 @@ export class QuizView {
             </div>
             <h1 style="font-size:24px;font-weight:700;color:var(--text);margin:0;">Luyện Tập &amp; Thi Trắc Nghiệm Toán Rời Rạc</h1>
             <p style="font-size:13.5px;color:var(--dim);margin:4px 0 0;">
-              Ngân hàng 100 câu hỏi tự luyện tập phản xạ, thi trực tuyến tính giờ Thang Điểm 10 và quản lý kết quả bài thi.
+              Ngân hàng 150 câu hỏi tự luyện tập phản xạ, thi trực tuyến tính giờ Thang Điểm 10 và quản lý kết quả bài thi.
             </p>
           </div>
 
@@ -321,7 +321,7 @@ export class QuizView {
   }
 
   // =========================================================================
-  // SUB-VIEW 1: INTERACTIVE PRACTICE ARENA (100 QUESTIONS, RISK-FREE)
+  // SUB-VIEW 1: INTERACTIVE PRACTICE ARENA (150 QUESTIONS, RISK-FREE)
   // =========================================================================
 
   _renderPracticeView() {
@@ -335,7 +335,7 @@ export class QuizView {
       <div style="background:rgba(56,189,248,0.08);border:1px solid rgba(56,189,248,0.25);border-radius:10px;padding:12px 18px;margin-bottom:16px;display:flex;align-items:center;gap:12px;">
         <span style="font-size:22px;">💡</span>
         <div style="font-size:13px;color:var(--text);line-height:1.5;">
-          <strong>Chế độ Tự Luyện Tập (100 Câu Hỏi):</strong> Bạn có thể thoải mái làm bài và thử sai để củng cố kiến thức theo 4 chuyên đề. Điểm tự luyện tập <em>không tính vào Bảng Xếp Hạng chính thức</em>. Để làm bài thi tính điểm xếp hạng theo Thang Điểm 10, hãy chuyển sang tab <strong>"📝 Đề Thi Của Tôi"</strong>.
+          <strong>Chế độ Tự Luyện Tập (150 Câu Hỏi):</strong> Bạn có thể thoải mái làm bài và thử sai để củng cố kiến thức theo 5 chuyên đề. Điểm tự luyện tập <em>không tính vào Bảng Xếp Hạng chính thức</em>. Để làm bài thi tính điểm xếp hạng theo Thang Điểm 10, hãy chuyển sang tab <strong>"📝 Đề Thi Của Tôi"</strong>.
         </div>
       </div>
 
@@ -344,15 +344,15 @@ export class QuizView {
         
         <!-- Filter Controls Card -->
         <div style="background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;">
-          <div style="font-size:12px;color:var(--dim);font-weight:600;text-transform:uppercase;margin-bottom:10px;">Lọc Chuyên Đề &amp; Độ Khó (Kho 125 Câu)</div>
+          <div style="font-size:12px;color:var(--dim);font-weight:600;text-transform:uppercase;margin-bottom:10px;">Lọc Chuyên Đề &amp; Độ Khó (Kho 150 Câu)</div>
           <div style="display:flex;gap:10px;flex-wrap:wrap;">
             <select id="selPracticeTopic" class="form-input" style="flex:1;min-width:140px;padding:6px 10px;font-size:12.5px;border-radius:6px;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);">
-              <option value="all" ${this.practiceFilter.topic === 'all' ? 'selected' : ''}>🌟 Tất cả các chương (125 câu)</option>
-              <option value="logic" ${this.practiceFilter.topic === 'logic' ? 'selected' : ''}>⚡ Chương 1: Cơ sở Logic &amp; Suy luận (25 câu)</option>
-              <option value="boolean" ${this.practiceFilter.topic === 'boolean' ? 'selected' : ''}>🔌 Chương 2: Đại số Boole &amp; Mạch Logic (25 câu)</option>
-              <option value="counting" ${this.practiceFilter.topic === 'counting' ? 'selected' : ''}>🎲 Chương 3: Đại số Tổ hợp &amp; Đếm (25 câu)</option>
-              <option value="relation" ${this.practiceFilter.topic === 'relation' ? 'selected' : ''}>🔗 Chương 4: Quan hệ 2 ngôi &amp; Thứ tự (25 câu)</option>
-              <option value="graph" ${this.practiceFilter.topic === 'graph' ? 'selected' : ''}>🌐 Chương 5: Lý thuyết Đồ thị &amp; Cây (25 câu)</option>
+              <option value="all" ${this.practiceFilter.topic === 'all' ? 'selected' : ''}>🌟 Tất cả các chương (150 câu)</option>
+              <option value="logic" ${this.practiceFilter.topic === 'logic' ? 'selected' : ''}>⚡ Chương 1: Cơ sở Logic &amp; Suy luận (30 câu)</option>
+              <option value="boolean" ${this.practiceFilter.topic === 'boolean' ? 'selected' : ''}>🔌 Chương 2: Đại số Boole &amp; Mạch Logic (30 câu)</option>
+              <option value="counting" ${this.practiceFilter.topic === 'counting' ? 'selected' : ''}>🎲 Chương 3: Đại số Tổ hợp &amp; Đếm (30 câu)</option>
+              <option value="relation" ${this.practiceFilter.topic === 'relation' ? 'selected' : ''}>🔗 Chương 4: Quan hệ 2 ngôi &amp; Thứ tự (30 câu)</option>
+              <option value="graph" ${this.practiceFilter.topic === 'graph' ? 'selected' : ''}>🌐 Chương 5: Lý thuyết Đồ thị &amp; Cây (30 câu)</option>
             </select>
             <select id="selPracticeDiff" class="form-input" style="flex:1;min-width:130px;padding:6px 10px;font-size:12.5px;border-radius:6px;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);">
               <option value="all" ${this.practiceFilter.difficulty === 'all' ? 'selected' : ''}>Tất cả độ khó</option>
@@ -990,7 +990,7 @@ export class QuizView {
             <span class="pill-badge" style="background:rgba(16,185,129,0.15);color:#10b981;font-size:11.5px;padding:2px 8px;border-radius:10px;">Thang Điểm 10 • 1 Lần Làm</span>
           </div>
           <p style="font-size:13px;color:var(--dim);margin:0 0 16px;">
-            Hệ thống sẽ tự động bốc ngẫu nhiên câu hỏi từ Kho 100 Câu Hỏi Toán Rời Rạc và giao bài cho sinh viên được chọn.
+            Hệ thống sẽ tự động bốc ngẫu nhiên câu hỏi từ Kho 150 Câu Hỏi Toán Rời Rạc và giao bài cho sinh viên được chọn.
           </p>
 
           <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));gap:16px;margin-bottom:16px;">
@@ -1042,12 +1042,12 @@ export class QuizView {
               <div style="display:flex;align-items:center;gap:8px;">
                 <label for="selManualChapterFilter" style="font-size:12.5px;font-weight:700;color:var(--text);">Lọc theo chương:</label>
                 <select id="selManualChapterFilter" class="form-input" style="padding:6px 12px;font-size:12.5px;border-radius:6px;background:var(--panel);border:1px solid var(--line);color:var(--text);">
-                  <option value="all">📚 Tất cả các chương (125 câu)</option>
-                  <option value="logic">⚡ Chương 1: Cơ sở Logic &amp; Suy luận (25 câu)</option>
-                  <option value="boolean">🔌 Chương 2: Đại số Boole &amp; Mạch Logic (25 câu)</option>
-                  <option value="counting">🎲 Chương 3: Đại số Tổ hợp &amp; Đếm (25 câu)</option>
-                  <option value="relation">🔗 Chương 4: Quan hệ 2 ngôi &amp; Thứ tự (25 câu)</option>
-                  <option value="graph">🌐 Chương 5: Lý thuyết Đồ thị &amp; Cây (25 câu)</option>
+                  <option value="all">📚 Tất cả các chương (150 câu)</option>
+                  <option value="logic">⚡ Chương 1: Cơ sở Logic &amp; Suy luận (30 câu)</option>
+                  <option value="boolean">🔌 Chương 2: Đại số Boole &amp; Mạch Logic (30 câu)</option>
+                  <option value="counting">🎲 Chương 3: Đại số Tổ hợp &amp; Đếm (30 câu)</option>
+                  <option value="relation">🔗 Chương 4: Quan hệ 2 ngôi &amp; Thứ tự (30 câu)</option>
+                  <option value="graph">🌐 Chương 5: Lý thuyết Đồ thị &amp; Cây (30 câu)</option>
                 </select>
               </div>
 
@@ -2263,8 +2263,22 @@ export class QuizView {
           if (topic !== 'all') {
             pool = pool.filter(q => q.topic === topic);
           }
-          const shuffled = shuffle(pool);
-          questionIds = shuffled.slice(0, Math.min(count, shuffled.length)).map(q => q.id);
+          // Allocate strictly 10% hard questions (e.g. 10 questions -> exactly 1 hard question)
+          const targetHardCount = Math.max(0, Math.round(count * 0.1));
+          const hardPool = pool.filter(q => q.difficulty === 'hard');
+          const standardPool = pool.filter(q => q.difficulty !== 'hard');
+
+          const shuffledHard = shuffle(hardPool);
+          const shuffledStandard = shuffle(standardPool);
+
+          const actualHardCount = Math.min(targetHardCount, shuffledHard.length);
+          const standardCount = Math.min(count - actualHardCount, shuffledStandard.length);
+
+          const selectedQuestions = shuffle([
+            ...shuffledStandard.slice(0, standardCount),
+            ...shuffledHard.slice(0, actualHardCount),
+          ]);
+          questionIds = selectedQuestions.map(q => q.id);
         }
 
         const result = examManager.createExam({
