@@ -160,7 +160,7 @@ export class QuizView {
    * @param {'practice' | 'myExams' | 'leaderboard' | 'studio'} tabName
    */
   setTab(tabName) {
-    if (tabName === 'studio' && !authManager.isAdmin()) {
+    if ((tabName === 'studio' || tabName === 'leaderboard') && !authManager.isAdmin()) {
       tabName = 'practice';
     }
     const validTabs = ['practice', 'myExams', 'leaderboard', 'studio'];
@@ -242,7 +242,7 @@ export class QuizView {
     }
     if (!this.container) return;
 
-    if (this.activeTab === 'studio' && !authManager.isAdmin()) {
+    if ((this.activeTab === 'studio' || this.activeTab === 'leaderboard') && !authManager.isAdmin()) {
       this.activeTab = 'practice';
     }
 
@@ -281,7 +281,7 @@ export class QuizView {
             <button type="button" class="btn-tab ${this.activeTab === 'myExams' ? 'active' : ''}" id="tabBtnMyExams" style="padding:8px 14px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;position:relative;">
               📝 ${isAdmin ? 'Quản Lý Đề Thi' : 'Đề Thi Của Tôi'} ${myPendingCount > 0 ? `<span style="background:#ef4444;color:#fff;font-size:10px;padding:1px 6px;border-radius:10px;margin-left:4px;font-weight:700;">${myPendingCount}</span>` : ''}
             </button>
-            <button type="button" class="btn-tab ${this.activeTab === 'leaderboard' ? 'active' : ''}" id="tabBtnLeaderboard" style="padding:8px 14px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;">
+            <button type="button" class="btn-tab ${this.activeTab === 'leaderboard' ? 'active' : ''}" id="tabBtnLeaderboard" style="${isAdmin ? '' : 'display:none;'}padding:8px 14px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;">
               🏆 Bảng Xếp Hạng
             </button>
             <button type="button" class="btn-tab ${this.activeTab === 'studio' ? 'active' : ''}" id="tabBtnStudio" style="${isAdmin ? '' : 'display:none;'}padding:8px 14px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;">
@@ -301,9 +301,11 @@ export class QuizView {
         </div>
 
         <!-- TAB 3: LEADERBOARD & USER STATS -->
+        ${isAdmin ? `
         <div id="paneLeaderboard" style="display:${this.activeTab === 'leaderboard' ? 'block' : 'none'};">
           ${this._renderLeaderboardView()}
         </div>
+        ` : ''}
 
         <!-- TAB 4: TEACHER'S EXAM STUDIO -->
         <div id="paneStudio" style="display:${this.activeTab === 'studio' ? 'block' : 'none'};">
@@ -775,6 +777,7 @@ export class QuizView {
     const sub = this.reviewSubmission;
     if (!sub) return '';
 
+    const isAdmin = authManager.isAdmin();
     const exam = examManager.getExamById(sub.examId);
     const questions = exam ? exam.questionIds.map(id => STATIC_QUESTION_BANK.find(q => q.id === id)).filter(Boolean) : [];
 
@@ -788,7 +791,7 @@ export class QuizView {
               ❮ Quay lại danh sách đề thi
             </button>
             <h2 style="font-size:22px;font-weight:700;color:var(--text);margin:0 0 4px;">
-              Chi Tiết Bài Làm: ${this._escapeHtml(sub.examTitle)}
+              ${isAdmin ? `Chi Tiết Bài Làm: ${this._escapeHtml(sub.examTitle)}` : `Kết Quả Bài Thi: ${this._escapeHtml(sub.examTitle)}`}
             </h2>
             <div style="font-size:13px;color:var(--dim);">
               Thí sinh: <strong>${this._escapeHtml(sub.fullName)}</strong> (${this._escapeHtml(sub.className)}) • Nộp lúc: ${new Date(sub.submittedAt).toLocaleString('vi-VN')}
@@ -805,73 +808,89 @@ export class QuizView {
           </div>
         </div>
 
-        <!-- Questions Review List -->
-        <div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:16px;">
-          📝 Chi tiết từng câu hỏi &amp; đáp án:
-        </div>
+        ${!isAdmin ? `
+          <!-- Student Result Notice: ONLY SCORE IS SHOWN, NO ANSWERS -->
+          <div style="background:var(--panel-alt);border:1px solid var(--line);border-radius:12px;padding:32px 24px;text-align:center;margin-top:20px;">
+            <div style="font-size:42px;margin-bottom:12px;">🛡️</div>
+            <h3 style="font-size:18px;font-weight:700;color:var(--text);margin:0 0 8px;">
+              Bài Thi Đã Được Nộp &amp; Chấm Điểm Thành Công!
+            </h3>
+            <p style="font-size:14px;color:var(--dim);max-width:540px;margin:0 auto 20px;line-height:1.6;">
+              Theo quy chế khảo thí và bảo mật đề thi trực tuyến, hệ thống <strong>chỉ công bố điểm số chính thức và số câu đúng</strong>, không hiển thị lại bộ câu hỏi và đáp án chi tiết.
+            </p>
+            <button type="button" class="btn-primary" id="btnBackToExamsFromScore" style="padding:10px 24px;font-weight:700;font-size:13.5px;">
+              📋 Quay Về Danh Sách Đề Thi
+            </button>
+          </div>
+        ` : `
+          <!-- Questions Review List (Admin only) -->
+          <div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:16px;">
+            📝 Chi tiết từng câu hỏi &amp; đáp án (Chế độ Quản trị viên):
+          </div>
 
-        <div style="display:flex;flex-direction:column;gap:18px;">
-          ${questions.map((q, idx) => {
-            const userChoice = sub.answers ? sub.answers[q.id] : null;
-            const isCorrect = userChoice === q.correctId;
-            const optionIds = sub.optionOrder && sub.optionOrder[q.id]
-              ? sub.optionOrder[q.id]
-              : q.options.map(option => option.id);
-            const displayedOptions = optionIds
-              .map(optionId => q.options.find(option => option.id === optionId))
-              .filter(Boolean);
+          <div style="display:flex;flex-direction:column;gap:18px;">
+            ${questions.map((q, idx) => {
+              const userChoice = sub.answers ? sub.answers[q.id] : null;
+              const isCorrect = userChoice === q.correctId;
+              const optionIds = sub.optionOrder && sub.optionOrder[q.id]
+                ? sub.optionOrder[q.id]
+                : q.options.map(option => option.id);
+              const displayedOptions = optionIds
+                .map(optionId => q.options.find(option => option.id === optionId))
+                .filter(Boolean);
 
-            return `
-              <div style="background:var(--panel-alt);border:1px solid ${isCorrect ? 'rgba(16,185,129,0.4)' : 'rgba(239,68,68,0.4)'};border-radius:10px;padding:18px;">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-                  <span style="font-weight:700;font-size:14px;color:var(--text);">
-                    Câu ${idx + 1}:
-                  </span>
-                  <span class="exam-status-badge ${isCorrect ? 'completed' : 'pending'}" style="${isCorrect ? '' : 'background:rgba(239,68,68,0.15);color:#ef4444;border-color:rgba(239,68,68,0.3);'}">
-                    ${isCorrect ? '✓ Trả lời Đúng (+1 điểm)' : `✗ Trả lời Sai (Bạn chọn ${userChoice || 'Bỏ trống'})`}
-                  </span>
+              return `
+                <div style="background:var(--panel-alt);border:1px solid ${isCorrect ? 'rgba(16,185,129,0.4)' : 'rgba(239,68,68,0.4)'};border-radius:10px;padding:18px;">
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                    <span style="font-weight:700;font-size:14px;color:var(--text);">
+                      Câu ${idx + 1}:
+                    </span>
+                    <span class="exam-status-badge ${isCorrect ? 'completed' : 'pending'}" style="${isCorrect ? '' : 'background:rgba(239,68,68,0.15);color:#ef4444;border-color:rgba(239,68,68,0.3);'}">
+                      ${isCorrect ? '✓ Trả lời Đúng (+1 điểm)' : `✗ Trả lời Sai (Bạn chọn ${userChoice || 'Bỏ trống'})`}
+                    </span>
+                  </div>
+
+                  <div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:14px;line-height:1.5;">
+                    ${q.question}
+                  </div>
+
+                  <!-- 4 Options with Review Marks -->
+                  <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px;">
+                    ${displayedOptions.map((opt, optionIndex) => {
+                      const displayLabel = String.fromCharCode(65 + optionIndex);
+                      let borderCol = 'var(--line)';
+                      let bgCol = 'var(--panel)';
+                      let tag = '';
+
+                      if (opt.id === q.correctId) {
+                        borderCol = '#10b981';
+                        bgCol = 'rgba(16,185,129,0.15)';
+                        tag = '<span style="color:#10b981;font-weight:bold;margin-left:auto;">✓ Đáp án chuẩn</span>';
+                      } else if (opt.id === userChoice) {
+                        borderCol = '#ef4444';
+                        bgCol = 'rgba(239,68,68,0.15)';
+                        tag = '<span style="color:#ef4444;font-weight:bold;margin-left:auto;">✗ Lựa chọn của bạn</span>';
+                      }
+
+                      return `
+                        <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:6px;background:${bgCol};border:1px solid ${borderCol};font-size:13.5px;">
+                          <span style="font-weight:700;width:24px;text-align:center;">${displayLabel}.</span>
+                          <span>${opt.text}</span>
+                          ${tag}
+                        </div>
+                      `;
+                    }).join('')}
+                  </div>
+
+                  <!-- Explanation -->
+                  <div style="background:rgba(56,189,248,0.06);border-left:3px solid #38bdf8;padding:10px 14px;border-radius:4px;font-size:13px;line-height:1.5;color:var(--text);">
+                    <strong>💡 Lời giải chi tiết:</strong> ${q.explanation}
+                  </div>
                 </div>
-
-                <div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:14px;line-height:1.5;">
-                  ${q.question}
-                </div>
-
-                <!-- 4 Options with Review Marks -->
-                <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px;">
-                  ${displayedOptions.map((opt, optionIndex) => {
-                    const displayLabel = String.fromCharCode(65 + optionIndex);
-                    let borderCol = 'var(--line)';
-                    let bgCol = 'var(--panel)';
-                    let tag = '';
-
-                    if (opt.id === q.correctId) {
-                      borderCol = '#10b981';
-                      bgCol = 'rgba(16,185,129,0.15)';
-                      tag = '<span style="color:#10b981;font-weight:bold;margin-left:auto;">✓ Đáp án chuẩn</span>';
-                    } else if (opt.id === userChoice) {
-                      borderCol = '#ef4444';
-                      bgCol = 'rgba(239,68,68,0.15)';
-                      tag = '<span style="color:#ef4444;font-weight:bold;margin-left:auto;">✗ Lựa chọn của bạn</span>';
-                    }
-
-                    return `
-                      <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:6px;background:${bgCol};border:1px solid ${borderCol};font-size:13.5px;">
-                        <span style="font-weight:700;width:24px;text-align:center;">${displayLabel}.</span>
-                        <span>${opt.text}</span>
-                        ${tag}
-                      </div>
-                    `;
-                  }).join('')}
-                </div>
-
-                <!-- Explanation -->
-                <div style="background:rgba(56,189,248,0.06);border-left:3px solid #38bdf8;padding:10px 14px;border-radius:4px;font-size:13px;line-height:1.5;color:var(--text);">
-                  <strong>💡 Lời giải chi tiết:</strong> ${q.explanation}
-                </div>
-              </div>
-            `;
-          }).join('')}
-        </div>
+              `;
+            }).join('')}
+          </div>
+        `}
 
       </div>
     `;
@@ -1976,6 +1995,14 @@ export class QuizView {
     const btnBackFromReview = this.container.querySelector('#btnBackFromReview');
     if (btnBackFromReview) {
       btnBackFromReview.addEventListener('click', () => {
+        this.reviewSubmission = null;
+        this.render();
+      });
+    }
+
+    const btnBackFromScore = this.container.querySelector('#btnBackToExamsFromScore');
+    if (btnBackFromScore) {
+      btnBackFromScore.addEventListener('click', () => {
         this.reviewSubmission = null;
         this.render();
       });

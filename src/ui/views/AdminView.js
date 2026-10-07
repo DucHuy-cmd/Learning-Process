@@ -68,7 +68,6 @@ export class AdminView {
     }
 
     const allUsers = authManager.getUsers();
-    const leaderboard = quizHistoryManager.getLeaderboard ? quizHistoryManager.getLeaderboard(50) : [];
     const studentCount = allUsers.filter(u => u.username !== 'admin' && u.id !== 'user_admin').length;
 
     this.container.innerHTML = `
@@ -92,10 +91,6 @@ export class AdminView {
             <button type="button" class="btn-secondary" id="btnAdminManualSync" style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;font-size:12.5px;font-weight:600;border-radius:8px;cursor:pointer;">
               <span>🔄</span>
               <span>Đồng bộ Máy chủ</span>
-            </button>
-            <button type="button" class="btn-danger-outline" id="btnAdminResetLeaderboard" style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;font-size:12.5px;font-weight:600;border-radius:8px;cursor:pointer;color:#ef4444;border-color:rgba(239,68,68,0.4);">
-              <span>🏆</span>
-              <span>Reset Bảng Xếp Hạng</span>
             </button>
             <button type="button" class="btn-danger" id="btnAdminFullDatabaseReset" style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;font-size:12.5px;font-weight:700;border-radius:8px;cursor:pointer;background:#ef4444;color:#fff;border:none;">
               <span>🔥</span>
@@ -127,15 +122,6 @@ export class AdminView {
             <div style="font-size:18px;font-weight:800;color:${this.isServerConnected ? '#10b981' : '#f59e0b'};display:flex;align-items:center;gap:6px;">
               <span>${this.isServerConnected ? '● Đã kết nối' : '○ Chế độ Ngoại tuyến'}</span>
             </div>
-          </div>
-
-          <!-- Card 3: Leaderboard -->
-          <div style="background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 18px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-              <span style="font-size:12px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:0.5px;">Bảng Xếp Hạng</span>
-              <span style="font-size:20px;">🏆</span>
-            </div>
-            <div style="font-size:26px;font-weight:800;color:var(--text);">${leaderboard.length}</div>
           </div>
 
           <!-- Card 4: System Admin -->
@@ -227,62 +213,6 @@ export class AdminView {
               </tbody>
             </table>
           </div>
-        </section>
-
-        <!-- Leaderboard Management Section -->
-        <section class="admin-leaderboard-section" style="background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px 22px;">
-          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:14px;">
-            <div>
-              <h3 style="margin:0 0 4px;font-size:16px;color:var(--text);font-weight:700;display:flex;align-items:center;gap:8px;">
-                <span>🏆</span>
-                <span>Quản Lý Bảng Xếp Hạng Trắc Nghiệm (${leaderboard.length})</span>
-              </h3>
-              <p style="margin:0;font-size:12px;color:var(--dim);">
-                Theo dõi thành tích làm bài thi, xóa điểm số sai lệch của từng sinh viên hoặc làm mới toàn bộ bảng xếp hạng.
-              </p>
-            </div>
-          </div>
-
-          ${leaderboard.length === 0 ? `
-            <div style="text-align:center;padding:24px;color:var(--dim);font-size:13px;background:var(--panel-alt);border-radius:8px;">
-              Chưa có kết quả trắc nghiệm nào trên bảng xếp hạng.
-            </div>
-          ` : `
-            <div style="overflow-x:auto;max-height:300px;border:1px solid var(--line);border-radius:8px;">
-              <table style="width:100%;border-collapse:collapse;font-size:12.5px;text-align:left;">
-                <thead style="background:var(--panel-alt);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:2;">
-                  <tr>
-                    <th style="padding:8px 12px;font-weight:700;color:var(--dim);font-size:11.5px;">Hạng</th>
-                    <th style="padding:8px 12px;font-weight:700;color:var(--dim);font-size:11.5px;">Sinh viên</th>
-                    <th style="padding:8px 12px;font-weight:700;color:var(--dim);font-size:11.5px;text-align:center;">Điểm</th>
-                    <th style="padding:8px 12px;font-weight:700;color:var(--dim);font-size:11.5px;text-align:center;">Độ chính xác</th>
-                    <th style="padding:8px 12px;font-weight:700;color:var(--dim);font-size:11.5px;text-align:center;">Số câu đã làm</th>
-                    <th style="padding:8px 12px;font-weight:700;color:var(--dim);font-size:11.5px;text-align:center;">Hành động</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${leaderboard.map(item => `
-                    <tr style="border-bottom:1px solid var(--line);">
-                      <td style="padding:8px 12px;font-weight:700;">${item.rankBadge || item.rank}</td>
-                      <td style="padding:8px 12px;">
-                        <span style="margin-right:6px;">${item.avatar || '👨‍🎓'}</span>
-                        <strong>${item.fullName}</strong>
-                        <span style="font-size:11px;color:var(--dim);margin-left:4px;">(${item.className || 'Sinh viên'})</span>
-                      </td>
-                      <td style="padding:8px 12px;text-align:center;font-weight:700;color:var(--accent);">${item.score} đ</td>
-                      <td style="padding:8px 12px;text-align:center;">${item.accuracy}%</td>
-                      <td style="padding:8px 12px;text-align:center;">${item.totalAnswered} câu</td>
-                      <td style="padding:8px 12px;text-align:center;">
-                        <button type="button" class="btn-admin-del-score" data-user-id="${item.userId}" data-name="${item.fullName}" style="padding:3px 8px;font-size:11px;color:#ef4444;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:4px;cursor:pointer;">
-                          🗑️ Xóa điểm
-                        </button>
-                      </td>
-                    </tr>
-                  `).join('')}
-                </tbody>
-              </table>
-            </div>
-          `}
         </section>
       </div>
     `;
@@ -452,23 +382,7 @@ export class AdminView {
       });
     }
 
-    // 4. Reset Leaderboard Button
-    const btnResetLb = this.container.querySelector('#btnAdminResetLeaderboard');
-    if (btnResetLb) {
-      btnResetLb.addEventListener('click', async () => {
-        if (typeof window !== 'undefined' && window.confirm && !window.confirm('CẢNH BÁO: Bạn có chắc chắn muốn RESET toàn bộ bảng xếp hạng điểm số trắc nghiệm? Dữ liệu điểm sẽ trở về trống!')) {
-          return;
-        }
-        quizHistoryManager.clearLeaderboard();
-        try {
-          await cloudSyncManager.resetQuizLeaderboard();
-        } catch {}
-        await this.render();
-        this._showAlert('✓ Bảng xếp hạng trắc nghiệm đã được reset sạch sẽ.', 'success');
-      });
-    }
-
-    // 5. Full Database Reset Button (Nuclear option: clears users, scores, AI chat)
+    // 4. Full Database Reset Button (Nuclear option: clears users, scores, AI chat)
     const btnFullReset = this.container.querySelector('#btnAdminFullDatabaseReset');
     if (btnFullReset) {
       btnFullReset.addEventListener('click', async () => {
@@ -503,7 +417,7 @@ export class AdminView {
   }
 
   /**
-   * Binds delete buttons in users table and leaderboard table.
+   * Binds delete buttons in users table.
    * @private
    */
   _bindTableActionButtons() {
@@ -531,23 +445,6 @@ export class AdminView {
         } else {
           this._showAlert(res.error || 'Lỗi khi xóa tài khoản.', 'error');
         }
-      });
-    });
-
-    // Delete single leaderboard score buttons
-    this.container.querySelectorAll('.btn-admin-del-score').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const userId = btn.getAttribute('data-user-id');
-        const userName = btn.getAttribute('data-name') || userId;
-        if (typeof window !== 'undefined' && window.confirm && !window.confirm(`Xóa điểm số của "${userName}" khỏi bảng xếp hạng?`)) {
-          return;
-        }
-        quizHistoryManager.removeUserStats(userId);
-        try {
-          await cloudSyncManager.deleteQuizLeaderboardUser(userId);
-        } catch {}
-        await this.render();
-        this._showAlert(`✓ Đã xóa điểm số của "${userName}" khỏi bảng xếp hạng.`, 'success');
       });
     });
   }

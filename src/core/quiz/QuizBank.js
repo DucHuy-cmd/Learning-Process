@@ -33,402 +33,767 @@ export const STATIC_QUESTION_BANK = [
   // CHƯƠNG 1 & 2: CƠ SỞ LOGIC MỆNH ĐỀ & VỊ TỪ
   // =========================================================================
   {
-    id: 'logic_q01',
-    topic: 'logic',
-    topicName: 'Logic Mệnh đề',
-    difficulty: 'easy',
-    question: 'Cho hai mệnh đề p = Đúng (1) và q = Sai (0). Mệnh đề kéo theo (p → q) có giá trị chân trị là gì?',
-    options: [
-      { id: 'A', text: '1 (Đúng)' },
-      { id: 'B', text: '0 (Sai)' },
-      { id: 'C', text: 'Không xác định được' },
-      { id: 'D', text: 'Cả 1 và 0 đều đúng' },
+    "id": "logic_q01",
+    "topic": "logic",
+    "topicName": "Logic Mệnh đề",
+    "difficulty": "easy",
+    "question": "Cho hai mệnh đề p = Đúng (1) và q = Sai (0). Mệnh đề kéo theo (p → q) có giá trị chân trị là gì?",
+    "options": [
+      {
+        "id": "A",
+        "text": "1 (Đúng)"
+      },
+      {
+        "id": "B",
+        "text": "0 (Sai)"
+      },
+      {
+        "id": "C",
+        "text": "Không xác định được"
+      },
+      {
+        "id": "D",
+        "text": "Cả 1 và 0 đều đúng"
+      }
     ],
-    correctId: 'B',
-    explanation: 'Theo định nghĩa phép kéo theo, p → q chỉ nhận giá trị SAI duy nhất khi tiền đề p Đúng (1) và kết luận q Sai (0). Do đó 1 → 0 = 0.',
-    actionLink: { view: 'logic', expression: 'p → q' },
+    "correctId": "B",
+    "explanation": "Theo định nghĩa phép kéo theo, p → q chỉ nhận giá trị SAI duy nhất khi tiền đề p Đúng (1) và kết luận q Sai (0). Do đó 1 → 0 = 0.",
+    "actionLink": {
+      "view": "logic",
+      "expression": "p → q"
+    }
   },
   {
-    id: 'logic_q02',
-    topic: 'logic',
-    topicName: 'Bản chất Mệnh đề',
-    difficulty: 'easy',
-    question: 'Biểu thức logic p ∨ ¬p (Luật triệt tam) thuộc loại mệnh đề nào sau đây?',
-    options: [
-      { id: 'A', text: 'Mâu thuẫn / Hằng sai (Contradiction)' },
-      { id: 'B', text: 'Tiếp liên / Thỏa được (Contingency)' },
-      { id: 'C', text: 'Hằng đúng (Tautology)' },
-      { id: 'D', text: 'Không thể phân loại' },
+    "id": "logic_q02",
+    "topic": "logic",
+    "topicName": "Bản chất Mệnh đề",
+    "difficulty": "easy",
+    "question": "Biểu thức logic p ∨ ¬p (Luật triệt tam) thuộc loại mệnh đề nào sau đây?",
+    "options": [
+      {
+        "id": "A",
+        "text": "Mâu thuẫn / Hằng sai (Contradiction)"
+      },
+      {
+        "id": "B",
+        "text": "Tiếp liên / Thỏa được (Contingency)"
+      },
+      {
+        "id": "C",
+        "text": "Hằng đúng (Tautology)"
+      },
+      {
+        "id": "D",
+        "text": "Không thể phân loại"
+      }
     ],
-    correctId: 'C',
-    explanation: 'Với mọi giá trị của p: khi p=1 thì p ∨ ¬p = 1 ∨ 0 = 1; khi p=0 thì 0 ∨ 1 = 1. Biểu thức luôn nhận giá trị Đúng ở tất cả các trường hợp nên là Hằng đúng (Tautology).',
-    actionLink: { view: 'logic', expression: 'p ∨ ¬p' },
+    "correctId": "C",
+    "explanation": "Với mọi giá trị của p: khi p=1 thì p ∨ ¬p = 1 ∨ 0 = 1; khi p=0 thì 0 ∨ 1 = 1. Biểu thức luôn nhận giá trị Đúng ở tất cả các trường hợp nên là Hằng đúng (Tautology).",
+    "actionLink": {
+      "view": "logic",
+      "expression": "p ∨ ¬p"
+    }
   },
   {
-    id: 'logic_q03',
-    topic: 'logic',
-    topicName: 'Tương đương Logic',
-    difficulty: 'medium',
-    question: 'Theo luật De Morgan, phủ định của mệnh đề hội ¬(p ∧ q) tương đương logic với biểu thức nào?',
-    options: [
-      { id: 'A', text: '¬p ∧ ¬q' },
-      { id: 'B', text: '¬p ∨ ¬q' },
-      { id: 'C', text: 'p ∨ q' },
-      { id: 'D', text: '¬p → q' },
+    "id": "logic_q03",
+    "topic": "logic",
+    "topicName": "Tương đương Logic",
+    "difficulty": "medium",
+    "question": "Theo luật De Morgan, phủ định của mệnh đề hội ¬(p ∧ q) tương đương logic với biểu thức nào?",
+    "options": [
+      {
+        "id": "A",
+        "text": "¬p ∧ ¬q"
+      },
+      {
+        "id": "B",
+        "text": "¬p ∨ ¬q"
+      },
+      {
+        "id": "C",
+        "text": "p ∨ q"
+      },
+      {
+        "id": "D",
+        "text": "¬p → q"
+      }
     ],
-    correctId: 'B',
-    explanation: 'Luật De Morgan khẳng định: Phủ định của một hội bằng tuyển của các phủ định: ¬(p ∧ q) ≡ ¬p ∨ ¬q.',
-    actionLink: { view: 'logic', expression: '¬(p ∧ q) ↔ (¬p ∨ ¬q)' },
+    "correctId": "B",
+    "explanation": "Luật De Morgan khẳng định: Phủ định của một hội bằng tuyển của các phủ định: ¬(p ∧ q) ≡ ¬p ∨ ¬q.",
+    "actionLink": {
+      "view": "logic",
+      "expression": "¬(p ∧ q) ↔ (¬p ∨ ¬q)"
+    }
   },
   {
-    id: 'logic_q04',
-    topic: 'logic',
-    topicName: 'Quy tắc Suy diễn',
-    difficulty: 'medium',
-    question: 'Quy tắc suy diễn "Nếu p → q đúng và tiền đề p đúng thì suy ra kết luận q đúng" có tên gọi kinh điển là gì?',
-    options: [
-      { id: 'A', text: 'Khẳng định tiền đề (Modus Ponens)' },
-      { id: 'B', text: 'Phủ định hậu đề (Modus Tollens)' },
-      { id: 'C', text: 'Tam đoạn luận giả thiết (Hypothetical Syllogism)' },
-      { id: 'D', text: 'Luật triệt tiêu mâu thuẫn' },
+    "id": "logic_q04",
+    "topic": "logic",
+    "topicName": "Quy tắc Suy diễn",
+    "difficulty": "medium",
+    "question": "Quy tắc suy diễn \"Nếu p → q đúng và tiền đề p đúng thì suy ra kết luận q đúng\" có tên gọi kinh điển là gì?",
+    "options": [
+      {
+        "id": "A",
+        "text": "Khẳng định tiền đề (Modus Ponens)"
+      },
+      {
+        "id": "B",
+        "text": "Phủ định hậu đề (Modus Tollens)"
+      },
+      {
+        "id": "C",
+        "text": "Tam đoạn luận giả thiết (Hypothetical Syllogism)"
+      },
+      {
+        "id": "D",
+        "text": "Luật triệt tiêu mâu thuẫn"
+      }
     ],
-    correctId: 'A',
-    explanation: 'Quy tắc ((p → q) ∧ p) → q là quy tắc suy diễn cơ bản nhất trong toán học, được gọi là Modus Ponens (Khẳng định tiền đề).',
-    actionLink: { view: 'logic', expression: '((p → q) ∧ p) → q' },
+    "correctId": "A",
+    "explanation": "Quy tắc ((p → q) ∧ p) → q là quy tắc suy diễn cơ bản nhất trong toán học, được gọi là Modus Ponens (Khẳng định tiền đề).",
+    "actionLink": {
+      "view": "logic",
+      "expression": "((p → q) ∧ p) → q"
+    }
   },
   {
-    id: 'logic_q05',
-    topic: 'logic',
-    topicName: 'Tương đương Phản đảo',
-    difficulty: 'medium',
-    question: 'Mệnh đề phản đảo (Contrapositive) của mệnh đề kéo theo "Nếu trời mưa thì đường trơn" (p → q) là mệnh đề nào?',
-    options: [
-      { id: 'A', text: 'Nếu đường trơn thì trời mưa (q → p)' },
-      { id: 'B', text: 'Nếu trời không mưa thì đường không trơn (¬p → ¬q)' },
-      { id: 'C', text: 'Nếu đường không trơn thì trời không mưa (¬q → ¬p)' },
-      { id: 'D', text: 'Trời mưa và đường không trơn (p ∧ ¬q)' },
+    "id": "logic_q05",
+    "topic": "logic",
+    "topicName": "Mạch Logic: Bộ cộng bán phần",
+    "difficulty": "medium",
+    "question": "Quan sát sơ đồ mạch logic số dưới đây. Cho biết đây là mạch chức năng gì?<br><svg viewBox=\"0 0 340 130\" width=\"100%\" height=\"auto\" style=\"max-width:340px;display:block;margin:10px auto;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:6px;\"><text x=\"12\" y=\"38\" fill=\"#38bdf8\" font-size=\"13\" font-weight=\"bold\" font-family=\"sans-serif\">A</text><text x=\"12\" y=\"78\" fill=\"#f43f5e\" font-size=\"13\" font-weight=\"bold\" font-family=\"sans-serif\">B</text><line x1=\"30\" y1=\"34\" x2=\"110\" y2=\"34\" stroke=\"#38bdf8\" stroke-width=\"2\"/><line x1=\"30\" y1=\"74\" x2=\"110\" y2=\"74\" stroke=\"#f43f5e\" stroke-width=\"2\"/><path d=\"M 105 20 Q 115 54 105 88 M 112 20 Q 122 54 112 88 Q 145 54 165 54 Q 145 54 112 20\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"2\"/><text x=\"130\" y=\"58\" fill=\"#94a3b8\" font-size=\"10\" font-weight=\"bold\" font-family=\"sans-serif\">XOR</text><line x1=\"165\" y1=\"54\" x2=\"260\" y2=\"54\" stroke=\"#10b981\" stroke-width=\"2\"/><text x=\"268\" y=\"58\" fill=\"#10b981\" font-size=\"13\" font-weight=\"bold\" font-family=\"sans-serif\">S (Sum)</text><circle cx=\"60\" cy=\"34\" r=\"3\" fill=\"#38bdf8\"/><circle cx=\"80\" cy=\"74\" r=\"3\" fill=\"#f43f5e\"/><path d=\"M 60 34 L 60 96 L 115 96\" fill=\"none\" stroke=\"#38bdf8\" stroke-width=\"2\"/><path d=\"M 80 74 L 80 114 L 115 114\" fill=\"none\" stroke=\"#f43f5e\" stroke-width=\"2\"/><path d=\"M 115 88 L 135 88 A 18 18 0 0 1 135 122 L 115 122 Z\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"2\"/><text x=\"128\" y=\"108\" fill=\"#94a3b8\" font-size=\"10\" font-weight=\"bold\" font-family=\"sans-serif\">AND</text><line x1=\"153\" y1=\"105\" x2=\"260\" y2=\"105\" stroke=\"#f59e0b\" stroke-width=\"2\"/><text x=\"268\" y=\"109\" fill=\"#f59e0b\" font-size=\"13\" font-weight=\"bold\" font-family=\"sans-serif\">C (Carry)</text></svg>",
+    "options": [
+      {
+        "id": "A",
+        "text": "Mạch cộng bán phần (Half Adder) với S = A ⊕ B (Tổng) và C = A ∧ B (Số nhớ)"
+      },
+      {
+        "id": "B",
+        "text": "Mạch cộng toàn phần (Full Adder) nhận 3 đầu vào"
+      },
+      {
+        "id": "C",
+        "text": "Bộ chọn kênh đa hợp (Multiplexer 2:1)"
+      },
+      {
+        "id": "D",
+        "text": "Mạch so sánh độ lớn 2-bit"
+      }
     ],
-    correctId: 'C',
-    explanation: 'Mệnh đề phản đảo của p → q là ¬q → ¬p. Theo định lý tương đương phản đảo, p → q ≡ ¬q → ¬p.',
-    actionLink: { view: 'logic', expression: '(p → q) ↔ (¬q → ¬p)' },
+    "correctId": "A",
+    "explanation": "Mạch gồm 1 cổng XOR và 1 cổng AND cùng nhận 2 đầu vào A và B. Ngõ ra XOR tạo bit Tổng S = A ⊕ B, ngõ ra AND tạo bit Nhớ C = A ∧ B. Đây chính là cấu trúc kinh điển của Bộ cộng nhị phân bán phần (Half Adder).",
+    "actionLink": {
+      "view": "logic",
+      "expression": "p ⊕ q"
+    }
   },
   {
-    id: 'logic_q06',
-    topic: 'logic',
-    topicName: 'Dạng chuẩn tắc',
-    difficulty: 'medium',
-    question: 'Một hàm logic 3 biến f(p, q, r) có bao nhiêu dòng trong bảng chân trị toàn phần?',
-    options: [
-      { id: 'A', text: '3 dòng' },
-      { id: 'B', text: '6 dòng' },
-      { id: 'C', text: '8 dòng (2³)' },
-      { id: 'D', text: '16 dòng (2⁴)' },
+    "id": "logic_q06",
+    "topic": "logic",
+    "topicName": "Mạch Logic: Bộ chọn kênh MUX",
+    "difficulty": "hard",
+    "question": "Sơ đồ mạch số dưới đây thực hiện chức năng của khối phần cứng nào trong kiến trúc máy tính?<br><svg viewBox=\"0 0 350 145\" width=\"100%\" height=\"auto\" style=\"max-width:350px;display:block;margin:10px auto;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:6px;\"><text x=\"10\" y=\"28\" fill=\"#38bdf8\" font-size=\"12\" font-weight=\"bold\" font-family=\"sans-serif\">D₀</text><text x=\"10\" y=\"80\" fill=\"#f43f5e\" font-size=\"12\" font-weight=\"bold\" font-family=\"sans-serif\">D₁</text><text x=\"10\" y=\"130\" fill=\"#fbbf24\" font-size=\"12\" font-weight=\"bold\" font-family=\"sans-serif\">S (Chọn)</text><line x1=\"30\" y1=\"24\" x2=\"130\" y2=\"24\" stroke=\"#38bdf8\" stroke-width=\"2\"/><line x1=\"30\" y1=\"76\" x2=\"130\" y2=\"76\" stroke=\"#f43f5e\" stroke-width=\"2\"/><line x1=\"75\" y1=\"126\" x2=\"130\" y2=\"92\" stroke=\"#fbbf24\" stroke-width=\"2\"/><path d=\"M 45 126 L 65 126 L 65 40 L 75 40\" fill=\"none\" stroke=\"#fbbf24\" stroke-width=\"2\"/><path d=\"M 75 34 L 92 40 L 75 46 Z\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"1.5\"/><circle cx=\"95\" cy=\"40\" r=\"2.5\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"1.5\"/><line x1=\"98\" y1=\"40\" x2=\"130\" y2=\"40\" stroke=\"#fbbf24\" stroke-width=\"2\"/><path d=\"M 130 16 L 150 16 A 16 16 0 0 1 150 48 L 130 48 Z\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"2\"/><path d=\"M 130 68 L 150 68 A 16 16 0 0 1 150 100 L 130 100 Z\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"2\"/><line x1=\"166\" y1=\"32\" x2=\"195\" y2=\"50\" stroke=\"#e2e8f0\" stroke-width=\"2\"/><line x1=\"166\" y1=\"84\" x2=\"195\" y2=\"66\" stroke=\"#e2e8f0\" stroke-width=\"2\"/><path d=\"M 195 44 Q 205 58 195 72 Q 220 58 235 58 Q 220 58 195 44\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"2\"/><line x1=\"235\" y1=\"58\" x2=\"280\" y2=\"58\" stroke=\"#10b981\" stroke-width=\"2.5\"/><text x=\"288\" y=\"62\" fill=\"#10b981\" font-size=\"14\" font-weight=\"bold\" font-family=\"sans-serif\">Y (Output)</text></svg>",
+    "options": [
+      {
+        "id": "A",
+        "text": "Bộ giải mã địa chỉ (Decoder 2-to-4)"
+      },
+      {
+        "id": "B",
+        "text": "Bộ chọn kênh đa hợp (Multiplexer 2:1 - MUX) với Y = (D₀ ∧ ¬S) ∨ (D₁ ∧ S)"
+      },
+      {
+        "id": "C",
+        "text": "Mạch đếm nhị phân đồng bộ"
+      },
+      {
+        "id": "D",
+        "text": "Bộ nhớ RAM tĩnh 1-bit"
+      }
     ],
-    correctId: 'C',
-    explanation: 'Với n biến mệnh đề độc lập, không gian chân trị toàn phần có chính xác 2ⁿ trường hợp gán trị. Với 3 biến, tổng số dòng là 2³ = 8 dòng.',
-    actionLink: { view: 'logic', expression: 'p ∧ q ∧ r' },
+    "correctId": "B",
+    "explanation": "Khi chân chọn S = 0 thì D₀ được phép đi qua cổng AND trên; khi S = 1 thì D₁ đi qua cổng AND dưới. Biểu thức ngõ ra Y = (D₀ ∧ ¬S) ∨ (D₁ ∧ S) định nghĩa chính xác Bộ đa hợp 2 sang 1 (2-to-1 Multiplexer).",
+    "actionLink": {
+      "view": "logic",
+      "expression": "(p ∧ ¬s) ∨ (q ∧ s)"
+    }
   },
   {
-    id: 'logic_q07',
-    topic: 'logic',
-    topicName: 'Lượng từ & Phủ định',
-    difficulty: 'easy',
-    question: 'Phủ định của mệnh đề lượng từ "Mọi sinh viên đều qua môn" (kí hiệu ∀x, P(x)) là mệnh đề nào?',
-    options: [
-      { id: 'A', text: 'Không có sinh viên nào qua môn (∀x, ¬P(x))' },
-      { id: 'B', text: 'Có ít nhất một sinh viên không qua môn (∃x, ¬P(x))' },
-      { id: 'C', text: 'Mọi sinh viên đều trượt môn' },
-      { id: 'D', text: 'Có ít nhất một sinh viên qua môn (∃x, P(x))' },
+    "id": "circuit_q01",
+    "topic": "logic",
+    "topicName": "Mạch Logic: Cổng NAND vạn năng",
+    "difficulty": "hard",
+    "question": "Mạch logic gồm 4 cổng NAND vạn năng mắc như hình dưới đây tương đương với cổng logic cơ bản nào giữa hai đầu vào A và B?<br><svg viewBox=\"0 0 360 145\" width=\"100%\" height=\"auto\" style=\"max-width:360px;display:block;margin:10px auto;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:6px;\"><text x=\"10\" y=\"44\" fill=\"#38bdf8\" font-size=\"13\" font-weight=\"bold\" font-family=\"sans-serif\">A</text><text x=\"10\" y=\"100\" fill=\"#f43f5e\" font-size=\"13\" font-weight=\"bold\" font-family=\"sans-serif\">B</text><path d=\"M 28 40 L 70 40 L 70 64 L 85 64\" fill=\"none\" stroke=\"#38bdf8\" stroke-width=\"2\"/><path d=\"M 28 96 L 70 96 L 70 78 L 85 78\" fill=\"none\" stroke=\"#f43f5e\" stroke-width=\"2\"/><path d=\"M 85 58 L 105 58 A 14 14 0 0 1 105 84 L 85 84 Z\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"1.8\"/><circle cx=\"122\" cy=\"71\" r=\"2.5\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"1.5\"/><text x=\"94\" y=\"74\" fill=\"#94a3b8\" font-size=\"8\" font-weight=\"bold\" font-family=\"sans-serif\">NAND1</text><path d=\"M 50 40 L 50 20 L 150 20\" fill=\"none\" stroke=\"#38bdf8\" stroke-width=\"2\"/><path d=\"M 125 71 L 138 71 L 138 34 L 150 34\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"2\"/><path d=\"M 150 14 L 170 14 A 14 14 0 0 1 170 40 L 150 40 Z\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"1.8\"/><circle cx=\"187\" cy=\"27\" r=\"2.5\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"1.5\"/><path d=\"M 125 71 L 138 71 L 138 108 L 150 108\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"2\"/><path d=\"M 50 96 L 50 122 L 150 122\" fill=\"none\" stroke=\"#f43f5e\" stroke-width=\"2\"/><path d=\"M 150 102 L 170 102 A 14 14 0 0 1 170 128 L 150 128 Z\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"1.8\"/><circle cx=\"187\" cy=\"115\" r=\"2.5\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"1.5\"/><path d=\"M 190 27 L 225 27 L 225 64 L 235 64\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"2\"/><path d=\"M 190 115 L 225 115 L 225 78 L 235 78\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"2\"/><path d=\"M 235 58 L 255 58 A 14 14 0 0 1 255 84 L 235 84 Z\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"1.8\"/><circle cx=\"272\" cy=\"71\" r=\"2.5\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"1.5\"/><line x1=\"275\" y1=\"71\" x2=\"310\" y2=\"71\" stroke=\"#10b981\" stroke-width=\"2.5\"/><text x=\"318\" y=\"75\" fill=\"#10b981\" font-size=\"13\" font-weight=\"bold\" font-family=\"sans-serif\">Y</text></svg>",
+    "options": [
+      {
+        "id": "A",
+        "text": "Cổng AND (Y = A ∧ B)"
+      },
+      {
+        "id": "B",
+        "text": "Cổng OR (Y = A ∨ B)"
+      },
+      {
+        "id": "C",
+        "text": "Cổng XOR (Y = A ⊕ B)"
+      },
+      {
+        "id": "D",
+        "text": "Cổng XNOR (Y = ¬(A ⊕ B))"
+      }
     ],
-    correctId: 'B',
-    explanation: 'Theo quy tắc phủ định lượng từ: ¬(∀x, P(x)) ≡ ∃x, ¬P(x). Phủ định của "tất cả đều đạt" là "tồn tại ít nhất một người không đạt".',
+    "correctId": "C",
+    "explanation": "Đây là sơ đồ kinh điển dùng đúng 4 cổng NAND để chế tạo cổng XOR: NAND1 sinh ¬(A∧B). NAND2 sinh ¬(A ∧ ¬(A∧B)). NAND3 sinh ¬(B ∧ ¬(A∧B)). NAND4 kết hợp lại cho ngõ ra (A ∧ ¬B) ∨ (¬A ∧ B) = A ⊕ B.",
+    "actionLink": {
+      "view": "logic",
+      "expression": "p ⊕ q"
+    }
   },
   {
-    id: 'logic_q08',
-    topic: 'logic',
-    topicName: 'Quy tắc Suy diễn',
-    difficulty: 'medium',
-    question: 'Cho hai tiền đề: "Nếu hôm nay là Chủ nhật thì trường đóng cửa" (p → q) và "Trường không đóng cửa" (¬q). Theo quy tắc Phủ định hậu đề (Modus Tollens), kết luận rút ra là gì?',
-    options: [
-      { id: 'A', text: 'Hôm nay là Chủ nhật (p)' },
-      { id: 'B', text: 'Hôm nay không phải là Chủ nhật (¬p)' },
-      { id: 'C', text: 'Trường sắp mở cửa' },
-      { id: 'D', text: 'Không thể kết luận được gì' },
+    "id": "logic_q08",
+    "topic": "logic",
+    "topicName": "Mạch Logic: Bộ cộng toàn phần",
+    "difficulty": "hard",
+    "question": "Sơ đồ khối và mạch ghép nối dưới đây biểu diễn mạch số học nào?<br><svg viewBox=\"0 0 380 145\" width=\"100%\" height=\"auto\" style=\"max-width:380px;display:block;margin:10px auto;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:6px;\"><rect x=\"60\" y=\"20\" width=\"75\" height=\"60\" rx=\"6\" fill=\"#1e293b\" stroke=\"#38bdf8\" stroke-width=\"1.8\"/><text x=\"73\" y=\"45\" fill=\"#38bdf8\" font-size=\"11\" font-weight=\"bold\" font-family=\"sans-serif\">Half Adder</text><text x=\"90\" y=\"60\" fill=\"#94a3b8\" font-size=\"10\" font-family=\"sans-serif\">HA 1</text><rect x=\"180\" y=\"20\" width=\"75\" height=\"60\" rx=\"6\" fill=\"#1e293b\" stroke=\"#f43f5e\" stroke-width=\"1.8\"/><text x=\"193\" y=\"45\" fill=\"#f43f5e\" font-size=\"11\" font-weight=\"bold\" font-family=\"sans-serif\">Half Adder</text><text x=\"210\" y=\"60\" fill=\"#94a3b8\" font-size=\"10\" font-family=\"sans-serif\">HA 2</text><text x=\"12\" y=\"38\" fill=\"#38bdf8\" font-size=\"12\" font-weight=\"bold\" font-family=\"sans-serif\">A</text><text x=\"12\" y=\"65\" fill=\"#f43f5e\" font-size=\"12\" font-weight=\"bold\" font-family=\"sans-serif\">B</text><line x1=\"28\" y1=\"35\" x2=\"60\" y2=\"35\" stroke=\"#38bdf8\" stroke-width=\"2\"/><line x1=\"28\" y1=\"62\" x2=\"60\" y2=\"62\" stroke=\"#f43f5e\" stroke-width=\"2\"/><line x1=\"135\" y1=\"35\" x2=\"180\" y2=\"35\" stroke=\"#e2e8f0\" stroke-width=\"2\"/><text x=\"145\" y=\"30\" fill=\"#94a3b8\" font-size=\"9\" font-family=\"sans-serif\">Sum1</text><text x=\"12\" y=\"115\" fill=\"#fbbf24\" font-size=\"12\" font-weight=\"bold\" font-family=\"sans-serif\">C_in</text><path d=\"M 38 112 L 160 112 L 160 62 L 180 62\" fill=\"none\" stroke=\"#fbbf24\" stroke-width=\"2\"/><line x1=\"255\" y1=\"35\" x2=\"330\" y2=\"35\" stroke=\"#10b981\" stroke-width=\"2.5\"/><text x=\"336\" y=\"39\" fill=\"#10b981\" font-size=\"13\" font-weight=\"bold\" font-family=\"sans-serif\">Sum</text><path d=\"M 135 65 L 148 65 L 148 100 L 290 100\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"2\"/><path d=\"M 255 65 L 270 65 L 270 114 L 290 114\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"2\"/><path d=\"M 290 94 Q 298 107 290 120 Q 315 107 330 107 Q 315 107 290 94\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"2\"/><line x1=\"330\" y1=\"107\" x2=\"355\" y2=\"107\" stroke=\"#f59e0b\" stroke-width=\"2.5\"/><text x=\"360\" y=\"111\" fill=\"#f59e0b\" font-size=\"12\" font-weight=\"bold\" font-family=\"sans-serif\">C_out</text></svg>",
+    "options": [
+      {
+        "id": "A",
+        "text": "Mạch cộng toàn phần (Full Adder) với 3 đầu vào: A, B và C_in"
+      },
+      {
+        "id": "B",
+        "text": "Mạch nhân nhị phân 2-bit"
+      },
+      {
+        "id": "C",
+        "text": "Bộ đếm nhị phân 3-bit"
+      },
+      {
+        "id": "D",
+        "text": "Mạch chốt dữ liệu D-Latch"
+      }
     ],
-    correctId: 'B',
-    explanation: 'Quy tắc Modus Tollens: ((p → q) ∧ ¬q) → ¬p. Vì hậu đề q sai, tiền đề p bắt buộc phải sai để mệnh đề kéo theo không bị mâu thuẫn.',
-    actionLink: { view: 'logic', expression: '((p → q) ∧ ¬q) → ¬p' },
+    "correctId": "A",
+    "explanation": "Một bộ cộng toàn phần (Full Adder) được ghép từ 2 bộ Half Adder (HA1, HA2) và 1 cổng OR gom bit nhớ: Sum = A ⊕ B ⊕ C_in và C_out = (A ∧ B) ∨ (C_in ∧ (A ⊕ B)).",
+    "actionLink": {
+      "view": "logic",
+      "expression": "p ⊕ q ⊕ r"
+    }
   },
   {
-    id: 'kmap_q01',
-    topic: 'logic',
-    topicName: 'Bìa Karnaugh',
-    difficulty: 'easy',
-    question: 'Quy tắc gom nhóm các ô số 1 liền kề trên Bìa Karnaugh yêu cầu số lượng ô trong mỗi nhóm phải là:',
-    options: [
-      { id: 'A', text: 'Số lượng ô bất kỳ (1, 2, 3, 4, 5...)' },
-      { id: 'B', text: 'Số nguyên tố (2, 3, 5, 7)' },
-      { id: 'C', text: 'Lũy thừa của 2 (1, 2, 4, 8, 16...)' },
-      { id: 'D', text: 'Số chia hết cho 3' },
+    "id": "logic_q09",
+    "topic": "logic",
+    "topicName": "Mạch Logic: Chốt RS Latch",
+    "difficulty": "hard",
+    "question": "Mạch điện tử gồm 2 cổng NOR ghép chéo phản hồi tín hiệu như hình dưới đây là linh kiện lưu trữ cơ bản nào trong máy tính?<br><svg viewBox=\"0 0 340 145\" width=\"100%\" height=\"auto\" style=\"max-width:340px;display:block;margin:10px auto;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:6px;\"><text x=\"12\" y=\"32\" fill=\"#ef4444\" font-size=\"13\" font-weight=\"bold\" font-family=\"sans-serif\">R (Reset)</text><text x=\"12\" y=\"122\" fill=\"#10b981\" font-size=\"13\" font-weight=\"bold\" font-family=\"sans-serif\">S (Set)</text><line x1=\"80\" y1=\"28\" x2=\"120\" y2=\"28\" stroke=\"#ef4444\" stroke-width=\"2\"/><line x1=\"80\" y1=\"118\" x2=\"120\" y2=\"118\" stroke=\"#10b981\" stroke-width=\"2\"/><path d=\"M 120 18 Q 130 36 120 54 Q 150 36 168 36 Q 150 36 120 18\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"2\"/><circle cx=\"172\" cy=\"36\" r=\"3\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"1.8\"/><path d=\"M 120 100 Q 130 118 120 136 Q 150 118 168 118 Q 150 118 120 100\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"2\"/><circle cx=\"172\" cy=\"118\" r=\"3\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"1.8\"/><line x1=\"175\" y1=\"36\" x2=\"270\" y2=\"36\" stroke=\"#38bdf8\" stroke-width=\"2.5\"/><text x=\"280\" y=\"40\" fill=\"#38bdf8\" font-size=\"14\" font-weight=\"bold\" font-family=\"sans-serif\">Q</text><line x1=\"175\" y1=\"118\" x2=\"270\" y2=\"118\" stroke=\"#f43f5e\" stroke-width=\"2.5\"/><text x=\"280\" y=\"122\" fill=\"#f43f5e\" font-size=\"14\" font-weight=\"bold\" font-family=\"sans-serif\">Q̄</text><circle cx=\"210\" cy=\"36\" r=\"3\" fill=\"#38bdf8\"/><path d=\"M 210 36 L 210 58 L 105 88 L 105 106 L 120 106\" fill=\"none\" stroke=\"#38bdf8\" stroke-width=\"1.6\"/><circle cx=\"230\" cy=\"118\" r=\"3\" fill=\"#f43f5e\"/><path d=\"M 230 118 L 230 96 L 105 64 L 105 44 L 120 44\" fill=\"none\" stroke=\"#f43f5e\" stroke-width=\"1.6\"/></svg>",
+    "options": [
+      {
+        "id": "A",
+        "text": "Mạch dao động đa hài không ổn định"
+      },
+      {
+        "id": "B",
+        "text": "Mạch chốt RS (RS Latch / Basic Flip-Flop) lưu trữ 1 bit nhớ"
+      },
+      {
+        "id": "C",
+        "text": "Bộ dịch chuyển thanh ghi (Shift Register)"
+      },
+      {
+        "id": "D",
+        "text": "Mạch giải mã BCD sang Led 7 đoạn"
+      }
     ],
-    correctId: 'C',
-    explanation: 'Các tế bào liền kề trên Bìa K chỉ có thể triệt tiêu biến khi tạo thành khối chữ nhật có kích thước là lũy thừa của 2 (2⁰=1, 2¹=2, 2²=4, 2³=8, 2⁴=16 ô).',
+    "correctId": "B",
+    "explanation": "Hai cổng NOR ghép hồi tiếp chéo (cross-coupled NOR gates) với hai ngõ vào R (Reset) và S (Set) tạo thành mạch chốt RS (RS Latch) - phần tử nhớ tĩnh cơ bản nhất dùng để lưu trữ 1 bit thông tin trạng thái.",
+    "actionLink": {
+      "view": "logic",
+      "expression": "¬(p ∨ q)"
+    }
   },
   {
-    id: 'kmap_q02',
-    topic: 'logic',
-    topicName: 'Bìa Karnaugh',
-    difficulty: 'hard',
-    question: 'Trên Bìa Karnaugh 4 biến (p, q, r, s), nếu 4 ô ở 4 góc biên (m0, m2, m8, m10) đều chứa giá trị 1, nhóm này sẽ rút gọn tối tiểu thành dạng nào?',
-    options: [
-      { id: 'A', text: '¬p ∧ ¬r' },
-      { id: 'B', text: '¬q ∧ ¬s' },
-      { id: 'C', text: 'p ∧ s' },
-      { id: 'D', text: 'q ∧ r' },
+    "id": "logic_q10",
+    "topic": "logic",
+    "topicName": "Mạch Logic: Hàm đa số Majority",
+    "difficulty": "medium",
+    "question": "Cho mạch logic gồm 3 cổng AND và 1 cổng OR như hình vẽ. Mạch này thực hiện chức năng gì?<br><svg viewBox=\"0 0 360 155\" width=\"100%\" height=\"auto\" style=\"max-width:360px;display:block;margin:10px auto;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:6px;\"><text x=\"12\" y=\"28\" fill=\"#38bdf8\" font-size=\"12\" font-weight=\"bold\" font-family=\"sans-serif\">A</text><text x=\"12\" y=\"78\" fill=\"#f43f5e\" font-size=\"12\" font-weight=\"bold\" font-family=\"sans-serif\">B</text><text x=\"12\" y=\"130\" fill=\"#fbbf24\" font-size=\"12\" font-weight=\"bold\" font-family=\"sans-serif\">C</text><path d=\"M 25 24 L 110 24\" stroke=\"#38bdf8\" stroke-width=\"2\"/><path d=\"M 25 74 L 80 74 L 80 38 L 110 38\" fill=\"none\" stroke=\"#f43f5e\" stroke-width=\"2\"/><path d=\"M 110 16 L 130 16 A 15 15 0 0 1 130 46 L 110 46 Z\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"1.8\"/><text x=\"115\" y=\"34\" fill=\"#94a3b8\" font-size=\"8\" font-family=\"sans-serif\">A∧B</text><path d=\"M 80 74 L 110 74\" stroke=\"#f43f5e\" stroke-width=\"2\"/><path d=\"M 25 126 L 90 126 L 90 88 L 110 88\" fill=\"none\" stroke=\"#fbbf24\" stroke-width=\"2\"/><path d=\"M 110 66 L 130 66 A 15 15 0 0 1 130 96 L 110 96 Z\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"1.8\"/><text x=\"115\" y=\"84\" fill=\"#94a3b8\" font-size=\"8\" font-family=\"sans-serif\">B∧C</text><path d=\"M 45 24 L 45 120 L 110 120\" fill=\"none\" stroke=\"#38bdf8\" stroke-width=\"2\"/><path d=\"M 90 126 L 90 138 L 110 138\" fill=\"none\" stroke=\"#fbbf24\" stroke-width=\"2\"/><path d=\"M 110 114 L 130 114 A 15 15 0 0 1 130 144 L 110 144 Z\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"1.8\"/><text x=\"115\" y=\"132\" fill=\"#94a3b8\" font-size=\"8\" font-family=\"sans-serif\">A∧C</text><path d=\"M 145 31 L 185 31 L 205 66\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"1.8\"/><path d=\"M 145 81 L 205 81\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"1.8\"/><path d=\"M 145 129 L 185 129 L 205 96\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"1.8\"/><path d=\"M 205 60 Q 215 81 205 102 Q 240 81 258 81 Q 240 81 205 60\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"2\"/><line x1=\"258\" y1=\"81\" x2=\"305\" y2=\"81\" stroke=\"#10b981\" stroke-width=\"2.5\"/><text x=\"312\" y=\"85\" fill=\"#10b981\" font-size=\"14\" font-weight=\"bold\" font-family=\"sans-serif\">Y</text></svg>",
+    "options": [
+      {
+        "id": "A",
+        "text": "Mạch xác định đa số (Majority Logic - ngõ ra Y = 1 khi có ít nhất 2 trong 3 ngõ vào bằng 1)"
+      },
+      {
+        "id": "B",
+        "text": "Mạch kiểm tra tính chẵn lẻ Parity"
+      },
+      {
+        "id": "C",
+        "text": "Mạch giải mã 3 sang 8"
+      },
+      {
+        "id": "D",
+        "text": "Bộ tạo số giả ngẫu nhiên"
+      }
     ],
-    correctId: 'B',
-    explanation: 'Nhờ tính chất cuộn tròn hình xuyến (torus) của mã Gray, 4 góc biên m0(0000), m2(0010), m8(1000), m10(1010) kề nhau. Ở 4 góc này, p và r đổi giá trị nên bị triệt tiêu; chỉ còn q=0 (¬q) và s=0 (¬s) giữ nguyên. Rút gọn thành ¬q ∧ ¬s.',
-    actionLink: { view: 'logic', expression: '(¬p ∧ ¬q ∧ ¬r ∧ ¬s) ∨ (¬p ∧ ¬q ∧ r ∧ ¬s) ∨ (p ∧ ¬q ∧ ¬r ∧ ¬s) ∨ (p ∧ ¬q ∧ r ∧ ¬s)' },
+    "correctId": "A",
+    "explanation": "Biểu thức của mạch là Y = (A ∧ B) ∨ (B ∧ C) ∨ (A ∧ C). Hàm này nhận giá trị 1 khi và chỉ khi có ít nhất hai biến trong số {A, B, C} nhận giá trị 1. Đây chính là hàm đa số (Majority function) hay dùng trong hệ thống chịu lỗi.",
+    "actionLink": {
+      "view": "logic",
+      "expression": "(p ∧ q) ∨ (q ∧ r) ∨ (p ∧ r)"
+    }
   },
   {
-    id: 'circuit_q01',
-    topic: 'logic',
-    topicName: 'Mạch Logic Số',
-    difficulty: 'easy',
-    question: 'Cổng logic nào chỉ cho ngõ ra bằng 1 khi hai tín hiệu đầu vào có giá trị khác nhau (một 0 và một 1)?',
-    options: [
-      { id: 'A', text: 'Cổng AND' },
-      { id: 'B', text: 'Cổng OR' },
-      { id: 'C', text: 'Cổng XOR (Tuyển loại trừ)' },
-      { id: 'D', text: 'Cổng NOT' },
+    "id": "logic_q11",
+    "topic": "logic",
+    "topicName": "Mạch Logic: Bộ so sánh bằng",
+    "difficulty": "medium",
+    "question": "Mạch logic gồm 2 cổng XNOR kết hợp 1 cổng AND dưới đây thực hiện chức năng gì giữa hai chuỗi bit A = (A₁, A₀) và B = (B₁, B₀)?<br><svg viewBox=\"0 0 350 140\" width=\"100%\" height=\"auto\" style=\"max-width:350px;display:block;margin:10px auto;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:6px;\"><text x=\"10\" y=\"24\" fill=\"#38bdf8\" font-size=\"11\" font-weight=\"bold\" font-family=\"sans-serif\">A₁</text><text x=\"10\" y=\"44\" fill=\"#f43f5e\" font-size=\"11\" font-weight=\"bold\" font-family=\"sans-serif\">B₁</text><line x1=\"30\" y1=\"20\" x2=\"90\" y2=\"20\" stroke=\"#38bdf8\" stroke-width=\"2\"/><line x1=\"30\" y1=\"40\" x2=\"90\" y2=\"40\" stroke=\"#f43f5e\" stroke-width=\"2\"/><path d=\"M 85 10 Q 95 30 85 50 M 92 10 Q 102 30 92 50 Q 120 30 135 30 Q 120 30 92 10\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"1.8\"/><circle cx=\"139\" cy=\"30\" r=\"3\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"1.5\"/><text x=\"10\" y=\"94\" fill=\"#38bdf8\" font-size=\"11\" font-weight=\"bold\" font-family=\"sans-serif\">A₀</text><text x=\"10\" y=\"114\" fill=\"#f43f5e\" font-size=\"11\" font-weight=\"bold\" font-family=\"sans-serif\">B₀</text><line x1=\"30\" y1=\"90\" x2=\"90\" y2=\"90\" stroke=\"#38bdf8\" stroke-width=\"2\"/><line x1=\"30\" y1=\"110\" x2=\"90\" y2=\"110\" stroke=\"#f43f5e\" stroke-width=\"2\"/><path d=\"M 85 80 Q 95 100 85 120 M 92 80 Q 102 100 92 120 Q 120 100 135 100 Q 120 100 92 80\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"1.8\"/><circle cx=\"139\" cy=\"100\" r=\"3\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"1.5\"/><path d=\"M 142 30 L 195 30 L 195 56 L 210 56\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"2\"/><path d=\"M 142 100 L 195 100 L 195 74 L 210 74\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"2\"/><path d=\"M 210 46 L 235 46 A 19 19 0 0 1 235 84 L 210 84 Z\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"2\"/><line x1=\"254\" y1=\"65\" x2=\"295\" y2=\"65\" stroke=\"#10b981\" stroke-width=\"2.5\"/><text x=\"300\" y=\"69\" fill=\"#10b981\" font-size=\"13\" font-weight=\"bold\" font-family=\"sans-serif\">A == B</text></svg>",
+    "options": [
+      {
+        "id": "A",
+        "text": "So sánh bằng (Ngõ ra = 1 khi và chỉ khi A = B)"
+      },
+      {
+        "id": "B",
+        "text": "So sánh lớn hơn (A > B)"
+      },
+      {
+        "id": "C",
+        "text": "Mạch bù 2 nhị phân"
+      },
+      {
+        "id": "D",
+        "text": "Mạch cộng tích lũy"
+      }
     ],
-    correctId: 'C',
-    explanation: 'Cổng XOR (Exclusive OR, ký hiệu ⊕) thực hiện phép tuyển loại trừ: 0 ⊕ 0 = 0, 1 ⊕ 1 = 0, nhưng 0 ⊕ 1 = 1 và 1 ⊕ 0 = 1.',
-    actionLink: { view: 'logic', expression: 'p ⊕ q' },
+    "correctId": "A",
+    "explanation": "Cổng XNOR là cổng tương đương (chỉ bằng 1 khi hai bit vào bằng nhau). Do đó (A₁ ↔ B₁) = 1 khi A₁=B₁, và (A₀ ↔ B₀) = 1 khi A₀=B₀. Qua cổng AND, ngõ ra bằng 1 khi cả 2 cặp bit đều bằng nhau, tức số A bằng số B.",
+    "actionLink": {
+      "view": "logic",
+      "expression": "(p ↔ q) ∧ (r ↔ s)"
+    }
   },
   {
-    id: 'circuit_q02',
-    topic: 'logic',
-    topicName: 'Mạch Logic Số',
-    difficulty: 'medium',
-    question: 'Biểu thức (¬s ∧ p) ∨ (s ∧ q) mô tả chức năng của linh kiện số quan trọng nào sau đây?',
-    options: [
-      { id: 'A', text: 'Mạch giải mã (Decoder 2-to-4)' },
-      { id: 'B', text: 'Bộ chọn kênh đa hợp (2-to-1 Multiplexer - MUX)' },
-      { id: 'C', text: 'Bộ đếm nhị phân' },
-      { id: 'D', text: 'Thanh ghi dịch' },
+    "id": "logic_q12",
+    "topic": "logic",
+    "topicName": "Mạch Logic: Tính toán mức tín hiệu",
+    "difficulty": "medium",
+    "question": "Cho mạch logic số như hình vẽ. Khi các đầu vào nhận giá trị A = 1, B = 0, C = 1, thì tín hiệu tại ngõ ra Y nhận mức logic nào?<br><svg viewBox=\"0 0 350 130\" width=\"100%\" height=\"auto\" style=\"max-width:350px;display:block;margin:10px auto;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:6px;\"><text x=\"12\" y=\"24\" fill=\"#38bdf8\" font-size=\"12\" font-weight=\"bold\" font-family=\"sans-serif\">A = 1</text><text x=\"12\" y=\"64\" fill=\"#f43f5e\" font-size=\"12\" font-weight=\"bold\" font-family=\"sans-serif\">B = 0</text><text x=\"12\" y=\"112\" fill=\"#fbbf24\" font-size=\"12\" font-weight=\"bold\" font-family=\"sans-serif\">C = 1</text><line x1=\"55\" y1=\"20\" x2=\"160\" y2=\"20\" stroke=\"#38bdf8\" stroke-width=\"2\"/><line x1=\"55\" y1=\"60\" x2=\"90\" y2=\"60\" stroke=\"#f43f5e\" stroke-width=\"2\"/><path d=\"M 90 52 L 115 60 L 90 68 Z\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"1.8\"/><circle cx=\"120\" cy=\"60\" r=\"3\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"1.5\"/><line x1=\"123\" y1=\"60\" x2=\"160\" y2=\"60\" stroke=\"#e2e8f0\" stroke-width=\"2\"/><path d=\"M 160 12 L 185 12 A 26 26 0 0 1 185 68 L 160 68 Z\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"2\"/><text x=\"175\" y=\"44\" fill=\"#94a3b8\" font-size=\"10\" font-family=\"sans-serif\">AND</text><path d=\"M 211 40 L 235 40 L 235 52 L 245 52\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"2\"/><path d=\"M 55 108 L 235 108 L 235 76 L 245 76\" fill=\"none\" stroke=\"#fbbf24\" stroke-width=\"2\"/><path d=\"M 245 44 Q 255 64 245 84 Q 280 64 295 64 Q 280 64 245 44\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"2\"/><text x=\"258\" y=\"68\" fill=\"#94a3b8\" font-size=\"10\" font-family=\"sans-serif\">OR</text><line x1=\"295\" y1=\"64\" x2=\"325\" y2=\"64\" stroke=\"#10b981\" stroke-width=\"2.5\"/><text x=\"330\" y=\"68\" fill=\"#10b981\" font-size=\"13\" font-weight=\"bold\" font-family=\"sans-serif\">Y = ?</text></svg>",
+    "options": [
+      {
+        "id": "A",
+        "text": "Y = 1 (Mức cao)"
+      },
+      {
+        "id": "B",
+        "text": "Y = 0 (Mức thấp)"
+      },
+      {
+        "id": "C",
+        "text": "Trạng thái thả nổi (High-Z)"
+      },
+      {
+        "id": "D",
+        "text": "Xung dao động không xác định"
+      }
     ],
-    correctId: 'B',
-    explanation: 'Khi chân chọn s=0 thì biểu thức bằng (1 ∧ p) ∨ (0 ∧ q) = p (cho kênh p đi qua). Khi s=1 thì biểu thức bằng (0 ∧ p) ∨ (1 ∧ q) = q (cho kênh q đi qua). Đây chính là bộ đa hợp 2-to-1 MUX.',
-    actionLink: { view: 'logic', expression: '(¬s ∧ p) ∨ (s ∧ q)' },
+    "correctId": "A",
+    "explanation": "Đầu vào B = 0 qua cổng NOT cho ngõ ra ¬B = 1. Cổng AND nhận A = 1 và ¬B = 1 nên ngõ ra AND = 1 ∧ 1 = 1. Cổng OR nhận tín hiệu từ AND (1) và C (1) nên ngõ ra Y = 1 ∨ 1 = 1.",
+    "actionLink": {
+      "view": "logic",
+      "expression": "(p ∧ ¬q) ∨ r"
+    }
   },
   {
-    id: 'logic_q09',
-    topic: 'logic',
-    topicName: 'Tương đương Logic',
-    difficulty: 'easy',
-    question: 'Mệnh đề kéo theo p → q luôn có cùng bảng chân trị và tương đương logic với dạng tuyển nào sau đây?',
-    options: [
-      { id: 'A', text: '¬p ∨ q' },
-      { id: 'B', text: 'p ∨ ¬q' },
-      { id: 'C', text: '¬p ∧ q' },
-      { id: 'D', text: '¬p ∨ ¬q' },
+    "id": "logic_q13",
+    "topic": "logic",
+    "topicName": "Mạch Logic: Cổng NOR vạn năng",
+    "difficulty": "easy",
+    "question": "Khi nối tắt hai ngõ vào của một cổng NOR vạn năng lại với nhau như hình vẽ, cổng này hoạt động tương đương linh kiện nào?<br><svg viewBox=\"0 0 280 110\" width=\"100%\" height=\"auto\" style=\"max-width:280px;display:block;margin:10px auto;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:6px;\"><text x=\"15\" y=\"58\" fill=\"#38bdf8\" font-size=\"14\" font-weight=\"bold\" font-family=\"sans-serif\">A</text><line x1=\"35\" y1=\"54\" x2=\"70\" y2=\"54\" stroke=\"#38bdf8\" stroke-width=\"2.5\"/><circle cx=\"70\" cy=\"54\" r=\"3.5\" fill=\"#38bdf8\"/><path d=\"M 70 54 L 70 38 L 105 38\" fill=\"none\" stroke=\"#38bdf8\" stroke-width=\"2\"/><path d=\"M 70 54 L 70 70 L 105 70\" fill=\"none\" stroke=\"#38bdf8\" stroke-width=\"2\"/><path d=\"M 105 24 Q 118 54 105 84 Q 145 54 165 54 Q 145 54 105 24\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"2\"/><circle cx=\"170\" cy=\"54\" r=\"3.5\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"1.8\"/><text x=\"120\" y=\"58\" fill=\"#94a3b8\" font-size=\"11\" font-weight=\"bold\" font-family=\"sans-serif\">NOR</text><line x1=\"174\" y1=\"54\" x2=\"230\" y2=\"54\" stroke=\"#10b981\" stroke-width=\"2.5\"/><text x=\"238\" y=\"58\" fill=\"#10b981\" font-size=\"14\" font-weight=\"bold\" font-family=\"sans-serif\">Y</text></svg>",
+    "options": [
+      {
+        "id": "A",
+        "text": "Cổng NOT (Inverter: Y = ¬A)"
+      },
+      {
+        "id": "B",
+        "text": "Cổng BUFFER (Đệm: Y = A)"
+      },
+      {
+        "id": "C",
+        "text": "Cổng OR"
+      },
+      {
+        "id": "D",
+        "text": "Cổng AND"
+      }
     ],
-    correctId: 'A',
-    explanation: 'Phép kéo theo p → q tương đương với ¬p ∨ q. Chỉ khi p đúng mà q sai thì ¬p ∨ q mới nhận giá trị 0, hoàn toàn trùng khớp với bảng chân trị của phép kéo theo.',
-    actionLink: { view: 'logic', expression: '(p → q) ↔ (¬p ∨ q)' },
+    "correctId": "A",
+    "explanation": "Khi hai ngõ vào của cổng NOR được nối chung thành A, biểu thức ngõ ra trở thành Y = ¬(A ∨ A). Theo luật lũy đẳng A ∨ A = A, suy ra Y = ¬A (hoạt động chính xác như một cổng đảo NOT).",
+    "actionLink": {
+      "view": "logic",
+      "expression": "¬(p ∨ p)"
+    }
   },
   {
-    id: 'logic_q10',
-    topic: 'logic',
-    topicName: 'Tương đương Song điều kiện',
-    difficulty: 'medium',
-    question: 'Mệnh đề tương đương logic p ↔ q (p khi và chỉ khi q) nhận giá trị Đúng khi nào?',
-    options: [
-      { id: 'A', text: 'Khi cả p và q đều có cùng giá trị chân trị (cùng Đúng hoặc cùng Sai)' },
-      { id: 'B', text: 'Khi p đúng và q sai' },
-      { id: 'C', text: 'Khi ít nhất một trong hai mệnh đề nhận giá trị Đúng' },
-      { id: 'D', text: 'Khi p sai và q đúng' },
+    "id": "logic_q14",
+    "topic": "logic",
+    "topicName": "Bìa Karnaugh: Tối thiểu hóa 4 biến",
+    "difficulty": "hard",
+    "question": "Trên Bìa Karnaugh 4 biến (p, q, r, s), nếu 4 ô ở 4 góc biên (m0, m2, m8, m10) đều chứa giá trị 1, nhóm này sẽ rút gọn tối tiểu thành dạng nào?",
+    "options": [
+      {
+        "id": "A",
+        "text": "¬p ∧ ¬r"
+      },
+      {
+        "id": "B",
+        "text": "¬q ∧ ¬s"
+      },
+      {
+        "id": "C",
+        "text": "p ∧ s"
+      },
+      {
+        "id": "D",
+        "text": "q ∧ r"
+      }
     ],
-    correctId: 'A',
-    explanation: 'Mệnh đề p ↔ q nhận giá trị Đúng (1) khi và chỉ khi cả hai mệnh đề p và q có cùng giá trị chân trị: 1 ↔ 1 = 1 và 0 ↔ 0 = 1; nếu khác giá trị thì kết quả bằng 0.',
-    actionLink: { view: 'logic', expression: 'p ↔ q' },
+    "correctId": "B",
+    "explanation": "Nhờ tính chất cuộn tròn hình xuyến (torus) của mã Gray, 4 góc biên m0(0000), m2(0010), m8(1000), m10(1010) kề nhau. Ở 4 góc này, p và r đổi giá trị nên bị triệt tiêu; chỉ còn q=0 (¬q) và s=0 (¬s) giữ nguyên. Rút gọn thành ¬q ∧ ¬s.",
+    "actionLink": {
+      "view": "logic",
+      "expression": "(¬p ∧ ¬q ∧ ¬r ∧ ¬s) ∨ (¬p ∧ ¬q ∧ r ∧ ¬s) ∨ (p ∧ ¬q ∧ ¬r ∧ ¬s) ∨ (p ∧ ¬q ∧ r ∧ ¬s)"
+    }
   },
   {
-    id: 'logic_q11',
-    topic: 'logic',
-    topicName: 'Dạng chuẩn tắc DNF',
-    difficulty: 'medium',
-    question: 'Dạng chuẩn tắc tuyển (Disjunctive Normal Form - DNF / SOP) của một hàm Boole là dạng biểu diễn nào?',
-    options: [
-      { id: 'A', text: 'Tuyển của các hội (tổng của các tích / Sum-of-Products)' },
-      { id: 'B', text: 'Hội của các tuyển (tích của các tổng / Product-of-Sums)' },
-      { id: 'C', text: 'Phép tuyển loại trừ XOR của các biến' },
-      { id: 'D', text: 'Phép phủ định lặp của tất cả các biến' },
+    "id": "logic_q15",
+    "topic": "logic",
+    "topicName": "Bìa Karnaugh: Điều kiện Don’t Care",
+    "difficulty": "medium",
+    "question": "Trong tối thiểu hóa hàm Boole bằng Bìa Karnaugh, các ô mang điều kiện tùy định \"Don't Care\" (ký hiệu X hoặc d) được xử lý như thế nào?",
+    "options": [
+      {
+        "id": "A",
+        "text": "Có thể coi là 1 hoặc 0 tùy ý sao cho kích thước nhóm gom là lớn nhất có thể"
+      },
+      {
+        "id": "B",
+        "text": "Bắt buộc phải coi là 1 trong mọi trường hợp"
+      },
+      {
+        "id": "C",
+        "text": "Bắt buộc phải coi là 0 và bỏ qua hoàn toàn"
+      },
+      {
+        "id": "D",
+        "text": "Chỉ được gom nếu đứng một mình"
+      }
     ],
-    correctId: 'A',
-    explanation: 'Dạng chuẩn tắc tuyển (DNF hay SOP - Sum of Products) là phép TUYỂN (∨) của các tiểu hạng hội (∧) minterm, tương ứng với tập hợp các dòng có ngõ ra bằng 1 trong bảng chân trị.',
-    actionLink: { view: 'logic', expression: '(p ∧ q) ∨ (¬p ∧ ¬q)' },
+    "correctId": "A",
+    "explanation": "Điều kiện Don't Care đại diện cho các trạng thái đầu vào không bao giờ xảy ra hoặc ngõ ra không quan trọng. Ta có thể linh hoạt gán X = 1 nếu việc đó giúp mở rộng nhóm gom (đạt lũy thừa của 2 lớn hơn), hoặc gán X = 0 nếu không cần gom.",
+    "actionLink": {
+      "view": "logic",
+      "expression": "p ∨ (¬p ∧ q)"
+    }
   },
   {
-    id: 'logic_q12',
-    topic: 'logic',
-    topicName: 'Dạng chuẩn tắc CNF',
-    difficulty: 'medium',
-    question: 'Trong đại số logic, Dạng chuẩn tắc hội (Conjunctive Normal Form - CNF / POS) được tạo thành từ phép toán nào?',
-    options: [
-      { id: 'A', text: 'Phép HỘI của các tuyển (tích của các tổng / Product-of-Sums các maxterm)' },
-      { id: 'B', text: 'Phép TUYỂN của các hội minterm' },
-      { id: 'C', text: 'Dãy các cổng XOR nối tiếp nhau' },
-      { id: 'D', text: 'Chỉ gồm các phép kéo theo' },
+    "id": "logic_q16",
+    "topic": "logic",
+    "topicName": "Vị từ & Lượng từ lồng nhau",
+    "difficulty": "hard",
+    "question": "Cho tập số thực ℝ. Phủ định của mệnh đề logic \"∀x ∈ ℝ, ∃y ∈ ℝ sao cho x + y = 0\" là mệnh đề nào?",
+    "options": [
+      {
+        "id": "A",
+        "text": "∃x ∈ ℝ, ∀y ∈ ℝ, x + y ≠ 0"
+      },
+      {
+        "id": "B",
+        "text": "∀x ∈ ℝ, ∀y ∈ ℝ, x + y ≠ 0"
+      },
+      {
+        "id": "C",
+        "text": "∃x ∈ ℝ, ∃y ∈ ℝ, x + y ≠ 0"
+      },
+      {
+        "id": "D",
+        "text": "∀x ∈ ℝ, ∃y ∈ ℝ, x + y ≠ 0"
+      }
     ],
-    correctId: 'A',
-    explanation: 'Dạng chuẩn tắc hội (CNF hay POS - Product of Sums) là phép HỘI (∧) của các mệnh đề tuyển (∨) maxterm, tương ứng với các dòng có giá trị hàm bằng 0 trong bảng chân trị.',
-    actionLink: { view: 'logic', expression: '(p ∨ q) ∧ (¬p ∨ ¬q)' },
+    "correctId": "A",
+    "explanation": "Theo quy tắc phủ định lượng từ đổi chiều: ¬(∀x ∃y P(x, y)) ≡ ∃x ¬(∃y P(x, y)) ≡ ∃x ∀y ¬P(x, y). Do đó phủ định của x + y = 0 là x + y ≠ 0."
   },
   {
-    id: 'logic_q13',
-    topic: 'logic',
-    topicName: 'Tam đoạn luận giả thiết',
-    difficulty: 'easy',
-    question: 'Quy tắc suy diễn "Nếu p → q và q → r thì suy ra p → r" được gọi là gì?',
-    options: [
-      { id: 'A', text: 'Tam đoạn luận giả thiết (Hypothetical Syllogism)' },
-      { id: 'B', text: 'Tam đoạn luận tuyển (Disjunctive Syllogism)' },
-      { id: 'C', text: 'Luật triệt tam' },
-      { id: 'D', text: 'Luật De Morgan' },
+    "id": "logic_q17",
+    "topic": "logic",
+    "topicName": "Quy tắc Suy diễn: Modus Tollens",
+    "difficulty": "medium",
+    "question": "Cho hai tiền đề: \"Nếu máy chủ quá tải thì hệ thống gửi cảnh báo\" (p → q) và \"Hệ thống không gửi cảnh báo\" (¬q). Theo quy tắc Phủ định hậu đề (Modus Tollens), kết luận rút ra là gì?",
+    "options": [
+      {
+        "id": "A",
+        "text": "Máy chủ quá tải (p)"
+      },
+      {
+        "id": "B",
+        "text": "Máy chủ không bị quá tải (¬p)"
+      },
+      {
+        "id": "C",
+        "text": "Hệ thống bị lỗi mạng"
+      },
+      {
+        "id": "D",
+        "text": "Không thể kết luận được gì"
+      }
     ],
-    correctId: 'A',
-    explanation: 'Hệ thức ((p → q) ∧ (q → r)) → (p → r) có tính chất bắc cầu của phép kéo theo, gọi là Tam đoạn luận giả thiết (Hypothetical Syllogism).',
-    actionLink: { view: 'logic', expression: '((p → q) ∧ (q → r)) → (p → r)' },
+    "correctId": "B",
+    "explanation": "Quy tắc Modus Tollens (Phủ định hậu đề): ((p → q) ∧ ¬q) → ¬p. Nếu tiền đề kéo theo đúng mà hậu đề sai thì bắt buộc tiền đề phải sai để tránh mâu thuẫn 1 → 0 = 0.",
+    "actionLink": {
+      "view": "logic",
+      "expression": "((p → q) ∧ ¬q) → ¬p"
+    }
   },
   {
-    id: 'logic_q14',
-    topic: 'logic',
-    topicName: 'Tam đoạn luận tuyển',
-    difficulty: 'easy',
-    question: 'Cho hai tiền đề: "p ∨ q" (p hoặc q) và "¬p" (không p). Quy tắc Tam đoạn luận tuyển cho phép rút ra kết luận gì?',
-    options: [
-      { id: 'A', text: 'q đúng' },
-      { id: 'B', text: 'q sai' },
-      { id: 'C', text: 'p ∧ q đúng' },
-      { id: 'D', text: 'Không thể kết luận được gì' },
+    "id": "logic_q18",
+    "topic": "logic",
+    "topicName": "Tam đoạn luận giả thiết",
+    "difficulty": "medium",
+    "question": "Quy tắc suy diễn nào cho phép kết luận p → r từ hai tiền đề (p → q) và (q → r)?",
+    "options": [
+      {
+        "id": "A",
+        "text": "Tam đoạn luận giả thiết (Hypothetical Syllogism / Tính bắc cầu)"
+      },
+      {
+        "id": "B",
+        "text": "Tam đoạn luận tuyển (Disjunctive Syllogism)"
+      },
+      {
+        "id": "C",
+        "text": "Luật triệt tam"
+      },
+      {
+        "id": "D",
+        "text": "Quy tắc khẳng định tiền đề"
+      }
     ],
-    correctId: 'A',
-    explanation: 'Tam đoạn luận tuyển (Disjunctive Syllogism): ((p ∨ q) ∧ ¬p) → q. Khi biết ít nhất một trong hai điều xảy ra mà một điều đã bị loại trừ, điều còn lại bắt buộc phải đúng.',
-    actionLink: { view: 'logic', expression: '((p ∨ q) ∧ ¬p) → q' },
+    "correctId": "A",
+    "explanation": "Hằng đúng ((p → q) ∧ (q → r)) → (p → r) được gọi là Tam đoạn luận giả thiết (Hypothetical Syllogism), thể hiện tính chất bắc cầu của phép suy luận kéo theo.",
+    "actionLink": {
+      "view": "logic",
+      "expression": "((p → q) ∧ (q → r)) → (p → r)"
+    }
   },
   {
-    id: 'logic_q15',
-    topic: 'logic',
-    topicName: 'Phủ định hậu đề',
-    difficulty: 'medium',
-    question: 'Quy tắc suy diễn Phủ định hậu đề (Modus Tollens) có dạng hình thức nào sau đây?',
-    options: [
-      { id: 'A', text: '((p → q) ∧ ¬q) → ¬p' },
-      { id: 'B', text: '((p → q) ∧ q) → p' },
-      { id: 'C', text: '((p → q) ∧ ¬p) → ¬q' },
-      { id: 'D', text: '(p ∧ q) → p' },
+    "id": "logic_q19",
+    "topic": "logic",
+    "topicName": "Tam đoạn luận tuyển",
+    "difficulty": "medium",
+    "question": "Cho hai tiền đề: \"Chương trình bị lỗi cú pháp hoặc bị tràn bộ nhớ\" (p ∨ q) và \"Chương trình không bị lỗi cú pháp\" (¬p). Kết luận rút ra theo Tam đoạn luận tuyển là gì?",
+    "options": [
+      {
+        "id": "A",
+        "text": "Chương trình bị tràn bộ nhớ (q)"
+      },
+      {
+        "id": "B",
+        "text": "Chương trình chạy hoàn toàn bình thường"
+      },
+      {
+        "id": "C",
+        "text": "Chương trình bị lỗi cả cú pháp lẫn bộ nhớ"
+      },
+      {
+        "id": "D",
+        "text": "Không có lỗi nào xảy ra"
+      }
     ],
-    correctId: 'A',
-    explanation: 'Modus Tollens (Bác bỏ hậu đề): Nếu "p kéo theo q" và biết "q sai", thì tiền đề "p cũng bắt buộc phải sai". Ví dụ: "Nếu trời mưa thì đường ướt. Đường không ướt => Trời không mưa".',
-    actionLink: { view: 'logic', expression: '((p → q) ∧ ¬q) → ¬p' },
+    "correctId": "A",
+    "explanation": "Quy tắc Tam đoạn luận tuyển (Disjunctive Syllogism): ((p ∨ q) ∧ ¬p) → q. Khi phép tuyển p ∨ q đúng mà một trong hai nhánh sai (¬p), nhánh còn lại bắt buộc phải đúng.",
+    "actionLink": {
+      "view": "logic",
+      "expression": "((p ∨ q) ∧ ¬p) → q"
+    }
   },
   {
-    id: 'logic_q16',
-    topic: 'logic',
-    topicName: 'Lượng từ lồng nhau',
-    difficulty: 'hard',
-    question: 'Phát biểu nào sau đây đúng khi so sánh hai mệnh đề lượng từ ∀x∃y P(x, y) và ∃y∀x P(x, y)?',
-    options: [
-      { id: 'A', text: '∃y∀x P(x, y) kéo theo ∀x∃y P(x, y), nhưng chiều ngược lại không nhất thiết đúng' },
-      { id: 'B', text: 'Hai mệnh đề này hoàn toàn tương đương nhau trong mọi mô hình' },
-      { id: 'C', text: '∀x∃y P(x, y) kéo theo ∃y∀x P(x, y)' },
-      { id: 'D', text: 'Cả hai mệnh đề đều không thể cùng đúng' },
+    "id": "logic_q20",
+    "topic": "logic",
+    "topicName": "Dạng chuẩn tắc DNF & Minterm",
+    "difficulty": "medium",
+    "question": "Một hàm Boole 3 biến f(x, y, z) có chính xác bao nhiêu Minterm khác nhau trong không gian đại số?",
+    "options": [
+      {
+        "id": "A",
+        "text": "3"
+      },
+      {
+        "id": "B",
+        "text": "6"
+      },
+      {
+        "id": "C",
+        "text": "8 (2³)"
+      },
+      {
+        "id": "D",
+        "text": "16 (2⁴)"
+      }
     ],
-    correctId: 'A',
-    explanation: '∃y∀x P(x, y) khẳng định tồn tại một y chung áp dụng cho mọi x, điều này mạnh hơn rất nhiều so với ∀x∃y P(x, y) (mỗi x có thể chọn một y riêng phụ thuộc x). Do đó ∃y∀x P(x, y) ⇒ ∀x∃y P(x, y).',
-    actionLink: { view: 'logic', expression: 'p → q' },
+    "correctId": "C",
+    "explanation": "Mỗi minterm ứng với đúng một dòng nhận giá trị 1 trong bảng chân trị. Với n biến, số lượng minterm tối đa là 2ⁿ. Với 3 biến, có chính xác 2³ = 8 minterm từ m₀ đến m₇."
   },
   {
-    id: 'logic_q17',
-    topic: 'logic',
-    topicName: 'Luật hấp thu',
-    difficulty: 'easy',
-    question: 'Theo Luật hấp thu (Absorption Law) trong đại số Boole, biểu thức p ∨ (p ∧ q) rút gọn thành:',
-    options: [
-      { id: 'A', text: 'p' },
-      { id: 'B', text: 'q' },
-      { id: 'C', text: 'p ∧ q' },
-      { id: 'D', text: '1' },
+    "id": "logic_q21",
+    "topic": "logic",
+    "topicName": "Luật hấp thu đại số Boole",
+    "difficulty": "medium",
+    "question": "Theo luật Hấp thu (Absorption Law) trong đại số Boole, biểu thức p ∨ (p ∧ q) rút gọn thành biểu thức nào?",
+    "options": [
+      {
+        "id": "A",
+        "text": "p"
+      },
+      {
+        "id": "B",
+        "text": "q"
+      },
+      {
+        "id": "C",
+        "text": "p ∧ q"
+      },
+      {
+        "id": "D",
+        "text": "1"
+      }
     ],
-    correctId: 'A',
-    explanation: 'Luật hấp thu: p ∨ (p ∧ q) ≡ p và p ∧ (p ∨ q) ≡ p. Biến p bao trùm hoàn toàn số hạng tử (p ∧ q), làm triệt tiêu q.',
-    actionLink: { view: 'logic', expression: 'p ∨ (p ∧ q)' },
+    "correctId": "A",
+    "explanation": "Luật hấp thu: p ∨ (p ∧ q) ≡ p. Chứng minh: p ∨ (p ∧ q) = (p ∧ 1) ∨ (p ∧ q) = p ∧ (1 ∨ q) = p ∧ 1 = p.",
+    "actionLink": {
+      "view": "logic",
+      "expression": "p ∨ (p ∧ q) ↔ p"
+    }
   },
   {
-    id: 'kmap_q03',
-    topic: 'logic',
-    topicName: 'Mã Gray trong Karnaugh',
-    difficulty: 'medium',
-    question: 'Tại sao các cột và hàng trong Bìa Karnaugh lại được đánh số theo thứ tự 00, 01, 11, 10 mà không phải 00, 01, 10, 11?',
-    options: [
-      { id: 'A', text: 'Vì sử dụng Mã Gray để hai ô liền kề bất kỳ chỉ khác nhau đúng 1 bit (khoảng cách Hamming = 1)' },
-      { id: 'B', text: 'Để dễ dàng tính tích của hai ma trận' },
-      { id: 'C', text: 'Do quy định ngẫu nhiên trong thiết kế phần cứng' },
-      { id: 'D', text: 'Để giảm thiểu số ô cần gom nhóm' },
+    "id": "logic_q22",
+    "topic": "logic",
+    "topicName": "Tập cổng logic vạn năng",
+    "difficulty": "medium",
+    "question": "Tập cổng logic nào sau đây được gọi là \"Tập đầy đủ chức năng phổ quát\" (Universal Gates), có thể độc lập dựng được tất cả các mạch số khác?",
+    "options": [
+      {
+        "id": "A",
+        "text": "Chỉ cần cổng NAND (hoặc chỉ cần cổng NOR)"
+      },
+      {
+        "id": "B",
+        "text": "Chỉ cần cổng XOR"
+      },
+      {
+        "id": "C",
+        "text": "Chỉ cần cổng AND"
+      },
+      {
+        "id": "D",
+        "text": "Chỉ cần cổng OR"
+      }
     ],
-    correctId: 'A',
-    explanation: 'Thứ tự mã Gray (00, 01, 11, 10) đảm bảo giữa hai ô liền kề chỉ có duy nhất một biến thay đổi giá trị (khoảng cách Hamming bằng 1), cho phép áp dụng luật kết hợp x ∨ ¬x = 1 để rút gọn biến.',
-    actionLink: { view: 'logic', expression: '(p ∧ q) ∨ (p ∧ ¬q)' },
+    "correctId": "A",
+    "explanation": "Cổng NAND và cổng NOR là các cổng vạn năng (Universal Gates). Chỉ bằng cách ghép các cổng NAND (hoặc chỉ cổng NOR), ta có thể biểu diễn được toàn bộ các phép toán NOT, AND, OR cơ bản.",
+    "actionLink": {
+      "view": "logic",
+      "expression": "¬(p ∧ q)"
+    }
   },
   {
-    id: 'kmap_q04',
-    topic: 'logic',
-    topicName: 'Điều kiện Don’t Care',
-    difficulty: 'medium',
-    question: 'Trong tối thiểu hóa hàm Boole bằng Bìa Karnaugh, các ô mang điều kiện tùy định "Don\'t Care" (ký hiệu X hoặc d) được xử lý như thế nào?',
-    options: [
-      { id: 'A', text: 'Có thể coi là 1 hoặc 0 tùy ý sao cho kích thước nhóm gom là lớn nhất có thể' },
-      { id: 'B', text: 'Bắt buộc phải coi là 1 trong mọi trường hợp' },
-      { id: 'C', text: 'Bắt buộc phải coi là 0 và bỏ qua hoàn toàn' },
-      { id: 'D', text: 'Chỉ được gom nếu đứng một mình' },
+    "id": "logic_q23",
+    "topic": "logic",
+    "topicName": "Bìa Karnaugh & Mã Gray",
+    "difficulty": "medium",
+    "question": "Tại sao các cột và hàng trên Bìa Karnaugh bắt buộc phải được đánh số theo thứ tự mã Gray (00, 01, 11, 10) thay vì nhị phân thông thường (00, 01, 10, 11)?",
+    "options": [
+      {
+        "id": "A",
+        "text": "Để hai ô kề nhau chỉ khác nhau duy nhất 1 biến, giúp triệt tiêu biến theo luật x ∨ ¬x = 1"
+      },
+      {
+        "id": "B",
+        "text": "Để tiết kiệm diện tích vẽ hình"
+      },
+      {
+        "id": "C",
+        "text": "Vì mã nhị phân thông thường không vẽ được hình vuông"
+      },
+      {
+        "id": "D",
+        "text": "Quy ước ngẫu nhiên không có ý nghĩa toán học"
+      }
     ],
-    correctId: 'A',
-    explanation: 'Điều kiện Don\'t Care đại diện cho các trạng thái đầu vào không bao giờ xảy ra hoặc ngõ ra không quan trọng. Ta có thể linh hoạt gán X = 1 nếu việc đó giúp mở rộng nhóm gom (đạt lũy thừa của 2 lớn hơn), hoặc gán X = 0 nếu không cần gom.',
-    actionLink: { view: 'logic', expression: 'p ∨ (¬p ∧ q)' },
+    "correctId": "A",
+    "explanation": "Mã Gray đảm bảo khoảng cách Hamming giữa 2 trạng thái liền kề bằng 1. Điều này đảm bảo khi gom 2 ô kề nhau, biến đổi giá trị sẽ bị triệt tiêu do (A ∧ x) ∨ (A ∧ ¬x) = A.",
+    "actionLink": {
+      "view": "logic",
+      "expression": "(p ∧ q) ∨ (p ∧ ¬q)"
+    }
   },
   {
-    id: 'circuit_q03',
-    topic: 'logic',
-    topicName: 'Tập cổng đầy đủ chức năng',
-    difficulty: 'hard',
-    question: 'Tập cổng logic nào sau đây được gọi là "Tập đầy đủ chức năng phổ quát" (Universal Gate), có thể dùng để tạo ra tất cả các cổng logic khác?',
-    options: [
-      { id: 'A', text: 'Chỉ cần duy nhất cổng NAND (hoặc chỉ cần duy nhất cổng NOR)' },
-      { id: 'B', text: 'Chỉ cần duy nhất cổng XOR' },
-      { id: 'C', text: 'Chỉ cần duy nhất cổng AND' },
-      { id: 'D', text: 'Chỉ cần duy nhất cổng OR' },
+    "id": "logic_q24",
+    "topic": "logic",
+    "topicName": "Mạch Logic: Bộ kiểm tra Parity",
+    "difficulty": "medium",
+    "question": "Sơ đồ mạch gồm chuỗi cổng XOR nối tiếp dưới đây thực hiện chức năng gì cho 3 bit dữ liệu A, B, C?<br><svg viewBox=\"0 0 340 120\" width=\"100%\" height=\"auto\" style=\"max-width:340px;display:block;margin:10px auto;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:6px;\"><text x=\"10\" y=\"28\" fill=\"#38bdf8\" font-size=\"12\" font-weight=\"bold\" font-family=\"sans-serif\">A</text><text x=\"10\" y=\"58\" fill=\"#f43f5e\" font-size=\"12\" font-weight=\"bold\" font-family=\"sans-serif\">B</text><text x=\"10\" y=\"102\" fill=\"#fbbf24\" font-size=\"12\" font-weight=\"bold\" font-family=\"sans-serif\">C</text><line x1=\"28\" y1=\"24\" x2=\"75\" y2=\"24\" stroke=\"#38bdf8\" stroke-width=\"2\"/><line x1=\"28\" y1=\"54\" x2=\"75\" y2=\"54\" stroke=\"#f43f5e\" stroke-width=\"2\"/><path d=\"M 70 12 Q 78 39 70 66 M 76 12 Q 84 39 76 66 Q 105 39 120 39 Q 105 39 76 12\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"1.8\"/><line x1=\"120\" y1=\"39\" x2=\"190\" y2=\"39\" stroke=\"#e2e8f0\" stroke-width=\"2\"/><text x=\"92\" y=\"43\" fill=\"#94a3b8\" font-size=\"9\" font-family=\"sans-serif\">XOR1</text><line x1=\"28\" y1=\"98\" x2=\"190\" y2=\"98\" stroke=\"#fbbf24\" stroke-width=\"2\"/><path d=\"M 185 26 Q 193 59 185 92 M 191 26 Q 199 59 191 92 Q 225 59 240 59 Q 225 59 191 26\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"1.8\"/><text x=\"207\" y=\"63\" fill=\"#94a3b8\" font-size=\"9\" font-family=\"sans-serif\">XOR2</text><line x1=\"240\" y1=\"59\" x2=\"285\" y2=\"59\" stroke=\"#10b981\" stroke-width=\"2.5\"/><text x=\"290\" y=\"63\" fill=\"#10b981\" font-size=\"13\" font-weight=\"bold\" font-family=\"sans-serif\">P (Parity)</text></svg>",
+    "options": [
+      {
+        "id": "A",
+        "text": "Mạch tạo bit chẵn lẻ (Parity Generator: P = A ⊕ B ⊕ C, P = 1 khi số lượng bit 1 là số lẻ)"
+      },
+      {
+        "id": "B",
+        "text": "Mạch giải mã 3 sang 8"
+      },
+      {
+        "id": "C",
+        "text": "Bộ đếm tiến 3-bit"
+      },
+      {
+        "id": "D",
+        "text": "Mạch so sánh lớn bé"
+      }
     ],
-    correctId: 'A',
-    explanation: 'Cổng NAND và cổng NOR là các cổng vạn năng (Universal Gates). Chỉ bằng cách ghép các cổng NAND (hoặc NOR), ta có thể biểu diễn được cả ba phép toán cơ bản NOT, AND, OR; từ đó dựng được bất kỳ mạch logic nào.',
-    actionLink: { view: 'logic', expression: '¬(p ∧ q)' },
+    "correctId": "A",
+    "explanation": "Phép toán XOR chuỗi P = A ⊕ B ⊕ C là phép cộng modulo 2. Ngõ ra P = 1 khi và chỉ khi tổng số lượng bit 1 ở đầu vào là số lẻ (Odd parity). Mạch này được ứng dụng rộng rãi để kiểm tra lỗi truyền dữ liệu.",
+    "actionLink": {
+      "view": "logic",
+      "expression": "p ⊕ q ⊕ r"
+    }
   },
   {
-    id: 'circuit_q04',
-    topic: 'logic',
-    topicName: 'Bộ cộng bán phần (Half Adder)',
-    difficulty: 'medium',
-    question: 'Một bộ cộng nhị phân bán phần (Half Adder) nhận 2 bit vào A và B sẽ cho bit Tổng (Sum) và bit Nhớ (Carry) theo các phép toán logic nào?',
-    options: [
-      { id: 'A', text: 'Sum = A ⊕ B (XOR), Carry = A ∧ B (AND)' },
-      { id: 'B', text: 'Sum = A ∧ B, Carry = A ∨ B' },
-      { id: 'C', text: 'Sum = A ∨ B, Carry = A ⊕ B' },
-      { id: 'D', text: 'Sum = A ↔ B, Carry = ¬A' },
+    "id": "logic_q25",
+    "topic": "logic",
+    "topicName": "Dạng chuẩn tắc hội CNF & Maxterm",
+    "difficulty": "hard",
+    "question": "Dạng chuẩn tắc hội liên kết CNF (Conjunctive Normal Form / POS) của một hàm Boole là dạng tích (hội) của các:",
+    "options": [
+      {
+        "id": "A",
+        "text": "Maxterm (mỗi Maxterm là tuyển của các biến hoặc phủ định của chúng)"
+      },
+      {
+        "id": "B",
+        "text": "Minterm (tích của các biến)"
+      },
+      {
+        "id": "C",
+        "text": "Cổng XOR liên tiếp"
+      },
+      {
+        "id": "D",
+        "text": "Hằng số 0 và 1"
+      }
     ],
-    correctId: 'A',
-    explanation: 'Bảng cộng nhị phân 1-bit: 0+0=0(nhớ 0), 0+1=1(nhớ 0), 1+0=1(nhớ 0), 1+1=0(nhớ 1). Do đó bit Tổng Sum ứng với cổng XOR (A ⊕ B) và bit Nhớ Carry ứng với cổng AND (A ∧ B).',
-    actionLink: { view: 'logic', expression: 'p ⊕ q' },
+    "correctId": "A",
+    "explanation": "Dạng CNF (Product of Sums - POS) là tích (hội ∧) của các Maxterm (tuyển ∨). Mỗi Maxterm triệt tiêu giá trị hàm tại một dòng mà hàm nhận giá trị 0 trong bảng chân trị."
   },
 
   // =========================================================================

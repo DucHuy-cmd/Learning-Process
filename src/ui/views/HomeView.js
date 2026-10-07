@@ -197,7 +197,8 @@ export class HomeView {
             </div>
           </div>
 
-          <div style="display:${authManager.isAdmin() ? 'none' : 'flex'};gap:14px;align-items:flex-start;">
+          ${authManager.isAdmin() ? `
+          <div style="display:flex;gap:14px;align-items:flex-start;">
             <div style="font-size:28px;">🏆</div>
             <div>
               <h4 style="font-size:15px;font-weight:700;color:var(--text);margin:0 0 4px 0;">Bảng Vàng Thành Tích</h4>
@@ -207,6 +208,18 @@ export class HomeView {
               <button type="button" class="btn-sm" id="btnHomeLeaderboard" style="font-size:12px;padding:5px 14px;cursor:pointer;">Xem bảng xếp hạng →</button>
             </div>
           </div>
+          ` : `
+          <div style="display:flex;gap:14px;align-items:flex-start;">
+            <div style="font-size:28px;">📝</div>
+            <div>
+              <h4 style="font-size:15px;font-weight:700;color:var(--text);margin:0 0 4px 0;">Đề Thi Trắc Nghiệm</h4>
+              <p style="font-size:12.5px;color:var(--dim);margin:0 0 10px 0;line-height:1.4;">
+                Tham gia phòng thi trực tuyến theo thời gian thực, nộp bài tính điểm thang 10 và rèn luyện phản xạ.
+              </p>
+              <button type="button" class="btn-sm" id="btnHomeMyExams" style="font-size:12px;padding:5px 14px;cursor:pointer;">Vào phòng thi →</button>
+            </div>
+          </div>
+          `}
 
           <div style="display:flex;gap:14px;align-items:flex-start;">
             <div style="font-size:28px;">📷</div>
@@ -307,6 +320,9 @@ export class HomeView {
 
     const btnHomeLeaderboard = this.container.querySelector('#btnHomeLeaderboard');
     if (btnHomeLeaderboard) btnHomeLeaderboard.addEventListener('click', () => this.onNavigate('quiz', 'leaderboard'));
+
+    const btnHomeMyExams = this.container.querySelector('#btnHomeMyExams');
+    if (btnHomeMyExams) btnHomeMyExams.addEventListener('click', () => this.onNavigate('quiz', 'myExams'));
 
     const btnHomeAiVision = this.container.querySelector('#btnHomeAiVision');
     if (btnHomeAiVision) btnHomeAiVision.addEventListener('click', () => this.onNavigate('ai'));

@@ -295,7 +295,8 @@ describe('QuizView UI Component', () => {
     expect(quizView.activeTab).toBe('practice');
   });
 
-  it('renders Leaderboard tab with Podium, Rankings Table, and Guest prompt', () => {
+  it('renders Leaderboard tab with Podium, Rankings Table, and Guest prompt for Admin', () => {
+    authManager.quickLogin('user_admin');
     const quizView = new QuizView({ container });
     const tabLeaderboard = container.querySelector('#tabBtnLeaderboard');
     expect(tabLeaderboard).not.toBeNull();
@@ -324,6 +325,8 @@ describe('QuizView UI Component', () => {
     btnGoPractice.click();
     expect(quizView.activeTab).toBe('practice');
     expect(container.querySelector('#panePractice').style.display).not.toBe('none');
+
+    authManager.logout();
   });
 
   it('keeps practice answers out of the official leaderboard and server sync', () => {
@@ -378,8 +381,8 @@ describe('QuizView UI Component', () => {
     expect(createdExam.shuffleOptions).toBe(false);
   });
 
-  it('restricts Studio tab and Leaderboard reset button based on Admin RBAC', () => {
-    // 1. As normal student: Studio tab is hidden and Leaderboard reset button does not exist
+  it('restricts Studio tab and Leaderboard tab based on Admin RBAC', () => {
+    // 1. As normal student: Studio tab and Leaderboard tab are hidden
     authManager.register({ username: 'sv_rbac_test', fullName: 'Sinh Viên RBAC', email: 'sv_rbac@toanrr.edu.vn', password: '123456' });
     expect(authManager.isAdmin()).toBe(false);
 
@@ -387,12 +390,15 @@ describe('QuizView UI Component', () => {
     const tabStudioStudent = container.querySelector('#tabBtnStudio');
     expect(tabStudioStudent.style.display).toBe('none');
 
+    const tabLbStudent = container.querySelector('#tabBtnLeaderboard');
+    expect(tabLbStudent.style.display).toBe('none');
+
     studentQuiz.setTab('leaderboard');
-    expect(container.querySelector('#btnAdminResetLeaderboard')).toBeNull();
+    expect(studentQuiz.activeTab).toBe('practice');
 
     authManager.logout();
 
-    // 2. As single Admin: Studio tab is visible, but redundant leaderboard reset is consolidated in AdminView
+    // 2. As single Admin: Studio tab and Leaderboard are visible
     authManager.quickLogin('user_admin');
     expect(authManager.isAdmin()).toBe(true);
 
@@ -401,8 +407,7 @@ describe('QuizView UI Component', () => {
     expect(tabStudioAdmin.style.display).not.toBe('none');
 
     adminQuiz.setTab('leaderboard');
-    // Leaderboard reset button was consolidated into AdminView, so it is null here
-    expect(container.querySelector('#btnAdminResetLeaderboard')).toBeNull();
+    expect(adminQuiz.activeTab).toBe('leaderboard');
 
     authManager.logout();
   });
@@ -463,13 +468,17 @@ describe('QuizView UI Component', () => {
     expect(btnSubmit).not.toBeNull();
     btnSubmit.click();
 
-    // Exam session should be cleared, review shown
+    // Exam session should be cleared, score shown
     expect(quizView.activeExamSession).toBeNull();
     expect(quizView.reviewSubmission).not.toBeNull();
-    expect(container.textContent).toContain('Chi Tiết Bài Làm');
+    expect(container.textContent).toContain('Kết Quả Bài Thi');
     expect(container.textContent).toContain('/ 10 điểm');
+    // Ensure answers are NOT revealed to student
+    expect(container.textContent).not.toContain('Đáp án chuẩn');
+    expect(container.textContent).not.toContain('Lời giải chi tiết');
 
-    // 5. Check official Leaderboard has the student ranked by GPA
+    // 5. Check official Leaderboard for Admin
+    authManager.quickLogin('user_admin');
     quizView.setTab('leaderboard');
     expect(container.textContent).toContain('Bảng Xếp Hạng Đề Thi Chính Thức (Thang Điểm 10)');
     expect(container.textContent).toContain('Thí Sinh A');

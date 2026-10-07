@@ -86,7 +86,6 @@ describe('AdminView (Dedicated Database & Student Management Tab)', () => {
     // 2. Metrics cards
     expect(container.textContent).toContain('Tổng Sinh Viên');
     expect(container.textContent).toContain('Trạng Thái Máy Chủ');
-    expect(container.textContent).toContain('Bảng Xếp Hạng');
     expect(container.textContent).toContain('@admin');
 
     // 3. User table shows admin labeled cleanly without Thầy/Cô
@@ -176,19 +175,12 @@ describe('AdminView (Dedicated Database & Student Management Tab)', () => {
     expect(authManager.getUsers().some(u => u.username === 'sv_to_delete')).toBe(false);
   });
 
-  it('resets leaderboard scores when clicking Reset Bảng Xếp Hạng button', async () => {
+  it('verifies leaderboard section is removed and database reset button is present', async () => {
     authManager.quickLogin('user_admin');
-    quizHistoryManager.clearLeaderboard();
-
     await adminView.render();
 
-    window.confirm = () => true;
-    const btnReset = container.querySelector('#btnAdminResetLeaderboard');
-    expect(btnReset).not.toBeNull();
-
-    btnReset.click();
-    await new Promise(r => setTimeout(r, 60));
-
-    expect(container.textContent).toContain('Bảng xếp hạng trắc nghiệm đã được reset sạch sẽ');
+    expect(container.querySelector('#btnAdminResetLeaderboard')).toBeNull();
+    expect(container.querySelector('.admin-leaderboard-section')).toBeNull();
+    expect(container.querySelector('#btnAdminFullDatabaseReset')).not.toBeNull();
   });
 });
