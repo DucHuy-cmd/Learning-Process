@@ -15,6 +15,7 @@ import { STATIC_QUESTION_BANK } from './QuizBank.js';
 
 export const STORAGE_KEY_EXAMS = 'trr_assigned_exams_v1';
 export const STORAGE_KEY_SUBMISSIONS = 'trr_exam_submissions_v1';
+export const STORAGE_KEY_EXAM_VIOLATIONS = 'trr_exam_violations_v1';
 
 export const DEFAULT_EXAMS = [
   {
@@ -52,6 +53,7 @@ export class ExamManager {
     this.listeners = new Set();
     this.memoryExams = [...DEFAULT_EXAMS];
     this.memorySubmissions = [];
+    this.memoryExamViolations = [];
     this._initStorage();
   }
 
@@ -63,6 +65,9 @@ export class ExamManager {
       }
       if (!this.storage.getItem(STORAGE_KEY_SUBMISSIONS)) {
         this.storage.setItem(STORAGE_KEY_SUBMISSIONS, JSON.stringify([]));
+      }
+      if (!this.storage.getItem(STORAGE_KEY_EXAM_VIOLATIONS)) {
+        this.storage.setItem(STORAGE_KEY_EXAM_VIOLATIONS, JSON.stringify([]));
       }
     } catch {}
   }
@@ -191,15 +196,18 @@ export class ExamManager {
   deleteExam(examId) {
     const exams = this.getExams().filter(e => e.id !== examId);
     const submissions = this.getSubmissions().filter(s => s.examId !== examId);
+    const violations = this.getExamViolationRecords().filter(record => record.examId !== examId);
 
     if (this.storage) {
       try {
         this.storage.setItem(STORAGE_KEY_EXAMS, JSON.stringify(exams));
         this.storage.setItem(STORAGE_KEY_SUBMISSIONS, JSON.stringify(submissions));
+        this.storage.setItem(STORAGE_KEY_EXAM_VIOLATIONS, JSON.stringify(violations));
       } catch {}
     } else {
       this.memoryExams = exams;
       this.memorySubmissions = submissions;
+      this.memoryExamViolations = violations;
     }
 
     this._notifyListeners('exam_deleted', { examId });
@@ -238,6 +246,51 @@ export class ExamManager {
    */
   getSubmissionsForExam(examId) {
     return this.getSubmissions().filter(s => s.examId === examId);
+  }
+
+  getExamViolationRecords() {
+    if (!this.storage) return this.memoryExamViolations.map(record => ({ ...record }));
+    try {
+      const raw = this.storage.getItem(STORAGE_KEY_EXAM_VIOLATIONS);
+      const records = raw ? JSON.parse(raw) : [];
+      return Array.isArray(records) ? records : [];
+    } catch {
+      return this.memoryExamViolations.map(record => ({ ...record }));
+    }
+  }
+
+  getExamViolationRecord(examId, userId) {
+    if (!examId || !userId) return { examId, userId, count: 0, banned: false };
+    return this.getExamViolationRecords().find(record =>
+      record.examId === examId && record.userId === userId
+    ) || { examId, userId, count: 0, banned: false };
+  }
+
+  recordExamViolation(examId, userId) {
+    if (!examId || !userId || userId === 'guest') {
+      return { success: false, error: 'Không thể ghi nhận vi phạm thi.' };
+    }
+
+    const records = this.getExamViolationRecords();
+    const record = records.find(item => item.examId === examId && item.userId === userId);
+    const nextRecord = record || { examId, userId, count: 0 };
+    nextRecord.count = Math.min(3, Math.max(0, Number(nextRecord.count) || 0) + 1);
+    nextRecord.banned = nextRecord.count >= 3;
+    nextRecord.updatedAt = new Date().toISOString();
+    if (!record) records.push(nextRecord);
+
+    if (this.storage) {
+      try {
+        this.storage.setItem(STORAGE_KEY_EXAM_VIOLATIONS, JSON.stringify(records));
+      } catch (err) {
+        return { success: false, error: err.message };
+      }
+    } else {
+      this.memoryExamViolations = records;
+    }
+
+    this._notifyListeners('exam_violation_recorded', { ...nextRecord });
+    return { success: true, record: { ...nextRecord } };
   }
 
   /**
@@ -468,10 +521,12 @@ export class ExamManager {
       try {
         this.storage.setItem(STORAGE_KEY_EXAMS, JSON.stringify(DEFAULT_EXAMS));
         this.storage.setItem(STORAGE_KEY_SUBMISSIONS, JSON.stringify([]));
+        this.storage.setItem(STORAGE_KEY_EXAM_VIOLATIONS, JSON.stringify([]));
       } catch {}
     } else {
       this.memoryExams = [...DEFAULT_EXAMS];
       this.memorySubmissions = [];
+      this.memoryExamViolations = [];
     }
     this._notifyListeners('data_reset', {});
   }

@@ -121,5 +121,21 @@ describe('Assigned exam API', () => {
     expect(first.data.submission.fullName).toBe('Sinh viên API');
     expect(first.data.submission.optionOrder.logic_q01).toEqual(['D', 'C', 'B', 'A']);
     expect(second.statusCode).toBe(409);
+
+    const otherExamId = `${examId}_other`;
+    serverExams.unshift({
+      id: otherExamId,
+      title: 'Đề khác',
+      durationMinutes: 15,
+      questionIds: ['logic_q01'],
+      assignedTo: ['all'],
+    });
+    const otherExamSubmission = await sendRequest({
+      method: 'POST',
+      url: '/api/exam-submissions',
+      body: { ...payload, examId: otherExamId },
+    });
+    expect(otherExamSubmission.statusCode).toBe(201);
   });
+
 });

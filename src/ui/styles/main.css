@@ -6755,6 +6755,19 @@ body.theme-light .btn-close-modal:hover {
   border: 1px solid rgba(245, 158, 11, 0.35);
 }
 
+.exam-status-badge.banned {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+}
+
+.exam-ban-notice {
+  color: #ef4444;
+  font-size: 12px;
+  font-weight: 600;
+  max-width: 65%;
+}
+
 /* Active Timed Exam Room */
 .active-exam-room {
   background: var(--panel);
@@ -6763,6 +6776,43 @@ body.theme-light .btn-close-modal:hover {
   padding: 24px;
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.18);
   margin-bottom: 24px;
+}
+
+.exam-lockdown-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(2, 6, 23, 0.88);
+}
+
+.exam-lockdown-dialog {
+  width: min(100%, 480px);
+  padding: 32px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--panel);
+  color: var(--text);
+  text-align: center;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
+}
+
+.exam-lockdown-icon {
+  font-size: 42px;
+  margin-bottom: 12px;
+}
+
+.exam-lockdown-dialog h2 {
+  margin: 0 0 10px;
+  font-size: 20px;
+}
+
+.exam-lockdown-dialog p {
+  margin: 0 0 22px;
+  color: var(--dim);
+  line-height: 1.6;
 }
 
 .active-exam-topbar {
@@ -7129,7 +7179,6 @@ body.theme-light .btn-close-modal:hover {
     font-size: 12px !important;
   }
 }
-
 
 
 

@@ -173,6 +173,7 @@ export class QuizView {
           ? window.confirm('Bạn đang trong phòng thi! Rời khỏi tab này có thể làm gián đoạn thời gian làm bài. Bạn có chắc muốn chuyển tab?')
           : true;
         if (!confirmLeave) return;
+        this._submitActiveExam();
       }
       this.activeTab = tabName;
       this.reviewSubmission = null;
@@ -255,7 +256,10 @@ export class QuizView {
     // Check my exams count
     const myExams = currentUser ? examManager.getExamsForUser(currentUser.id) : [];
     const myPendingCount = currentUser 
-      ? myExams.filter(e => !examManager.getSubmission(e.id, currentUser.id)).length 
+      ? myExams.filter(e =>
+        !examManager.getSubmission(e.id, currentUser.id) &&
+        !examManager.getExamViolationRecord(e.id, currentUser.id).banned
+      ).length
       : 0;
 
     this.container.innerHTML = `
@@ -584,13 +588,15 @@ export class QuizView {
           ${assignedExams.map(exam => {
             const sub = examManager.getSubmission(exam.id, currentUser.id);
             const isCompleted = Boolean(sub);
+            const violationRecord = examManager.getExamViolationRecord(exam.id, currentUser.id);
+            const isBanned = Boolean(violationRecord.banned);
 
             return `
               <div class="exam-card">
                 <div>
                   <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:10px;">
-                    <span class="exam-status-badge ${isCompleted ? 'completed' : 'pending'}">
-                      ${isCompleted ? `✅ ĐÃ HOÀN THÀNH: ${sub.score} / 10` : '⏳ CHƯA LÀM (Chỉ 1 lượt)'}
+                    <span class="exam-status-badge ${isBanned ? 'banned' : (isCompleted ? 'completed' : 'pending')}">
+                      ${isBanned ? '🚫 KHÔNG THỂ THI LẠI ĐỀ NÀY (3/3)' : (isCompleted ? `✅ ĐÃ HOÀN THÀNH: ${sub.score} / 10` : '⏳ CHƯA LÀM (Chỉ 1 lượt)')}
                     </span>
                     <span style="font-size:11px;color:var(--dim);">
                       ${new Date(exam.createdAt).toLocaleDateString('vi-VN')}
@@ -615,9 +621,13 @@ export class QuizView {
                     <button type="button" class="btn-sm btn-review-exam" data-exam-id="${exam.id}" style="background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);font-weight:600;padding:6px 14px;border-radius:6px;cursor:pointer;">
                       👁️ Xem lại bài thi
                     </button>
+                  ` : isBanned ? `
+                    <div class="exam-ban-notice">
+                      Đã vi phạm quy chế ${violationRecord.count} lần. Bạn không thể thi lại đề này; các đề thi khác vẫn được phép làm.
+                    </div>
                   ` : `
                     <div style="font-size:12px;color:#f59e0b;font-weight:600;">
-                      ⚠️ Chỉ 1 lần làm bài duy nhất
+                      ⚠️ Chỉ 1 lần làm bài • 3 vi phạm sẽ cấm thi lại đề này
                     </div>
                     <button type="button" class="btn-primary btn-start-exam" data-exam-id="${exam.id}" style="font-size:13px;font-weight:700;padding:8px 18px;border-radius:6px;">
                       ▶️ Bắt Đầu Làm Bài
@@ -656,9 +666,20 @@ export class QuizView {
     const s = Math.max(0, session.timeRemaining) % 60;
     const timeFormatted = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
     const isUrgent = session.timeRemaining <= 120;
+    const lockdownOverlay = session.lockdownPending ? `
+      <div class="exam-lockdown-overlay" role="dialog" aria-modal="true" aria-labelledby="examLockdownTitle">
+        <div class="exam-lockdown-dialog">
+          <div class="exam-lockdown-icon">🔒</div>
+          <h2 id="examLockdownTitle">Phòng thi đã bị thoát toàn màn hình</h2>
+          <p>Vi phạm ${session.violationCount}/3. Đủ 3 lần sẽ bị cấm thi lại đề này; những đề khác không bị ảnh hưởng.</p>
+          <button type="button" class="btn-primary" id="btnResumeExamLockdown">Quay lại phòng thi toàn màn hình</button>
+        </div>
+      </div>
+    ` : '';
 
     return `
       <div class="active-exam-room">
+        ${lockdownOverlay}
         
         <!-- Top bar: Title, Timer, Submitting -->
         <div class="active-exam-topbar">
@@ -1492,8 +1513,15 @@ export class QuizView {
       return;
     }
 
+    const violationRecord = examManager.getExamViolationRecord(examId, currentUser.id);
+    if (violationRecord.banned) {
+      this._showAlert('Bạn đã bị cấm thi lại đề này do vi phạm quy chế 3 lần. Các đề thi khác vẫn được phép làm.');
+      this.render();
+      return;
+    }
+
     const confirmStart = typeof window !== 'undefined' && window.confirm
-      ? window.confirm(`Bắt đầu làm đề thi: "${exam.title}"?\n\nLưu ý quan trọng:\n- Thời gian làm bài: ${exam.durationMinutes} phút.\n- Mỗi thí sinh chỉ có DUY NHẤT 1 LƯỢT LÀM.\n- Đồng hồ đếm ngược sẽ bắt đầu ngay bây giờ!\n\nBạn đã sẵn sàng chưa?`)
+      ? window.confirm(`Bắt đầu làm đề thi: "${exam.title}"?\n\nLưu ý quan trọng:\n- Thời gian làm bài: ${exam.durationMinutes} phút.\n- Mỗi thí sinh chỉ có DUY NHẤT 1 LƯỢT LÀM.\n- Màn hình sẽ tự khóa toàn màn hình khi vào thi; rời cửa sổ thi sẽ tính là vi phạm.\n- Đủ 3 vi phạm sẽ cấm thi lại đề này; các đề khác không bị ảnh hưởng.\n- Đồng hồ đếm ngược sẽ bắt đầu ngay bây giờ!\n\nBạn đã sẵn sàng chưa?`)
       : true;
 
     if (!confirmStart) return;
@@ -1518,42 +1546,132 @@ export class QuizView {
       timeRemaining: exam.durationMinutes * 60,
       timerId: null,
       startedAt: Date.now(),
+      violationCount: violationRecord.count || 0,
+      lockdownPending: false,
+      fullscreenActive: false,
     };
 
-    // Start 1-second interval timer
-    this.activeExamSession.timerId = setInterval(() => {
-      if (!this.activeExamSession) return;
-      this.activeExamSession.timeRemaining--;
+    this.render();
+    this._attachExamLockdownListeners();
+    this._requestExamFullscreen();
+    this._startExamTimer();
+  }
+
+  _startExamTimer() {
+    const session = this.activeExamSession;
+    if (!session || session.timerId) return;
+    session.timerId = setInterval(() => {
+      if (this.activeExamSession !== session) return;
+      session.timeRemaining--;
 
       const timerEl = this.container ? this.container.querySelector('#activeExamTimer') : null;
       if (timerEl) {
-        const m = Math.floor(Math.max(0, this.activeExamSession.timeRemaining) / 60);
-        const s = Math.max(0, this.activeExamSession.timeRemaining) % 60;
+        const m = Math.floor(Math.max(0, session.timeRemaining) / 60);
+        const s = Math.max(0, session.timeRemaining) % 60;
         timerEl.textContent = `⏱️ ${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-        if (this.activeExamSession.timeRemaining <= 120) {
-          timerEl.classList.add('urgent');
-        }
+        if (session.timeRemaining <= 120) timerEl.classList.add('urgent');
       }
 
-      if (this.activeExamSession.timeRemaining <= 0) {
-        if (this.activeExamSession.timerId) {
-          clearInterval(this.activeExamSession.timerId);
-          this.activeExamSession.timerId = null;
-        }
+      if (session.timeRemaining <= 0) {
         this._showAlert('⏰ Đã hết thời gian làm bài! Hệ thống tự động nộp bài thi của bạn.');
         this._submitActiveExam();
       }
     }, 1000);
+  }
 
+  _attachExamLockdownListeners() {
+    if (typeof document === 'undefined' || this._examLockdownHandlers) return;
+    this._examLockdownHandlers = {
+      fullscreenchange: () => {
+        const session = this.activeExamSession;
+        if (!session) return;
+        const isFullscreen = document.fullscreenElement === document.documentElement;
+        if (isFullscreen) {
+          session.fullscreenActive = true;
+          if (session.lockdownPending) {
+            session.lockdownPending = false;
+            this.render();
+          }
+        } else if (session.fullscreenActive) {
+          session.fullscreenActive = false;
+          this._recordExamLockdownViolation();
+        }
+      },
+      visibilitychange: () => {
+        if (document.visibilityState === 'hidden') this._recordExamLockdownViolation();
+      },
+    };
+    document.addEventListener('fullscreenchange', this._examLockdownHandlers.fullscreenchange);
+    document.addEventListener('visibilitychange', this._examLockdownHandlers.visibilitychange);
+  }
+
+  _detachExamLockdownListeners() {
+    if (typeof document !== 'undefined' && this._examLockdownHandlers) {
+      document.removeEventListener('fullscreenchange', this._examLockdownHandlers.fullscreenchange);
+      document.removeEventListener('visibilitychange', this._examLockdownHandlers.visibilitychange);
+    }
+    this._examLockdownHandlers = null;
+  }
+
+  _requestExamFullscreen() {
+    if (typeof document === 'undefined' || typeof document.documentElement.requestFullscreen !== 'function') {
+      return;
+    }
+    const session = this.activeExamSession;
+    try {
+      Promise.resolve(document.documentElement.requestFullscreen()).then(() => {
+        if (this.activeExamSession !== session) return;
+        session.fullscreenActive = true;
+        session.lockdownPending = false;
+        this.render();
+      }).catch(() => {
+        if (this.activeExamSession !== session) return;
+        session.lockdownPending = true;
+        this.render();
+      });
+    } catch {
+      if (this.activeExamSession === session) {
+        session.lockdownPending = true;
+        this.render();
+      }
+    }
+  }
+
+  _recordExamLockdownViolation() {
+    const session = this.activeExamSession;
+    if (!session || session.lockdownPending) return;
+    const currentUser = authManager.getCurrentUser();
+    if (!currentUser) return;
+
+    const result = examManager.recordExamViolation(session.exam.id, currentUser.id);
+    if (!result.success) {
+      this._showAlert(`Không thể lưu vi phạm thi: ${result.error}`);
+      return;
+    }
+    session.violationCount = result.record.count;
+    session.lockdownPending = true;
+
+    if (session.violationCount >= 3) {
+      this._finishExamForViolationBan();
+      return;
+    }
     this.render();
   }
 
-  _submitActiveExam() {
+  _finishExamForViolationBan() {
+    this._submitActiveExam({ integrityBan: true });
+  }
+
+  _submitActiveExam({ integrityBan = false } = {}) {
     if (!this.activeExamSession) return;
 
     if (this.activeExamSession.timerId) {
       clearInterval(this.activeExamSession.timerId);
       this.activeExamSession.timerId = null;
+    }
+    this._detachExamLockdownListeners();
+    if (typeof document !== 'undefined' && document.fullscreenElement && typeof document.exitFullscreen === 'function') {
+      Promise.resolve(document.exitFullscreen()).catch(() => {});
     }
 
     const currentUser = authManager.getCurrentUser();
@@ -1575,10 +1693,14 @@ export class QuizView {
     this.activeExamSession = null;
 
     if (result.success) {
-      this._showAlert(`🎉 Bạn đã nộp bài thi thành công!\n\nĐiểm số: ${result.submission.score} / 10 điểm\nSố câu đúng: ${result.submission.correctCount} / ${result.submission.totalQuestions}\n\nKết quả đã được ghi nhận vào Bảng Xếp Hạng chính thức!`);
+      this._showAlert(integrityBan
+        ? `🚫 Bạn đã bị cấm thi lại đề này sau 3 lần vi phạm. Bài làm hiện tại đã được nộp.\n\nĐiểm số: ${result.submission.score} / 10 điểm`
+        : `🎉 Bạn đã nộp bài thi thành công!\n\nĐiểm số: ${result.submission.score} / 10 điểm\nSố câu đúng: ${result.submission.correctCount} / ${result.submission.totalQuestions}\n\nKết quả đã được ghi nhận vào Bảng Xếp Hạng chính thức!`);
       this.reviewSubmission = result.submission;
     } else {
-      this._showAlert(result.error || 'Có lỗi xảy ra khi nộp bài thi.');
+      this._showAlert(integrityBan
+        ? `Bạn đã bị cấm thi lại đề này sau 3 lần vi phạm; các đề thi khác vẫn được phép làm. ${result.error || ''}`
+        : (result.error || 'Có lỗi xảy ra khi nộp bài thi.'));
     }
 
     this.render();
@@ -1756,6 +1878,13 @@ export class QuizView {
 
     // In Active Exam Room Events
     if (this.activeExamSession) {
+      const btnResumeExamLockdown = this.container.querySelector('#btnResumeExamLockdown');
+      if (btnResumeExamLockdown) {
+        btnResumeExamLockdown.addEventListener('click', () => {
+          this._requestExamFullscreen();
+        });
+      }
+
       // Jump to question
       this.container.querySelectorAll('.exam-q-jump-btn').forEach(btn => {
         btn.addEventListener('click', () => {
