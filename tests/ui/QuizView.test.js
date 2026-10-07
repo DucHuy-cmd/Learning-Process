@@ -33,6 +33,7 @@ describe('QuizView UI Component', () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     authManager.logout();
     vi.restoreAllMocks();
     delete global.window;
@@ -498,6 +499,71 @@ describe('QuizView UI Component', () => {
     otherExamButton.click();
     expect(quizView.activeExamSession.exam.id).toBe(otherExam.id);
     expect(requestFullscreen).toHaveBeenCalledTimes(1);
+    quizView._submitActiveExam();
+    authManager.logout();
+  });
+
+  it('adds one violation after the 20-second lockdown countdown without requesting fullscreen', () => {
+    vi.useFakeTimers();
+    authManager.register({ username: 'sv_lockdown_timeout', fullName: 'Thí Sinh C', email: 'tsc@toanrr.edu.vn', password: '123456' });
+    examManager.clearAllData();
+    const quizView = new QuizView({ container });
+    quizView.setTab('myExams');
+    window.confirm = () => true;
+    container.querySelector('.btn-start-exam').click();
+
+    const session = quizView.activeExamSession;
+    const requestFullscreen = vi.fn();
+    Object.defineProperty(document.documentElement, 'requestFullscreen', {
+      configurable: true,
+      value: requestFullscreen,
+    });
+
+    quizView._recordExamLockdownViolation();
+    expect(session.violationCount).toBe(1);
+    expect(session.lockdownCountdown).toBe(20);
+    expect(container.querySelector('#examLockdownCountdown').textContent).toBe('20');
+
+    vi.advanceTimersByTime(19000);
+    expect(session.violationCount).toBe(1);
+    expect(session.lockdownCountdown).toBe(1);
+
+    vi.advanceTimersByTime(1000);
+    expect(session.violationCount).toBe(2);
+    expect(container.querySelector('.exam-lockdown-warning').textContent).toContain('CẢNH BÁO');
+    expect(container.querySelector('.exam-lockdown-warning').textContent).toContain('cộng thêm 1 vi phạm');
+    expect(requestFullscreen).not.toHaveBeenCalled();
+
+    quizView._submitActiveExam();
+    authManager.logout();
+  });
+
+  it('cancels the lockdown countdown when the student manually continues', async () => {
+    vi.useFakeTimers();
+    authManager.register({ username: 'sv_lockdown_resume', fullName: 'Thí Sinh D', email: 'tsd@toanrr.edu.vn', password: '123456' });
+    examManager.clearAllData();
+    const quizView = new QuizView({ container });
+    quizView.setTab('myExams');
+    window.confirm = () => true;
+    container.querySelector('.btn-start-exam').click();
+
+    const session = quizView.activeExamSession;
+    const requestFullscreen = vi.fn().mockResolvedValue();
+    Object.defineProperty(document.documentElement, 'requestFullscreen', {
+      configurable: true,
+      value: requestFullscreen,
+    });
+
+    quizView._recordExamLockdownViolation();
+    container.querySelector('#btnResumeExamLockdown').click();
+
+    expect(session.lockdownTimerId).toBeNull();
+    expect(session.lockdownCountdown).toBeNull();
+    expect(requestFullscreen).toHaveBeenCalledTimes(1);
+    vi.advanceTimersByTime(20000);
+    expect(session.violationCount).toBe(1);
+
+    await Promise.resolve();
     quizView._submitActiveExam();
     authManager.logout();
   });

@@ -6815,6 +6815,20 @@ body.theme-light .btn-close-modal:hover {
   line-height: 1.6;
 }
 
+.exam-lockdown-dialog .exam-lockdown-countdown {
+  color: #fbbf24;
+  font-weight: 700;
+}
+
+.exam-lockdown-dialog .exam-lockdown-warning {
+  padding: 12px;
+  border: 1px solid rgba(248, 113, 113, 0.55);
+  border-radius: 8px;
+  background: rgba(127, 29, 29, 0.3);
+  color: #fecaca;
+  font-weight: 800;
+}
+
 .active-exam-topbar {
   display: flex;
   justify-content: space-between;
@@ -7179,6 +7193,5 @@ body.theme-light .btn-close-modal:hover {
     font-size: 12px !important;
   }
 }
-
 
 
