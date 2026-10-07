@@ -11,12 +11,12 @@ export const javaBellmanFord = {
   filename: 'BellmanFord.java',
   title: 'Bellman-Ford (Java 11+)',
   mapping: {
-    [AlgorithmAction.INITIALIZE]: [20, 21, 22, 23, 24, 25],
+    [AlgorithmAction.INITIALIZE]: [21, 22, 23, 24, 25, 26],
     [AlgorithmAction.SELECT_NODE]: [28, 29],
-    [AlgorithmAction.INSPECT_EDGE]: [31, 32],
-    [AlgorithmAction.RELAX_EDGE]: [33, 34, 35, 36, 37],
-    [AlgorithmAction.ERROR]: [43, 44, 45, 46, 47],
-    [AlgorithmAction.FINISH]: [51],
+    [AlgorithmAction.INSPECT_EDGE]: [31, 32, 33],
+    [AlgorithmAction.RELAX_EDGE]: [34, 35, 36, 37],
+    [AlgorithmAction.ERROR]: [45, 46, 47, 48, 49],
+    [AlgorithmAction.FINISH]: [54],
   },
   generateSource(graph, options = {}) {
     const startNode = options.startNodeId || 'A';
@@ -107,9 +107,9 @@ ${edgeInits}
         Result res = bellmanFord(edges, nodes, source);
 
         if (res.hasNegativeCycle) {
-            System.out.println("Phat hien chu trinh am!");
+            System.out.println("Negative weight cycle detected!");
         } else {
-            System.out.println("Khoang cach ngan nhat den " + target + ": " + res.dist.get(target));
+            System.out.println("Shortest distance to " + target + ": " + res.dist.get(target));
         }
     }
 }

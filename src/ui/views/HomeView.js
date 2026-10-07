@@ -197,18 +197,6 @@ export class HomeView {
             </div>
           </div>
 
-          ${authManager.isAdmin() ? `
-          <div style="display:flex;gap:14px;align-items:flex-start;">
-            <div style="font-size:28px;">🏆</div>
-            <div>
-              <h4 style="font-size:15px;font-weight:700;color:var(--text);margin:0 0 4px 0;">Bảng Vàng Thành Tích</h4>
-              <p style="font-size:12.5px;color:var(--dim);margin:0 0 10px 0;line-height:1.4;">
-                Theo dõi bảng xếp hạng sinh viên xuất sắc, điểm số và thành tích rèn luyện qua các bài thi trắc nghiệm Toán Rời Rạc.
-              </p>
-              <button type="button" class="btn-sm" id="btnHomeLeaderboard" style="font-size:12px;padding:5px 14px;cursor:pointer;">Xem bảng xếp hạng →</button>
-            </div>
-          </div>
-          ` : `
           <div style="display:flex;gap:14px;align-items:flex-start;">
             <div style="font-size:28px;">📝</div>
             <div>
@@ -219,7 +207,6 @@ export class HomeView {
               <button type="button" class="btn-sm" id="btnHomeMyExams" style="font-size:12px;padding:5px 14px;cursor:pointer;">Vào phòng thi →</button>
             </div>
           </div>
-          `}
 
           <div style="display:flex;gap:14px;align-items:flex-start;">
             <div style="font-size:28px;">📷</div>
@@ -317,9 +304,6 @@ export class HomeView {
 
     const btnHomeQuizStudio = this.container.querySelector('#btnHomeQuizStudio');
     if (btnHomeQuizStudio) btnHomeQuizStudio.addEventListener('click', () => this.onNavigate('quiz', 'studio'));
-
-    const btnHomeLeaderboard = this.container.querySelector('#btnHomeLeaderboard');
-    if (btnHomeLeaderboard) btnHomeLeaderboard.addEventListener('click', () => this.onNavigate('quiz', 'leaderboard'));
 
     const btnHomeMyExams = this.container.querySelector('#btnHomeMyExams');
     if (btnHomeMyExams) btnHomeMyExams.addEventListener('click', () => this.onNavigate('quiz', 'myExams'));

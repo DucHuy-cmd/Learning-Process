@@ -345,6 +345,88 @@ export class AuthManager {
   }
 
   /**
+   * Admin batch imports multiple user accounts from parsed file records.
+   * @param {Array<Object>} records - [{ username, password, fullName, className, email }]
+   * @returns {{ success: boolean, addedCount: number, skippedCount: number, errors: string[], createdUsers: Array<Object>, error?: string }}
+   */
+  batchImportUsers(records = []) {
+    if (!this.isAdmin()) {
+      return { success: false, error: 'Chỉ có Quản trị viên (admin) mới có quyền nhập tài khoản hàng loạt.', addedCount: 0, skippedCount: 0, errors: [] };
+    }
+    if (!Array.isArray(records) || records.length === 0) {
+      return { success: false, error: 'Danh sách tài khoản nhập vào trống hoặc không hợp lệ.', addedCount: 0, skippedCount: 0, errors: [] };
+    }
+
+    const users = this.getUsers();
+    const existingUsernames = new Set(users.map(u => u.username.toLowerCase()));
+    const errors = [];
+    const createdUsers = [];
+    let addedCount = 0;
+    let skippedCount = 0;
+
+    records.forEach((rec, index) => {
+      const lineNo = index + 1;
+      const rawUser = String(rec.username || '').trim();
+      const rawFullName = String(rec.fullName || rec.name || '').trim();
+      const rawClass = String(rec.className || rec.class || 'Sinh viên').trim();
+      const rawPass = String(rec.password || '123456').trim();
+      const rawEmail = String(rec.email || '').trim();
+
+      if (!rawUser || rawUser.length < 3) {
+        errors.push(`Dòng ${lineNo}: Tên đăng nhập "${rawUser}" không hợp lệ (ít nhất 3 ký tự).`);
+        skippedCount++;
+        return;
+      }
+
+      const cleanUsername = rawUser.toLowerCase();
+      if (existingUsernames.has(cleanUsername)) {
+        skippedCount++;
+        return;
+      }
+
+      const fullName = rawFullName || rawUser;
+      const cleanEmail = rawEmail || `${cleanUsername}@toanrr.edu.vn`;
+
+      const newUser = {
+        id: `user_${Date.now()}_${Math.random().toString(36).slice(2, 7)}_${index}`,
+        username: cleanUsername,
+        fullName,
+        className: rawClass || 'Sinh viên',
+        email: cleanEmail,
+        password: rawPass || '123456',
+        avatar: '👨‍🎓',
+        role: 'student',
+        createdAt: new Date().toISOString(),
+      };
+
+      existingUsernames.add(cleanUsername);
+      users.push(newUser);
+      createdUsers.push(newUser);
+      addedCount++;
+    });
+
+    if (addedCount > 0 && this.storage) {
+      try {
+        this.storage.setItem(STORAGE_KEY_USERS, JSON.stringify(users));
+      } catch {
+        return { success: false, error: 'Lỗi bộ nhớ khi lưu danh sách tài khoản.', addedCount: 0, skippedCount, errors };
+      }
+    }
+
+    if (addedCount > 0) {
+      this._notifyListeners('users_batch_imported', { createdUsers, totalUsers: users });
+    }
+
+    return {
+      success: true,
+      addedCount,
+      skippedCount,
+      errors,
+      createdUsers,
+    };
+  }
+
+  /**
    * Log in with username/email and password.
    * For demo users, password can be '123456' or any non-empty password.
    * @param {string} usernameOrEmail

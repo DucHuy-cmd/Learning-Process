@@ -132,7 +132,7 @@ export function getCodeExample(algorithm = 'dijkstra', language = 'cpp', graph =
     : example.source;
 
   return {
-    algorithm: example.algorithm,
+    algorithm: algoKey,
     language: example.language,
     filename: example.filename,
     title: example.title,

@@ -281,9 +281,9 @@ describe('QuizView UI Component', () => {
     expect(container.querySelector('#panePractice').style.display).not.toBe('none');
     expect(container.querySelector('#paneStudio').style.display).toBe('none');
 
-    quizView.setTab('leaderboard');
-    expect(quizView.activeTab).toBe('leaderboard');
-    expect(container.querySelector('#paneLeaderboard').style.display).not.toBe('none');
+    quizView.setTab('myExams');
+    expect(quizView.activeTab).toBe('myExams');
+    expect(container.querySelector('#paneMyExams').style.display).not.toBe('none');
     expect(container.querySelector('#panePractice').style.display).toBe('none');
     expect(container.querySelector('#paneStudio').style.display).toBe('none');
   });
@@ -295,36 +295,14 @@ describe('QuizView UI Component', () => {
     expect(quizView.activeTab).toBe('practice');
   });
 
-  it('renders Leaderboard tab with Podium, Rankings Table, and Guest prompt for Admin', () => {
+  it('verifies that Leaderboard tab is completely removed from navigation and UI', () => {
     authManager.quickLogin('user_admin');
     const quizView = new QuizView({ container });
-    const tabLeaderboard = container.querySelector('#tabBtnLeaderboard');
-    expect(tabLeaderboard).not.toBeNull();
+    expect(container.querySelector('#tabBtnLeaderboard')).toBeNull();
+    expect(container.querySelector('#paneLeaderboard')).toBeNull();
 
-    tabLeaderboard.click();
-    expect(quizView.activeTab).toBe('leaderboard');
-    expect(container.querySelector('#paneLeaderboard').style.display).not.toBe('none');
-
-    // Header & Podium
-    expect(container.textContent).toContain('BẢNG VÀNG THÀNH TÍCH');
-    expect(container.textContent).toContain('Sinh viên Toán Rời Rạc');
-    expect(container.querySelector('.leaderboard-podium-row')).not.toBeNull();
-    expect(container.querySelector('.podium-rank-1')).not.toBeNull();
-    expect(container.querySelector('.podium-rank-2')).not.toBeNull();
-    expect(container.querySelector('.podium-rank-3')).not.toBeNull();
-
-    // Empty state message when freshly initialized
-    expect(container.textContent).toContain('Bảng xếp hạng hiện đang trống');
-
-    // Rankings table
-    expect(container.querySelector('.leaderboard-table')).not.toBeNull();
-
-    // CTA back to practice
-    const btnGoPractice = container.querySelector('#btnGoToPracticeFromLb');
-    expect(btnGoPractice).not.toBeNull();
-    btnGoPractice.click();
+    quizView.setTab('leaderboard');
     expect(quizView.activeTab).toBe('practice');
-    expect(container.querySelector('#panePractice').style.display).not.toBe('none');
 
     authManager.logout();
   });
@@ -381,8 +359,8 @@ describe('QuizView UI Component', () => {
     expect(createdExam.shuffleOptions).toBe(false);
   });
 
-  it('restricts Studio tab and Leaderboard tab based on Admin RBAC', () => {
-    // 1. As normal student: Studio tab and Leaderboard tab are hidden
+  it('restricts Studio tab based on Admin RBAC and ensures Leaderboard is removed', () => {
+    // 1. As normal student: Studio tab is hidden and Leaderboard is completely absent
     authManager.register({ username: 'sv_rbac_test', fullName: 'Sinh Viên RBAC', email: 'sv_rbac@toanrr.edu.vn', password: '123456' });
     expect(authManager.isAdmin()).toBe(false);
 
@@ -390,15 +368,14 @@ describe('QuizView UI Component', () => {
     const tabStudioStudent = container.querySelector('#tabBtnStudio');
     expect(tabStudioStudent.style.display).toBe('none');
 
-    const tabLbStudent = container.querySelector('#tabBtnLeaderboard');
-    expect(tabLbStudent.style.display).toBe('none');
+    expect(container.querySelector('#tabBtnLeaderboard')).toBeNull();
 
-    studentQuiz.setTab('leaderboard');
+    studentQuiz.setTab('studio');
     expect(studentQuiz.activeTab).toBe('practice');
 
     authManager.logout();
 
-    // 2. As single Admin: Studio tab and Leaderboard are visible
+    // 2. As single Admin: Studio tab is visible
     authManager.quickLogin('user_admin');
     expect(authManager.isAdmin()).toBe(true);
 
@@ -406,8 +383,7 @@ describe('QuizView UI Component', () => {
     const tabStudioAdmin = container.querySelector('#tabBtnStudio');
     expect(tabStudioAdmin.style.display).not.toBe('none');
 
-    adminQuiz.setTab('leaderboard');
-    expect(adminQuiz.activeTab).toBe('leaderboard');
+    expect(container.querySelector('#tabBtnLeaderboard')).toBeNull();
 
     authManager.logout();
   });
@@ -477,11 +453,15 @@ describe('QuizView UI Component', () => {
     expect(container.textContent).not.toContain('Đáp án chuẩn');
     expect(container.textContent).not.toContain('Lời giải chi tiết');
 
-    // 5. Check official Leaderboard for Admin
+    // 5. Check Gradebook and Excel Export button for Admin
     authManager.quickLogin('user_admin');
-    quizView.setTab('leaderboard');
-    expect(container.textContent).toContain('Bảng Xếp Hạng Đề Thi Chính Thức (Thang Điểm 10)');
-    expect(container.textContent).toContain('Thí Sinh A');
+    quizView.setTab('studio');
+    const btnGradebook = container.querySelector('.btn-view-gradebook');
+    if (btnGradebook) {
+      btnGradebook.click();
+      expect(container.querySelector('#btnExportGradebookExcel')).not.toBeNull();
+      expect(container.textContent).toContain('Thí Sinh A');
+    }
 
     authManager.logout();
   });

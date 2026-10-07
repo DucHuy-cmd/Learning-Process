@@ -156,14 +156,17 @@ export class QuizView {
   }
 
   /**
-   * Sets active subtab: 'practice' | 'myExams' | 'leaderboard' | 'studio'
-   * @param {'practice' | 'myExams' | 'leaderboard' | 'studio'} tabName
+   * Sets active subtab: 'practice' | 'myExams' | 'studio'
+   * @param {'practice' | 'myExams' | 'studio'} tabName
    */
   setTab(tabName) {
-    if ((tabName === 'studio' || tabName === 'leaderboard') && !authManager.isAdmin()) {
+    if (tabName === 'leaderboard') {
       tabName = 'practice';
     }
-    const validTabs = ['practice', 'myExams', 'leaderboard', 'studio'];
+    if (tabName === 'studio' && !authManager.isAdmin()) {
+      tabName = 'practice';
+    }
+    const validTabs = ['practice', 'myExams', 'studio'];
     if (validTabs.includes(tabName)) {
       if (this.activeExamSession && tabName !== 'myExams') {
         const confirmLeave = typeof window !== 'undefined' && window.confirm 
@@ -176,7 +179,7 @@ export class QuizView {
       if (this.container) {
         this.render();
       }
-      if (tabName === 'leaderboard' || tabName === 'myExams') {
+      if (tabName === 'myExams') {
         try {
           if (cloudSyncManager && cloudSyncManager.isConnected) {
             cloudSyncManager.syncExams(examManager).catch(() => {});
@@ -242,7 +245,7 @@ export class QuizView {
     }
     if (!this.container) return;
 
-    if ((this.activeTab === 'studio' || this.activeTab === 'leaderboard') && !authManager.isAdmin()) {
+    if (this.activeTab === 'leaderboard' || (this.activeTab === 'studio' && !authManager.isAdmin())) {
       this.activeTab = 'practice';
     }
 
@@ -269,7 +272,7 @@ export class QuizView {
             </div>
             <h1 style="font-size:24px;font-weight:700;color:var(--text);margin:0;">Luyện Tập &amp; Thi Trắc Nghiệm Toán Rời Rạc</h1>
             <p style="font-size:13.5px;color:var(--dim);margin:4px 0 0;">
-              Ngân hàng 100 câu hỏi tự luyện tập phản xạ, phân đề thi tính giờ Thang Điểm 10 và Bảng Xếp Hạng Điểm Trung Bình chính thức.
+              Ngân hàng 100 câu hỏi tự luyện tập phản xạ, thi trực tuyến tính giờ Thang Điểm 10 và quản lý kết quả bài thi.
             </p>
           </div>
 
@@ -280,9 +283,6 @@ export class QuizView {
             </button>
             <button type="button" class="btn-tab ${this.activeTab === 'myExams' ? 'active' : ''}" id="tabBtnMyExams" style="padding:8px 14px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;position:relative;">
               📝 ${isAdmin ? 'Quản Lý Đề Thi' : 'Đề Thi Của Tôi'} ${myPendingCount > 0 ? `<span style="background:#ef4444;color:#fff;font-size:10px;padding:1px 6px;border-radius:10px;margin-left:4px;font-weight:700;">${myPendingCount}</span>` : ''}
-            </button>
-            <button type="button" class="btn-tab ${this.activeTab === 'leaderboard' ? 'active' : ''}" id="tabBtnLeaderboard" style="${isAdmin ? '' : 'display:none;'}padding:8px 14px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;">
-              🏆 Bảng Xếp Hạng
             </button>
             <button type="button" class="btn-tab ${this.activeTab === 'studio' ? 'active' : ''}" id="tabBtnStudio" style="${isAdmin ? '' : 'display:none;'}padding:8px 14px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;">
               👩‍🏫 Quản Trị &amp; Soạn Đề
@@ -300,14 +300,7 @@ export class QuizView {
           ${this._renderMyExamsView()}
         </div>
 
-        <!-- TAB 3: LEADERBOARD & USER STATS -->
-        ${isAdmin ? `
-        <div id="paneLeaderboard" style="display:${this.activeTab === 'leaderboard' ? 'block' : 'none'};">
-          ${this._renderLeaderboardView()}
-        </div>
-        ` : ''}
-
-        <!-- TAB 4: TEACHER'S EXAM STUDIO -->
+        <!-- TAB 3: TEACHER'S EXAM STUDIO -->
         <div id="paneStudio" style="display:${this.activeTab === 'studio' ? 'block' : 'none'};">
           ${this._renderStudioView()}
         </div>
@@ -897,258 +890,7 @@ export class QuizView {
   }
 
   // =========================================================================
-  // SUB-VIEW 3: OFFICIAL GPA LEADERBOARD (BẢNG XẾP HẠNG THANG ĐIỂM 10)
-  // =========================================================================
-
-  _renderLeaderboardView() {
-    const leaderboard = examManager.getLeaderboard(50);
-    const currentUser = authManager.getCurrentUser();
-    const isAdmin = authManager.isAdmin();
-
-    // User's own exam stats
-    const mySubmissions = currentUser ? examManager.getSubmissions().filter(s => s.userId === currentUser.id) : [];
-    const examsCompleted = mySubmissions.length;
-    const avgScore = examsCompleted > 0 
-      ? Math.round((mySubmissions.reduce((acc, s) => acc + s.score, 0) / examsCompleted) * 10) / 10 
-      : 0;
-    const totalCorrect = mySubmissions.reduce((acc, s) => acc + s.correctCount, 0);
-    const totalQuestions = mySubmissions.reduce((acc, s) => acc + s.totalQuestions, 0);
-    const accuracy = totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : 0;
-
-    const rank1 = leaderboard[0] || null;
-    const rank2 = leaderboard[1] || null;
-    const rank3 = leaderboard[2] || null;
-
-    return `
-      <div class="quiz-leaderboard-container">
-        
-        <!-- Leaderboard Header Banner -->
-        <div class="leaderboard-hero-card">
-          <div class="hero-content">
-            <div class="hero-tag">
-              <span>🏆 BẢNG VÀNG THÀNH TÍCH</span>
-              <span class="dot-sep">•</span>
-              <span>Sinh viên Toán Rời Rạc</span>
-              <span class="dot-sep">•</span>
-              <span class="hero-cloud-badge" id="heroCloudBadge" style="font-size:11px;padding:2px 8px;border-radius:10px;background:${cloudSyncManager.isConnected ? 'rgba(16,185,129,0.15)' : 'rgba(245,158,11,0.15)'};color:${cloudSyncManager.isConnected ? '#10b981' : '#f59e0b'};border:1px solid ${cloudSyncManager.isConnected ? 'rgba(16,185,129,0.3)' : 'rgba(245,158,11,0.3)'};">
-                ${cloudSyncManager.isConnected ? '🟢 Đã kết nối Máy chủ (Live)' : '💾 Lưu trữ Trình duyệt (Offline)'}
-              </span>
-            </div>
-            <h2 class="hero-title">Bảng Xếp Hạng Đề Thi Chính Thức (Thang Điểm 10)</h2>
-            <p class="hero-desc">
-              Vinh danh các sinh viên xuất sắc nhất có Điểm Trung Bình (GPA Thang Điểm 10) cao nhất qua các đề thi được phân phối. Mỗi đề thi được làm đúng 1 lần duy nhất để đảm bảo tính minh bạch và công bằng.
-            </p>
-          </div>
-          <div class="hero-actions" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-            <button type="button" class="btn-primary" id="btnGoToMyExamsFromLb" style="padding:10px 20px;font-size:13.5px;font-weight:700;">
-              📝 Vào Đề Thi Của Tôi Để Thi Ngay ➔
-            </button>
-            <button type="button" class="btn-secondary" id="btnGoToPracticeFromLb" style="padding:10px 16px;font-size:13px;">
-              🎮 Ôn Tập (100 Câu)
-            </button>
-          </div>
-        </div>
-
-        <!-- Top 3 Podium (Bục Vinh Quang) -->
-        <div class="leaderboard-podium-row">
-          
-          <!-- PODIUM RANK 2 (Á Khoa) -->
-          <div class="podium-card podium-rank-2">
-            <div class="podium-medal">🥈</div>
-            <div class="podium-avatar">${rank2 ? rank2.avatar : '👨‍💻'}</div>
-            <h3 class="podium-name">${rank2 ? this._escapeHtml(rank2.fullName) : 'Chưa có'}</h3>
-            <span class="podium-class">${rank2 ? this._escapeHtml(rank2.className) : 'Sinh viên'}</span>
-            <div class="podium-badge">${rank2 ? (rank2.badge || '🥈 Á Khoa Toàn Diện') : 'Đang đua top'}</div>
-            <div class="podium-stat-pill">
-              <span class="stat-score">${rank2 ? rank2.averageScore.toFixed(1) : 0} / 10 điểm</span>
-              <span class="stat-acc">Đã thi: ${rank2 ? rank2.examsCompleted : 0} đề</span>
-            </div>
-            <div class="podium-streak">🎯 Tỷ lệ đúng: <strong>${rank2 ? rank2.accuracy : 0}%</strong></div>
-            <div class="podium-stand stand-2">
-              <span class="stand-number">2</span>
-            </div>
-          </div>
-
-          <!-- PODIUM RANK 1 (Thủ Khoa) -->
-          <div class="podium-card podium-rank-1">
-            <div class="podium-crown">👑</div>
-            <div class="podium-medal">🥇</div>
-            <div class="podium-avatar">${rank1 ? rank1.avatar : '👨‍🎓'}</div>
-            <h3 class="podium-name">${rank1 ? this._escapeHtml(rank1.fullName) : 'Chưa có'}</h3>
-            <span class="podium-class">${rank1 ? this._escapeHtml(rank1.className) : 'Sinh viên'}</span>
-            <div class="podium-badge">${rank1 ? (rank1.badge || '🥇 Quán Quân Đấu Trường') : 'Đang dẫn đầu'}</div>
-            <div class="podium-stat-pill gold">
-              <span class="stat-score">${rank1 ? rank1.averageScore.toFixed(1) : 0} / 10 điểm</span>
-              <span class="stat-acc">Đã thi: ${rank1 ? rank1.examsCompleted : 0} đề</span>
-            </div>
-            <div class="podium-streak">🎯 Tỷ lệ đúng: <strong>${rank1 ? rank1.accuracy : 0}%</strong></div>
-            <div class="podium-stand stand-1">
-              <span class="stand-number">1</span>
-            </div>
-          </div>
-
-          <!-- PODIUM RANK 3 (Hạng Ba) -->
-          <div class="podium-card podium-rank-3">
-            <div class="podium-medal">🥉</div>
-            <div class="podium-avatar">${rank3 ? rank3.avatar : '👨‍🔬'}</div>
-            <h3 class="podium-name">${rank3 ? this._escapeHtml(rank3.fullName) : 'Chưa có'}</h3>
-            <span class="podium-class">${rank3 ? this._escapeHtml(rank3.className) : 'Sinh viên'}</span>
-            <div class="podium-badge">${rank3 ? (rank3.badge || '🥉 Quý Quân Toán Rời Rạc') : 'Đang đua top'}</div>
-            <div class="podium-stat-pill">
-              <span class="stat-score">${rank3 ? rank3.averageScore.toFixed(1) : 0} / 10 điểm</span>
-              <span class="stat-acc">Đã thi: ${rank3 ? rank3.examsCompleted : 0} đề</span>
-            </div>
-            <div class="podium-streak">🎯 Tỷ lệ đúng: <strong>${rank3 ? rank3.accuracy : 0}%</strong></div>
-            <div class="podium-stand stand-3">
-              <span class="stand-number">3</span>
-            </div>
-          </div>
-
-        </div>
-
-        <!-- Personal Stats Card -->
-        <div class="leaderboard-my-card">
-          ${currentUser ? `
-            <div class="my-card-header">
-              <div class="my-card-user">
-                <span class="my-card-avatar">${currentUser.avatar || '👤'}</span>
-                <div>
-                  <h4 class="my-card-name">${this._escapeHtml(currentUser.fullName)}</h4>
-                  <span class="my-card-subtitle">${this._escapeHtml(currentUser.className || 'Sinh viên')} • @${this._escapeHtml(currentUser.username)}</span>
-                </div>
-              </div>
-              <div class="my-card-rank-badge">
-                ${(() => {
-                  const myRankIdx = leaderboard.findIndex(u => u.userId === currentUser.id);
-                  if (myRankIdx !== -1) {
-                    return `<span>Hạng toàn lớp: <strong>#${myRankIdx + 1}</strong></span>`;
-                  }
-                  return `<span>Chưa có xếp hạng (Hãy làm đề thi)</span>`;
-                })()}
-              </div>
-            </div>
-            <div class="my-card-stats-grid">
-              <div class="stat-box">
-                <span class="box-label">Điểm Trung Bình (GPA)</span>
-                <span class="box-val highlight">${avgScore.toFixed(1)} / 10</span>
-              </div>
-              <div class="stat-box">
-                <span class="box-label">Đề thi đã hoàn thành</span>
-                <span class="box-val">${examsCompleted}</span>
-              </div>
-              <div class="stat-box">
-                <span class="box-label">Số câu đúng</span>
-                <span class="box-val text-green">${totalCorrect}/${totalQuestions}</span>
-              </div>
-              <div class="stat-box">
-                <span class="box-label">Tỷ lệ chính xác</span>
-                <span class="box-val">${accuracy}%</span>
-              </div>
-              <div class="stat-box">
-                <span class="box-label">Xếp loại</span>
-                <span class="box-val text-orange">${avgScore >= 8.5 ? 'Xuất Sắc' : avgScore >= 7.0 ? 'Khá Giỏi' : avgScore >= 5.0 ? 'Đạt' : 'Cần Cố Gắng'}</span>
-              </div>
-            </div>
-          ` : `
-            <div class="my-card-guest">
-              <div class="guest-info">
-                <span style="font-size:32px;">👤</span>
-                <div>
-                  <h4 style="margin:0 0 4px;font-size:16px;color:var(--text);font-weight:700;">Bạn đang xem dưới tư cách Khách</h4>
-                  <p style="margin:0;font-size:13px;color:var(--dim);">
-                    Đăng nhập hoặc đăng ký tài khoản sinh viên để làm các đề thi được giao và ghi danh trên Bảng Vàng!
-                  </p>
-                </div>
-              </div>
-              <button type="button" class="btn-primary" id="btnLeaderboardLogin" style="padding:10px 18px;font-size:13px;font-weight:600;white-space:nowrap;">
-                🔑 Đăng Nhập / Đăng Ký Ngay
-              </button>
-            </div>
-          `}
-        </div>
-
-        <!-- Full Class Ranking Table -->
-        <div class="leaderboard-table-card">
-          <div class="table-card-header">
-            <h3 class="table-card-title">📋 Bảng Xếp Hạng Điểm Thi Chính Thức (Thang Điểm 10)</h3>
-            <span class="table-card-count">${leaderboard.length} sinh viên đã hoàn thành đề thi</span>
-          </div>
-
-          <div style="overflow-x:auto;">
-            <table class="leaderboard-table">
-              <thead>
-                <tr>
-                  <th style="width:70px;text-align:center;">Hạng</th>
-                  <th>Sinh viên</th>
-                  <th style="text-align:right;">Điểm TB (Thang 10)</th>
-                  <th style="text-align:center;">Số đề thi</th>
-                  <th style="text-align:center;">Đúng/Tổng</th>
-                  <th style="text-align:center;">Tỷ lệ</th>
-                  <th>Danh hiệu</th>
-                  ${isAdmin ? '<th style="text-align:center;width:90px;">Hành động</th>' : ''}
-                </tr>
-              </thead>
-              <tbody>
-                ${leaderboard.length === 0 ? `
-                  <tr>
-                    <td colspan="${isAdmin ? 8 : 7}" style="text-align:center;padding:36px;color:var(--dim);font-style:italic;font-size:14px;">
-                      🌟 Bảng xếp hạng hiện đang trống. Hãy vào tab "Đề Thi Của Tôi" để hoàn thành đề thi đầu tiên và dẫn đầu Bảng Vàng!
-                    </td>
-                  </tr>
-                ` : leaderboard.map(item => {
-                  const isCurrent = currentUser && item.userId === currentUser.id;
-                  return `
-                    <tr class="${isCurrent ? 'row-current-user' : ''}">
-                      <td style="text-align:center;font-size:16px;font-weight:700;">
-                        ${item.rankBadge}
-                      </td>
-                      <td>
-                        <div class="table-user-cell">
-                          <span class="cell-avatar">${item.avatar || '👤'}</span>
-                          <div>
-                            <span class="cell-name">${this._escapeHtml(item.fullName)} ${isCurrent ? '<span class="tag-you">(Bạn)</span>' : ''}</span>
-                            <span class="cell-class">${this._escapeHtml(item.className || 'Sinh viên')}</span>
-                          </div>
-                        </div>
-                      </td>
-                      <td style="text-align:right;font-weight:800;color:var(--brand);font-size:15px;">
-                        ${item.averageScore.toFixed(1)} / 10
-                      </td>
-                      <td style="text-align:center;font-size:13px;font-weight:600;">
-                        ${item.examsCompleted} đề
-                      </td>
-                      <td style="text-align:center;font-size:13px;color:var(--dim);">
-                        ${item.totalCorrect}/${item.totalQuestions}
-                      </td>
-                      <td style="text-align:center;">
-                        <span class="table-acc-pill ${item.accuracy >= 80 ? 'acc-high' : (item.accuracy >= 65 ? 'acc-mid' : 'acc-low')}">
-                          ${item.accuracy}%
-                        </span>
-                      </td>
-                      <td>
-                        <span class="table-badge-chip">${item.badge || '⭐ Sinh viên'}</span>
-                      </td>
-                      ${isAdmin ? `
-                        <td style="text-align:center;">
-                          <button type="button" class="btn-delete-lb-row" data-user-id="${item.userId}" data-user-name="${this._escapeHtml(item.fullName)}" title="Xóa toàn bộ điểm thi của sinh viên này khỏi bảng xếp hạng" style="background:rgba(239,68,68,0.12);color:#ef4444;border:1px solid rgba(239,68,68,0.3);padding:4px 10px;border-radius:6px;cursor:pointer;font-size:11.5px;font-weight:600;">
-                            🗑️ Xóa
-                          </button>
-                        </td>
-                      ` : ''}
-                    </tr>
-                  `;
-                }).join('')}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-      </div>
-    `;
-  }
-
-  // =========================================================================
-  // SUB-VIEW 4: TEACHER'S EXAM STUDIO & ASSIGNMENT MANAGEMENT
+  // SUB-VIEW 3: TEACHER'S EXAM STUDIO & ASSIGNMENT MANAGEMENT
   // =========================================================================
 
   _renderStudioView() {
@@ -1332,6 +1074,9 @@ export class QuizView {
                       <td style="text-align:right;white-space:nowrap;">
                         <button type="button" class="btn-sm btn-view-gradebook" data-exam-id="${item.id}" style="background:rgba(16,185,129,0.15);color:#10b981;border:1px solid rgba(16,185,129,0.3);margin-right:6px;font-weight:600;padding:4px 10px;border-radius:6px;cursor:pointer;">
                           📊 Xem Sổ Điểm
+                        </button>
+                        <button type="button" class="btn-sm btn-export-exam-excel" data-exam-id="${item.id}" data-exam-title="${this._escapeHtml(item.title)}" style="background:rgba(59,130,246,0.15);color:#3b82f6;border:1px solid rgba(59,130,246,0.3);margin-right:6px;font-weight:600;padding:4px 10px;border-radius:6px;cursor:pointer;">
+                          📥 Xuất Excel
                         </button>
                         <button type="button" class="btn-sm btn-delete-assigned-exam" data-exam-id="${item.id}" data-exam-title="${this._escapeHtml(item.title)}" style="background:rgba(239,68,68,0.12);color:#ef4444;border:1px solid rgba(239,68,68,0.3);font-weight:600;padding:4px 10px;border-radius:6px;cursor:pointer;">
                           🗑️ Xóa
@@ -1574,9 +1319,14 @@ export class QuizView {
                 ${this._escapeHtml(exam.title)}
               </h3>
             </div>
-            <button type="button" class="btn-sm" id="btnCloseGradebook" style="padding:6px 12px;font-size:13px;border-radius:6px;">
-              ✕ Đóng
-            </button>
+            <div style="display:flex;gap:10px;align-items:center;">
+              <button type="button" class="btn-sm" id="btnExportGradebookExcel" style="background:#10b981;color:#fff;border:none;padding:6px 14px;font-size:13px;border-radius:6px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;">
+                📥 Xuất File Excel (.csv)
+              </button>
+              <button type="button" class="btn-sm" id="btnCloseGradebook" style="padding:6px 12px;font-size:13px;border-radius:6px;">
+                ✕ Đóng
+              </button>
+            </div>
           </div>
 
           <div style="padding:16px 24px;background:var(--panel-alt);border-bottom:1px solid var(--line);display:flex;gap:20px;align-items:center;flex-wrap:wrap;">
@@ -1659,6 +1409,59 @@ export class QuizView {
     if (typeof window !== 'undefined' && typeof window.alert === 'function') {
       window.alert(msg);
     }
+  }
+
+  /**
+   * Exports an exam's submissions to an Excel-friendly CSV with BOM.
+   * @param {string} examId
+   */
+  _exportExamSubmissionsToCsv(examId) {
+    const exam = examManager.getExamById(examId);
+    if (!exam) return;
+    const subs = examManager.getSubmissionsForExam(examId);
+    if (subs.length === 0) {
+      this._showAlert(`Đề thi "${exam.title}" chưa có sinh viên nào nộp bài để xuất điểm!`);
+      return;
+    }
+
+    let csv = '\uFEFF"STT","Họ và Tên","Tài Khoản (Username)","Lớp / Đơn Vị","Điểm (Thang 10)","Số Câu Đúng","Tổng Số Câu","Thời Gian Làm","Thời Điểm Nộp","Xếp Loại"\r\n';
+
+    subs.forEach((s, idx) => {
+      const minutes = Math.floor(s.timeSpentSeconds / 60);
+      const seconds = s.timeSpentSeconds % 60;
+      const durationStr = `${minutes}p ${seconds}s`;
+      const dateStr = new Date(s.submittedAt).toLocaleString('vi-VN');
+      let rating = 'Yếu / Chưa đạt';
+      if (s.score >= 9.0) rating = 'Xuất sắc';
+      else if (s.score >= 8.0) rating = 'Giỏi';
+      else if (s.score >= 6.5) rating = 'Khá';
+      else if (s.score >= 5.0) rating = 'Trung bình';
+
+      const row = [
+        idx + 1,
+        `"${(s.fullName || '').replace(/"/g, '""')}"`,
+        `"${(s.username || '').replace(/"/g, '""')}"`,
+        `"${(s.className || 'Sinh viên').replace(/"/g, '""')}"`,
+        `"${s.score}"`,
+        `"${s.correctCount}"`,
+        `"${s.totalQuestions}"`,
+        `"${durationStr}"`,
+        `"${dateStr}"`,
+        `"${rating}"`,
+      ];
+      csv += row.join(',') + '\r\n';
+    });
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const safeTitle = (exam.title || 'Diem_Thi').replace(/[^a-zA-Z0-9\u00C0-\u024F\u1EA0-\u1EF9]/g, '_');
+    a.download = `Bang_Diem_${safeTitle}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   }
 
   // =========================================================================
@@ -1790,7 +1593,6 @@ export class QuizView {
     const tabPractice = this.container.querySelector('#tabBtnPractice');
     const tabMyExams = this.container.querySelector('#tabBtnMyExams');
     const tabStudio = this.container.querySelector('#tabBtnStudio');
-    const tabLeaderboard = this.container.querySelector('#tabBtnLeaderboard');
 
     if (tabPractice) {
       tabPractice.addEventListener('click', () => {
@@ -1810,68 +1612,12 @@ export class QuizView {
       });
     }
 
-    if (tabLeaderboard) {
-      tabLeaderboard.addEventListener('click', () => {
-        this.setTab('leaderboard');
-      });
-    }
-
-    // Leaderboard Specific CTA Events
-    const btnGoMyExamsFromLb = this.container.querySelector('#btnGoToMyExamsFromLb');
-    if (btnGoMyExamsFromLb) {
-      btnGoMyExamsFromLb.addEventListener('click', () => {
-        this.setTab('myExams');
-      });
-    }
-
-    const btnGoPractice = this.container.querySelector('#btnGoToPracticeFromLb');
-    if (btnGoPractice) {
-      btnGoPractice.addEventListener('click', () => {
-        this.setTab('practice');
-      });
-    }
-
-    const btnLbLogin = this.container.querySelector('#btnLeaderboardLogin');
-    if (btnLbLogin) {
-      btnLbLogin.addEventListener('click', () => {
-        this._openAuthModal('login');
-      });
-    }
-
     const btnMyExamsLogin = this.container.querySelector('#btnMyExamsLogin');
     if (btnMyExamsLogin) {
       btnMyExamsLogin.addEventListener('click', () => {
         this._openAuthModal('login');
       });
     }
-
-    // Leaderboard Row Delete (Admin only)
-    this.container.querySelectorAll('.btn-delete-lb-row').forEach(btn => {
-      btn.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        if (!authManager.isAdmin()) return;
-        const targetId = btn.getAttribute('data-user-id');
-        const targetName = btn.getAttribute('data-user-name') || targetId;
-        if (typeof window !== 'undefined' && window.confirm && !window.confirm(`Xóa toàn bộ điểm thi của sinh viên "${targetName}" khỏi bảng xếp hạng?`)) {
-          return;
-        }
-
-        // Remove user's submissions in ExamManager
-        const submissions = examManager.getSubmissions().filter(s => s.userId !== targetId);
-        if (examManager.storage) {
-          try {
-            examManager.storage.setItem('trr_exam_submissions_v1', JSON.stringify(submissions));
-          } catch {}
-        }
-        quizHistoryManager.removeUserStats(targetId);
-
-        try {
-          await cloudSyncManager.deleteQuizLeaderboardUser(targetId);
-        } catch {}
-
-        this.render();
-      });
-    });
 
     // 2. Practice Arena Events
     const selTopic = this.container.querySelector('#selPracticeTopic');
@@ -2216,6 +1962,25 @@ export class QuizView {
         this.render();
       });
     }
+
+    // Export Gradebook Excel in Modal
+    const btnExportGradebook = this.container.querySelector('#btnExportGradebookExcel');
+    if (btnExportGradebook && this.gradebookExamId) {
+      btnExportGradebook.addEventListener('click', () => {
+        this._exportExamSubmissionsToCsv(this.gradebookExamId);
+      });
+    }
+
+    // Export Exam Excel from assigned exams table
+    this.container.querySelectorAll('.btn-export-exam-excel').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const examId = btn.getAttribute('data-exam-id');
+        if (examId) {
+          this._exportExamSubmissionsToCsv(examId);
+        }
+      });
+    });
 
     const gradebookBackdrop = this.container.querySelector('#gradebookModalBackdrop');
     if (gradebookBackdrop) {

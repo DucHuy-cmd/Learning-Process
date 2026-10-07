@@ -11,12 +11,12 @@ export const pythonBellmanFord = {
   filename: 'bellman_ford.py',
   title: 'Bellman-Ford (Python 3)',
   mapping: {
-    [AlgorithmAction.INITIALIZE]: [6, 7, 8],
-    [AlgorithmAction.SELECT_NODE]: [11, 12],
-    [AlgorithmAction.INSPECT_EDGE]: [13],
-    [AlgorithmAction.RELAX_EDGE]: [14, 15, 16, 17],
-    [AlgorithmAction.ERROR]: [22, 23, 24],
-    [AlgorithmAction.FINISH]: [26],
+    [AlgorithmAction.INITIALIZE]: [4, 5, 6],
+    [AlgorithmAction.SELECT_NODE]: [8, 9],
+    [AlgorithmAction.INSPECT_EDGE]: [11, 12],
+    [AlgorithmAction.RELAX_EDGE]: [13, 14, 15],
+    [AlgorithmAction.ERROR]: [20, 21, 22],
+    [AlgorithmAction.FINISH]: [24],
   },
   generateSource(graph, options = {}) {
     const startNode = options.startNodeId || 'A';

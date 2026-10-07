@@ -136,11 +136,23 @@ export class AdminView {
 
         <!-- Add Student Form Section (Collapsible/Accordion) -->
         <section class="admin-create-user-section" style="background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px 22px;margin-bottom:24px;">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:12px;">
             <h3 style="margin:0;font-size:15px;color:var(--text);font-weight:700;display:flex;align-items:center;gap:8px;">
               <span>➕</span>
               <span>Cấp Tài Khoản Sinh Viên Mới</span>
             </h3>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+              <button type="button" id="btnAdminDownloadUserTemplate" class="btn-sm" style="padding:6px 12px;font-size:12px;font-weight:600;background:var(--panel-alt);border:1px solid var(--line);border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:6px;color:var(--text);">
+                <span>📄</span> Tải File Mẫu (.csv)
+              </button>
+              <button type="button" id="btnAdminTriggerImportUsers" class="btn-sm" style="padding:6px 12px;font-size:12px;font-weight:600;background:rgba(59,130,246,0.12);border:1px solid rgba(59,130,246,0.3);color:var(--accent);border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:6px;">
+                <span>📂</span> Nhập Tài Khoản Từ File
+              </button>
+              <input type="file" id="adminFileInputUsers" accept=".csv,.txt" style="display:none;" />
+            </div>
+          </div>
+          <div style="font-size:12px;color:var(--dim);margin-bottom:12px;background:var(--panel-alt);padding:8px 12px;border-radius:6px;border:1px dashed var(--line);">
+            💡 <strong>Quy định nhập file:</strong> File định dạng <code>.csv</code> hoặc <code>.txt</code> với các cột: <code>username,password,fullName,className,email</code>. Mật khẩu nếu bỏ trống sẽ mặc định là <code>123456</code>.
           </div>
 
           <form id="adminViewAddUserForm" style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:14px;margin-top:12px;">
@@ -357,6 +369,98 @@ export class AdminView {
           this._showAlert(`✓ Đã cấp tài khoản thành công cho sinh viên "${fullName}" (@${username.trim().toLowerCase()}).`, 'success');
         } else {
           this._showAlert(res.error || 'Lỗi khi tạo tài khoản.', 'error');
+        }
+      });
+    }
+
+    // 2b. Download User Template CSV
+    const btnDownloadTemplate = this.container.querySelector('#btnAdminDownloadUserTemplate');
+    if (btnDownloadTemplate) {
+      btnDownloadTemplate.addEventListener('click', () => {
+        const csvContent = '\uFEFFusername,password,fullName,className,email\r\n' +
+          'sv_k66_01,123456,Nguyễn Văn An,K66-CNTT,an.nv@sinhvien.edu.vn\r\n' +
+          'sv_k66_02,123456,Trần Thị Mai,K66-KTPM,mai.tt@sinhvien.edu.vn\r\n' +
+          'sv_k66_03,123456,Lê Hoàng Nam,K66-HTTT,nam.lh@sinhvien.edu.vn\r\n' +
+          'sv_k66_04,123456,Phạm Quốc Huy,K66-KHMT,huy.pq@sinhvien.edu.vn\r\n';
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'Mau_Danh_Sach_Tai_Khoan.csv';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      });
+    }
+
+    // 2c. Batch Import Users from File
+    const btnTriggerImport = this.container.querySelector('#btnAdminTriggerImportUsers');
+    const fileInputUsers = this.container.querySelector('#adminFileInputUsers');
+    if (btnTriggerImport && fileInputUsers) {
+      btnTriggerImport.addEventListener('click', () => {
+        fileInputUsers.value = '';
+        fileInputUsers.click();
+      });
+
+      fileInputUsers.addEventListener('change', async (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+
+        try {
+          const text = await file.text();
+          const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+          if (lines.length === 0) {
+            this._showAlert('Tập tin trống, vui lòng chọn lại file!', 'error');
+            return;
+          }
+
+          const records = [];
+          for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            const delimiter = line.includes('\t') ? '\t' : (line.includes(';') ? ';' : ',');
+            const parts = line.split(delimiter).map(p => p.replace(/^["']|["']$/g, '').trim());
+
+            if (i === 0 && (parts[0].toLowerCase().includes('username') || parts[0].toLowerCase().includes('tên') || parts[0].toLowerCase().includes('tai khoan'))) {
+              continue;
+            }
+
+            if (parts.length >= 1 && parts[0]) {
+              records.push({
+                username: parts[0],
+                password: parts[1] || '123456',
+                fullName: parts[2] || parts[0],
+                className: parts[3] || 'Sinh viên',
+                email: parts[4] || '',
+              });
+            }
+          }
+
+          if (records.length === 0) {
+            this._showAlert('Không tìm thấy dòng dữ liệu tài khoản hợp lệ trong file.', 'error');
+            return;
+          }
+
+          const res = authManager.batchImportUsers(records);
+          if (res.success) {
+            if (res.createdUsers && res.createdUsers.length > 0) {
+              for (const u of res.createdUsers) {
+                try {
+                  await cloudSyncManager.adminCreateUser(u);
+                } catch {}
+              }
+            }
+            await this.render();
+            let msg = `✓ Đã nhập thành công ${res.addedCount} tài khoản mới!`;
+            if (res.skippedCount > 0) {
+              msg += ` (Bỏ qua ${res.skippedCount} tài khoản do đã tồn tại hoặc không hợp lệ)`;
+            }
+            this._showAlert(msg, 'success');
+          } else {
+            this._showAlert(res.error || 'Lỗi khi nhập tài khoản hàng loạt.', 'error');
+          }
+        } catch (err) {
+          this._showAlert(`Lỗi đọc file: ${err.message}`, 'error');
         }
       });
     }

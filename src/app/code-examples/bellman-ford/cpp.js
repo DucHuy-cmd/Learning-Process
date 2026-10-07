@@ -12,11 +12,11 @@ export const cppBellmanFord = {
   title: 'Bellman-Ford (C++17)',
   mapping: {
     [AlgorithmAction.INITIALIZE]: [25, 26, 27, 28, 29, 30],
-    [AlgorithmAction.SELECT_NODE]: [33, 34],
-    [AlgorithmAction.INSPECT_EDGE]: [36, 37],
-    [AlgorithmAction.RELAX_EDGE]: [38, 39, 40, 41, 42],
-    [AlgorithmAction.ERROR]: [48, 49, 50, 51, 52],
-    [AlgorithmAction.FINISH]: [56, 57],
+    [AlgorithmAction.SELECT_NODE]: [32, 33, 34],
+    [AlgorithmAction.INSPECT_EDGE]: [35, 36],
+    [AlgorithmAction.RELAX_EDGE]: [37, 38, 39, 40],
+    [AlgorithmAction.ERROR]: [47, 48, 49, 50, 51],
+    [AlgorithmAction.FINISH]: [53],
   },
   generateSource(graph, options = {}) {
     const startNode = options.startNodeId || 'A';

@@ -25,8 +25,6 @@ export const CANONICAL_PRESET_KEYS = Object.freeze([
   'euler_path',
   'euler_none',
   'euler_disconnected',
-  'bellman_sample',
-  'bellman_neg_cycle',
 ]);
 
 /**
@@ -258,6 +256,49 @@ const CANONICAL_PRESETS = {
     ],
     edges: [
       ["S", "A", 4.0],
+      ["A", "B", 1.0],
+      ["B", "C", -3.0],
+      ["C", "A", 1.0],
+    ],
+  },
+
+  johnson_sample: {
+    name: "Bài tập Johnson (Slide)",
+    isBuilding: false,
+    directed: true,
+    algo: "johnson",
+    nodes: [
+      { id: "A", name: "A", short: "A", kind: "phong", x: 120, y: 150 },
+      { id: "B", name: "B", short: "B", kind: "phong", x: 300, y: 100 },
+      { id: "C", name: "C", short: "C", kind: "phong", x: 260, y: 260 },
+      { id: "D", name: "D", short: "D", kind: "phong", x: 500, y: 100 },
+      { id: "E", name: "E", short: "E", kind: "phong", x: 440, y: 260 },
+      { id: "F", name: "F", short: "F", kind: "phong", x: 640, y: 180 },
+    ],
+    edges: [
+      ["A", "B", 2.0],
+      ["A", "C", 4.0],
+      ["B", "C", 1.0],
+      ["B", "D", 7.0],
+      ["C", "E", 3.0],
+      ["D", "F", 1.0],
+      ["E", "D", 2.0],
+      ["B", "F", -3.0],
+      ["F", "E", -2.0],
+    ],
+  },
+
+  johnson_neg_cycle: {
+    name: "Bài tập Johnson (Chu trình âm)",
+    isBuilding: false,
+    directed: true,
+    algo: "johnson",
+    nodes: [
+      { id: "A", name: "A", short: "A", kind: "phong", x: 200, y: 180 },
+      { id: "B", name: "B", short: "B", kind: "phong", x: 450, y: 120 },
+      { id: "C", name: "C", short: "C", kind: "phong", x: 350, y: 320 },
+    ],
+    edges: [
       ["A", "B", 1.0],
       ["B", "C", -3.0],
       ["C", "A", 1.0],

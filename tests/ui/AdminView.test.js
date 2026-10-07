@@ -183,4 +183,22 @@ describe('AdminView (Dedicated Database & Student Management Tab)', () => {
     expect(container.querySelector('.admin-leaderboard-section')).toBeNull();
     expect(container.querySelector('#btnAdminFullDatabaseReset')).not.toBeNull();
   });
+
+  it('provides template download and batch user import from file', async () => {
+    authManager.quickLogin('user_admin');
+    await adminView.render();
+
+    const btnTemplate = container.querySelector('#btnAdminDownloadUserTemplate');
+    const btnImport = container.querySelector('#btnAdminTriggerImportUsers');
+    const fileInput = container.querySelector('#adminFileInputUsers');
+
+    expect(btnTemplate).not.toBeNull();
+    expect(btnImport).not.toBeNull();
+    expect(fileInput).not.toBeNull();
+
+    // Clicking trigger triggers click on hidden file input
+    const clickSpy = vi.spyOn(fileInput, 'click');
+    btnImport.click();
+    expect(clickSpy).toHaveBeenCalled();
+  });
 });

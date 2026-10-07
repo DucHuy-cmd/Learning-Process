@@ -147,6 +147,32 @@ describe('AuthManager & User Accounts', () => {
     expect(delRes.success).toBe(true);
     expect(auth.getUsers().some(u => u.username === 'sv_test_rbac')).toBe(false);
   });
+
+  it('allows Admin to batch import users from file records and handles duplicates', () => {
+    auth.quickLogin('user_admin');
+
+    const records = [
+      { username: 'sv_batch_01', password: '123', fullName: 'Sinh Viên 01', className: 'K66-A' },
+      { username: 'sv_batch_02', fullName: 'Sinh Viên 02', className: 'K66-B' },
+      { username: 'sv_batch_01', fullName: 'Trùng Lặp 01' }, // Duplicate username
+      { username: 'ab' }, // Invalid short username
+    ];
+
+    const result = auth.batchImportUsers(records);
+    expect(result.success).toBe(true);
+    expect(result.addedCount).toBe(2);
+    expect(result.skippedCount).toBe(2);
+    expect(result.createdUsers.length).toBe(2);
+
+    const users = auth.getUsers();
+    expect(users.some(u => u.username === 'sv_batch_01')).toBe(true);
+    expect(users.some(u => u.username === 'sv_batch_02')).toBe(true);
+
+    // Non-admin cannot batch import
+    auth.logout();
+    const guestRes = auth.batchImportUsers(records);
+    expect(guestRes.success).toBe(false);
+  });
 });
 
 describe('AiHistoryManager', () => {

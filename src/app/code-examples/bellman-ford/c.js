@@ -11,12 +11,12 @@ export const cBellmanFord = {
   filename: 'bellman_ford.c',
   title: 'Bellman-Ford (C99)',
   mapping: {
-    [AlgorithmAction.INITIALIZE]: [25, 26, 27, 28, 29],
-    [AlgorithmAction.SELECT_NODE]: [32, 33],
-    [AlgorithmAction.INSPECT_EDGE]: [35, 36],
-    [AlgorithmAction.RELAX_EDGE]: [37, 38, 39, 40, 41],
-    [AlgorithmAction.ERROR]: [48, 49, 50, 51, 52],
-    [AlgorithmAction.FINISH]: [56],
+    [AlgorithmAction.INITIALIZE]: [20, 21, 22, 23, 24, 25, 26],
+    [AlgorithmAction.SELECT_NODE]: [28, 29],
+    [AlgorithmAction.INSPECT_EDGE]: [30, 31, 32, 33, 34],
+    [AlgorithmAction.RELAX_EDGE]: [35, 36, 37],
+    [AlgorithmAction.ERROR]: [44, 48, 49, 50, 51],
+    [AlgorithmAction.FINISH]: [54],
   },
   generateSource(graph, options = {}) {
     let nodeCount = 4;
@@ -122,9 +122,9 @@ ${edgeInits}
     BellmanFordResult res = bellmanFord(edges, edgeCount, nodeCount, source);
 
     if (res.hasNegativeCycle) {
-        printf("Phat hien chu trinh am!\\n");
+        printf("Negative weight cycle detected!\\n");
     } else {
-        printf("Khoang cach tu %d den %d: %d\\n", source, target, res.dist[target]);
+        printf("Distance from %d to %d: %d\\n", source, target, res.dist[target]);
     }
     return 0;
 }
