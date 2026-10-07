@@ -72,10 +72,10 @@ describe('LogicLabView Integration Tests', () => {
   it('inserts symbols into input when virtual keypad buttons are clicked', () => {
     const view = new LogicLabView({ container });
     view.inputSingle.value = '';
-    const keyAnd = container.querySelector('.btn-key[data-insert=" ∧ "]');
+    const keyAnd = container.querySelector('.btn-key[data-insert=" * "]');
     expect(keyAnd).not.toBeNull();
     keyAnd.click();
-    expect(view.inputSingle.value).toContain('∧');
+    expect(view.inputSingle.value).toContain('*');
   });
 
   it('controls truth table playback via step and navigation buttons', () => {
@@ -174,7 +174,7 @@ describe('LogicLabView Integration Tests', () => {
     // Test MUX preset
     const muxBtn = container.querySelector('.btn-circuit-preset[data-preset="case_mux"]');
     muxBtn.click();
-    expect(view.inputSingle.value).toBe('(¬s ∧ p) ∨ (s ∧ q)');
+    expect(view.inputSingle.value).toBe('(¬s * p) + (s * q)');
     expect(view.totalSteps).toBe(8);
 
     // Test 4 Corners preset
@@ -182,11 +182,11 @@ describe('LogicLabView Integration Tests', () => {
     cornersBtn.click();
     expect(view.totalSteps).toBe(16);
 
-    // Test Textbook Absorption SGK preset ((x1 ∧ x2) ∨ x1)
+    // Test Textbook Absorption SGK preset ((x1 * x2) + x1)
     const sgkBtn = container.querySelector('.btn-circuit-preset[data-preset="case_sgk"]');
     expect(sgkBtn).not.toBeNull();
     sgkBtn.click();
-    expect(view.inputSingle.value).toBe('(x1 ∧ x2) ∨ x1');
+    expect(view.inputSingle.value).toBe('(x1 * x2) + x1');
     expect(view.totalSteps).toBe(4);
     expect(view.circuitSvgContainer.innerHTML).toContain('<svg');
     expect(view.circuitSvgContainer.innerHTML).toContain('AND');

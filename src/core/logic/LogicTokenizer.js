@@ -104,22 +104,16 @@ export function tokenizeLogic(input) {
       continue;
     }
 
-    // Conjunction: ∧ or ^ or & or *
-    if (ch === '∧' || ch === '&' || ch === '*') {
-      tokens.push({ type: TokenType.AND, value: '∧', text: '∧', pos: i });
-      i++;
-      continue;
-    }
-    if (ch === '^') {
-      // caret can mean AND in logic (or XOR in programming). In discrete math, ^ is AND.
-      tokens.push({ type: TokenType.AND, value: '∧', text: '∧', pos: i });
+    // Conjunction: * or · or ∧ or ^ or &
+    if (ch === '*' || ch === '·' || ch === '∧' || ch === '&' || ch === '^') {
+      tokens.push({ type: TokenType.AND, value: '*', text: '*', pos: i });
       i++;
       continue;
     }
 
-    // Disjunction: ∨ or | or +
-    if (ch === '∨' || ch === '|' || ch === '+') {
-      tokens.push({ type: TokenType.OR, value: '∨', text: '∨', pos: i });
+    // Disjunction: + or ∨ or |
+    if (ch === '+' || ch === '∨' || ch === '|') {
+      tokens.push({ type: TokenType.OR, value: '+', text: '+', pos: i });
       i++;
       continue;
     }
@@ -148,11 +142,11 @@ export function tokenizeLogic(input) {
         continue;
       }
       if (lower === 'and') {
-        tokens.push({ type: TokenType.AND, value: '∧', text: '∧', pos: startPos });
+        tokens.push({ type: TokenType.AND, value: '*', text: '*', pos: startPos });
         continue;
       }
       if (lower === 'or' || lower === 'v') {
-        tokens.push({ type: TokenType.OR, value: '∨', text: '∨', pos: startPos });
+        tokens.push({ type: TokenType.OR, value: '+', text: '+', pos: startPos });
         continue;
       }
       if (lower === 'xor') {
@@ -186,5 +180,26 @@ export function tokenizeLogic(input) {
     throw new Error(`Ký tự không hợp lệ tại vị trí ${i + 1}: "${ch}"`);
   }
 
-  return tokens;
+  // Insert implicit conjunction (AND: *) between adjacent operands
+  // Examples: p q -> p * q, p(q+r) -> p * (q+r), (p+q)(r+s) -> (p+q) * (r+s)
+  const result = [];
+  for (let k = 0; k < tokens.length; k++) {
+    result.push(tokens[k]);
+    if (k + 1 < tokens.length) {
+      const curr = tokens[k];
+      const next = tokens[k + 1];
+      const currCanEnd = curr.type === TokenType.VAR || curr.type === TokenType.CONST || curr.type === TokenType.RPAREN;
+      const nextCanStart = next.type === TokenType.VAR || next.type === TokenType.CONST || next.type === TokenType.LPAREN || next.type === TokenType.NOT;
+      if (currCanEnd && nextCanStart) {
+        result.push({
+          type: TokenType.AND,
+          value: '*',
+          text: '*',
+          pos: curr.pos,
+        });
+      }
+    }
+  }
+
+  return result;
 }

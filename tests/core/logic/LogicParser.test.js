@@ -41,7 +41,7 @@ describe('LogicParser Unit Tests', () => {
     const subTexts = subexprs.map(s => s.text);
     expect(subTexts).toContain('p → q');
     expect(subTexts).toContain('q → r');
-    expect(subTexts[subTexts.length - 1]).toBe('(p → q) ∧ (q → r)');
+    expect(subTexts[subTexts.length - 1]).toBe('(p → q) * (q → r)');
   });
 
   it('throws friendly syntax errors for unmatched parentheses and empty input', () => {

@@ -3,11 +3,11 @@
  * Question Repository, Procedural Exam Generator, and LaTeX/Print Exporter
  * for Discrete Mathematics & Logic Education.
  * 
- * Fully covers all 4 Curriculum Pillars / Chapters:
- * - Chapter 1 & 2: Propositional & Predicate Logic, Karnaugh Maps & Digital Circuits (Logic Lab)
- * - Chapter 3: Combinatorics & Counting Methods (Counting Lab)
- * - Chapter 4: Binary Relations & Boolean Algebra, Warshall & Hasse (Relation Lab)
- * - Chapter 5: Graph Theory & Core Optimization Algorithms (Algorithm Lab)
+ * Fully covers all 4 Curriculum Pillars / Chapters directly from the university slides:
+ * - Chapter 1 & 2: Propositional & Predicate Logic, Boolean Algebra, Karnaugh Maps & Digital Logic Circuits
+ * - Chapter 3: Sets, Mappings, Counting Principles, Permutations, Combinations, Pigeonhole & Recurrence Relations
+ * - Chapter 4: Binary Relations, Equivalence, Modulo, POSET, Hasse Diagrams & Closures
+ * - Chapter 5: Graph Theory, Degree, Handshaking, Euler, Hamilton, Trees, Kruskal, Prim & Dijkstra
  */
 
 export const QUIZ_TOPICS = {
@@ -27,782 +27,414 @@ export const QUIZ_DIFFICULTIES = {
 
 /**
  * Curated Question Bank covering university-level Discrete Mathematics across all chapters.
+ * 100% aligned with lecture slides. Logic notation: AND = *, OR = +, NOT = ¬.
  */
 export const STATIC_QUESTION_BANK = [
   // =========================================================================
-  // CHƯƠNG 1 & 2: CƠ SỞ LOGIC MỆNH ĐỀ & VỊ TỪ
+  // CHƯƠNG 1 & 2: CƠ SỞ LOGIC MỆNH ĐỀ, ĐẠI SỐ BOOLE & MẠCH LOGIC
   // =========================================================================
   {
-    "id": "logic_q01",
-    "topic": "logic",
-    "topicName": "Logic Mệnh đề",
-    "difficulty": "easy",
-    "question": "Cho hai mệnh đề p = Đúng (1) và q = Sai (0). Mệnh đề kéo theo (p → q) có giá trị chân trị là gì?",
-    "options": [
-      {
-        "id": "A",
-        "text": "1 (Đúng)"
-      },
-      {
-        "id": "B",
-        "text": "0 (Sai)"
-      },
-      {
-        "id": "C",
-        "text": "Không xác định được"
-      },
-      {
-        "id": "D",
-        "text": "Cả 1 và 0 đều đúng"
-      }
+    id: 'logic_q01',
+    topic: 'logic',
+    topicName: 'Phép kéo theo Logic',
+    difficulty: 'easy',
+    question: 'Cho hai mệnh đề p = Đúng (1) và q = Sai (0). Mệnh đề kéo theo (p → q) có giá trị chân trị là gì?',
+    options: [
+      { id: 'A', text: '1 (Đúng)' },
+      { id: 'B', text: '0 (Sai)' },
+      { id: 'C', text: 'Không xác định được' },
+      { id: 'D', text: 'Cả 1 và 0 đều đúng' },
     ],
-    "correctId": "B",
-    "explanation": "Theo định nghĩa phép kéo theo, p → q chỉ nhận giá trị SAI duy nhất khi tiền đề p Đúng (1) và kết luận q Sai (0). Do đó 1 → 0 = 0.",
-    "actionLink": {
-      "view": "logic",
-      "expression": "p → q"
-    }
+    correctId: 'B',
+    explanation: 'Theo định nghĩa phép kéo theo trong slide, p → q chỉ nhận giá trị SAI duy nhất khi tiền đề p Đúng (1) và kết luận q Sai (0). Do đó 1 → 0 = 0.',
+    actionLink: { view: 'logic', expression: 'p → q' },
   },
   {
-    "id": "logic_q02",
-    "topic": "logic",
-    "topicName": "Bản chất Mệnh đề",
-    "difficulty": "easy",
-    "question": "Biểu thức logic p ∨ ¬p (Luật triệt tam) thuộc loại mệnh đề nào sau đây?",
-    "options": [
-      {
-        "id": "A",
-        "text": "Mâu thuẫn / Hằng sai (Contradiction)"
-      },
-      {
-        "id": "B",
-        "text": "Tiếp liên / Thỏa được (Contingency)"
-      },
-      {
-        "id": "C",
-        "text": "Hằng đúng (Tautology)"
-      },
-      {
-        "id": "D",
-        "text": "Không thể phân loại"
-      }
+    id: 'logic_q02',
+    topic: 'logic',
+    topicName: 'Hằng đúng & Hằng sai',
+    difficulty: 'easy',
+    question: 'Biểu thức logic p + ¬p (Luật bù / Triệt tam) thuộc loại mệnh đề nào sau đây?',
+    options: [
+      { id: 'A', text: 'Mâu thuẫn / Hằng sai (Contradiction)' },
+      { id: 'B', text: 'Tiếp liên / Thỏa được (Contingency)' },
+      { id: 'C', text: 'Hằng đúng (Tautology)' },
+      { id: 'D', text: 'Không thể phân loại' },
     ],
-    "correctId": "C",
-    "explanation": "Với mọi giá trị của p: khi p=1 thì p ∨ ¬p = 1 ∨ 0 = 1; khi p=0 thì 0 ∨ 1 = 1. Biểu thức luôn nhận giá trị Đúng ở tất cả các trường hợp nên là Hằng đúng (Tautology).",
-    "actionLink": {
-      "view": "logic",
-      "expression": "p ∨ ¬p"
-    }
+    correctId: 'C',
+    explanation: 'Theo luật bù trong slide, với mọi giá trị của p: khi p = 1 thì 1 + 0 = 1; khi p = 0 thì 0 + 1 = 1. Biểu thức luôn nhận giá trị 1 ở tất cả các dòng nên là Hằng đúng (Tautology).',
+    actionLink: { view: 'logic', expression: 'p + ¬p' },
   },
   {
-    "id": "logic_q03",
-    "topic": "logic",
-    "topicName": "Tương đương Logic",
-    "difficulty": "medium",
-    "question": "Theo luật De Morgan, phủ định của mệnh đề hội ¬(p ∧ q) tương đương logic với biểu thức nào?",
-    "options": [
-      {
-        "id": "A",
-        "text": "¬p ∧ ¬q"
-      },
-      {
-        "id": "B",
-        "text": "¬p ∨ ¬q"
-      },
-      {
-        "id": "C",
-        "text": "p ∨ q"
-      },
-      {
-        "id": "D",
-        "text": "¬p → q"
-      }
+    id: 'logic_q03',
+    topic: 'logic',
+    topicName: 'Luật De Morgan',
+    difficulty: 'medium',
+    question: 'Theo luật De Morgan, phủ định của mệnh đề hội ¬(p * q) tương đương logic với biểu thức nào?',
+    options: [
+      { id: 'A', text: '¬p * ¬q' },
+      { id: 'B', text: '¬p + ¬q' },
+      { id: 'C', text: 'p + q' },
+      { id: 'D', text: '¬p → q' },
     ],
-    "correctId": "B",
-    "explanation": "Luật De Morgan khẳng định: Phủ định của một hội bằng tuyển của các phủ định: ¬(p ∧ q) ≡ ¬p ∨ ¬q.",
-    "actionLink": {
-      "view": "logic",
-      "expression": "¬(p ∧ q) ↔ (¬p ∨ ¬q)"
-    }
+    correctId: 'B',
+    explanation: 'Luật De Morgan trong slide khẳng định: Phủ định của một tích (hội) bằng tổng (tuyển) của các phủ định: ¬(p * q) ≡ ¬p + ¬q.',
+    actionLink: { view: 'logic', expression: '¬(p * q) ↔ (¬p + ¬q)' },
   },
   {
-    "id": "logic_q04",
-    "topic": "logic",
-    "topicName": "Quy tắc Suy diễn",
-    "difficulty": "medium",
-    "question": "Quy tắc suy diễn \"Nếu p → q đúng và tiền đề p đúng thì suy ra kết luận q đúng\" có tên gọi kinh điển là gì?",
-    "options": [
-      {
-        "id": "A",
-        "text": "Khẳng định tiền đề (Modus Ponens)"
-      },
-      {
-        "id": "B",
-        "text": "Phủ định hậu đề (Modus Tollens)"
-      },
-      {
-        "id": "C",
-        "text": "Tam đoạn luận giả thiết (Hypothetical Syllogism)"
-      },
-      {
-        "id": "D",
-        "text": "Luật triệt tiêu mâu thuẫn"
-      }
+    id: 'logic_q04',
+    topic: 'logic',
+    topicName: 'Quy tắc Modus Ponens',
+    difficulty: 'medium',
+    question: 'Quy tắc suy diễn "Nếu p → q đúng và tiền đề p đúng thì suy ra kết luận q đúng" có tên gọi kinh điển là gì?',
+    options: [
+      { id: 'A', text: 'Khẳng định tiền đề (Modus Ponens)' },
+      { id: 'B', text: 'Phủ định hậu đề (Modus Tollens)' },
+      { id: 'C', text: 'Tam đoạn luận giả thiết (Hypothetical Syllogism)' },
+      { id: 'D', text: 'Tam đoạn luận tuyển' },
     ],
-    "correctId": "A",
-    "explanation": "Quy tắc ((p → q) ∧ p) → q là quy tắc suy diễn cơ bản nhất trong toán học, được gọi là Modus Ponens (Khẳng định tiền đề).",
-    "actionLink": {
-      "view": "logic",
-      "expression": "((p → q) ∧ p) → q"
-    }
+    correctId: 'A',
+    explanation: 'Quy tắc suy diễn Modus Ponens (Khẳng định tiền đề): ((p → q) * p) → q. Khi điều kiện kéo theo đúng và nguyên nhân xảy ra thì kết quả bắt buộc phải xảy ra.',
+    actionLink: { view: 'logic', expression: '((p → q) * p) → q' },
   },
   {
-    "id": "logic_q05",
-    "topic": "logic",
-    "topicName": "Mạch Logic: Bộ cộng bán phần",
-    "difficulty": "medium",
-    "question": "Quan sát sơ đồ mạch logic số dưới đây. Cho biết đây là mạch chức năng gì?<br><svg viewBox=\"0 0 340 130\" width=\"100%\" height=\"auto\" style=\"max-width:340px;display:block;margin:10px auto;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:6px;\"><text x=\"12\" y=\"38\" fill=\"#38bdf8\" font-size=\"13\" font-weight=\"bold\" font-family=\"sans-serif\">A</text><text x=\"12\" y=\"78\" fill=\"#f43f5e\" font-size=\"13\" font-weight=\"bold\" font-family=\"sans-serif\">B</text><line x1=\"30\" y1=\"34\" x2=\"110\" y2=\"34\" stroke=\"#38bdf8\" stroke-width=\"2\"/><line x1=\"30\" y1=\"74\" x2=\"110\" y2=\"74\" stroke=\"#f43f5e\" stroke-width=\"2\"/><path d=\"M 105 20 Q 115 54 105 88 M 112 20 Q 122 54 112 88 Q 145 54 165 54 Q 145 54 112 20\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"2\"/><text x=\"130\" y=\"58\" fill=\"#94a3b8\" font-size=\"10\" font-weight=\"bold\" font-family=\"sans-serif\">XOR</text><line x1=\"165\" y1=\"54\" x2=\"260\" y2=\"54\" stroke=\"#10b981\" stroke-width=\"2\"/><text x=\"268\" y=\"58\" fill=\"#10b981\" font-size=\"13\" font-weight=\"bold\" font-family=\"sans-serif\">S (Sum)</text><circle cx=\"60\" cy=\"34\" r=\"3\" fill=\"#38bdf8\"/><circle cx=\"80\" cy=\"74\" r=\"3\" fill=\"#f43f5e\"/><path d=\"M 60 34 L 60 96 L 115 96\" fill=\"none\" stroke=\"#38bdf8\" stroke-width=\"2\"/><path d=\"M 80 74 L 80 114 L 115 114\" fill=\"none\" stroke=\"#f43f5e\" stroke-width=\"2\"/><path d=\"M 115 88 L 135 88 A 18 18 0 0 1 135 122 L 115 122 Z\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"2\"/><text x=\"128\" y=\"108\" fill=\"#94a3b8\" font-size=\"10\" font-weight=\"bold\" font-family=\"sans-serif\">AND</text><line x1=\"153\" y1=\"105\" x2=\"260\" y2=\"105\" stroke=\"#f59e0b\" stroke-width=\"2\"/><text x=\"268\" y=\"109\" fill=\"#f59e0b\" font-size=\"13\" font-weight=\"bold\" font-family=\"sans-serif\">C (Carry)</text></svg>",
-    "options": [
-      {
-        "id": "A",
-        "text": "Mạch cộng bán phần (Half Adder) với S = A ⊕ B (Tổng) và C = A ∧ B (Số nhớ)"
-      },
-      {
-        "id": "B",
-        "text": "Mạch cộng toàn phần (Full Adder) nhận 3 đầu vào"
-      },
-      {
-        "id": "C",
-        "text": "Bộ chọn kênh đa hợp (Multiplexer 2:1)"
-      },
-      {
-        "id": "D",
-        "text": "Mạch so sánh độ lớn 2-bit"
-      }
+    id: 'logic_q05',
+    topic: 'logic',
+    topicName: 'Mạch Logic: Phân tích đầu ra',
+    difficulty: 'medium',
+    question: 'Cho mạch logic tổ hợp gồm 1 cổng NOT, 2 cổng AND và 1 cổng OR như hình vẽ. Biểu thức Boole đầu ra Y của mạch là gì?<br><svg viewBox="0 0 320 120" width="100%" height="auto" style="max-width:320px;display:block;margin:10px auto;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:6px;"><text x="10" y="32" fill="#38bdf8" font-size="12" font-weight="bold">x</text><text x="10" y="88" fill="#f43f5e" font-size="12" font-weight="bold">y</text><line x1="25" y1="28" x2="100" y2="28" stroke="#38bdf8" stroke-width="2"/><circle cx="45" cy="28" r="3" fill="#38bdf8"/><path d="M 45 28 L 45 56 L 65 56" fill="none" stroke="#38bdf8" stroke-width="2"/><path d="M 65 48 L 85 56 L 65 64 Z" fill="none" stroke="#e2e8f0" stroke-width="1.8"/><circle cx="90" cy="56" r="2.5" fill="none" stroke="#e2e8f0" stroke-width="1.5"/><line x1="93" y1="56" x2="130" y2="56" stroke="#e2e8f0" stroke-width="2"/><line x1="25" y1="84" x2="70" y2="84" stroke="#f43f5e" stroke-width="2"/><circle cx="70" cy="84" r="3" fill="#f43f5e"/><path d="M 70 84 L 70 38 L 100 38" fill="none" stroke="#f43f5e" stroke-width="2"/><path d="M 70 84 L 130 84" stroke="#f43f5e" stroke-width="2"/><path d="M 100 20 L 120 20 A 15 15 0 0 1 120 46 L 100 46 Z" fill="none" stroke="#e2e8f0" stroke-width="1.8"/><text x="103" y="36" fill="#94a3b8" font-size="9" font-weight="bold">AND1</text><path d="M 130 48 L 150 48 A 15 15 0 0 1 150 92 L 130 92 Z" fill="none" stroke="#e2e8f0" stroke-width="1.8"/><text x="133" y="73" fill="#94a3b8" font-size="9" font-weight="bold">AND2</text><path d="M 135 33 L 190 33 L 190 48 L 205 48" fill="none" stroke="#e2e8f0" stroke-width="2"/><path d="M 165 70 L 190 70 L 190 62 L 205 62" fill="none" stroke="#e2e8f0" stroke-width="2"/><path d="M 205 40 Q 215 55 205 70 Q 235 55 250 55 Q 235 55 205 40" fill="none" stroke="#e2e8f0" stroke-width="2"/><text x="212" y="58" fill="#94a3b8" font-size="9" font-weight="bold">OR</text><line x1="250" y1="55" x2="290" y2="55" stroke="#10b981" stroke-width="2.5"/><text x="295" y="59" fill="#10b981" font-size="13" font-weight="bold">Y</text></svg>',
+    options: [
+      { id: 'A', text: 'Y = x*y + ¬x*y' },
+      { id: 'B', text: 'Y = (x + y) * ¬x' },
+      { id: 'C', text: 'Y = x*¬y + ¬x*y' },
+      { id: 'D', text: 'Y = ¬(x*y)' },
     ],
-    "correctId": "A",
-    "explanation": "Mạch gồm 1 cổng XOR và 1 cổng AND cùng nhận 2 đầu vào A và B. Ngõ ra XOR tạo bit Tổng S = A ⊕ B, ngõ ra AND tạo bit Nhớ C = A ∧ B. Đây chính là cấu trúc kinh điển của Bộ cộng nhị phân bán phần (Half Adder).",
-    "actionLink": {
-      "view": "logic",
-      "expression": "p ⊕ q"
-    }
+    correctId: 'A',
+    explanation: 'Cổng AND1 nhận x và y cho ra x*y. Cổng AND2 nhận ¬x và y cho ra ¬x*y. Cổng OR kết hợp hai nhánh tạo biểu thức đầu ra Y = x*y + ¬x*y (đây chính là ví dụ thiết kế mạch tổ hợp ở trang 22 slide Chương 2).',
+    actionLink: { view: 'logic', expression: 'x*y + ¬x*y' },
   },
   {
-    "id": "logic_q06",
-    "topic": "logic",
-    "topicName": "Mạch Logic: Bộ chọn kênh MUX",
-    "difficulty": "hard",
-    "question": "Sơ đồ mạch số dưới đây thực hiện chức năng của khối phần cứng nào trong kiến trúc máy tính?<br><svg viewBox=\"0 0 350 145\" width=\"100%\" height=\"auto\" style=\"max-width:350px;display:block;margin:10px auto;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:6px;\"><text x=\"10\" y=\"28\" fill=\"#38bdf8\" font-size=\"12\" font-weight=\"bold\" font-family=\"sans-serif\">D₀</text><text x=\"10\" y=\"80\" fill=\"#f43f5e\" font-size=\"12\" font-weight=\"bold\" font-family=\"sans-serif\">D₁</text><text x=\"10\" y=\"130\" fill=\"#fbbf24\" font-size=\"12\" font-weight=\"bold\" font-family=\"sans-serif\">S (Chọn)</text><line x1=\"30\" y1=\"24\" x2=\"130\" y2=\"24\" stroke=\"#38bdf8\" stroke-width=\"2\"/><line x1=\"30\" y1=\"76\" x2=\"130\" y2=\"76\" stroke=\"#f43f5e\" stroke-width=\"2\"/><line x1=\"75\" y1=\"126\" x2=\"130\" y2=\"92\" stroke=\"#fbbf24\" stroke-width=\"2\"/><path d=\"M 45 126 L 65 126 L 65 40 L 75 40\" fill=\"none\" stroke=\"#fbbf24\" stroke-width=\"2\"/><path d=\"M 75 34 L 92 40 L 75 46 Z\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"1.5\"/><circle cx=\"95\" cy=\"40\" r=\"2.5\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"1.5\"/><line x1=\"98\" y1=\"40\" x2=\"130\" y2=\"40\" stroke=\"#fbbf24\" stroke-width=\"2\"/><path d=\"M 130 16 L 150 16 A 16 16 0 0 1 150 48 L 130 48 Z\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"2\"/><path d=\"M 130 68 L 150 68 A 16 16 0 0 1 150 100 L 130 100 Z\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"2\"/><line x1=\"166\" y1=\"32\" x2=\"195\" y2=\"50\" stroke=\"#e2e8f0\" stroke-width=\"2\"/><line x1=\"166\" y1=\"84\" x2=\"195\" y2=\"66\" stroke=\"#e2e8f0\" stroke-width=\"2\"/><path d=\"M 195 44 Q 205 58 195 72 Q 220 58 235 58 Q 220 58 195 44\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"2\"/><line x1=\"235\" y1=\"58\" x2=\"280\" y2=\"58\" stroke=\"#10b981\" stroke-width=\"2.5\"/><text x=\"288\" y=\"62\" fill=\"#10b981\" font-size=\"14\" font-weight=\"bold\" font-family=\"sans-serif\">Y (Output)</text></svg>",
-    "options": [
-      {
-        "id": "A",
-        "text": "Bộ giải mã địa chỉ (Decoder 2-to-4)"
-      },
-      {
-        "id": "B",
-        "text": "Bộ chọn kênh đa hợp (Multiplexer 2:1 - MUX) với Y = (D₀ ∧ ¬S) ∨ (D₁ ∧ S)"
-      },
-      {
-        "id": "C",
-        "text": "Mạch đếm nhị phân đồng bộ"
-      },
-      {
-        "id": "D",
-        "text": "Bộ nhớ RAM tĩnh 1-bit"
-      }
+    id: 'logic_q06',
+    topic: 'logic',
+    topicName: 'Khái niệm Mệnh đề',
+    difficulty: 'easy',
+    question: 'Trong các câu sau đây, câu nào là một Mệnh đề logic theo định nghĩa giáo trình?',
+    options: [
+      { id: 'A', text: 'Hôm nay em đẹp quá!' },
+      { id: 'B', text: 'Đại học CNTT trực thuộc ĐHQG TP.HCM.' },
+      { id: 'C', text: 'Hôm nay là ngày thứ mấy?' },
+      { id: 'D', text: 'Hãy giải bài tập này cẩn thận!' },
     ],
-    "correctId": "B",
-    "explanation": "Khi chân chọn S = 0 thì D₀ được phép đi qua cổng AND trên; khi S = 1 thì D₁ đi qua cổng AND dưới. Biểu thức ngõ ra Y = (D₀ ∧ ¬S) ∨ (D₁ ∧ S) định nghĩa chính xác Bộ đa hợp 2 sang 1 (2-to-1 Multiplexer).",
-    "actionLink": {
-      "view": "logic",
-      "expression": "(p ∧ ¬s) ∨ (q ∧ s)"
-    }
+    correctId: 'B',
+    explanation: 'Theo định nghĩa trang 3 slide Chương 1: Mệnh đề là khẳng định có giá trị chân lý xác định (đúng hoặc sai). Câu hỏi, câu cảm thán, câu cầu khiến không là mệnh đề. Câu B là một khẳng định đúng.',
   },
   {
-    "id": "circuit_q01",
-    "topic": "logic",
-    "topicName": "Mạch Logic: Cổng NAND vạn năng",
-    "difficulty": "hard",
-    "question": "Mạch logic gồm 4 cổng NAND vạn năng mắc như hình dưới đây tương đương với cổng logic cơ bản nào giữa hai đầu vào A và B?<br><svg viewBox=\"0 0 360 145\" width=\"100%\" height=\"auto\" style=\"max-width:360px;display:block;margin:10px auto;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:6px;\"><text x=\"10\" y=\"44\" fill=\"#38bdf8\" font-size=\"13\" font-weight=\"bold\" font-family=\"sans-serif\">A</text><text x=\"10\" y=\"100\" fill=\"#f43f5e\" font-size=\"13\" font-weight=\"bold\" font-family=\"sans-serif\">B</text><path d=\"M 28 40 L 70 40 L 70 64 L 85 64\" fill=\"none\" stroke=\"#38bdf8\" stroke-width=\"2\"/><path d=\"M 28 96 L 70 96 L 70 78 L 85 78\" fill=\"none\" stroke=\"#f43f5e\" stroke-width=\"2\"/><path d=\"M 85 58 L 105 58 A 14 14 0 0 1 105 84 L 85 84 Z\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"1.8\"/><circle cx=\"122\" cy=\"71\" r=\"2.5\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"1.5\"/><text x=\"94\" y=\"74\" fill=\"#94a3b8\" font-size=\"8\" font-weight=\"bold\" font-family=\"sans-serif\">NAND1</text><path d=\"M 50 40 L 50 20 L 150 20\" fill=\"none\" stroke=\"#38bdf8\" stroke-width=\"2\"/><path d=\"M 125 71 L 138 71 L 138 34 L 150 34\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"2\"/><path d=\"M 150 14 L 170 14 A 14 14 0 0 1 170 40 L 150 40 Z\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"1.8\"/><circle cx=\"187\" cy=\"27\" r=\"2.5\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"1.5\"/><path d=\"M 125 71 L 138 71 L 138 108 L 150 108\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"2\"/><path d=\"M 50 96 L 50 122 L 150 122\" fill=\"none\" stroke=\"#f43f5e\" stroke-width=\"2\"/><path d=\"M 150 102 L 170 102 A 14 14 0 0 1 170 128 L 150 128 Z\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"1.8\"/><circle cx=\"187\" cy=\"115\" r=\"2.5\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"1.5\"/><path d=\"M 190 27 L 225 27 L 225 64 L 235 64\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"2\"/><path d=\"M 190 115 L 225 115 L 225 78 L 235 78\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"2\"/><path d=\"M 235 58 L 255 58 A 14 14 0 0 1 255 84 L 235 84 Z\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"1.8\"/><circle cx=\"272\" cy=\"71\" r=\"2.5\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"1.5\"/><line x1=\"275\" y1=\"71\" x2=\"310\" y2=\"71\" stroke=\"#10b981\" stroke-width=\"2.5\"/><text x=\"318\" y=\"75\" fill=\"#10b981\" font-size=\"13\" font-weight=\"bold\" font-family=\"sans-serif\">Y</text></svg>",
-    "options": [
-      {
-        "id": "A",
-        "text": "Cổng AND (Y = A ∧ B)"
-      },
-      {
-        "id": "B",
-        "text": "Cổng OR (Y = A ∨ B)"
-      },
-      {
-        "id": "C",
-        "text": "Cổng XOR (Y = A ⊕ B)"
-      },
-      {
-        "id": "D",
-        "text": "Cổng XNOR (Y = ¬(A ⊕ B))"
-      }
+    id: 'circuit_q01',
+    topic: 'logic',
+    topicName: 'Mạch Logic: Cổng NAND vạn năng',
+    difficulty: 'hard',
+    question: 'Mạch logic gồm 4 cổng NAND vạn năng mắc như hình dưới đây tương đương với hàm logic cơ bản nào giữa hai đầu vào A và B?<br><svg viewBox="0 0 360 145" width="100%" height="auto" style="max-width:360px;display:block;margin:10px auto;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:6px;"><text x="10" y="44" fill="#38bdf8" font-size="13" font-weight="bold">A</text><text x="10" y="100" fill="#f43f5e" font-size="13" font-weight="bold">B</text><path d="M 28 40 L 70 40 L 70 64 L 85 64" fill="none" stroke="#38bdf8" stroke-width="2"/><path d="M 28 96 L 70 96 L 70 78 L 85 78" fill="none" stroke="#f43f5e" stroke-width="2"/><path d="M 85 58 L 105 58 A 14 14 0 0 1 105 84 L 85 84 Z" fill="none" stroke="#e2e8f0" stroke-width="1.8"/><circle cx="122" cy="71" r="2.5" fill="none" stroke="#e2e8f0" stroke-width="1.5"/><text x="94" y="74" fill="#94a3b8" font-size="8" font-weight="bold">NAND1</text><path d="M 50 40 L 50 20 L 150 20" fill="none" stroke="#38bdf8" stroke-width="2"/><path d="M 125 71 L 138 71 L 138 34 L 150 34" fill="none" stroke="#e2e8f0" stroke-width="2"/><path d="M 150 14 L 170 14 A 14 14 0 0 1 170 40 L 150 40 Z" fill="none" stroke="#e2e8f0" stroke-width="1.8"/><circle cx="187" cy="27" r="2.5" fill="none" stroke="#e2e8f0" stroke-width="1.5"/><path d="M 125 71 L 138 71 L 138 108 L 150 108" fill="none" stroke="#e2e8f0" stroke-width="2"/><path d="M 50 96 L 50 122 L 150 122" fill="none" stroke="#f43f5e" stroke-width="2"/><path d="M 150 102 L 170 102 A 14 14 0 0 1 170 128 L 150 128 Z" fill="none" stroke="#e2e8f0" stroke-width="1.8"/><circle cx="187" cy="115" r="2.5" fill="none" stroke="#e2e8f0" stroke-width="1.5"/><path d="M 190 27 L 225 27 L 225 64 L 235 64" fill="none" stroke="#e2e8f0" stroke-width="2"/><path d="M 190 115 L 225 115 L 225 78 L 235 78" fill="none" stroke="#e2e8f0" stroke-width="2"/><path d="M 235 58 L 255 58 A 14 14 0 0 1 255 84 L 235 84 Z" fill="none" stroke="#e2e8f0" stroke-width="1.8"/><circle cx="272" cy="71" r="2.5" fill="none" stroke="#e2e8f0" stroke-width="1.5"/><line x1=\"275\" y1=\"71\" x2=\"310\" y2=\"71\" stroke=\"#10b981\" stroke-width=\"2.5\"/><text x=\"318\" y=\"75\" fill=\"#10b981\" font-size=\"13\" font-weight=\"bold\">Y</text></svg>',
+    options: [
+      { id: 'A', text: 'Cổng AND (Y = A * B)' },
+      { id: 'B', text: 'Cổng OR (Y = A + B)' },
+      { id: 'C', text: 'Cổng XOR (Y = A ⊕ B = A*¬B + ¬A*B)' },
+      { id: 'D', text: 'Cổng XNOR (Y = ¬(A ⊕ B))' },
     ],
-    "correctId": "C",
-    "explanation": "Đây là sơ đồ kinh điển dùng đúng 4 cổng NAND để chế tạo cổng XOR: NAND1 sinh ¬(A∧B). NAND2 sinh ¬(A ∧ ¬(A∧B)). NAND3 sinh ¬(B ∧ ¬(A∧B)). NAND4 kết hợp lại cho ngõ ra (A ∧ ¬B) ∨ (¬A ∧ B) = A ⊕ B.",
-    "actionLink": {
-      "view": "logic",
-      "expression": "p ⊕ q"
-    }
+    correctId: 'C',
+    explanation: 'Sơ đồ gồm 4 cổng NAND: NAND1 sinh ¬(A*B). NAND2 sinh ¬(A * ¬(A*B)) = ¬A + A*B. NAND3 sinh ¬(B * ¬(A*B)) = ¬B + A*B. NAND4 kết hợp lại cho ngõ ra (A * ¬B) + (¬A * B) = A ⊕ B.',
+    actionLink: { view: 'logic', expression: 'p ⊕ q' },
   },
   {
-    "id": "logic_q08",
-    "topic": "logic",
-    "topicName": "Mạch Logic: Bộ cộng toàn phần",
-    "difficulty": "hard",
-    "question": "Sơ đồ khối và mạch ghép nối dưới đây biểu diễn mạch số học nào?<br><svg viewBox=\"0 0 380 145\" width=\"100%\" height=\"auto\" style=\"max-width:380px;display:block;margin:10px auto;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:6px;\"><rect x=\"60\" y=\"20\" width=\"75\" height=\"60\" rx=\"6\" fill=\"#1e293b\" stroke=\"#38bdf8\" stroke-width=\"1.8\"/><text x=\"73\" y=\"45\" fill=\"#38bdf8\" font-size=\"11\" font-weight=\"bold\" font-family=\"sans-serif\">Half Adder</text><text x=\"90\" y=\"60\" fill=\"#94a3b8\" font-size=\"10\" font-family=\"sans-serif\">HA 1</text><rect x=\"180\" y=\"20\" width=\"75\" height=\"60\" rx=\"6\" fill=\"#1e293b\" stroke=\"#f43f5e\" stroke-width=\"1.8\"/><text x=\"193\" y=\"45\" fill=\"#f43f5e\" font-size=\"11\" font-weight=\"bold\" font-family=\"sans-serif\">Half Adder</text><text x=\"210\" y=\"60\" fill=\"#94a3b8\" font-size=\"10\" font-family=\"sans-serif\">HA 2</text><text x=\"12\" y=\"38\" fill=\"#38bdf8\" font-size=\"12\" font-weight=\"bold\" font-family=\"sans-serif\">A</text><text x=\"12\" y=\"65\" fill=\"#f43f5e\" font-size=\"12\" font-weight=\"bold\" font-family=\"sans-serif\">B</text><line x1=\"28\" y1=\"35\" x2=\"60\" y2=\"35\" stroke=\"#38bdf8\" stroke-width=\"2\"/><line x1=\"28\" y1=\"62\" x2=\"60\" y2=\"62\" stroke=\"#f43f5e\" stroke-width=\"2\"/><line x1=\"135\" y1=\"35\" x2=\"180\" y2=\"35\" stroke=\"#e2e8f0\" stroke-width=\"2\"/><text x=\"145\" y=\"30\" fill=\"#94a3b8\" font-size=\"9\" font-family=\"sans-serif\">Sum1</text><text x=\"12\" y=\"115\" fill=\"#fbbf24\" font-size=\"12\" font-weight=\"bold\" font-family=\"sans-serif\">C_in</text><path d=\"M 38 112 L 160 112 L 160 62 L 180 62\" fill=\"none\" stroke=\"#fbbf24\" stroke-width=\"2\"/><line x1=\"255\" y1=\"35\" x2=\"330\" y2=\"35\" stroke=\"#10b981\" stroke-width=\"2.5\"/><text x=\"336\" y=\"39\" fill=\"#10b981\" font-size=\"13\" font-weight=\"bold\" font-family=\"sans-serif\">Sum</text><path d=\"M 135 65 L 148 65 L 148 100 L 290 100\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"2\"/><path d=\"M 255 65 L 270 65 L 270 114 L 290 114\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"2\"/><path d=\"M 290 94 Q 298 107 290 120 Q 315 107 330 107 Q 315 107 290 94\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"2\"/><line x1=\"330\" y1=\"107\" x2=\"355\" y2=\"107\" stroke=\"#f59e0b\" stroke-width=\"2.5\"/><text x=\"360\" y=\"111\" fill=\"#f59e0b\" font-size=\"12\" font-weight=\"bold\" font-family=\"sans-serif\">C_out</text></svg>",
-    "options": [
-      {
-        "id": "A",
-        "text": "Mạch cộng toàn phần (Full Adder) với 3 đầu vào: A, B và C_in"
-      },
-      {
-        "id": "B",
-        "text": "Mạch nhân nhị phân 2-bit"
-      },
-      {
-        "id": "C",
-        "text": "Bộ đếm nhị phân 3-bit"
-      },
-      {
-        "id": "D",
-        "text": "Mạch chốt dữ liệu D-Latch"
-      }
+    id: 'logic_q08',
+    topic: 'logic',
+    topicName: 'Nguyên lý đối ngẫu',
+    difficulty: 'easy',
+    question: 'Theo nguyên lý đối ngẫu trong đại số Boole, biểu thức đối ngẫu của f(x, y, z) = x*y*z + ¬x*¬y*¬z là biểu thức nào?',
+    options: [
+      { id: 'A', text: '(x + y + z) * (¬x + ¬y + ¬z)' },
+      { id: 'B', text: '(x * y * z) + (¬x * ¬y * ¬z)' },
+      { id: 'C', text: '¬x*¬y*¬z + x*y*z' },
+      { id: 'D', text: '(x + ¬x) * (y + ¬y) * (z + ¬z)' },
     ],
-    "correctId": "A",
-    "explanation": "Một bộ cộng toàn phần (Full Adder) được ghép từ 2 bộ Half Adder (HA1, HA2) và 1 cổng OR gom bit nhớ: Sum = A ⊕ B ⊕ C_in và C_out = (A ∧ B) ∨ (C_in ∧ (A ⊕ B)).",
-    "actionLink": {
-      "view": "logic",
-      "expression": "p ⊕ q ⊕ r"
-    }
+    correctId: 'A',
+    explanation: 'Theo nguyên lý đối ngẫu ở slide Chương 2 (Bài tập 1 trang 38): Để tìm biểu thức đối ngẫu, ta hoán đổi phép nhân (*) thành phép cộng (+) và phép cộng (+) thành phép nhân (*). Do đó x*y*z + ¬x*¬y*¬z trở thành (x + y + z) * (¬x + ¬y + ¬z).',
   },
   {
-    "id": "logic_q09",
-    "topic": "logic",
-    "topicName": "Mạch Logic: Chốt RS Latch",
-    "difficulty": "hard",
-    "question": "Mạch điện tử gồm 2 cổng NOR ghép chéo phản hồi tín hiệu như hình dưới đây là linh kiện lưu trữ cơ bản nào trong máy tính?<br><svg viewBox=\"0 0 340 145\" width=\"100%\" height=\"auto\" style=\"max-width:340px;display:block;margin:10px auto;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:6px;\"><text x=\"12\" y=\"32\" fill=\"#ef4444\" font-size=\"13\" font-weight=\"bold\" font-family=\"sans-serif\">R (Reset)</text><text x=\"12\" y=\"122\" fill=\"#10b981\" font-size=\"13\" font-weight=\"bold\" font-family=\"sans-serif\">S (Set)</text><line x1=\"80\" y1=\"28\" x2=\"120\" y2=\"28\" stroke=\"#ef4444\" stroke-width=\"2\"/><line x1=\"80\" y1=\"118\" x2=\"120\" y2=\"118\" stroke=\"#10b981\" stroke-width=\"2\"/><path d=\"M 120 18 Q 130 36 120 54 Q 150 36 168 36 Q 150 36 120 18\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"2\"/><circle cx=\"172\" cy=\"36\" r=\"3\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"1.8\"/><path d=\"M 120 100 Q 130 118 120 136 Q 150 118 168 118 Q 150 118 120 100\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"2\"/><circle cx=\"172\" cy=\"118\" r=\"3\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"1.8\"/><line x1=\"175\" y1=\"36\" x2=\"270\" y2=\"36\" stroke=\"#38bdf8\" stroke-width=\"2.5\"/><text x=\"280\" y=\"40\" fill=\"#38bdf8\" font-size=\"14\" font-weight=\"bold\" font-family=\"sans-serif\">Q</text><line x1=\"175\" y1=\"118\" x2=\"270\" y2=\"118\" stroke=\"#f43f5e\" stroke-width=\"2.5\"/><text x=\"280\" y=\"122\" fill=\"#f43f5e\" font-size=\"14\" font-weight=\"bold\" font-family=\"sans-serif\">Q̄</text><circle cx=\"210\" cy=\"36\" r=\"3\" fill=\"#38bdf8\"/><path d=\"M 210 36 L 210 58 L 105 88 L 105 106 L 120 106\" fill=\"none\" stroke=\"#38bdf8\" stroke-width=\"1.6\"/><circle cx=\"230\" cy=\"118\" r=\"3\" fill=\"#f43f5e\"/><path d=\"M 230 118 L 230 96 L 105 64 L 105 44 L 120 44\" fill=\"none\" stroke=\"#f43f5e\" stroke-width=\"1.6\"/></svg>",
-    "options": [
-      {
-        "id": "A",
-        "text": "Mạch dao động đa hài không ổn định"
-      },
-      {
-        "id": "B",
-        "text": "Mạch chốt RS (RS Latch / Basic Flip-Flop) lưu trữ 1 bit nhớ"
-      },
-      {
-        "id": "C",
-        "text": "Bộ dịch chuyển thanh ghi (Shift Register)"
-      },
-      {
-        "id": "D",
-        "text": "Mạch giải mã BCD sang Led 7 đoạn"
-      }
+    id: 'logic_q09',
+    topic: 'logic',
+    topicName: 'Quy tắc Modus Tollens',
+    difficulty: 'medium',
+    question: 'Cho quy tắc suy diễn: "Nếu Hùng chăm học thì Hùng đạt môn Toán rời rạc" (p → q) và "Hùng không đạt môn Toán rời rạc" (¬q). Rút ra kết luận "Hùng không chăm học" (¬p) dựa trên quy tắc nào?',
+    options: [
+      { id: 'A', text: 'Khẳng định tiền đề (Modus Ponens)' },
+      { id: 'B', text: 'Phủ định hậu đề (Modus Tollens)' },
+      { id: 'C', text: 'Tam đoạn luận giả thiết' },
+      { id: 'D', text: 'Quy tắc mâu thuẫn' },
     ],
-    "correctId": "B",
-    "explanation": "Hai cổng NOR ghép hồi tiếp chéo (cross-coupled NOR gates) với hai ngõ vào R (Reset) và S (Set) tạo thành mạch chốt RS (RS Latch) - phần tử nhớ tĩnh cơ bản nhất dùng để lưu trữ 1 bit thông tin trạng thái.",
-    "actionLink": {
-      "view": "logic",
-      "expression": "¬(p ∨ q)"
-    }
+    correctId: 'B',
+    explanation: 'Theo ví dụ quy tắc phủ định Modus Tollens trong slide Chương 1 trang 32: ((p → q) * ¬q) → ¬p. Hậu đề q bị phủ định thì tiền đề p bắt buộc phải phủ định.',
+    actionLink: { view: 'logic', expression: '((p → q) * ¬q) → ¬p' },
   },
   {
-    "id": "logic_q10",
-    "topic": "logic",
-    "topicName": "Mạch Logic: Hàm đa số Majority",
-    "difficulty": "medium",
-    "question": "Cho mạch logic gồm 3 cổng AND và 1 cổng OR như hình vẽ. Mạch này thực hiện chức năng gì?<br><svg viewBox=\"0 0 360 155\" width=\"100%\" height=\"auto\" style=\"max-width:360px;display:block;margin:10px auto;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:6px;\"><text x=\"12\" y=\"28\" fill=\"#38bdf8\" font-size=\"12\" font-weight=\"bold\" font-family=\"sans-serif\">A</text><text x=\"12\" y=\"78\" fill=\"#f43f5e\" font-size=\"12\" font-weight=\"bold\" font-family=\"sans-serif\">B</text><text x=\"12\" y=\"130\" fill=\"#fbbf24\" font-size=\"12\" font-weight=\"bold\" font-family=\"sans-serif\">C</text><path d=\"M 25 24 L 110 24\" stroke=\"#38bdf8\" stroke-width=\"2\"/><path d=\"M 25 74 L 80 74 L 80 38 L 110 38\" fill=\"none\" stroke=\"#f43f5e\" stroke-width=\"2\"/><path d=\"M 110 16 L 130 16 A 15 15 0 0 1 130 46 L 110 46 Z\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"1.8\"/><text x=\"115\" y=\"34\" fill=\"#94a3b8\" font-size=\"8\" font-family=\"sans-serif\">A∧B</text><path d=\"M 80 74 L 110 74\" stroke=\"#f43f5e\" stroke-width=\"2\"/><path d=\"M 25 126 L 90 126 L 90 88 L 110 88\" fill=\"none\" stroke=\"#fbbf24\" stroke-width=\"2\"/><path d=\"M 110 66 L 130 66 A 15 15 0 0 1 130 96 L 110 96 Z\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"1.8\"/><text x=\"115\" y=\"84\" fill=\"#94a3b8\" font-size=\"8\" font-family=\"sans-serif\">B∧C</text><path d=\"M 45 24 L 45 120 L 110 120\" fill=\"none\" stroke=\"#38bdf8\" stroke-width=\"2\"/><path d=\"M 90 126 L 90 138 L 110 138\" fill=\"none\" stroke=\"#fbbf24\" stroke-width=\"2\"/><path d=\"M 110 114 L 130 114 A 15 15 0 0 1 130 144 L 110 144 Z\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"1.8\"/><text x=\"115\" y=\"132\" fill=\"#94a3b8\" font-size=\"8\" font-family=\"sans-serif\">A∧C</text><path d=\"M 145 31 L 185 31 L 205 66\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"1.8\"/><path d=\"M 145 81 L 205 81\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"1.8\"/><path d=\"M 145 129 L 185 129 L 205 96\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"1.8\"/><path d=\"M 205 60 Q 215 81 205 102 Q 240 81 258 81 Q 240 81 205 60\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"2\"/><line x1=\"258\" y1=\"81\" x2=\"305\" y2=\"81\" stroke=\"#10b981\" stroke-width=\"2.5\"/><text x=\"312\" y=\"85\" fill=\"#10b981\" font-size=\"14\" font-weight=\"bold\" font-family=\"sans-serif\">Y</text></svg>",
-    "options": [
-      {
-        "id": "A",
-        "text": "Mạch xác định đa số (Majority Logic - ngõ ra Y = 1 khi có ít nhất 2 trong 3 ngõ vào bằng 1)"
-      },
-      {
-        "id": "B",
-        "text": "Mạch kiểm tra tính chẵn lẻ Parity"
-      },
-      {
-        "id": "C",
-        "text": "Mạch giải mã 3 sang 8"
-      },
-      {
-        "id": "D",
-        "text": "Bộ tạo số giả ngẫu nhiên"
-      }
+    id: 'logic_q10',
+    topic: 'logic',
+    topicName: 'Biến đổi đại số Boole',
+    difficulty: 'medium',
+    question: 'Rút gọn biểu thức Boole f(x, y, z) = x*y*z + x*¬y*z theo phương pháp biến đổi đại số ta được biểu thức tối thiểu nào?',
+    options: [
+      { id: 'A', text: 'x * z' },
+      { id: 'B', text: 'x * y' },
+      { id: 'C', text: 'y * z' },
+      { id: 'D', text: 'x + z' },
     ],
-    "correctId": "A",
-    "explanation": "Biểu thức của mạch là Y = (A ∧ B) ∨ (B ∧ C) ∨ (A ∧ C). Hàm này nhận giá trị 1 khi và chỉ khi có ít nhất hai biến trong số {A, B, C} nhận giá trị 1. Đây chính là hàm đa số (Majority function) hay dùng trong hệ thống chịu lỗi.",
-    "actionLink": {
-      "view": "logic",
-      "expression": "(p ∧ q) ∨ (q ∧ r) ∨ (p ∧ r)"
-    }
+    correctId: 'A',
+    explanation: 'Theo ví dụ ở trang 26-27 slide Chương 2: f(x, y, z) = x*y*z + x*¬y*z = x*z*(y + ¬y) = x*z*1 = x*z.',
+    actionLink: { view: 'logic', expression: 'x*y*z + x*¬y*z' },
   },
   {
-    "id": "logic_q11",
-    "topic": "logic",
-    "topicName": "Mạch Logic: Bộ so sánh bằng",
-    "difficulty": "medium",
-    "question": "Mạch logic gồm 2 cổng XNOR kết hợp 1 cổng AND dưới đây thực hiện chức năng gì giữa hai chuỗi bit A = (A₁, A₀) và B = (B₁, B₀)?<br><svg viewBox=\"0 0 350 140\" width=\"100%\" height=\"auto\" style=\"max-width:350px;display:block;margin:10px auto;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:6px;\"><text x=\"10\" y=\"24\" fill=\"#38bdf8\" font-size=\"11\" font-weight=\"bold\" font-family=\"sans-serif\">A₁</text><text x=\"10\" y=\"44\" fill=\"#f43f5e\" font-size=\"11\" font-weight=\"bold\" font-family=\"sans-serif\">B₁</text><line x1=\"30\" y1=\"20\" x2=\"90\" y2=\"20\" stroke=\"#38bdf8\" stroke-width=\"2\"/><line x1=\"30\" y1=\"40\" x2=\"90\" y2=\"40\" stroke=\"#f43f5e\" stroke-width=\"2\"/><path d=\"M 85 10 Q 95 30 85 50 M 92 10 Q 102 30 92 50 Q 120 30 135 30 Q 120 30 92 10\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"1.8\"/><circle cx=\"139\" cy=\"30\" r=\"3\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"1.5\"/><text x=\"10\" y=\"94\" fill=\"#38bdf8\" font-size=\"11\" font-weight=\"bold\" font-family=\"sans-serif\">A₀</text><text x=\"10\" y=\"114\" fill=\"#f43f5e\" font-size=\"11\" font-weight=\"bold\" font-family=\"sans-serif\">B₀</text><line x1=\"30\" y1=\"90\" x2=\"90\" y2=\"90\" stroke=\"#38bdf8\" stroke-width=\"2\"/><line x1=\"30\" y1=\"110\" x2=\"90\" y2=\"110\" stroke=\"#f43f5e\" stroke-width=\"2\"/><path d=\"M 85 80 Q 95 100 85 120 M 92 80 Q 102 100 92 120 Q 120 100 135 100 Q 120 100 92 80\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"1.8\"/><circle cx=\"139\" cy=\"100\" r=\"3\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"1.5\"/><path d=\"M 142 30 L 195 30 L 195 56 L 210 56\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"2\"/><path d=\"M 142 100 L 195 100 L 195 74 L 210 74\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"2\"/><path d=\"M 210 46 L 235 46 A 19 19 0 0 1 235 84 L 210 84 Z\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"2\"/><line x1=\"254\" y1=\"65\" x2=\"295\" y2=\"65\" stroke=\"#10b981\" stroke-width=\"2.5\"/><text x=\"300\" y=\"69\" fill=\"#10b981\" font-size=\"13\" font-weight=\"bold\" font-family=\"sans-serif\">A == B</text></svg>",
-    "options": [
-      {
-        "id": "A",
-        "text": "So sánh bằng (Ngõ ra = 1 khi và chỉ khi A = B)"
-      },
-      {
-        "id": "B",
-        "text": "So sánh lớn hơn (A > B)"
-      },
-      {
-        "id": "C",
-        "text": "Mạch bù 2 nhị phân"
-      },
-      {
-        "id": "D",
-        "text": "Mạch cộng tích lũy"
-      }
+    id: 'logic_q11',
+    topic: 'logic',
+    topicName: 'Phủ định lượng từ',
+    difficulty: 'easy',
+    question: 'Phủ định của mệnh đề chứa lượng từ "∀x ∈ ℝ, x² ≥ 0" là mệnh đề nào sau đây?',
+    options: [
+      { id: 'A', text: '∃x ∈ ℝ, x² < 0' },
+      { id: 'B', text: '∀x ∈ ℝ, x² < 0' },
+      { id: 'C', text: '∃x ∈ ℝ, x² ≤ 0' },
+      { id: 'D', text: '∀x ∈ ℝ, x² ≤ 0' },
     ],
-    "correctId": "A",
-    "explanation": "Cổng XNOR là cổng tương đương (chỉ bằng 1 khi hai bit vào bằng nhau). Do đó (A₁ ↔ B₁) = 1 khi A₁=B₁, và (A₀ ↔ B₀) = 1 khi A₀=B₀. Qua cổng AND, ngõ ra bằng 1 khi cả 2 cặp bit đều bằng nhau, tức số A bằng số B.",
-    "actionLink": {
-      "view": "logic",
-      "expression": "(p ↔ q) ∧ (r ↔ s)"
-    }
+    correctId: 'A',
+    explanation: 'Theo quy tắc phủ định lượng từ ở slide Chương 1 trang 47-49: ¬(∀x P(x)) ≡ ∃x ¬P(x). Phủ định của "x² ≥ 0" là "x² < 0".',
   },
   {
-    "id": "logic_q12",
-    "topic": "logic",
-    "topicName": "Mạch Logic: Tính toán mức tín hiệu",
-    "difficulty": "medium",
-    "question": "Cho mạch logic số như hình vẽ. Khi các đầu vào nhận giá trị A = 1, B = 0, C = 1, thì tín hiệu tại ngõ ra Y nhận mức logic nào?<br><svg viewBox=\"0 0 350 130\" width=\"100%\" height=\"auto\" style=\"max-width:350px;display:block;margin:10px auto;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:6px;\"><text x=\"12\" y=\"24\" fill=\"#38bdf8\" font-size=\"12\" font-weight=\"bold\" font-family=\"sans-serif\">A = 1</text><text x=\"12\" y=\"64\" fill=\"#f43f5e\" font-size=\"12\" font-weight=\"bold\" font-family=\"sans-serif\">B = 0</text><text x=\"12\" y=\"112\" fill=\"#fbbf24\" font-size=\"12\" font-weight=\"bold\" font-family=\"sans-serif\">C = 1</text><line x1=\"55\" y1=\"20\" x2=\"160\" y2=\"20\" stroke=\"#38bdf8\" stroke-width=\"2\"/><line x1=\"55\" y1=\"60\" x2=\"90\" y2=\"60\" stroke=\"#f43f5e\" stroke-width=\"2\"/><path d=\"M 90 52 L 115 60 L 90 68 Z\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"1.8\"/><circle cx=\"120\" cy=\"60\" r=\"3\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"1.5\"/><line x1=\"123\" y1=\"60\" x2=\"160\" y2=\"60\" stroke=\"#e2e8f0\" stroke-width=\"2\"/><path d=\"M 160 12 L 185 12 A 26 26 0 0 1 185 68 L 160 68 Z\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"2\"/><text x=\"175\" y=\"44\" fill=\"#94a3b8\" font-size=\"10\" font-family=\"sans-serif\">AND</text><path d=\"M 211 40 L 235 40 L 235 52 L 245 52\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"2\"/><path d=\"M 55 108 L 235 108 L 235 76 L 245 76\" fill=\"none\" stroke=\"#fbbf24\" stroke-width=\"2\"/><path d=\"M 245 44 Q 255 64 245 84 Q 280 64 295 64 Q 280 64 245 44\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"2\"/><text x=\"258\" y=\"68\" fill=\"#94a3b8\" font-size=\"10\" font-family=\"sans-serif\">OR</text><line x1=\"295\" y1=\"64\" x2=\"325\" y2=\"64\" stroke=\"#10b981\" stroke-width=\"2.5\"/><text x=\"330\" y=\"68\" fill=\"#10b981\" font-size=\"13\" font-weight=\"bold\" font-family=\"sans-serif\">Y = ?</text></svg>",
-    "options": [
-      {
-        "id": "A",
-        "text": "Y = 1 (Mức cao)"
-      },
-      {
-        "id": "B",
-        "text": "Y = 0 (Mức thấp)"
-      },
-      {
-        "id": "C",
-        "text": "Trạng thái thả nổi (High-Z)"
-      },
-      {
-        "id": "D",
-        "text": "Xung dao động không xác định"
-      }
+    id: 'logic_q12',
+    topic: 'logic',
+    topicName: 'Mạch Logic: Mức tín hiệu',
+    difficulty: 'medium',
+    question: 'Cho mạch logic số gồm 1 cổng NOT, 1 cổng AND và 1 cổng OR như hình vẽ. Khi các đầu vào nhận giá trị A = 1, B = 0, C = 1 thì tín hiệu tại ngõ ra Y nhận giá trị Boole nào?<br><svg viewBox="0 0 350 130" width="100%" height="auto" style="max-width:350px;display:block;margin:10px auto;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:6px;"><text x="12" y="24" fill="#38bdf8" font-size="12" font-weight="bold">A = 1</text><text x="12" y="64" fill="#f43f5e" font-size="12" font-weight="bold">B = 0</text><text x="12" y="112" fill="#fbbf24" font-size="12" font-weight="bold">C = 1</text><line x1="55" y1="20" x2="160" y2="20" stroke="#38bdf8" stroke-width="2"/><line x1="55" y1="60" x2="90" y2="60" stroke="#f43f5e" stroke-width="2"/><path d="M 90 52 L 115 60 L 90 68 Z" fill="none" stroke="#e2e8f0" stroke-width="1.8"/><circle cx="120" cy="60" r="3" fill="none" stroke="#e2e8f0" stroke-width="1.5"/><line x1="123" y1="60" x2="160" y2="60" stroke="#e2e8f0" stroke-width="2"/><path d="M 160 12 L 185 12 A 26 26 0 0 1 185 68 L 160 68 Z" fill="none" stroke="#e2e8f0" stroke-width="2"/><text x="175" y="44" fill="#94a3b8" font-size="10">AND</text><path d="M 211 40 L 235 40 L 235 52 L 245 52" fill="none" stroke="#e2e8f0" stroke-width="2"/><path d="M 55 108 L 235 108 L 235 76 L 245 76" fill="none" stroke="#fbbf24" stroke-width="2"/><path d="M 245 44 Q 255 64 245 84 Q 280 64 295 64 Q 280 64 245 44" fill="none" stroke="#e2e8f0" stroke-width="2"/><text x="258" y="68" fill="#94a3b8" font-size="10">OR</text><line x1="295" y1="64" x2="325" y2="64" stroke="#10b981" stroke-width="2.5"/><text x="330" y="68" fill="#10b981" font-size="13" font-weight="bold">Y = ?</text></svg>',
+    options: [
+      { id: 'A', text: 'Y = 1' },
+      { id: 'B', text: 'Y = 0' },
+      { id: 'C', text: 'Không xác định' },
+      { id: 'D', text: 'Bằng cả 0 và 1' },
     ],
-    "correctId": "A",
-    "explanation": "Đầu vào B = 0 qua cổng NOT cho ngõ ra ¬B = 1. Cổng AND nhận A = 1 và ¬B = 1 nên ngõ ra AND = 1 ∧ 1 = 1. Cổng OR nhận tín hiệu từ AND (1) và C (1) nên ngõ ra Y = 1 ∨ 1 = 1.",
-    "actionLink": {
-      "view": "logic",
-      "expression": "(p ∧ ¬q) ∨ r"
-    }
+    correctId: 'A',
+    explanation: 'Đầu vào B = 0 qua cổng NOT cho ¬B = 1. Cổng AND nhận A = 1 và ¬B = 1 cho kết quả 1 * 1 = 1. Cổng OR nhận tín hiệu 1 và C = 1 cho ngõ ra Y = 1 + 1 = 1.',
+    actionLink: { view: 'logic', expression: '(p * ¬q) + r' },
   },
   {
-    "id": "logic_q13",
-    "topic": "logic",
-    "topicName": "Mạch Logic: Cổng NOR vạn năng",
-    "difficulty": "easy",
-    "question": "Khi nối tắt hai ngõ vào của một cổng NOR vạn năng lại với nhau như hình vẽ, cổng này hoạt động tương đương linh kiện nào?<br><svg viewBox=\"0 0 280 110\" width=\"100%\" height=\"auto\" style=\"max-width:280px;display:block;margin:10px auto;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:6px;\"><text x=\"15\" y=\"58\" fill=\"#38bdf8\" font-size=\"14\" font-weight=\"bold\" font-family=\"sans-serif\">A</text><line x1=\"35\" y1=\"54\" x2=\"70\" y2=\"54\" stroke=\"#38bdf8\" stroke-width=\"2.5\"/><circle cx=\"70\" cy=\"54\" r=\"3.5\" fill=\"#38bdf8\"/><path d=\"M 70 54 L 70 38 L 105 38\" fill=\"none\" stroke=\"#38bdf8\" stroke-width=\"2\"/><path d=\"M 70 54 L 70 70 L 105 70\" fill=\"none\" stroke=\"#38bdf8\" stroke-width=\"2\"/><path d=\"M 105 24 Q 118 54 105 84 Q 145 54 165 54 Q 145 54 105 24\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"2\"/><circle cx=\"170\" cy=\"54\" r=\"3.5\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"1.8\"/><text x=\"120\" y=\"58\" fill=\"#94a3b8\" font-size=\"11\" font-weight=\"bold\" font-family=\"sans-serif\">NOR</text><line x1=\"174\" y1=\"54\" x2=\"230\" y2=\"54\" stroke=\"#10b981\" stroke-width=\"2.5\"/><text x=\"238\" y=\"58\" fill=\"#10b981\" font-size=\"14\" font-weight=\"bold\" font-family=\"sans-serif\">Y</text></svg>",
-    "options": [
-      {
-        "id": "A",
-        "text": "Cổng NOT (Inverter: Y = ¬A)"
-      },
-      {
-        "id": "B",
-        "text": "Cổng BUFFER (Đệm: Y = A)"
-      },
-      {
-        "id": "C",
-        "text": "Cổng OR"
-      },
-      {
-        "id": "D",
-        "text": "Cổng AND"
-      }
+    id: 'logic_q13',
+    topic: 'logic',
+    topicName: 'Mạch Logic: Cổng NOR nối tắt',
+    difficulty: 'easy',
+    question: 'Khi nối tắt hai ngõ vào của một cổng NOR lại với nhau như hình vẽ, cổng này hoạt động tương đương linh kiện nào?<br><svg viewBox="0 0 280 110" width="100%" height="auto" style="max-width:280px;display:block;margin:10px auto;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:6px;"><text x="15" y="58" fill="#38bdf8" font-size="14" font-weight="bold">A</text><line x1="35" y1="54" x2="70" y2="54" stroke="#38bdf8" stroke-width="2.5"/><circle cx="70" cy="54" r="3.5" fill="#38bdf8"/><path d="M 70 54 L 70 38 L 105 38" fill="none" stroke="#38bdf8" stroke-width="2"/><path d="M 70 54 L 70 70 L 105 70" fill="none" stroke="#38bdf8" stroke-width="2"/><path d="M 105 24 Q 118 54 105 84 Q 145 54 165 54 Q 145 54 105 24" fill="none" stroke="#e2e8f0" stroke-width="2"/><circle cx="170" cy="54" r="3.5" fill="none" stroke="#e2e8f0" stroke-width="1.8"/><text x="120" y="58" fill="#94a3b8" font-size="11">NOR</text><line x1="174" y1="54" x2="230" y2="54" stroke="#10b981" stroke-width="2.5"/><text x="238" y="58" fill="#10b981" font-size="14" font-weight="bold">Y</text></svg>',
+    options: [
+      { id: 'A', text: 'Cổng NOT (Inverter: Y = ¬A)' },
+      { id: 'B', text: 'Cổng BUFFER (Đệm: Y = A)' },
+      { id: 'C', text: 'Cổng OR' },
+      { id: 'D', text: 'Cổng AND' },
     ],
-    "correctId": "A",
-    "explanation": "Khi hai ngõ vào của cổng NOR được nối chung thành A, biểu thức ngõ ra trở thành Y = ¬(A ∨ A). Theo luật lũy đẳng A ∨ A = A, suy ra Y = ¬A (hoạt động chính xác như một cổng đảo NOT).",
-    "actionLink": {
-      "view": "logic",
-      "expression": "¬(p ∨ p)"
-    }
+    correctId: 'A',
+    explanation: 'Khi hai ngõ vào nối chung thành A, biểu thức ngõ ra trở thành Y = ¬(A + A). Theo luật lũy đẳng A + A = A, suy ra Y = ¬A (hoạt động chính xác như cổng đảo NOT).',
+    actionLink: { view: 'logic', expression: '¬(p + p)' },
   },
   {
-    "id": "logic_q14",
-    "topic": "logic",
-    "topicName": "Bìa Karnaugh: Tối thiểu hóa 4 biến",
-    "difficulty": "hard",
-    "question": "Trên Bìa Karnaugh 4 biến (p, q, r, s), nếu 4 ô ở 4 góc biên (m0, m2, m8, m10) đều chứa giá trị 1, nhóm này sẽ rút gọn tối tiểu thành dạng nào?",
-    "options": [
-      {
-        "id": "A",
-        "text": "¬p ∧ ¬r"
-      },
-      {
-        "id": "B",
-        "text": "¬q ∧ ¬s"
-      },
-      {
-        "id": "C",
-        "text": "p ∧ s"
-      },
-      {
-        "id": "D",
-        "text": "q ∧ r"
-      }
+    id: 'logic_q14',
+    topic: 'logic',
+    topicName: 'Bìa Karnaugh 4 biến',
+    difficulty: 'hard',
+    question: 'Trên Bìa Karnaugh 4 biến (p, q, r, s), nếu 4 ô ở 4 góc biên m0(0000), m2(0010), m8(1000), m10(1010) đều bằng 1 thì nhóm 4 ô này rút gọn tối thiểu thành dạng nào?',
+    options: [
+      { id: 'A', text: '¬p * ¬r' },
+      { id: 'B', text: '¬q * ¬s' },
+      { id: 'C', text: 'p * s' },
+      { id: 'D', text: 'q * r' },
     ],
-    "correctId": "B",
-    "explanation": "Nhờ tính chất cuộn tròn hình xuyến (torus) của mã Gray, 4 góc biên m0(0000), m2(0010), m8(1000), m10(1010) kề nhau. Ở 4 góc này, p và r đổi giá trị nên bị triệt tiêu; chỉ còn q=0 (¬q) và s=0 (¬s) giữ nguyên. Rút gọn thành ¬q ∧ ¬s.",
-    "actionLink": {
-      "view": "logic",
-      "expression": "(¬p ∧ ¬q ∧ ¬r ∧ ¬s) ∨ (¬p ∧ ¬q ∧ r ∧ ¬s) ∨ (p ∧ ¬q ∧ ¬r ∧ ¬s) ∨ (p ∧ ¬q ∧ r ∧ ¬s)"
-    }
+    correctId: 'B',
+    explanation: 'Theo tính chất cuộn tròn của mã Gray trong bìa Karnaugh, 4 góc biên là các ô kề nhau. Ở 4 ô này, p và r thay đổi giá trị nên bị triệt tiêu; chỉ còn q = 0 (¬q) và s = 0 (¬s) giữ nguyên. Rút gọn thành ¬q * ¬s.',
+    actionLink: { view: 'logic', expression: '(¬p * ¬q * ¬r * ¬s) + (¬p * ¬q * r * ¬s) + (p * ¬q * ¬r * ¬s) + (p * ¬q * r * ¬s)' },
   },
   {
-    "id": "logic_q15",
-    "topic": "logic",
-    "topicName": "Bìa Karnaugh: Điều kiện Don’t Care",
-    "difficulty": "medium",
-    "question": "Trong tối thiểu hóa hàm Boole bằng Bìa Karnaugh, các ô mang điều kiện tùy định \"Don't Care\" (ký hiệu X hoặc d) được xử lý như thế nào?",
-    "options": [
-      {
-        "id": "A",
-        "text": "Có thể coi là 1 hoặc 0 tùy ý sao cho kích thước nhóm gom là lớn nhất có thể"
-      },
-      {
-        "id": "B",
-        "text": "Bắt buộc phải coi là 1 trong mọi trường hợp"
-      },
-      {
-        "id": "C",
-        "text": "Bắt buộc phải coi là 0 và bỏ qua hoàn toàn"
-      },
-      {
-        "id": "D",
-        "text": "Chỉ được gom nếu đứng một mình"
-      }
+    id: 'logic_q15',
+    topic: 'logic',
+    topicName: 'Hằng sai / Mâu thuẫn',
+    difficulty: 'easy',
+    question: 'Biểu thức logic nào sau đây là hằng sai (mâu thuẫn / Contradiction) với mọi giá trị của biến p?',
+    options: [
+      { id: 'A', text: 'p + ¬p' },
+      { id: 'B', text: 'p → p' },
+      { id: 'C', text: 'p + 1' },
+      { id: 'D', text: 'p * ¬p' },
     ],
-    "correctId": "A",
-    "explanation": "Điều kiện Don't Care đại diện cho các trạng thái đầu vào không bao giờ xảy ra hoặc ngõ ra không quan trọng. Ta có thể linh hoạt gán X = 1 nếu việc đó giúp mở rộng nhóm gom (đạt lũy thừa của 2 lớn hơn), hoặc gán X = 0 nếu không cần gom.",
-    "actionLink": {
-      "view": "logic",
-      "expression": "p ∨ (¬p ∧ q)"
-    }
+    correctId: 'D',
+    explanation: 'Theo luật bù trong slide Chương 1 trang 21: p * ¬p = 0 với mọi giá trị của p. Biểu thức luôn nhận giá trị 0 nên là Hằng sai (mâu thuẫn).',
+    actionLink: { view: 'logic', expression: 'p * ¬p' },
   },
   {
-    "id": "logic_q16",
-    "topic": "logic",
-    "topicName": "Vị từ & Lượng từ lồng nhau",
-    "difficulty": "hard",
-    "question": "Cho tập số thực ℝ. Phủ định của mệnh đề logic \"∀x ∈ ℝ, ∃y ∈ ℝ sao cho x + y = 0\" là mệnh đề nào?",
-    "options": [
-      {
-        "id": "A",
-        "text": "∃x ∈ ℝ, ∀y ∈ ℝ, x + y ≠ 0"
-      },
-      {
-        "id": "B",
-        "text": "∀x ∈ ℝ, ∀y ∈ ℝ, x + y ≠ 0"
-      },
-      {
-        "id": "C",
-        "text": "∃x ∈ ℝ, ∃y ∈ ℝ, x + y ≠ 0"
-      },
-      {
-        "id": "D",
-        "text": "∀x ∈ ℝ, ∃y ∈ ℝ, x + y ≠ 0"
-      }
+    id: 'logic_q16',
+    topic: 'logic',
+    topicName: 'Tam đoạn luận giả thiết',
+    difficulty: 'medium',
+    question: 'Quy tắc Tam đoạn luận giả thiết (Hypothetical Syllogism) khẳng định hằng đúng nào sau đây?',
+    options: [
+      { id: 'A', text: '((p → q) * (q → r)) → (p → r)' },
+      { id: 'B', text: '((p → q) * p) → q' },
+      { id: 'C', text: '((p + q) * ¬p) → q' },
+      { id: 'D', text: '(p * q) → p' },
     ],
-    "correctId": "A",
-    "explanation": "Theo quy tắc phủ định lượng từ đổi chiều: ¬(∀x ∃y P(x, y)) ≡ ∃x ¬(∃y P(x, y)) ≡ ∃x ∀y ¬P(x, y). Do đó phủ định của x + y = 0 là x + y ≠ 0."
+    correctId: 'A',
+    explanation: 'Slide Chương 1 trang 33: Tam đoạn luận giả thiết thể hiện tính chất bắc cầu của phép suy luận kéo theo: nếu p → q và q → r thì suy ra p → r.',
+    actionLink: { view: 'logic', expression: '((p → q) * (q → r)) → (p → r)' },
   },
   {
-    "id": "logic_q17",
-    "topic": "logic",
-    "topicName": "Quy tắc Suy diễn: Modus Tollens",
-    "difficulty": "medium",
-    "question": "Cho hai tiền đề: \"Nếu máy chủ quá tải thì hệ thống gửi cảnh báo\" (p → q) và \"Hệ thống không gửi cảnh báo\" (¬q). Theo quy tắc Phủ định hậu đề (Modus Tollens), kết luận rút ra là gì?",
-    "options": [
-      {
-        "id": "A",
-        "text": "Máy chủ quá tải (p)"
-      },
-      {
-        "id": "B",
-        "text": "Máy chủ không bị quá tải (¬p)"
-      },
-      {
-        "id": "C",
-        "text": "Hệ thống bị lỗi mạng"
-      },
-      {
-        "id": "D",
-        "text": "Không thể kết luận được gì"
-      }
+    id: 'logic_q17',
+    topic: 'logic',
+    topicName: 'Tam đoạn luận tuyển',
+    difficulty: 'medium',
+    question: 'Theo quy tắc Tam đoạn luận tuyển: Cho hai tiền đề "Xe hết xăng hoặc bị hỏng hóc" (p + q) và "Xe không hết xăng" (¬p). Kết luận rút ra là gì?',
+    options: [
+      { id: 'A', text: 'Xe hết xăng (p)' },
+      { id: 'B', text: 'Xe bị hỏng hóc (q)' },
+      { id: 'C', text: 'Xe vẫn chạy tốt (¬q)' },
+      { id: 'D', text: 'Không rút ra được kết luận gì' },
     ],
-    "correctId": "B",
-    "explanation": "Quy tắc Modus Tollens (Phủ định hậu đề): ((p → q) ∧ ¬q) → ¬p. Nếu tiền đề kéo theo đúng mà hậu đề sai thì bắt buộc tiền đề phải sai để tránh mâu thuẫn 1 → 0 = 0.",
-    "actionLink": {
-      "view": "logic",
-      "expression": "((p → q) ∧ ¬q) → ¬p"
-    }
+    correctId: 'B',
+    explanation: 'Slide Chương 1 trang 28, 31: Quy tắc Tam đoạn luận tuyển ((p + q) * ¬p) → q. Khi phép tuyển đúng mà một nhánh sai thì nhánh còn lại bắt buộc phải đúng.',
+    actionLink: { view: 'logic', expression: '((p + q) * ¬p) → q' },
   },
   {
-    "id": "logic_q18",
-    "topic": "logic",
-    "topicName": "Tam đoạn luận giả thiết",
-    "difficulty": "medium",
-    "question": "Quy tắc suy diễn nào cho phép kết luận p → r từ hai tiền đề (p → q) và (q → r)?",
-    "options": [
-      {
-        "id": "A",
-        "text": "Tam đoạn luận giả thiết (Hypothetical Syllogism / Tính bắc cầu)"
-      },
-      {
-        "id": "B",
-        "text": "Tam đoạn luận tuyển (Disjunctive Syllogism)"
-      },
-      {
-        "id": "C",
-        "text": "Luật triệt tam"
-      },
-      {
-        "id": "D",
-        "text": "Quy tắc khẳng định tiền đề"
-      }
+    id: 'logic_q18',
+    topic: 'logic',
+    topicName: 'Luật hấp thu Boole',
+    difficulty: 'easy',
+    question: 'Theo luật Hấp thu (Absorption Law) trong đại số Boole, biểu thức p * (p + q) rút gọn thành biểu thức nào?',
+    options: [
+      { id: 'A', text: 'p' },
+      { id: 'B', text: 'q' },
+      { id: 'C', text: 'p * q' },
+      { id: 'D', text: 'p + q' },
     ],
-    "correctId": "A",
-    "explanation": "Hằng đúng ((p → q) ∧ (q → r)) → (p → r) được gọi là Tam đoạn luận giả thiết (Hypothetical Syllogism), thể hiện tính chất bắc cầu của phép suy luận kéo theo.",
-    "actionLink": {
-      "view": "logic",
-      "expression": "((p → q) ∧ (q → r)) → (p → r)"
-    }
+    correctId: 'A',
+    explanation: 'Theo slide Chương 1 trang 22: Luật hấp thu khẳng định p * (p + q) = p và p + (p * q) = p.',
+    actionLink: { view: 'logic', expression: 'p * (p + q)' },
   },
   {
-    "id": "logic_q19",
-    "topic": "logic",
-    "topicName": "Tam đoạn luận tuyển",
-    "difficulty": "medium",
-    "question": "Cho hai tiền đề: \"Chương trình bị lỗi cú pháp hoặc bị tràn bộ nhớ\" (p ∨ q) và \"Chương trình không bị lỗi cú pháp\" (¬p). Kết luận rút ra theo Tam đoạn luận tuyển là gì?",
-    "options": [
-      {
-        "id": "A",
-        "text": "Chương trình bị tràn bộ nhớ (q)"
-      },
-      {
-        "id": "B",
-        "text": "Chương trình chạy hoàn toàn bình thường"
-      },
-      {
-        "id": "C",
-        "text": "Chương trình bị lỗi cả cú pháp lẫn bộ nhớ"
-      },
-      {
-        "id": "D",
-        "text": "Không có lỗi nào xảy ra"
-      }
+    id: 'logic_q19',
+    topic: 'logic',
+    topicName: 'Thứ tự ưu tiên phép toán Boole',
+    difficulty: 'medium',
+    question: 'Theo thứ tự ưu tiên của các phép toán trong đại số Boole, thứ tự thực hiện đúng khi không có ngoặc là gì?',
+    options: [
+      { id: 'A', text: 'Phép bù (NOT) → Phép tích (AND *) → Phép tổng (OR +)' },
+      { id: 'B', text: 'Phép tổng (OR +) → Phép tích (AND *) → Phép bù (NOT)' },
+      { id: 'C', text: 'Phép tích (AND *) → Phép tổng (OR +) → Phép bù (NOT)' },
+      { id: 'D', text: 'Thực hiện lần lượt từ trái sang phải' },
     ],
-    "correctId": "A",
-    "explanation": "Quy tắc Tam đoạn luận tuyển (Disjunctive Syllogism): ((p ∨ q) ∧ ¬p) → q. Khi phép tuyển p ∨ q đúng mà một trong hai nhánh sai (¬p), nhánh còn lại bắt buộc phải đúng.",
-    "actionLink": {
-      "view": "logic",
-      "expression": "((p ∨ q) ∧ ¬p) → q"
-    }
+    correctId: 'A',
+    explanation: 'Trang 8 slide Chương 2 quy định rõ thứ tự ưu tiên: 1. Phép bù (phủ định) → 2. Tích Boole (phép nhân *) → 3. Tổng Boole (phép cộng +).',
   },
   {
-    "id": "logic_q20",
-    "topic": "logic",
-    "topicName": "Dạng chuẩn tắc DNF & Minterm",
-    "difficulty": "medium",
-    "question": "Một hàm Boole 3 biến f(x, y, z) có chính xác bao nhiêu Minterm khác nhau trong không gian đại số?",
-    "options": [
-      {
-        "id": "A",
-        "text": "3"
-      },
-      {
-        "id": "B",
-        "text": "6"
-      },
-      {
-        "id": "C",
-        "text": "8 (2³)"
-      },
-      {
-        "id": "D",
-        "text": "16 (2⁴)"
-      }
+    id: 'logic_q20',
+    topic: 'logic',
+    topicName: 'Tính toán giá trị Boole',
+    difficulty: 'easy',
+    question: 'Giá trị Boole của biểu thức (1 * 0) + (0 + 1) bằng bao nhiêu?',
+    options: [
+      { id: 'A', text: '0' },
+      { id: 'B', text: '2' },
+      { id: 'C', text: '1' },
+      { id: 'D', text: 'Không xác định' },
     ],
-    "correctId": "C",
-    "explanation": "Mỗi minterm ứng với đúng một dòng nhận giá trị 1 trong bảng chân trị. Với n biến, số lượng minterm tối đa là 2ⁿ. Với 3 biến, có chính xác 2³ = 8 minterm từ m₀ đến m₇."
+    correctId: 'C',
+    explanation: 'Trang 7 slide Chương 2: 1 * 0 = 0; 0 + 1 = 1; do đó 0 + 1 = 1 trong đại số Boole.',
   },
   {
-    "id": "logic_q21",
-    "topic": "logic",
-    "topicName": "Luật hấp thu đại số Boole",
-    "difficulty": "medium",
-    "question": "Theo luật Hấp thu (Absorption Law) trong đại số Boole, biểu thức p ∨ (p ∧ q) rút gọn thành biểu thức nào?",
-    "options": [
-      {
-        "id": "A",
-        "text": "p"
-      },
-      {
-        "id": "B",
-        "text": "q"
-      },
-      {
-        "id": "C",
-        "text": "p ∧ q"
-      },
-      {
-        "id": "D",
-        "text": "1"
-      }
+    id: 'logic_q21',
+    topic: 'logic',
+    topicName: 'Khai triển tổng các tích (SOP)',
+    difficulty: 'medium',
+    question: 'Tìm dạng chuẩn tắc tuyển đầy đủ (tổng các minterm) của hàm Boole f(x, y, z) = x*y*¬z + ¬y*z:',
+    options: [
+      { id: 'A', text: 'x*y*¬z + x*y*z' },
+      { id: 'B', text: 'x*y*¬z + x*¬y*z + ¬x*¬y*z' },
+      { id: 'C', text: 'x*y*z + ¬x*¬y*¬z' },
+      { id: 'D', text: 'x*¬y*z + ¬x*y*¬z' },
     ],
-    "correctId": "A",
-    "explanation": "Luật hấp thu: p ∨ (p ∧ q) ≡ p. Chứng minh: p ∨ (p ∧ q) = (p ∧ 1) ∨ (p ∧ q) = p ∧ (1 ∨ q) = p ∧ 1 = p.",
-    "actionLink": {
-      "view": "logic",
-      "expression": "p ∨ (p ∧ q) ↔ p"
-    }
+    correctId: 'B',
+    explanation: 'Slide Chương 2 trang 17: f(x, y, z) = x*y*¬z + ¬y*z = x*y*¬z + ¬y*z*(x + ¬x) = x*y*¬z + x*¬y*z + ¬x*¬y*z.',
+    actionLink: { view: 'logic', expression: 'x*y*¬z + ¬y*z' },
   },
   {
-    "id": "logic_q22",
-    "topic": "logic",
-    "topicName": "Tập cổng logic vạn năng",
-    "difficulty": "medium",
-    "question": "Tập cổng logic nào sau đây được gọi là \"Tập đầy đủ chức năng phổ quát\" (Universal Gates), có thể độc lập dựng được tất cả các mạch số khác?",
-    "options": [
-      {
-        "id": "A",
-        "text": "Chỉ cần cổng NAND (hoặc chỉ cần cổng NOR)"
-      },
-      {
-        "id": "B",
-        "text": "Chỉ cần cổng XOR"
-      },
-      {
-        "id": "C",
-        "text": "Chỉ cần cổng AND"
-      },
-      {
-        "id": "D",
-        "text": "Chỉ cần cổng OR"
-      }
+    id: 'logic_q22',
+    topic: 'logic',
+    topicName: 'Mã Gray trong Bìa Karnaugh',
+    difficulty: 'easy',
+    question: 'Trong bảng Karnaugh (K-map), các nhãn hàng và cột được sắp xếp theo thứ tự mã nào để đảm bảo hai ô liền kề chỉ khác nhau duy nhất 1 bit?',
+    options: [
+      { id: 'A', text: 'Mã Gray (00, 01, 11, 10)' },
+      { id: 'B', text: 'Mã nhị phân tự nhiên (00, 01, 10, 11)' },
+      { id: 'C', text: 'Mã BCD' },
+      { id: 'D', text: 'Mã bù 2' },
     ],
-    "correctId": "A",
-    "explanation": "Cổng NAND và cổng NOR là các cổng vạn năng (Universal Gates). Chỉ bằng cách ghép các cổng NAND (hoặc chỉ cổng NOR), ta có thể biểu diễn được toàn bộ các phép toán NOT, AND, OR cơ bản.",
-    "actionLink": {
-      "view": "logic",
-      "expression": "¬(p ∧ q)"
-    }
+    correctId: 'A',
+    explanation: 'Slide Chương 2 trang 35: Bảng Karnaugh dùng mã Gray (00, 01, 11, 10) để hai ô kề nhau chỉ khác nhau duy nhất 1 biến, giúp triệt tiêu biến theo luật x + ¬x = 1.',
   },
   {
-    "id": "logic_q23",
-    "topic": "logic",
-    "topicName": "Bìa Karnaugh & Mã Gray",
-    "difficulty": "medium",
-    "question": "Tại sao các cột và hàng trên Bìa Karnaugh bắt buộc phải được đánh số theo thứ tự mã Gray (00, 01, 11, 10) thay vì nhị phân thông thường (00, 01, 10, 11)?",
-    "options": [
-      {
-        "id": "A",
-        "text": "Để hai ô kề nhau chỉ khác nhau duy nhất 1 biến, giúp triệt tiêu biến theo luật x ∨ ¬x = 1"
-      },
-      {
-        "id": "B",
-        "text": "Để tiết kiệm diện tích vẽ hình"
-      },
-      {
-        "id": "C",
-        "text": "Vì mã nhị phân thông thường không vẽ được hình vuông"
-      },
-      {
-        "id": "D",
-        "text": "Quy ước ngẫu nhiên không có ý nghĩa toán học"
-      }
+    id: 'logic_q23',
+    topic: 'logic',
+    topicName: 'Rút gọn hàm Boole 2 biến',
+    difficulty: 'medium',
+    question: 'Rút gọn hàm Boole f(x, y) = x*¬y + x*y + ¬x*y bằng bảng Karnaugh hoặc biến đổi đại số ta được kết quả tối thiểu là gì?',
+    options: [
+      { id: 'A', text: 'x + y' },
+      { id: 'B', text: 'x * y' },
+      { id: 'C', text: '¬x + ¬y' },
+      { id: 'D', text: 'x' },
     ],
-    "correctId": "A",
-    "explanation": "Mã Gray đảm bảo khoảng cách Hamming giữa 2 trạng thái liền kề bằng 1. Điều này đảm bảo khi gom 2 ô kề nhau, biến đổi giá trị sẽ bị triệt tiêu do (A ∧ x) ∨ (A ∧ ¬x) = A.",
-    "actionLink": {
-      "view": "logic",
-      "expression": "(p ∧ q) ∨ (p ∧ ¬q)"
-    }
+    correctId: 'A',
+    explanation: 'Slide Chương 2 trang 28 và 34: f(x, y) = x*(¬y + y) + ¬x*y = x + ¬x*y = (x + ¬x)*(x + y) = 1*(x + y) = x + y.',
+    actionLink: { view: 'logic', expression: 'x*¬y + x*y + ¬x*y' },
   },
   {
-    "id": "logic_q24",
-    "topic": "logic",
-    "topicName": "Mạch Logic: Bộ kiểm tra Parity",
-    "difficulty": "medium",
-    "question": "Sơ đồ mạch gồm chuỗi cổng XOR nối tiếp dưới đây thực hiện chức năng gì cho 3 bit dữ liệu A, B, C?<br><svg viewBox=\"0 0 340 120\" width=\"100%\" height=\"auto\" style=\"max-width:340px;display:block;margin:10px auto;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:6px;\"><text x=\"10\" y=\"28\" fill=\"#38bdf8\" font-size=\"12\" font-weight=\"bold\" font-family=\"sans-serif\">A</text><text x=\"10\" y=\"58\" fill=\"#f43f5e\" font-size=\"12\" font-weight=\"bold\" font-family=\"sans-serif\">B</text><text x=\"10\" y=\"102\" fill=\"#fbbf24\" font-size=\"12\" font-weight=\"bold\" font-family=\"sans-serif\">C</text><line x1=\"28\" y1=\"24\" x2=\"75\" y2=\"24\" stroke=\"#38bdf8\" stroke-width=\"2\"/><line x1=\"28\" y1=\"54\" x2=\"75\" y2=\"54\" stroke=\"#f43f5e\" stroke-width=\"2\"/><path d=\"M 70 12 Q 78 39 70 66 M 76 12 Q 84 39 76 66 Q 105 39 120 39 Q 105 39 76 12\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"1.8\"/><line x1=\"120\" y1=\"39\" x2=\"190\" y2=\"39\" stroke=\"#e2e8f0\" stroke-width=\"2\"/><text x=\"92\" y=\"43\" fill=\"#94a3b8\" font-size=\"9\" font-family=\"sans-serif\">XOR1</text><line x1=\"28\" y1=\"98\" x2=\"190\" y2=\"98\" stroke=\"#fbbf24\" stroke-width=\"2\"/><path d=\"M 185 26 Q 193 59 185 92 M 191 26 Q 199 59 191 92 Q 225 59 240 59 Q 225 59 191 26\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"1.8\"/><text x=\"207\" y=\"63\" fill=\"#94a3b8\" font-size=\"9\" font-family=\"sans-serif\">XOR2</text><line x1=\"240\" y1=\"59\" x2=\"285\" y2=\"59\" stroke=\"#10b981\" stroke-width=\"2.5\"/><text x=\"290\" y=\"63\" fill=\"#10b981\" font-size=\"13\" font-weight=\"bold\" font-family=\"sans-serif\">P (Parity)</text></svg>",
-    "options": [
-      {
-        "id": "A",
-        "text": "Mạch tạo bit chẵn lẻ (Parity Generator: P = A ⊕ B ⊕ C, P = 1 khi số lượng bit 1 là số lẻ)"
-      },
-      {
-        "id": "B",
-        "text": "Mạch giải mã 3 sang 8"
-      },
-      {
-        "id": "C",
-        "text": "Bộ đếm tiến 3-bit"
-      },
-      {
-        "id": "D",
-        "text": "Mạch so sánh lớn bé"
-      }
+    id: 'logic_q24',
+    topic: 'logic',
+    topicName: 'Định lý tương đương logic',
+    difficulty: 'easy',
+    question: 'Hai dạng mệnh đề E và F được gọi là tương đương logic (ký hiệu E ≡ F) khi và chỉ khi mệnh đề nào sau đây là một hằng đúng?',
+    options: [
+      { id: 'A', text: 'E * F' },
+      { id: 'B', text: 'E + F' },
+      { id: 'C', text: 'E ↔ F' },
+      { id: 'D', text: '¬E → ¬F' },
     ],
-    "correctId": "A",
-    "explanation": "Phép toán XOR chuỗi P = A ⊕ B ⊕ C là phép cộng modulo 2. Ngõ ra P = 1 khi và chỉ khi tổng số lượng bit 1 ở đầu vào là số lẻ (Odd parity). Mạch này được ứng dụng rộng rãi để kiểm tra lỗi truyền dữ liệu.",
-    "actionLink": {
-      "view": "logic",
-      "expression": "p ⊕ q ⊕ r"
-    }
+    correctId: 'C',
+    explanation: 'Định lý slide Chương 1 trang 19: Hai dạng mệnh đề E và F tương đương với nhau khi và chỉ khi E ↔ F là hằng đúng (chúng có cùng bảng chân trị).',
+    actionLink: { view: 'logic', expression: 'p ↔ q' },
   },
   {
-    "id": "logic_q25",
-    "topic": "logic",
-    "topicName": "Dạng chuẩn tắc hội CNF & Maxterm",
-    "difficulty": "hard",
-    "question": "Dạng chuẩn tắc hội liên kết CNF (Conjunctive Normal Form / POS) của một hàm Boole là dạng tích (hội) của các:",
-    "options": [
-      {
-        "id": "A",
-        "text": "Maxterm (mỗi Maxterm là tuyển của các biến hoặc phủ định của chúng)"
-      },
-      {
-        "id": "B",
-        "text": "Minterm (tích của các biến)"
-      },
-      {
-        "id": "C",
-        "text": "Cổng XOR liên tiếp"
-      },
-      {
-        "id": "D",
-        "text": "Hằng số 0 và 1"
-      }
+    id: 'logic_q25',
+    topic: 'logic',
+    topicName: 'Luật về phép kéo theo',
+    difficulty: 'medium',
+    question: 'Mệnh đề kéo theo p → q tương đương logic với dạng mệnh đề nào sau đây (luật về phép kéo theo)?',
+    options: [
+      { id: 'A', text: 'p * ¬q' },
+      { id: 'B', text: '¬p + q' },
+      { id: 'C', text: '¬p * q' },
+      { id: 'D', text: 'p + ¬q' },
     ],
-    "correctId": "A",
-    "explanation": "Dạng CNF (Product of Sums - POS) là tích (hội ∧) của các Maxterm (tuyển ∨). Mỗi Maxterm triệt tiêu giá trị hàm tại một dòng mà hàm nhận giá trị 0 trong bảng chân trị."
+    correctId: 'B',
+    explanation: 'Slide Chương 1 trang 18 và 22: Luật kéo theo khẳng định p → q ≡ ¬p + q ≡ ¬q → ¬p (mệnh đề phản đảo).',
+    actionLink: { view: 'logic', expression: '(p → q) ↔ (¬p + q)' },
   },
 
   // =========================================================================
-  // CHƯƠNG 3: ĐẠI SỐ TỔ HỢP & PHÉP ĐẾM
+  // CHƯƠNG 3: ĐẠI SỐ TỔ HỢP, ÁNH XẠ & PHƯƠNG PHÁP ĐẾM
   // =========================================================================
   {
     id: 'count_q01',
     topic: 'counting',
-    topicName: 'Ánh xạ & Hàm số',
+    topicName: 'Ánh xạ & Đơn ánh',
     difficulty: 'easy',
     question: 'Một ánh xạ f: A → B được gọi là Đơn ánh (Injective / One-to-one) khi thỏa mãn điều kiện nào?',
     options: [
@@ -812,175 +444,170 @@ export const STATIC_QUESTION_BANK = [
       { id: 'D', text: 'Mọi phần tử của A đều ánh xạ tới cùng một phần tử trong B' },
     ],
     correctId: 'B',
-    explanation: 'Định nghĩa đơn ánh: các phần tử khác nhau ở tập nguồn A phải có ảnh khác nhau ở tập đích B: x₁ ≠ x₂ ⇒ f(x₁) ≠ f(x₂) (tương đương f(x₁) = f(x₂) ⇒ x₁ = x₂).',
+    explanation: 'Định nghĩa đơn ánh ở trang 17 slide Chương 3: các phần tử khác nhau ở tập nguồn A phải có ảnh khác nhau ở tập đích B: x₁ ≠ x₂ ⇒ f(x₁) ≠ f(x₂) (tương đương f(x₁) = f(x₂) ⇒ x₁ = x₂).',
     actionLink: { view: 'counting', tab: 'mapping' },
   },
   {
     id: 'count_q02',
     topic: 'counting',
-    topicName: 'Ánh xạ & Bản số',
+    topicName: 'Toàn ánh & Bản số',
     difficulty: 'medium',
-    question: 'Cho hai tập hữu hạn A và B. Để tồn tại một Toàn ánh (Surjection) từ A lên B, điều kiện cần về số lượng phần tử là gì?',
+    question: 'Cho hai tập hữu hạn X và Y. Để tồn tại một Toàn ánh (Surjection) từ X lên Y, điều kiện cần về số lượng phần tử là gì?',
     options: [
-      { id: 'A', text: '|A| < |B|' },
-      { id: 'B', text: '|A| ≥ |B|' },
-      { id: 'C', text: '|A| + |B| là số chẵn' },
-      { id: 'D', text: '|A| ≤ |B|' },
+      { id: 'A', text: '|X| < |Y|' },
+      { id: 'B', text: '|X| ≥ |Y|' },
+      { id: 'C', text: '|X| + |Y| là số chẵn' },
+      { id: 'D', text: '|X| ≤ |Y|' },
     ],
     correctId: 'B',
-    explanation: 'Toàn ánh đòi hỏi mỗi phần tử của B đều phải được ít nhất một phần tử của A ánh xạ tới. Do đó, tập nguồn A phải có ít nhất bằng số phần tử của tập đích B (|A| ≥ |B|).',
+    explanation: 'Slide Chương 3 trang 18: Toàn ánh đòi hỏi f(X) = Y, tức mỗi phần tử của Y đều có ít nhất 1 tạo ảnh từ X. Do đó tập nguồn phải có số phần tử không ít hơn tập đích (|X| ≥ |Y|).',
     actionLink: { view: 'counting', tab: 'mapping' },
   },
   {
     id: 'count_q03',
     topic: 'counting',
-    topicName: 'Ánh xạ & Hàm ngược',
+    topicName: 'Song ánh & Ánh xạ ngược',
     difficulty: 'medium',
-    question: 'Điều kiện cần và đủ để ánh xạ f: A → B có ánh xạ ngược f⁻¹: B → A là gì?',
+    question: 'Điều kiện cần và đủ để ánh xạ f: X → Y có ánh xạ ngược f⁻¹: Y → X là gì?',
     options: [
       { id: 'A', text: 'f là đơn ánh' },
       { id: 'B', text: 'f là toàn ánh' },
       { id: 'C', text: 'f là song ánh (vừa đơn ánh vừa toàn ánh)' },
-      { id: 'D', text: 'Tập A là tập con của B' },
+      { id: 'D', text: 'X là tập con của Y' },
     ],
     correctId: 'C',
-    explanation: 'Ánh xạ ngược f⁻¹ tồn tại khi và chỉ khi f là Song ánh (Bijective). Khi đó mỗi phần tử y ∈ B tương ứng duy nhất với một phần tử x ∈ A.',
+    explanation: 'Slide Chương 3 trang 19: Ánh xạ f có ánh xạ ngược f⁻¹ khi và chỉ khi f là Song ánh. Khi đó mỗi y ∈ Y tương ứng duy nhất với một phần tử x ∈ X.',
     actionLink: { view: 'counting', tab: 'mapping' },
   },
   {
     id: 'count_q04',
     topic: 'counting',
-    topicName: 'Nguyên lý Dirichlet',
+    topicName: 'Tích Descartes của tập hợp',
     difficulty: 'easy',
-    question: 'Một hộp chứa các viên bi gồm 3 màu: Đỏ, Xanh, Vàng. Cần lấy ngẫu nhiên ít nhất bao nhiêu viên bi để chắc chắn có ít nhất 2 viên cùng màu?',
+    question: 'Cho tập A = {a, b} và tập B = {c, d, e}. Số phần tử của tích Descartes A × B là bao nhiêu?',
     options: [
-      { id: 'A', text: '3 viên' },
-      { id: 'B', text: '4 viên' },
-      { id: 'C', text: '5 viên' },
-      { id: 'D', text: '6 viên' },
+      { id: 'A', text: '5' },
+      { id: 'B', text: '8' },
+      { id: 'C', text: '6' },
+      { id: 'D', text: '9' },
     ],
-    correctId: 'B',
-    explanation: 'Theo Nguyên lý Dirichlet: Có 3 màu (3 chuồng). Khi lấy 4 viên bi (4 bồ câu), chắc chắn có ít nhất 1 màu chứa ⌈4/3⌉ = 2 viên cùng màu.',
-    actionLink: { view: 'counting', tab: 'dirichlet' },
+    correctId: 'C',
+    explanation: 'Slide Chương 3 trang 12: Tích Descartes A × B gồm tất cả các cặp có thứ tự (x, y) với x ∈ A và y ∈ B. Số phần tử |A × B| = |A| * |B| = 2 * 3 = 6.',
   },
   {
     id: 'count_q05',
     topic: 'counting',
-    topicName: 'Nguyên lý Dirichlet tổng quát',
-    difficulty: 'medium',
-    question: 'Trong một buổi sinh hoạt lớp có 45 sinh viên. Theo nguyên lý Dirichlet, chắc chắn có ít nhất bao nhiêu sinh viên sinh trong cùng một tháng?',
+    topicName: 'Nguyên lý cộng',
+    difficulty: 'easy',
+    question: 'Một khoa có 15 cán bộ và 135 sinh viên. Theo nguyên lý cộng, có bao nhiêu cách chọn 1 người làm đại diện tham dự đại hội trường?',
     options: [
-      { id: 'A', text: '3 sinh viên' },
-      { id: 'B', text: '4 sinh viên' },
-      { id: 'C', text: '5 sinh viên' },
-      { id: 'D', text: '12 sinh viên' },
+      { id: 'A', text: '15 + 135 = 150 cách' },
+      { id: 'B', text: '15 * 135 = 2025 cách' },
+      { id: 'C', text: '135 - 15 = 120 cách' },
+      { id: 'D', text: '15! cách' },
     ],
-    correctId: 'B',
-    explanation: 'Một năm có 12 tháng (12 hộp). Áp dụng nguyên lý Dirichlet tổng quát: có ít nhất ⌈45 / 12⌉ = ⌈3.75⌉ = 4 sinh viên sinh cùng một tháng.',
-    actionLink: { view: 'counting', tab: 'dirichlet' },
+    correctId: 'A',
+    explanation: 'Slide Chương 3 trang 21 (Ví dụ nguyên lý cộng): Việc chọn đại diện gồm 2 trường hợp rời nhau: chọn 1 cán bộ (15 cách) hoặc chọn 1 sinh viên (135 cách). Tổng số cách là 15 + 135 = 150.',
   },
   {
     id: 'count_q06',
     topic: 'counting',
-    topicName: 'Nguyên lý Dirichlet nâng cao',
-    difficulty: 'hard',
-    question: 'Chọn ngẫu nhiên 5 số nguyên phân biệt từ tập S = {1, 2, 3, 4, 5, 6, 7, 8}. Khẳng định nào sau đây luôn luôn đúng?',
+    topicName: 'Nguyên lý nhân',
+    difficulty: 'medium',
+    question: 'Các ghế trong một hội trường được đánh dấu bởi 1 chữ cái tiếng Anh (trong 26 chữ cái) và 1 số nguyên dương không vượt quá 100. Theo nguyên lý nhân, có nhiều nhất bao nhiêu ghế được đánh dấu khác nhau?',
     options: [
-      { id: 'A', text: 'Luôn tồn tại ít nhất hai số có tổng bằng 9' },
-      { id: 'B', text: 'Tất cả 5 số đều là số lẻ' },
-      { id: 'C', text: 'Luôn tồn tại hai số có hiệu bằng 4' },
-      { id: 'D', text: 'Tích của 5 số luôn là số lẻ' },
+      { id: 'A', text: '26 * 100 = 2600 ghế' },
+      { id: 'B', text: '26 + 100 = 126 ghế' },
+      { id: 'C', text: '100² = 10000 ghế' },
+      { id: 'D', text: '26² = 676 ghế' },
     ],
     correctId: 'A',
-    explanation: 'Chia tập S thành 4 cặp số có tổng bằng 9: {1, 8}, {2, 7}, {3, 6}, {4, 5} (4 chuồng). Khi chọn 5 số (5 bồ câu), theo Dirichlet chắc chắn có ít nhất 2 số rơi vào cùng một cặp, do đó tổng của chúng bằng 9.',
-    actionLink: { view: 'counting', tab: 'dirichlet' },
+    explanation: 'Slide Chương 3 trang 24 (Bài tập 2): Một ghế được xác định qua 2 công đoạn liên tiếp: chọn chữ cái (26 cách) và chọn số nguyên từ 1 đến 100 (100 cách). Theo nguyên lý nhân: 26 * 100 = 2600 ghế.',
   },
   {
     id: 'count_q07',
     topic: 'counting',
-    topicName: 'Chỉnh hợp & Tổ hợp',
+    topicName: 'Chỉnh hợp không lặp',
     difficulty: 'easy',
     question: 'Có bao nhiêu cách bầu một ban cán sự gồm 1 Lớp trưởng, 1 Lớp phó và 1 Bí thư từ một tập thể gồm 10 sinh viên?',
     options: [
       { id: 'A', text: 'C(10, 3) = 120 cách' },
-      { id: 'B', text: 'A(10, 3) = 10 × 9 × 8 = 720 cách' },
+      { id: 'B', text: 'A(10, 3) = 10 * 9 * 8 = 720 cách' },
       { id: 'C', text: '10³ = 1000 cách' },
       { id: 'D', text: '30 cách' },
     ],
     correctId: 'B',
-    explanation: 'Vì 3 chức vụ Lớp trưởng, Lớp phó, Bí thư phân biệt rạch ròi nên việc chọn và xếp đặt có tính thứ tự. Đây là bài toán Chỉnh hợp chập 3 của 10 phần tử: A(10, 3) = 10! / (10 - 3)! = 720 cách.',
+    explanation: 'Vì 3 chức vụ Lớp trưởng, Lớp phó, Bí thư phân biệt rạch ròi nên việc chọn và sắp đặt có tính thứ tự. Đây là bài toán Chỉnh hợp chập 3 của 10 phần tử: A(10, 3) = 10! / (10 - 3)! = 720 cách.',
     actionLink: { view: 'counting', tab: 'pascal' },
   },
   {
     id: 'count_q08',
     topic: 'counting',
-    topicName: 'Quy tắc đếm cơ bản',
-    difficulty: 'medium',
-    question: 'Một mã bảo mật dài đúng 4 ký tự gồm: ký tự đầu tiên là một chữ cái in hoa (trong 26 chữ cái tiếng Anh), 3 ký tự tiếp theo là các chữ số từ 0 đến 9 (có thể lặp lại). Có bao nhiêu mã bảo mật có thể tạo ra?',
+    topicName: 'Hoán vị',
+    difficulty: 'easy',
+    question: 'Thầy giáo muốn tặng 5 cuốn sách khác nhau cho 5 bạn học sinh, mỗi bạn nhận đúng 1 cuốn. Hỏi có bao nhiêu cách tặng sách?',
     options: [
-      { id: 'A', text: '26 × 10 × 9 × 8 = 18.720 mã' },
-      { id: 'B', text: '26 + 10 + 10 + 10 = 56 mã' },
-      { id: 'C', text: '26 × 10³ = 26.000 mã' },
-      { id: 'D', text: '36⁴ = 1.679.616 mã' },
+      { id: 'A', text: 'P₅ = 5! = 120 cách' },
+      { id: 'B', text: '5⁵ = 3125 cách' },
+      { id: 'C', text: 'C(5, 1) = 5 cách' },
+      { id: 'D', text: '25 cách' },
     ],
-    correctId: 'C',
-    explanation: 'Theo quy tắc nhân: Vị trí 1 có 26 cách chọn; Vị trí 2 có 10 cách; Vị trí 3 có 10 cách; Vị trí 4 có 10 cách. Tổng số mã = 26 × 10 × 10 × 10 = 26.000 mã.',
-    actionLink: { view: 'counting', tab: 'pascal' },
+    correctId: 'A',
+    explanation: 'Slide Chương 3 trang 26: Số cách xếp 5 cuốn sách phân biệt cho 5 học sinh là số hoán vị của 5 phần tử: P₅ = 5! = 5 * 4 * 3 * 2 * 1 = 120 cách.',
   },
   {
     id: 'count_q09',
     topic: 'counting',
-    topicName: 'Tam giác Pascal',
-    difficulty: 'easy',
-    question: 'Theo đồng nhất thức Pascal, giá trị tổ hợp C(n, k) được tính qua hai tổ hợp ở hàng trên theo công thức nào?',
+    topicName: 'Tổ hợp',
+    difficulty: 'medium',
+    question: 'Một tổ gồm 8 nam và 6 nữ. Có bao nhiêu cách chọn một nhóm gồm 5 người sao cho trong đó có đúng 2 nữ?',
     options: [
-      { id: 'A', text: 'C(n, k) = C(n - 1, k - 1) + C(n - 1, k)' },
-      { id: 'B', text: 'C(n, k) = C(n - 1, k) × C(n - 1, k - 1)' },
-      { id: 'C', text: 'C(n, k) = C(n, k - 1) + C(n - 1, k)' },
-      { id: 'D', text: 'C(n, k) = C(n - 1, k) - C(n - 1, k - 1)' },
+      { id: 'A', text: 'C(14, 5) = 2002 cách' },
+      { id: 'B', text: 'C(6, 2) * C(8, 3) = 15 * 56 = 840 cách' },
+      { id: 'C', text: 'A(6, 2) * A(8, 3) = 10080 cách' },
+      { id: 'D', text: 'C(6, 2) + C(8, 3) = 71 cách' },
     ],
-    correctId: 'A',
-    explanation: 'Đồng nhất thức Pascal: C(n, k) = C(n - 1, k - 1) + C(n - 1, k). Trong Tam giác Pascal, mỗi phần tử bên trong bằng tổng của hai số nằm ngay phía trên nó.',
+    correctId: 'B',
+    explanation: 'Slide Chương 3 trang 27: Nhóm 5 người có đúng 2 nữ đồng nghĩa với việc có 3 nam. Số cách chọn 2 nữ từ 6 nữ là C(6, 2) = 15. Số cách chọn 3 nam từ 8 nam là C(8, 3) = 56. Theo quy tắc nhân: 15 * 56 = 840 cách.',
     actionLink: { view: 'counting', tab: 'pascal' },
   },
   {
     id: 'count_q10',
     topic: 'counting',
-    topicName: 'Nhị thức Newton',
-    difficulty: 'medium',
-    question: 'Tổng hệ số của tất cả các số hạng trong khai triển nhị thức (1 + 1)ⁿ = ∑ C(n, k) (k từ 0 đến n) bằng bao nhiêu?',
+    topicName: 'Chỉnh hợp lặp',
+    difficulty: 'easy',
+    question: 'Để đăng ký ký hiệu một loại máy mới, người ta dùng chuỗi gồm 3 chữ số lấy từ 9 chữ số {1, 2, 3, ..., 9} (các chữ số được phép lặp lại). Có thể tạo được bao nhiêu ký hiệu máy khác nhau?',
     options: [
-      { id: 'A', text: '2n' },
-      { id: 'B', text: 'n²' },
-      { id: 'C', text: '2ⁿ' },
-      { id: 'D', text: 'n!' },
+      { id: 'A', text: '9³ = 729 ký hiệu' },
+      { id: 'B', text: 'A(9, 3) = 504 ký hiệu' },
+      { id: 'C', text: 'C(9, 3) = 84 ký hiệu' },
+      { id: 'D', text: '9 * 3 = 27 ký hiệu' },
     ],
-    correctId: 'C',
-    explanation: 'Thay x = 1 và y = 1 vào khai triển nhị thức Newton (x + y)ⁿ = ∑ C(n, k) xⁿ⁻ᵏ yᵏ, ta được: 2ⁿ = C(n, 0) + C(n, 1) + ... + C(n, n). Đây cũng chính là tổng số tập con của một tập hợp n phần tử.',
-    actionLink: { view: 'counting', tab: 'pascal' },
+    correctId: 'A',
+    explanation: 'Slide Chương 3 trang 30: Đây là chỉnh hợp lặp chập 3 của 9 phần tử. Mỗi vị trí có 9 cách chọn độc lập, tổng cộng 9 * 9 * 9 = 9³ = 729 ký hiệu.',
   },
   {
     id: 'count_q11',
     topic: 'counting',
     topicName: 'Tổ hợp lặp',
-    difficulty: 'hard',
-    question: 'Số nghiệm nguyên không âm (x₁, x₂, x₃) của phương trình x₁ + x₂ + x₃ = 7 là bao nhiêu?',
+    difficulty: 'medium',
+    question: 'Có 4 loại bút bi (xanh, đỏ, vàng, tím), mỗi loại có sẵn số lượng lớn. Có bao nhiêu cách chọn ra 6 cây bút bất kỳ?',
     options: [
-      { id: 'A', text: 'C(7, 3) = 35 nghiệm' },
-      { id: 'B', text: 'C(7 + 3 - 1, 7) = C(9, 7) = 36 nghiệm' },
-      { id: 'C', text: 'A(9, 3) = 504 nghiệm' },
-      { id: 'D', text: '7³ = 343 nghiệm' },
+      { id: 'A', text: '4⁶ = 4096 cách' },
+      { id: 'B', text: 'K(4, 6) = C(4+6-1, 6) = C(9, 6) = 84 cách' },
+      { id: 'C', text: 'C(6, 4) = 15 cách' },
+      { id: 'D', text: 'A(9, 6) = 60480 cách' },
     ],
     correctId: 'B',
-    explanation: 'Bài toán chia kẹo Euler (Stars and Bars): Số nghiệm nguyên không âm của x₁ + ... + xₙ = k là tổ hợp lặp C(k + n - 1, k). Với n = 3, k = 7: C(7 + 3 - 1, 7) = C(9, 7) = C(9, 2) = 36 nghiệm.',
+    explanation: 'Slide Chương 3 trang 29 (Ví dụ tổ hợp lặp): Chọn 6 cây bút từ 4 loại là tổ hợp lặp chập 6 của 4 phần tử: K(n, k) = C(n+k-1, k) = C(4+6-1, 6) = C(9, 6) = 84 cách.',
     actionLink: { view: 'counting', tab: 'pascal' },
   },
   {
     id: 'count_q12',
     topic: 'counting',
-    topicName: 'Hệ thức truy hồi & Tháp Hà Nội',
+    topicName: 'Hệ thức truy hồi Tháp Hà Nội',
     difficulty: 'easy',
-    question: 'Bài toán Tháp Hà Nội với n đĩa có hệ thức truy hồi Hₙ = 2Hₙ₋₁ + 1 với H₁ = 1. Số bước chuyển tối thiểu để dời toàn bộ tháp có n = 4 đĩa là:',
+    question: 'Bài toán Tháp Hà Nội với n đĩa có hệ thức truy hồi H_n = 2*H_{n-1} + 1 với H₁ = 1. Số bước chuyển tối thiểu để dời toàn bộ tháp có n = 4 đĩa là bao nhiêu?',
     options: [
       { id: 'A', text: '7 bước' },
       { id: 'B', text: '8 bước' },
@@ -988,226 +615,219 @@ export const STATIC_QUESTION_BANK = [
       { id: 'D', text: '16 bước (2⁴)' },
     ],
     correctId: 'C',
-    explanation: 'Nghiệm tường minh của hệ thức Tháp Hà Nội là Hₙ = 2ⁿ - 1. Với n = 4 đĩa: H₄ = 2⁴ - 1 = 16 - 1 = 15 bước.',
+    explanation: 'Slide Chương 3 trang 43: Nghiệm tường minh của hệ thức Tháp Hà Nội là H_n = 2ⁿ - 1. Với n = 4 đĩa: H₄ = 2⁴ - 1 = 16 - 1 = 15 bước.',
     actionLink: { view: 'counting', tab: 'recurrence' },
   },
   {
     id: 'count_q13',
     topic: 'counting',
-    topicName: 'Dãy Fibonacci & Truy hồi',
-    difficulty: 'medium',
-    question: 'Phương trình đặc trưng của hệ thức truy hồi tuyến tính bậc 2 của dãy Fibonacci Fₙ = Fₙ₋₁ + Fₙ₋₂ là phương trình nào?',
+    topicName: 'Nguyên lý Dirichlet (Chuồng bồ câu)',
+    difficulty: 'easy',
+    question: 'Theo Nguyên lý Dirichlet, trong một nhóm gồm 367 người, khẳng định nào sau đây chắc chắn đúng?',
     options: [
-      { id: 'A', text: 'r² - r - 1 = 0' },
-      { id: 'B', text: 'r² + r + 1 = 0' },
-      { id: 'C', text: 'r² - 2r + 1 = 0' },
-      { id: 'D', text: 'r² - r + 1 = 0' },
+      { id: 'A', text: 'Mọi người đều có ngày sinh khác nhau' },
+      { id: 'B', text: 'Có ít nhất 2 người có cùng ngày sinh nhật trong năm (kể cả năm nhuận 366 ngày)' },
+      { id: 'C', text: 'Có đúng 2 người sinh cùng ngày' },
+      { id: 'D', text: 'Có ít nhất 3 người sinh cùng ngày' },
     ],
-    correctId: 'A',
-    explanation: 'Giả sử nghiệm có dạng Fₙ = rⁿ. Thay vào hệ thức rⁿ = rⁿ⁻¹ + rⁿ⁻² ⇒ chia cho rⁿ⁻² ta được phương trình đặc trưng: r² - r - 1 = 0. Nghiệm của phương trình này dẫn tới tỉ lệ vàng φ = (1 + √5)/2.',
-    actionLink: { view: 'counting', tab: 'recurrence' },
+    correctId: 'B',
+    explanation: 'Slide Chương 3 trang 31: Một năm có tối đa 366 ngày (chuồng). Có 367 người (bồ câu). Theo nguyên lý Dirichlet, vì 367 > 366 nên chắc chắn có ít nhất ⌈367/366⌉ = 2 người có cùng ngày sinh.',
+    actionLink: { view: 'counting', tab: 'dirichlet' },
   },
   {
     id: 'count_q14',
     topic: 'counting',
-    topicName: 'Nguyên lý Bao hàm - Loại trừ',
+    topicName: 'Nguyên lý Dirichlet mở rộng',
     difficulty: 'medium',
-    question: 'Trong một lớp gồm 50 sinh viên: có 30 sinh viên giỏi Python, 25 sinh viên giỏi C++, và 10 sinh viên giỏi cả hai ngôn ngữ. Hỏi có bao nhiêu sinh viên không giỏi ngôn ngữ nào trong hai ngôn ngữ trên?',
+    question: 'Cần chọn ít nhất bao nhiêu sinh viên để chắc chắn có ít nhất 3 sinh viên sinh cùng một tháng trong năm?',
     options: [
-      { id: 'A', text: '0 sinh viên' },
-      { id: 'B', text: '5 sinh viên' },
-      { id: 'C', text: '10 sinh viên' },
-      { id: 'D', text: '15 sinh viên' },
+      { id: 'A', text: '2 * 12 + 1 = 25 sinh viên' },
+      { id: 'B', text: '3 * 12 = 36 sinh viên' },
+      { id: 'C', text: '13 sinh viên' },
+      { id: 'D', text: '24 sinh viên' },
     ],
-    correctId: 'B',
-    explanation: 'Theo Nguyên lý Bao hàm - Loại trừ: Số sinh viên giỏi ít nhất 1 ngôn ngữ là |P ∪ C| = |P| + |C| - |P ∩ C| = 30 + 25 - 10 = 45 sinh viên. Số sinh viên không giỏi ngôn ngữ nào = 50 - 45 = 5 sinh viên.',
-    actionLink: { view: 'counting', tab: 'pascal' },
+    correctId: 'A',
+    explanation: 'Slide Chương 3 trang 32: Có k = 12 tháng. Theo nguyên tắc xấu nhất, mỗi tháng có tối đa 2 người (2 * 12 = 24 người). Do đó chỉ cần thêm 1 người nữa (24 + 1 = 25 sinh viên) thì theo nguyên lý Dirichlet chắc chắn có ít nhất ⌈25/12⌉ = 3 sinh viên cùng tháng sinh.',
+    actionLink: { view: 'counting', tab: 'dirichlet' },
   },
-
   {
     id: 'count_q15',
     topic: 'counting',
-    topicName: 'Quy tắc Cộng & Quy tắc Nhân',
-    difficulty: 'easy',
-    question: 'Một sinh viên có thể chọn đề tài tốt nghiệp từ 3 khoa: Khoa CNTT có 12 đề tài, Khoa Điện tử có 8 đề tài, và Khoa Toán có 5 đề tài (các đề tài không trùng nhau). Hỏi sinh viên có bao nhiêu cách chọn 1 đề tài?',
+    topicName: 'Nguyên lý bù trừ',
+    difficulty: 'medium',
+    question: 'Theo nguyên lý bù trừ, nếu lớp CNTT có 150 sinh viên học môn Java, 160 sinh viên học môn Thiết kế Web, và 40 sinh viên học cả hai môn, thì tổng số sinh viên học ít nhất một trong hai môn là bao nhiêu?',
     options: [
-      { id: 'A', text: '25 cách' },
-      { id: 'B', text: '480 cách' },
-      { id: 'C', text: '120 cách' },
-      { id: 'D', text: '96 cách' },
+      { id: 'A', text: '150 + 160 - 40 = 270 sinh viên' },
+      { id: 'B', text: '150 + 160 + 40 = 350 sinh viên' },
+      { id: 'C', text: '150 + 160 = 310 sinh viên' },
+      { id: 'D', text: '230 sinh viên' },
     ],
     correctId: 'A',
-    explanation: 'Vì việc chọn đề tài từ các khoa là các hành động rời nhau (xung khắc), theo Quy tắc Cộng (Sum Rule), tổng số cách chọn là 12 + 8 + 5 = 25 cách.',
-    actionLink: { view: 'counting', tab: 'combinatorics' },
+    explanation: 'Slide Chương 3 trang 23: Nguyên lý bù trừ cho hai tập hợp: |A ∪ B| = |A| + |B| - |A ∩ B| = 150 + 160 - 40 = 270 sinh viên.',
   },
   {
     id: 'count_q16',
     topic: 'counting',
-    topicName: 'Hoán vị lặp',
-    difficulty: 'medium',
-    question: 'Có bao nhiêu chuỗi ký tự khác nhau (có hoặc không có nghĩa) có thể tạo ra bằng cách hoán vị tất cả các chữ cái của từ "SUCCESS"?',
+    topicName: 'Hệ thức truy hồi bậc 1',
+    difficulty: 'easy',
+    question: 'Giải hệ thức truy hồi thuần nhất bậc 1: a_n = 3*a_{n-1} với điều kiện đầu a_0 = 2. Nghiệm tổng quát của hệ thức là gì?',
     options: [
-      { id: 'A', text: '420 chuỗi' },
-      { id: 'B', text: '5040 chuỗi' },
-      { id: 'C', text: '720 chuỗi' },
-      { id: 'D', text: '840 chuỗi' },
+      { id: 'A', text: 'a_n = 2 + 3n' },
+      { id: 'B', text: 'a_n = 2 * 3ⁿ' },
+      { id: 'C', text: 'a_n = 3 * 2ⁿ' },
+      { id: 'D', text: 'a_n = 3ⁿ' },
     ],
-    correctId: 'A',
-    explanation: 'Từ "SUCCESS" có 7 chữ cái gồm: 3 chữ S, 2 chữ C, 1 chữ U, 1 chữ E. Áp dụng công thức hoán vị lặp: 7! / (3! × 2! × 1! × 1!) = 5040 / (6 × 2) = 420 chuỗi.',
-    actionLink: { view: 'counting', tab: 'combinatorics' },
+    correctId: 'B',
+    explanation: 'Slide Chương 3 trang 42: Bằng phương pháp lặp lùi: a_n = 3*a_{n-1} = 3²*a_{n-2} = ... = 3ⁿ*a₀ = 2 * 3ⁿ.',
+    actionLink: { view: 'counting', tab: 'recurrence' },
   },
   {
     id: 'count_q17',
     topic: 'counting',
-    topicName: 'Hoán vị vòng tròn',
+    topicName: 'Phương trình đặc trưng bậc 2',
     difficulty: 'medium',
-    question: 'Có bao nhiêu cách sắp xếp 6 người ngồi quanh một bàn tròn, biết rằng hai cách xếp được coi là như nhau nếu cách này thu được từ cách kia bằng một phép quay bàn?',
+    question: 'Phương trình đặc trưng của hệ thức truy hồi tuyến tính thuần nhất S(n) = 5*S(n-1) - 6*S(n-2) là phương trình nào?',
     options: [
-      { id: 'A', text: '120 cách' },
-      { id: 'B', text: '720 cách' },
-      { id: 'C', text: '360 cách' },
-      { id: 'D', text: '24 cách' },
+      { id: 'A', text: 'r² + 5r - 6 = 0' },
+      { id: 'B', text: 'r² - 5r + 6 = 0' },
+      { id: 'C', text: 'r² - 6r + 5 = 0' },
+      { id: 'D', text: 'r² + 6r + 5 = 0' },
     ],
-    correctId: 'A',
-    explanation: 'Số hoán vị vòng tròn của n phần tử là (n - 1)!. Với n = 6 người, số cách xếp là (6 - 1)! = 5! = 120 cách (cố định 1 vị trí để phá vỡ tính đối xứng quay).',
-    actionLink: { view: 'counting', tab: 'combinatorics' },
+    correctId: 'B',
+    explanation: 'Slide Chương 3 trang 45: Đưa về dạng chuẩn S(n) - 5*S(n-1) + 6*S(n-2) = 0. Phương trình đặc trưng tương ứng là r² - 5r + 6 = 0.',
+    actionLink: { view: 'counting', tab: 'recurrence' },
   },
   {
     id: 'count_q18',
     topic: 'counting',
-    topicName: 'Tổ hợp lặp',
+    topicName: 'Nghiệm tổng quát bậc 2',
     difficulty: 'medium',
-    question: 'Một tiệm bánh bán 4 loại bánh ngọt khác nhau. Một khách hàng muốn mua 6 chiếc bánh. Hỏi có bao nhiêu cách chọn nếu tiệm luôn có đủ bánh mỗi loại?',
+    question: 'Nghiệm tổng quát của hệ thức truy hồi S(n) = 5*S(n-1) - 6*S(n-2) có dạng nào sau đây (với α₁, α₂ là các hằng số)?',
     options: [
-      { id: 'A', text: '84 cách' },
-      { id: 'B', text: '24 cách' },
-      { id: 'C', text: '4096 cách' },
-      { id: 'D', text: '360 cách' },
+      { id: 'A', text: 'S(n) = α₁ * 2ⁿ + α₂ * 3ⁿ' },
+      { id: 'B', text: 'S(n) = α₁ * 5ⁿ + α₂ * 6ⁿ' },
+      { id: 'C', text: 'S(n) = (α₁ + α₂*n) * 2ⁿ' },
+      { id: 'D', text: 'S(n) = α₁ * 2ⁿ - α₂ * 3ⁿ' },
     ],
     correctId: 'A',
-    explanation: 'Số cách chọn k phần tử từ n loại có lặp là tổ hợp lặp: C(n + k - 1, k) = C(4 + 6 - 1, 6) = C(9, 6) = C(9, 3) = (9 × 8 × 7) / (3 × 2 × 1) = 84 cách.',
-    actionLink: { view: 'counting', tab: 'combinatorics' },
+    explanation: 'Slide Chương 3 trang 45-46: Phương trình đặc trưng r² - 5r + 6 = 0 có 2 nghiệm phân biệt r₁ = 2, r₂ = 3. Nghiệm tổng quát có dạng S(n) = α₁ * 2ⁿ + α₂ * 3ⁿ.',
+    actionLink: { view: 'counting', tab: 'recurrence' },
   },
   {
     id: 'count_q19',
     topic: 'counting',
-    topicName: 'Nguyên lý Bù trừ 3 tập hợp',
+    topicName: 'Nghiệm kép phương trình đặc trưng',
     difficulty: 'hard',
-    question: 'Có bao nhiêu số nguyên dương từ 1 đến 1000 không chia hết cho bất kỳ số nào trong ba số 2, 3, 5?',
+    question: 'Hệ thức truy hồi S(n) = 4*S(n-1) - 4*S(n-2) có phương trình đặc trưng r² - 4r + 4 = 0 nghiệm kép r₀ = 2. Nghiệm tổng quát của hệ thức có dạng là gì?',
     options: [
-      { id: 'A', text: '266 số' },
-      { id: 'B', text: '734 số' },
-      { id: 'C', text: '200 số' },
-      { id: 'D', text: '333 số' },
+      { id: 'A', text: 'S(n) = (α₁ + α₂*n) * 2ⁿ' },
+      { id: 'B', text: 'S(n) = α₁ * 2ⁿ + α₂ * 4ⁿ' },
+      { id: 'C', text: 'S(n) = α₁ * 2ⁿ' },
+      { id: 'D', text: 'S(n) = α₁ * 4ⁿ + α₂*n' },
     ],
     correctId: 'A',
-    explanation: 'Đặt A, B, C lần lượt là tập các số chia hết cho 2, 3, 5. |A|=500, |B|=333, |C|=200. |A∩B|=166, |B∩C|=66, |C∩A|=100, |A∩B∩C|=33. Số chia hết cho ít nhất một số: 500+333+200 - (166+66+100) + 33 = 734. Số không chia hết cho số nào: 1000 - 734 = 266 số.',
-    actionLink: { view: 'counting', tab: 'combinatorics' },
+    explanation: 'Slide Chương 3 trang 47: Khi phương trình đặc trưng có nghiệm kép r₀, nghiệm tổng quát của hệ thức truy hồi có dạng S(n) = (α₁ + α₂*n) * r₀ⁿ = (α₁ + α₂*n) * 2ⁿ.',
+    actionLink: { view: 'counting', tab: 'recurrence' },
   },
   {
     id: 'count_q20',
     topic: 'counting',
-    topicName: 'Số Stirling loại hai',
-    difficulty: 'hard',
-    question: 'Số Stirling loại hai S(n, k) đại diện cho đại lượng tổ hợp nào sau đây?',
+    topicName: 'Số chuỗi bit nhị phân',
+    difficulty: 'easy',
+    question: 'Số xâu nhị phân (bit string) có độ dài n là bao nhiêu?',
     options: [
-      { id: 'A', text: 'Số cách phân hoạch tập hợp gồm n phần tử phân biệt thành k khối (tập con) khác rỗng không phân biệt' },
-      { id: 'B', text: 'Số hoán vị của n phần tử có đúng k chu trình' },
-      { id: 'C', text: 'Số tập con có đúng k phần tử từ n phần tử' },
-      { id: 'D', text: 'Số cách chia n quả cầu giống nhau vào k hộp phân biệt' },
+      { id: 'A', text: '2ⁿ' },
+      { id: 'B', text: '2n' },
+      { id: 'C', text: 'n²' },
+      { id: 'D', text: 'n!' },
     ],
     correctId: 'A',
-    explanation: 'Số Stirling loại hai S(n, k) là số cách chia n phần tử phân biệt thành k tập con không rỗng và không có thứ tự. Hệ thức truy hồi: S(n, k) = k·S(n-1, k) + S(n-1, k-1).',
-    actionLink: { view: 'counting', tab: 'combinatorics' },
+    explanation: 'Slide Chương 3 trang 30: Mỗi vị trí trong xâu nhị phân có 2 khả năng (0 hoặc 1). Với độ dài n, số xâu nhị phân là 2 * 2 * ... * 2 = 2ⁿ.',
   },
   {
     id: 'count_q21',
     topic: 'counting',
-    topicName: 'Nghiệm nguyên dương',
+    topicName: 'Chỉnh hợp phân biệt tiết học',
     difficulty: 'medium',
-    question: 'Phương trình x₁ + x₂ + x₃ + x₄ = 12 có bao nhiêu nghiệm nguyên DƯƠNG (xᵢ ≥ 1 với mọi i = 1..4)?',
+    question: 'Một lớp phải học 10 môn, mỗi ngày xếp học 2 môn phân biệt theo thứ tự (tiết 1, tiết 2). Hỏi có bao nhiêu cách sắp xếp thời khóa biểu trong 1 ngày?',
     options: [
-      { id: 'A', text: '165 nghiệm' },
-      { id: 'B', text: '455 nghiệm' },
-      { id: 'C', text: '1365 nghiệm' },
-      { id: 'D', text: '220 nghiệm' },
+      { id: 'A', text: 'C(10, 2) = 45 cách' },
+      { id: 'B', text: 'A(10, 2) = 90 cách' },
+      { id: 'C', text: '10² = 100 cách' },
+      { id: 'D', text: '20 cách' },
     ],
-    correctId: 'A',
-    explanation: 'Đặt yᵢ = xᵢ - 1 ≥ 0 thì y₁ + y₂ + y₃ + y₄ = 12 - 4 = 8. Số nghiệm nguyên không âm là C(n + k - 1, k) = C(4 + 8 - 1, 8) = C(11, 8) = C(11, 3) = (11 × 10 × 9) / 6 = 165 nghiệm (hoặc dùng bài toán chia kẹo C(m - 1, n - 1) = C(11, 3) = 165).',
-    actionLink: { view: 'counting', tab: 'combinatorics' },
+    correctId: 'B',
+    explanation: 'Slide Chương 3 trang 28 (Ví dụ thời khóa biểu): Chọn 2 môn từ 10 môn có phân biệt thứ tự tiết học là chỉnh hợp chập 2 của 10: A(10, 2) = 10 * 9 = 90 cách.',
   },
   {
     id: 'count_q22',
     topic: 'counting',
-    topicName: 'Dãy Fibonacci & Hệ thức',
-    difficulty: 'medium',
-    question: 'Một bậc thang có n bậc. Một người mỗi bước có thể bước lên 1 bậc hoặc 2 bậc. Số cách bước lên đỉnh bậc thang n thỏa mãn hệ thức truy hồi nào?',
+    topicName: 'Số lượng song ánh',
+    difficulty: 'easy',
+    question: 'Số song ánh khác nhau từ một tập X có n phần tử vào chính nó bằng bao nhiêu?',
     options: [
-      { id: 'A', text: 'aₙ = aₙ₋₁ + aₙ₋₂ với a₁ = 1, a₂ = 2 (Dãy Fibonacci dịch vị)' },
-      { id: 'B', text: 'aₙ = 2aₙ₋₁' },
-      { id: 'C', text: 'aₙ = aₙ₋₁ × aₙ₋₂' },
-      { id: 'D', text: 'aₙ = aₙ₋₁ + 2' },
+      { id: 'A', text: '2ⁿ' },
+      { id: 'B', text: 'n!' },
+      { id: 'C', text: 'nⁿ' },
+      { id: 'D', text: 'C(n, 2)' },
     ],
-    correctId: 'A',
-    explanation: 'Để đến bậc n, bước cuối cùng có thể là bước 1 bậc (từ bậc n-1, có aₙ₋₁ cách) hoặc bước 2 bậc (từ bậc n-2, có aₙ₋₂ cách). Do đó aₙ = aₙ₋₁ + aₙ₋₂. Đây là bài toán kinh điển mô hình hóa bằng dãy Fibonacci.',
-    actionLink: { view: 'counting', tab: 'recurrence' },
+    correctId: 'B',
+    explanation: 'Slide Chương 3 trang 19: Mỗi song ánh từ tập n phần tử vào chính nó tương ứng với một hoán vị của n phần tử. Do đó có đúng n! song ánh.',
   },
   {
     id: 'count_q23',
     topic: 'counting',
-    topicName: 'Hệ thức truy hồi không thuần nhất',
-    difficulty: 'hard',
-    question: 'Để tìm nghiệm riêng của hệ thức truy hồi tuyến tính không thuần nhất aₙ - 5aₙ₋₁ + 6aₙ₋₂ = 2ⁿ, khi biết 2 là một nghiệm của phương trình đặc trưng r² - 5r + 6 = 0, ta chọn dạng nghiệm riêng nào?',
+    topicName: 'Bài toán đếm số chia hết cho 2',
+    difficulty: 'medium',
+    question: 'Cho tập X = {1, 2, 3, 4, 5, 0}. Có bao nhiêu số tự nhiên gồm 3 chữ số đôi một khác nhau và chia hết cho 2?',
     options: [
-      { id: 'A', text: 'aₙ^(p) = c · n · 2ⁿ' },
-      { id: 'B', text: 'aₙ^(p) = c · 2ⁿ' },
-      { id: 'C', text: 'aₙ^(p) = c · n² · 2ⁿ' },
-      { id: 'D', text: 'aₙ^(p) = c · 3ⁿ' },
+      { id: 'A', text: '60 số' },
+      { id: 'B', text: '52 số' },
+      { id: 'C', text: '48 số' },
+      { id: 'D', text: '100 số' },
     ],
-    correctId: 'A',
-    explanation: 'Phương trình đặc trưng r² - 5r + 6 = 0 có nghiệm r₁ = 2, r₂ = 3. Vì vế phải f(n) = 2ⁿ trùng với nghiệm đơn r = 2 của phương trình đặc trưng, nên nghiệm riêng phải nhân thêm n: aₙ^(p) = c · n · 2ⁿ.',
-    actionLink: { view: 'counting', tab: 'recurrence' },
+    correctId: 'B',
+    explanation: 'Slide Chương 3 trang 24 (Bài tập 1): Số có dạng abc chia hết cho 2. TH1: c = 0 có 5 * 4 = 20 số. TH2: c ∈ {2, 4} có 2 cách chọn c; chữ số a ≠ 0 và a ≠ c có 4 cách; chữ số b có 4 cách ⇒ 2 * 4 * 4 = 32 số. Tổng cộng: 20 + 32 = 52 số.',
   },
   {
     id: 'count_q24',
     topic: 'counting',
-    topicName: 'Số ánh xạ & Phép đếm',
+    topicName: 'Hệ thức tam giác Pascal',
     difficulty: 'easy',
-    question: 'Cho tập A có m phần tử và tập B có n phần tử. Tổng số ánh xạ khác nhau từ A vào B là bao nhiêu?',
+    question: 'Đẳng thức tổ hợp kinh điển nào sau đây đúng (hệ thức Pascal)?',
     options: [
-      { id: 'A', text: 'nᵐ' },
-      { id: 'B', text: 'mⁿ' },
-      { id: 'C', text: 'P(n, m)' },
-      { id: 'D', text: 'C(n, m)' },
+      { id: 'A', text: 'C(n, k) = C(n-1, k-1) + C(n-1, k)' },
+      { id: 'B', text: 'C(n, k) = C(n-1, k-1) * C(n-1, k)' },
+      { id: 'C', text: 'C(n, k) = C(n, k-1) + C(n, k+1)' },
+      { id: 'D', text: 'C(n, k) = C(n-1, k) - C(n-1, k-1)' },
     ],
     correctId: 'A',
-    explanation: 'Mỗi phần tử trong số m phần tử của tập A đều có độc lập n lựa chọn ảnh trong tập B. Theo quy tắc nhân, tổng số ánh xạ từ A vào B là n × n × ... × n (m lần) = nᵐ.',
-    actionLink: { view: 'counting', tab: 'mapping' },
+    explanation: 'Slide Chương 3 trang 27: Tính chất cơ bản của tổ hợp: C(n, k) = C(n-1, k-1) + C(n-1, k) (công thức xây dựng tam giác Pascal).',
+    actionLink: { view: 'counting', tab: 'pascal' },
   },
   {
     id: 'count_q25',
     topic: 'counting',
-    topicName: 'Số đơn ánh',
+    topicName: 'Hoán vị có phần tử cố định',
     difficulty: 'medium',
-    question: 'Cho tập A có 3 phần tử và tập B có 5 phần tử. Số đơn ánh khác nhau từ A vào B là bao nhiêu?',
+    question: 'Có bao nhiêu cách xếp 5 bạn A, B, C, D, E vào một hàng ngang gồm 5 ghế sao cho bạn C luôn ngồi chính giữa?',
     options: [
-      { id: 'A', text: '60 đơn ánh' },
-      { id: 'B', text: '125 đơn ánh' },
-      { id: 'C', text: '10 đơn ánh' },
-      { id: 'D', text: '243 đơn ánh' },
+      { id: 'A', text: '5! = 120 cách' },
+      { id: 'B', text: '3! = 6 cách' },
+      { id: 'C', text: '4! = 24 cách' },
+      { id: 'D', text: '12 cách' },
     ],
-    correctId: 'A',
-    explanation: 'Số đơn ánh từ tập 3 phần tử vào tập 5 phần tử là chỉnh hợp chập 3 của 5: P(5, 3) = 5 × 4 × 3 = 60 đơn ánh.',
-    actionLink: { view: 'counting', tab: 'mapping' },
+    correctId: 'C',
+    explanation: 'Slide Chương 3 trang 25 (Bài tập 6): Bạn C cố định ở vị trí giữa ghế (ghế số 3). Xếp 4 bạn còn lại vào 4 chiếc ghế còn lại có P₄ = 4! = 24 cách.',
   },
 
   // =========================================================================
-  // CHƯƠNG 4: QUAN HỆ 2 NGÔI & ĐẠI SỐ BOOL
+  // CHƯƠNG 4: QUAN HỆ HAI NGÔI, TƯƠNG ĐƯƠNG & QUAN HỆ THỨ TỰ (POSET)
   // =========================================================================
   {
     id: 'rel_q01',
     topic: 'relation',
-    topicName: 'Ma trận Boolean',
+    topicName: 'Ma trận Boolean của quan hệ',
     difficulty: 'easy',
     question: 'Cho quan hệ R trên tập A = {1, 2, 3} xác định bởi R = {(1, 1), (1, 2), (2, 3), (3, 3)}. Phần tử ở hàng 1 cột 3 của ma trận Boolean M_R[1, 3] có giá trị là bao nhiêu?',
     options: [
@@ -1223,25 +843,25 @@ export const STATIC_QUESTION_BANK = [
   {
     id: 'rel_q02',
     topic: 'relation',
-    topicName: 'Hợp thành quan hệ',
-    difficulty: 'medium',
-    question: 'Cho quan hệ R từ A sang B và quan hệ S từ B sang C. Ma trận Boolean biểu diễn quan hệ hợp thành S ∘ R được tính theo phép toán nào?',
+    topicName: 'Tính chất Phản xạ',
+    difficulty: 'easy',
+    question: 'Quan hệ hai ngôi R trên tập A được gọi là Phản xạ (Reflexive) khi và chỉ khi thỏa mãn điều kiện nào?',
     options: [
-      { id: 'A', text: 'Cộng đại số thông thường M_R + M_S' },
-      { id: 'B', text: 'Tích Boolean ma trận: M_(S ∘ R) = M_R ⊙ M_S' },
-      { id: 'C', text: 'Phép trừ ma trận M_R - M_S' },
-      { id: 'D', text: 'Nghịch đảo ma trận M_R⁻¹' },
+      { id: 'A', text: 'Với mọi a, b ∈ A, nếu a R b thì b R a' },
+      { id: 'B', text: 'Với mọi a ∈ A, luôn có a R a' },
+      { id: 'C', text: 'Với mọi a, b ∈ A, nếu a R b và b R a thì a = b' },
+      { id: 'D', text: 'Tồn tại ít nhất một phần tử a sao cho a R a' },
     ],
     correctId: 'B',
-    explanation: 'Quan hệ hợp thành S ∘ R có ma trận Boolean được tính bằng tích Boolean (Boolean product): M_(S ∘ R) = M_R ⊙ M_S, trong đó phép nhân là phép HỘI (∧) và phép cộng là phép TUYỂN (∨).',
-    actionLink: { view: 'relation', tab: 'matrix' },
+    explanation: 'Slide Chương 4 trang 6: Định nghĩa quan hệ phản xạ: ∀a ∈ A, a R a (mọi phần tử đều có quan hệ với chính nó).',
+    actionLink: { view: 'relation', tab: 'properties' },
   },
   {
     id: 'rel_q03',
     topic: 'relation',
-    topicName: 'Tính chất Phản xạ',
+    topicName: 'Dấu hiệu Ma trận Phản xạ',
     difficulty: 'easy',
-    question: 'Dấu hiệu nhận biết nhanh nhất một quan hệ R trên tập A có tính chất phản xạ (Reflexive) thông qua ma trận Boolean M_R là:',
+    question: 'Dấu hiệu nhận biết nhanh nhất một quan hệ R trên tập A có tính chất phản xạ (Reflexive) thông qua ma trận Boolean M_R là gì?',
     options: [
       { id: 'A', text: 'Tất cả các phần tử trên đường chéo chính đều bằng 1 (M_R[i, i] = 1, ∀i)' },
       { id: 'B', text: 'Tất cả các phần tử ngoài đường chéo chính đều bằng 0' },
@@ -1249,7 +869,7 @@ export const STATIC_QUESTION_BANK = [
       { id: 'D', text: 'Đường chéo chính chứa ít nhất một số 1' },
     ],
     correctId: 'A',
-    explanation: 'Tính phản xạ đòi hỏi (a, a) ∈ R với mọi a ∈ A. Do đó, tất cả các ô trên đường chéo chính M_R[i, i] đều bắt buộc phải mang giá trị 1.',
+    explanation: 'Slide Chương 4 trang 7: Tính phản xạ đòi hỏi (a, a) ∈ R với mọi a ∈ A. Do đó, tất cả các ô trên đường chéo chính M_R[i, i] đều bắt buộc phải mang giá trị 1.',
     actionLink: { view: 'relation', tab: 'properties' },
   },
   {
@@ -1257,31 +877,31 @@ export const STATIC_QUESTION_BANK = [
     topic: 'relation',
     topicName: 'Tính chất Đối xứng',
     difficulty: 'easy',
-    question: 'Một quan hệ R trên tập A có tính đối xứng (Symmetric) khi và chỉ khi ma trận Boolean M_R thỏa mãn điều kiện nào sau đây?',
+    question: 'Quan hệ R trên tập A được gọi là Đối xứng (Symmetric) khi và chỉ khi thỏa mãn điều kiện nào?',
     options: [
-      { id: 'A', text: 'M_R = M_Rᵀ (Ma trận bằng ma trận chuyển vị của chính nó)' },
-      { id: 'B', text: 'M_R có định thức bằng 0' },
-      { id: 'C', text: 'M_R ⊙ M_R = M_R' },
-      { id: 'D', text: 'M_R[i, i] = 0 với mọi i' },
+      { id: 'A', text: 'Với mọi a, b ∈ A, nếu a R b thì b R a' },
+      { id: 'B', text: 'Với mọi a, b ∈ A, nếu a R b và b R a thì a = b' },
+      { id: 'C', text: 'Với mọi a ∈ A, a R a' },
+      { id: 'D', text: 'Với mọi a, b, c ∈ A, nếu a R b và b R c thì a R c' },
     ],
     correctId: 'A',
-    explanation: 'Tính đối xứng đòi hỏi (a, b) ∈ R ⇒ (b, a) ∈ R, nghĩa là M_R[i, j] = M_R[j, i] với mọi i, j. Điều này tương đương với ma trận đối xứng M_R = M_Rᵀ.',
+    explanation: 'Slide Chương 4 trang 8: Định nghĩa quan hệ đối xứng: ∀a, b ∈ A, (a R b) → (b R a).',
     actionLink: { view: 'relation', tab: 'properties' },
   },
   {
     id: 'rel_q05',
     topic: 'relation',
     topicName: 'Tính chất Phản đối xứng',
-    difficulty: 'medium',
-    question: 'Cho tập A = {1, 2, 3}. Quan hệ R = {(1, 1), (2, 2), (3, 3)} có tính chất nào sau đây?',
+    difficulty: 'easy',
+    question: 'Quan hệ R trên tập A được gọi là Phản đối xứng (Antisymmetric) khi thỏa mãn điều kiện nào?',
     options: [
-      { id: 'A', text: 'Chỉ đối xứng chứ không phản đối xứng' },
-      { id: 'B', text: 'Chỉ phản đối xứng chứ không đối xứng' },
-      { id: 'C', text: 'Vừa có tính đối xứng, vừa có tính phản đối xứng' },
-      { id: 'D', text: 'Không đối xứng cũng không phản đối xứng' },
+      { id: 'A', text: 'Với mọi a, b ∈ A, nếu a R b thì b không có quan hệ với a' },
+      { id: 'B', text: 'Với mọi a, b ∈ A, nếu (a R b) và (b R a) thì bắt buộc a = b' },
+      { id: 'C', text: 'Không có phần tử nào có quan hệ với chính nó' },
+      { id: 'D', text: 'Ma trận M_R có đường chéo toàn số 0' },
     ],
-    correctId: 'C',
-    explanation: 'Quan hệ đồng nhất Δ = {(a, a)}: R đối xứng vì (a, b) ∈ R ⇒ a=b ⇒ (b, a) ∈ R; R cũng phản đối xứng vì (a, b) ∈ R ∧ (b, a) ∈ R ⇒ a = b (mệnh đề luôn thỏa mãn). Đây là ví dụ kinh điển minh họa phản đối xứng KHÔNG PHẢI là phủ định của đối xứng.',
+    correctId: 'B',
+    explanation: 'Slide Chương 4 trang 8: Định nghĩa quan hệ phản đối xứng: ∀a, b ∈ A, (a R b) * (b R a) → (a = b). Nghĩa là với 2 phần tử phân biệt a ≠ b, không thể đồng thời có cả a R b và b R a.',
     actionLink: { view: 'relation', tab: 'properties' },
   },
   {
@@ -1289,330 +909,329 @@ export const STATIC_QUESTION_BANK = [
     topic: 'relation',
     topicName: 'Tính chất Bắc cầu',
     difficulty: 'easy',
-    question: 'Cho tập A = {1, 2, 3} và quan hệ R = {(1, 2), (2, 3)}. Để quan hệ này có tính chất bắc cầu (Transitive), ta bắt buộc phải bổ sung thêm cặp nào?',
+    question: 'Quan hệ R trên tập A được gọi là Bắc cầu (Transitive / Truyền) khi thỏa mãn điều kiện nào?',
     options: [
-      { id: 'A', text: 'Cặp (2, 1)' },
-      { id: 'B', text: 'Cặp (3, 2)' },
-      { id: 'C', text: 'Cặp (1, 3)' },
-      { id: 'D', text: 'Cặp (3, 1)' },
+      { id: 'A', text: 'Với mọi a, b ∈ A, nếu a R b thì b R a' },
+      { id: 'B', text: 'Với mọi a ∈ A, a R a' },
+      { id: 'C', text: 'Với mọi a, b, c ∈ A, nếu (a R b) và (b R c) thì (a R c)' },
+      { id: 'D', text: 'Ma trận M_R bằng chuyển vị của chính nó' },
     ],
     correctId: 'C',
-    explanation: 'Tính chất bắc cầu quy định: Nếu (a, b) ∈ R và (b, c) ∈ R thì bắt buộc (a, c) ∈ R. Vì có (1, 2) và (2, 3) nên cần bổ sung cặp (1, 3).',
+    explanation: 'Slide Chương 4 trang 11: Định nghĩa tính bắc cầu: ∀a, b, c ∈ A, (a R b) * (b R c) → (a R c).',
     actionLink: { view: 'relation', tab: 'properties' },
   },
   {
     id: 'rel_q07',
     topic: 'relation',
-    topicName: 'Bao đóng quan hệ',
+    topicName: 'Quan hệ tương đương',
     difficulty: 'easy',
-    question: 'Bao đóng phản xạ của quan hệ R trên tập A, ký hiệu r(R), được xác định bởi công thức nào sau đây?',
+    question: 'Một quan hệ R trên tập A được gọi là Quan hệ tương đương (Equivalence relation) khi thỏa mãn đồng thời 3 tính chất nào?',
     options: [
-      { id: 'A', text: 'R ∪ R⁻¹' },
-      { id: 'B', text: 'R ∪ Δ_A (với Δ_A = {(x, x) | x ∈ A})' },
-      { id: 'C', text: 'R ∩ Δ_A' },
-      { id: 'D', text: 'R² = R ⊙ R' },
+      { id: 'A', text: 'Phản xạ, Phản đối xứng, Bắc cầu' },
+      { id: 'B', text: 'Đối xứng, Phản đối xứng, Bắc cầu' },
+      { id: 'C', text: 'Phản xạ, Đối xứng, Bắc cầu' },
+      { id: 'D', text: 'Phản xạ, Đối xứng, Toàn phần' },
     ],
-    correctId: 'B',
-    explanation: 'Bao đóng phản xạ là quan hệ phản xạ nhỏ nhất chứa R. Nó thu được bằng cách hợp thêm tất cả các cặp đường chéo (x, x): r(R) = R ∪ Δ_A.',
-    actionLink: { view: 'relation', tab: 'warshall' },
+    correctId: 'C',
+    explanation: 'Slide Chương 4 trang 15: Định nghĩa quan hệ tương đương: thỏa mãn 3 tính chất: Phản xạ, Đối xứng và Bắc cầu.',
+    actionLink: { view: 'relation', tab: 'equivalence' },
   },
   {
     id: 'rel_q08',
     topic: 'relation',
-    topicName: 'Thuật toán Roy-Warshall',
-    difficulty: 'medium',
-    question: 'Thuật toán Roy-Warshall trong lý thuyết quan hệ được sử dụng nhằm mục đích chính nào?',
+    topicName: 'Quan hệ thứ tự (POSET)',
+    difficulty: 'easy',
+    question: 'Một quan hệ R trên tập A được gọi là Quan hệ thứ tự (POSET) khi thỏa mãn đồng thời 3 tính chất nào?',
     options: [
-      { id: 'A', text: 'Tìm bao đóng phản xạ' },
-      { id: 'B', text: 'Tìm bao đóng đối xứng' },
-      { id: 'C', text: 'Tìm bao đóng bắc cầu (Transitive Closure / Đường đi liên thông)' },
-      { id: 'D', text: 'Tìm phần tử lớn nhất của POSET' },
+      { id: 'A', text: 'Phản xạ, Phản đối xứng, Bắc cầu' },
+      { id: 'B', text: 'Phản xạ, Đối xứng, Bắc cầu' },
+      { id: 'C', text: 'Đối xứng, Phản đối xứng, Bắc cầu' },
+      { id: 'D', text: 'Phản xạ, Bắc cầu, Liên thông' },
     ],
-    correctId: 'C',
-    explanation: 'Thuật toán Roy-Warshall tính toán bao đóng bắc cầu của ma trận nhị phân qua n bước lặp trung gian k (k = 1..n), tương đương với tìm ma trận liên thông đường đi giữa mọi cặp đỉnh.',
-    actionLink: { view: 'relation', tab: 'warshall' },
+    correctId: 'A',
+    explanation: 'Slide Chương 4 trang 24: Định nghĩa quan hệ thứ tự: thỏa mãn 3 tính chất: Phản xạ, Phản đối xứng và Bắc cầu. Ký hiệu cặp (A, ≤) là POSET.',
+    actionLink: { view: 'relation', tab: 'poset' },
   },
   {
     id: 'rel_q09',
     topic: 'relation',
-    topicName: 'Thuật toán Roy-Warshall',
+    topicName: 'Đồng dư Modulo m',
     difficulty: 'medium',
-    question: 'Với một tập hợp gồm n phần tử, thuật toán Roy-Warshall cập nhật bao đóng bắc cầu có độ phức tạp thời gian là bao nhiêu?',
+    question: 'Cho số nguyên dương m. Quan hệ đồng dư modulo m trên tập số nguyên ℤ (a ≡ b (mod m) ⇔ m | (a - b)) là loại quan hệ nào?',
     options: [
-      { id: 'A', text: 'O(n)' },
-      { id: 'B', text: 'O(n²)' },
-      { id: 'C', text: 'O(n³)' },
-      { id: 'D', text: 'O(2ⁿ)' },
+      { id: 'A', text: 'Quan hệ thứ tự toàn phần' },
+      { id: 'B', text: 'Quan hệ tương đương' },
+      { id: 'C', text: 'Quan hệ phản xạ nhưng không đối xứng' },
+      { id: 'D', text: 'Quan hệ không bắc cầu' },
     ],
-    correctId: 'C',
-    explanation: 'Thuật toán gồm 3 vòng lặp lồng nhau: vòng lặp ngoài duyệt k từ 1 đến n (đỉnh trung gian), và 2 vòng lặp trong duyệt mọi cặp hàng i, cột j từ 1 đến n. Tổng số phép toán là n × n × n = O(n³).',
-    actionLink: { view: 'relation', tab: 'warshall' },
+    correctId: 'B',
+    explanation: 'Slide Chương 4 trang 16: Quan hệ đồng dư modulo m có tính phản xạ (m | 0), đối xứng (m | (a-b) ⇔ m | (b-a)), và bắc cầu (m | (a-b) và m | (b-c) ⇒ m | (a-c)). Do đó đây là một Quan hệ tương đương.',
+    actionLink: { view: 'relation', tab: 'equivalence' },
   },
   {
     id: 'rel_q10',
     topic: 'relation',
-    topicName: 'Quan hệ Tương đương',
+    topicName: 'Phân hoạch lớp đồng dư ℤ_m',
     difficulty: 'easy',
-    question: 'Một quan hệ 2 ngôi R trên tập A được gọi là Quan hệ tương đương (Equivalence Relation) khi thỏa mãn đồng thời 3 tính chất nào?',
+    question: 'Tập hợp các số nguyên ℤ theo quan hệ đồng dư modulo m được phân hoạch thành bao nhiêu lớp tương đương rời nhau?',
     options: [
-      { id: 'A', text: 'Phản xạ, Đối xứng, Bắc cầu' },
-      { id: 'B', text: 'Phản xạ, Phản đối xứng, Bắc cầu' },
-      { id: 'C', text: 'Đối xứng, Phản đối xứng, Bắc cầu' },
-      { id: 'D', text: 'Phản xạ, Đối xứng, Không bắc cầu' },
+      { id: 'A', text: 'Vô số lớp' },
+      { id: 'B', text: 'Đúng m lớp: [0], [1], ..., [m-1]' },
+      { id: 'C', text: 'm - 1 lớp' },
+      { id: 'D', text: '2ᵐ lớp' },
     ],
-    correctId: 'A',
-    explanation: 'Định nghĩa: Quan hệ tương đương là quan hệ thỏa mãn 3 tính chất: Phản xạ (Reflexive), Đối xứng (Symmetric) và Bắc cầu (Transitive). Ví dụ kinh điển là quan hệ bằng nhau (=) hoặc quan hệ đồng dư modulo m.',
-    actionLink: { view: 'relation', tab: 'hasse' },
+    correctId: 'B',
+    explanation: 'Slide Chương 4 trang 21: Có đúng m lớp đồng dư modulo m là [0]ₘ, [1]ₘ, ..., [m-1]ₘ. Chúng lập thành một phân hoạch của ℤ thành các tập con rời nhau.',
+    actionLink: { view: 'relation', tab: 'equivalence' },
   },
   {
     id: 'rel_q11',
     topic: 'relation',
-    topicName: 'Lớp tương đương & Modulo',
+    topicName: 'Kiểm tra tính phản xạ',
     difficulty: 'medium',
-    question: 'Xét quan hệ đồng dư modulo 3 trên tập số nguyên ℤ: a R b ⇔ a ≡ b (mod 3). Tập thương ℤ/R gồm bao nhiêu lớp tương đương?',
+    question: 'Cho tập A = {1, 2, 3, 4} và quan hệ R = {(1, 1), (1, 2), (2, 1), (2, 2), (3, 4), (4, 1), (4, 4)}. Quan hệ R không có tính phản xạ vì sao?',
     options: [
-      { id: 'A', text: '1 lớp duy nhất' },
-      { id: 'B', text: '2 lớp tương đương' },
-      { id: 'C', text: '3 lớp tương đương: [0], [1], [2]' },
-      { id: 'D', text: 'Vô số lớp tương đương' },
+      { id: 'A', text: 'Vì (3, 3) ∉ R' },
+      { id: 'B', text: 'Vì (1, 2) ∈ R' },
+      { id: 'C', text: 'Vì (4, 1) ∈ R' },
+      { id: 'D', text: 'Vì đường chéo chính chứa số 1' },
     ],
-    correctId: 'C',
-    explanation: 'Mọi số nguyên khi chia cho 3 chỉ có 3 số dư có thể: 0, 1 hoặc 2. Do đó tập các lớp tương đương gồm đúng 3 lớp: [0] = {3k}, [1] = {3k+1}, [2] = {3k+2}. Các lớp này tạo thành một phân hoạch của ℤ.',
-    actionLink: { view: 'relation', tab: 'hasse' },
+    correctId: 'A',
+    explanation: 'Slide Chương 4 trang 6 (Ví dụ R1): Trên tập A = {1, 2, 3, 4}, quan hệ R thiếu phần tử (3, 3) nên không thỏa mãn điều kiện phản xạ (mọi a ∈ A đều phải có a R a).',
+    actionLink: { view: 'relation', tab: 'properties' },
   },
   {
     id: 'rel_q12',
     topic: 'relation',
-    topicName: 'Quan hệ Thứ tự & POSET',
-    difficulty: 'easy',
-    question: 'Một quan hệ thứ tự bộ phận (Partial Order) trên tập A đòi hỏi phải thỏa mãn bộ 3 tính chất nào?',
+    topicName: 'Phản ví dụ POSET trên ℤ',
+    difficulty: 'medium',
+    question: 'Quan hệ ước số "a | b" trên tập số nguyên dương ℤ⁺ là một POSET. Tuy nhiên quan hệ ước số trên tập số nguyên ℤ (chứa cả số âm) KHÔNG phải là một POSET vì vi phạm tính chất nào?',
     options: [
-      { id: 'A', text: 'Phản xạ, Đối xứng, Bắc cầu' },
-      { id: 'B', text: 'Phản xạ, Phản đối xứng, Bắc cầu' },
-      { id: 'C', text: 'Không phản xạ, Đối xứng, Bắc cầu' },
-      { id: 'D', text: 'Phản đối xứng, Đối xứng, Bắc cầu' },
+      { id: 'A', text: 'Tính phản xạ' },
+      { id: 'B', text: 'Tính phản đối xứng (vì 3 | -3 và -3 | 3 nhưng 3 ≠ -3)' },
+      { id: 'C', text: 'Tính bắc cầu' },
+      { id: 'D', text: 'Không vi phạm tính chất nào' },
     ],
     correctId: 'B',
-    explanation: 'Tập sắp thứ tự bộ phận (POSET - Partially Ordered Set) được định nghĩa bởi 3 tính chất: Phản xạ (Reflexive), Phản đối xứng (Antisymmetric) và Bắc cầu (Transitive). Ký hiệu (A, ≤).',
-    actionLink: { view: 'relation', tab: 'hasse' },
+    explanation: 'Slide Chương 4 trang 26: Trên ℤ, ta có 3 | -3 và -3 | 3 nhưng 3 ≠ -3. Do đó vi phạm tính phản đối xứng, nên (ℤ, |) không phải là một POSET.',
+    actionLink: { view: 'relation', tab: 'poset' },
   },
   {
     id: 'rel_q13',
     topic: 'relation',
-    topicName: 'Biểu đồ Hasse',
+    topicName: 'Biểu đồ Hasse: Quy ước vẽ',
     difficulty: 'medium',
-    question: 'Trong Biểu đồ Hasse của một tập thứ tự bộ phận (POSET), quy tắc tối giản hóa nào sau đây được áp dụng?',
+    question: 'Trong biểu đồ Hasse của một tập sắp thứ tự (POSET), các cung có đặc điểm gì theo quy ước chuẩn trong giáo trình?',
     options: [
-      { id: 'A', text: 'Vẽ tất cả các khuyên phản xạ (x, x) ở mọi đỉnh' },
-      { id: 'B', text: 'Lược bỏ khuyên phản xạ và lược bỏ các cạnh bắc cầu suy diễn được, chỉ giữ lại quan hệ phủ trực tiếp' },
-      { id: 'C', text: 'Vẽ mũi tên theo cả hai chiều lên và xuống' },
-      { id: 'D', text: 'Nối cạnh giữa tất cả các cặp đỉnh' },
+      { id: 'A', text: 'Vẽ mũi tên chỉ từ trên xuống dưới' },
+      { id: 'B', text: 'Không vẽ mũi tên, các cung ngầm hiểu đi từ dưới lên trên và đã loại bỏ khuyên cùng cạnh bắc cầu' },
+      { id: 'C', text: 'Vẽ tất cả các khuyên tại mỗi đỉnh' },
+      { id: 'D', text: 'Vẽ mũi tên hai chiều' },
     ],
     correctId: 'B',
-    explanation: 'Biểu đồ Hasse tối giản đồ thị thứ tự bằng cách: (1) Bỏ mọi khuyên phản xạ (ngầm hiểu x ≤ x); (2) Bỏ các cạnh bắc cầu suy diễn được (nếu x ≤ y và y ≤ z thì không vẽ cạnh x → z); (3) Vẽ đỉnh lớn hơn ở trên đỉnh nhỏ hơn.',
-    actionLink: { view: 'relation', tab: 'hasse' },
+    explanation: 'Slide Chương 4 trang 32: Biểu đồ Hasse tối giản bằng cách bỏ tất cả khuyên (tính phản xạ), bỏ các cạnh bắc cầu, và quy ước mọi cung đều đi từ dưới lên trên nên không cần vẽ mũi tên.',
+    actionLink: { view: 'relation', tab: 'poset' },
   },
   {
     id: 'rel_q14',
     topic: 'relation',
-    topicName: 'Phần tử Tối đại vs Lớn nhất',
-    difficulty: 'hard',
-    question: 'Cho POSET (A, ≤). Điểm khác biệt căn bản giữa phần tử tối đại (Maximal element) và phần tử lớn nhất (Greatest element) là gì?',
+    topicName: 'Phần tử tối đại (Maximal)',
+    difficulty: 'medium',
+    question: 'Trong một POSET hữu hạn (S, ≤), phần tử tối đại (Maximal element) m được định nghĩa là phần tử:',
     options: [
-      { id: 'A', text: 'Phần tử tối đại luôn là duy nhất, còn phần tử lớn nhất có thể có nhiều phần tử' },
-      { id: 'B', text: 'Phần tử tối đại là phần tử không có phần tử nào lớn hơn nó; còn phần tử lớn nhất phải lớn hơn hoặc bằng MỌI phần tử trong tập' },
-      { id: 'C', text: 'Hai khái niệm này hoàn toàn tương đương nhau trong mọi POSET' },
-      { id: 'D', text: 'Phần tử lớn nhất nằm ở đáy biểu đồ Hasse' },
+      { id: 'A', text: 'Không có phần tử nào trong S lớn hơn m (không có cung xuất phát đi lên từ m)' },
+      { id: 'B', text: 'Lớn hơn mọi phần tử khác trong S' },
+      { id: 'C', text: 'Nhỏ hơn mọi phần tử khác trong S' },
+      { id: 'D', text: 'Luôn luôn là duy nhất' },
     ],
-    correctId: 'B',
-    explanation: 'Trong POSET: a là tối đại nếu không tồn tại x sao cho a < x (có thể có nhiều phần tử tối đại). Còn a là phần tử lớn nhất nếu x ≤ a với MỌI x ∈ A (nếu tồn tại thì phần tử lớn nhất là duy nhất).',
-    actionLink: { view: 'relation', tab: 'hasse' },
+    correctId: 'A',
+    explanation: 'Slide Chương 4 trang 34: Phần tử tối đại là phần tử không bị trội bởi phần tử nào khác trong S (không có cung nào xuất phát đi lên từ điểm tối đại). Phần tử tối đại có thể có nhiều và không nhất thiết so sánh được với mọi phần tử.',
+    actionLink: { view: 'relation', tab: 'poset' },
   },
-
   {
     id: 'rel_q15',
     topic: 'relation',
-    topicName: 'Tính chất Phản đối xứng',
+    topicName: 'Tìm phần tử tối đại POSET',
     difficulty: 'medium',
-    question: 'Quan hệ R trên tập A có tính phản đối xứng (Antisymmetric) khi thỏa mãn điều kiện nào?',
+    question: 'Cho POSET S = ({2, 4, 5, 10, 12, 20, 25}, | ) với quan hệ chia hết. Các phần tử tối đại của S là gì?',
     options: [
-      { id: 'A', text: 'Với mọi a, b ∈ A: nếu (a, b) ∈ R và (b, a) ∈ R thì a = b' },
-      { id: 'B', text: 'Với mọi a, b ∈ A: nếu (a, b) ∈ R thì (b, a) ∉ R' },
-      { id: 'C', text: 'Với mọi a ∈ A: (a, a) ∉ R' },
-      { id: 'D', text: 'Ma trận M_R không có phần tử 1 nào' },
+      { id: 'A', text: '{2, 5}' },
+      { id: 'B', text: '{12, 20, 25}' },
+      { id: 'C', text: '{25}' },
+      { id: 'D', text: '{20}' },
     ],
-    correctId: 'A',
-    explanation: 'Định nghĩa tính phản đối xứng: Hai phần tử phân biệt không bao giờ được cùng quan hệ hai chiều với nhau. Nếu (a, b) ∈ R và (b, a) ∈ R thì bắt buộc a phải bằng b.',
-    actionLink: { view: 'relation', tab: 'properties' },
+    correctId: 'B',
+    explanation: 'Slide Chương 4 trang 36 (Ví dụ phần tử tối đại): Các số 12, 20, 25 không chia hết cho số nào khác lớn hơn chúng trong tập S. Do đó {12, 20, 25} là các phần tử tối đại.',
+    actionLink: { view: 'relation', tab: 'poset' },
   },
   {
     id: 'rel_q16',
     topic: 'relation',
-    topicName: 'Tính chất Bắc cầu',
+    topicName: 'Tìm phần tử tối tiểu POSET',
     difficulty: 'medium',
-    question: 'Cho quan hệ R có ma trận Boolean M_R. Điều kiện đại số Boolean để R có tính chất bắc cầu (Transitive) là gì?',
+    question: 'Cho POSET S = ({2, 4, 5, 10, 12, 20, 25}, | ) với quan hệ chia hết. Các phần tử tối tiểu của S là gì?',
     options: [
-      { id: 'A', text: 'M_R ⊙ M_R ≤ M_R (tức là ô nào trong M_R² bằng 1 thì ô đó trong M_R cũng phải bằng 1)' },
-      { id: 'B', text: 'M_R ⊙ M_R = I (ma trận đơn vị)' },
-      { id: 'C', text: 'M_R ∨ M_Rᵀ = M_R' },
-      { id: 'D', text: 'M_R ⊙ M_R = 0' },
+      { id: 'A', text: '{2, 5}' },
+      { id: 'B', text: '{12, 20, 25}' },
+      { id: 'C', text: '{2}' },
+      { id: 'D', text: '{4, 10}' },
     ],
     correctId: 'A',
-    explanation: 'Quan hệ R bắc cầu khi và chỉ khi R² ⊆ R, tương đương trong ma trận Boolean: M_R ⊙ M_R ≤ M_R. Nghĩa là mọi đường đi độ dài 2 đều có đường tắt độ dài 1 nối trực tiếp.',
-    actionLink: { view: 'relation', tab: 'properties' },
+    explanation: 'Slide Chương 4 trang 36: Các số 2 và 5 không có ước số nào khác nhỏ hơn chúng trong tập S (không có cung kết thúc ở chúng). Do đó {2, 5} là các phần tử tối tiểu.',
+    actionLink: { view: 'relation', tab: 'poset' },
   },
   {
     id: 'rel_q17',
     topic: 'relation',
-    topicName: 'Thứ tự toàn phần',
+    topicName: 'Tính duy nhất của phần tử lớn nhất',
     difficulty: 'easy',
-    question: 'Một tập thứ tự bộ phận (A, ≤) được gọi là tập thứ tự toàn phần (Total Order / Linear Order / Xích) khi thỏa mãn thêm điều kiện nào?',
+    question: 'Phần tử lớn nhất (Greatest element) của một POSET (nếu tồn tại) có tính chất gì đặc biệt?',
     options: [
-      { id: 'A', text: 'Mọi cặp phần tử a, b ∈ A đều so sánh được với nhau (a ≤ b hoặc b ≤ a)' },
-      { id: 'B', text: 'Tập A không có phần tử lớn nhất' },
-      { id: 'C', text: 'Mọi phần tử đều có bậc bằng nhau' },
-      { id: 'D', text: 'Biểu đồ Hasse của nó là một hình tròn khép kín' },
+      { id: 'A', text: 'Luôn luôn có ít nhất 2 phần tử' },
+      { id: 'B', text: 'Không thể so sánh được với các phần tử khác' },
+      { id: 'C', text: 'Luôn luôn trùng với phần tử tối tiểu' },
+      { id: 'D', text: 'Nếu tồn tại thì phần tử lớn nhất là duy nhất' },
     ],
-    correctId: 'A',
-    explanation: 'Thứ tự toàn phần (hay thứ tự tuyến tính) yêu cầu không có hai phần tử nào "không so sánh được". Biểu đồ Hasse của nó là một đường thẳng dọc duy nhất (một xích - chain).',
-    actionLink: { view: 'relation', tab: 'hasse' },
+    correctId: 'D',
+    explanation: 'Slide Chương 4 trang 36: Phần tử lớn nhất lớn hơn mọi phần tử khác trong POSET. Nếu tồn tại, phần tử lớn nhất luôn luôn là DUY NHẤT (khác với phần tử tối đại có thể có nhiều).',
+    actionLink: { view: 'relation', tab: 'poset' },
   },
   {
     id: 'rel_q18',
     topic: 'relation',
-    topicName: 'Bao đóng đối xứng',
-    difficulty: 'easy',
-    question: 'Bao đóng đối xứng s(R) của quan hệ R được xây dựng bằng công thức tập hợp nào?',
+    topicName: 'POSET tập lũy thừa P(S)',
+    difficulty: 'medium',
+    question: 'Quan hệ bao hàm tập con (P(S), ⊆) trên tập các tập con của S có phải là một POSET không?',
     options: [
-      { id: 'A', text: 's(R) = R ∪ R⁻¹ (hợp của R với quan hệ nghịch đảo của nó)' },
-      { id: 'B', text: 's(R) = R ∩ R⁻¹' },
-      { id: 'C', text: 's(R) = R ∪ Δ (với Δ là đường chéo chính)' },
-      { id: 'D', text: 's(R) = R \\ R⁻¹' },
+      { id: 'A', text: 'Có, vì quan hệ ⊆ có tính phản xạ, phản đối xứng và bắc cầu' },
+      { id: 'B', text: 'Không, vì không có tính phản xạ' },
+      { id: 'C', text: 'Không, vì không có tính bắc cầu' },
+      { id: 'D', text: 'Không, vì vi phạm tính phản đối xứng' },
     ],
     correctId: 'A',
-    explanation: 'Bao đóng đối xứng là quan hệ đối xứng nhỏ nhất chứa R. Nó thu được bằng cách thêm các cặp đảo ngược (b, a) nếu (a, b) ∈ R, tức s(R) = R ∪ R⁻¹ (ma trận M_s(R) = M_R ∨ M_Rᵀ).',
-    actionLink: { view: 'relation', tab: 'warshall' },
+    explanation: 'Slide Chương 4 trang 27: Với mọi tập A, B, C: A ⊆ A (phản xạ); A ⊆ B và B ⊆ A ⇒ A = B (phản đối xứng); A ⊆ B và B ⊆ C ⇒ A ⊆ C (bắc cầu). Do đó (P(S), ⊆) là một POSET.',
+    actionLink: { view: 'relation', tab: 'poset' },
   },
   {
-    id: 'rel_q19',
+    id: 'relation_q19',
     topic: 'relation',
-    topicName: 'Bao đóng bắc cầu',
+    topicName: 'Thứ tự toàn phần',
     difficulty: 'medium',
-    question: 'Cho quan hệ R trên tập n phần tử. Bao đóng bắc cầu t(R) bằng hợp của các luỹ thừa Boolean nào?',
+    question: 'Quan hệ thứ tự nào sau đây là Thứ tự toàn phần (Linear / Total order)?',
     options: [
-      { id: 'A', text: 't(R) = R ∪ R² ∪ R³ ∪ ... ∪ Rⁿ' },
-      { id: 'B', text: 't(R) = R ∩ R²' },
-      { id: 'C', text: 't(R) = Rⁿ duy nhất' },
-      { id: 'D', text: 't(R) = R \\ R²' },
+      { id: 'A', text: 'Quan hệ ước số "a | b" trên tập số nguyên dương ℤ⁺' },
+      { id: 'B', text: 'Quan hệ "≤" trên tập số nguyên dương ℤ⁺' },
+      { id: 'C', text: 'Quan hệ tập con "⊆" trên P({1, 2})' },
+      { id: 'D', text: 'Quan hệ đồng dư mod 3' },
     ],
-    correctId: 'A',
-    explanation: 'Định lý Roy: Bao đóng bắc cầu t(R) là liên thông mọi đường đi có độ dài từ 1 đến n: t(R) = ⋃_{k=1}^n R^k. Thuật toán Roy-Warshall chính là thuật toán tối ưu hóa việc tính bao đóng này trong O(n³).',
-    actionLink: { view: 'relation', tab: 'warshall' },
+    correctId: 'B',
+    explanation: 'Slide Chương 4 trang 28-29: Thứ tự toàn phần là POSET mà hai phần tử bất kỳ luôn so sánh được với nhau. Trên ℤ⁺, với hai số bất kỳ luôn có a ≤ b hoặc b ≤ a. Trong khi với quan hệ ước số thì 5 và 7 không so sánh được.',
+    actionLink: { view: 'relation', tab: 'poset' },
   },
   {
     id: 'rel_q20',
     topic: 'relation',
-    topicName: 'Phân hoạch & Lớp tương đương',
-    difficulty: 'medium',
-    question: 'Mối quan hệ giữa Quan hệ tương đương trên tập A và Phân hoạch (Partition) của tập A là gì?',
+    topicName: 'Bao đóng phản xạ',
+    difficulty: 'easy',
+    question: 'Bao đóng phản xạ (Reflexive closure) r(R) của quan hệ R trên tập A được xác định bằng công thức nào?',
     options: [
-      { id: 'A', text: 'Mỗi quan hệ tương đương tạo ra một phân hoạch duy nhất trên A, và ngược lại mỗi phân hoạch tương ứng với một quan hệ tương đương duy nhất' },
-      { id: 'B', text: 'Một quan hệ tương đương luôn chia A thành đúng 2 tập con' },
-      { id: 'C', text: 'Phân hoạch không liên quan gì đến quan hệ tương đương' },
-      { id: 'D', text: 'Quan hệ tương đương chỉ tồn tại trên các tập vô hạn' },
+      { id: 'A', text: 'r(R) = R ∪ Δ_A (với Δ_A = {(a, a) | a ∈ A})' },
+      { id: 'B', text: 'r(R) = R ∩ Δ_A' },
+      { id: 'C', text: 'r(R) = R ∪ R⁻¹' },
+      { id: 'D', text: 'r(R) = R \\ Δ_A' },
     ],
     correctId: 'A',
-    explanation: 'Định lý cơ bản về quan hệ tương đương: Tập hợp các lớp tương đương A/R tạo thành một phân hoạch của tập A (các lớp rời nhau đôi một và hợp lại bằng A), và mỗi phân hoạch xác định duy nhất một quan hệ tương đương.',
-    actionLink: { view: 'relation', tab: 'properties' },
+    explanation: 'Slide Chương 4 trang 7: Bao đóng phản xạ là quan hệ phản xạ nhỏ nhất chứa R, thu được bằng cách bổ sung toàn bộ đường chéo Δ_A: r(R) = R ∪ Δ_A (ma trận M_{r(R)} = M_R + Iₙ).',
+    actionLink: { view: 'relation', tab: 'closure' },
   },
   {
     id: 'rel_q21',
     topic: 'relation',
-    topicName: 'Cận trên nhỏ nhất (LUB)',
-    difficulty: 'medium',
-    question: 'Trong POSET (A, ≤), phần tử u được gọi là Cận trên nhỏ nhất (Least Upper Bound - LUB hay Supremum) của tập con S khi nào?',
+    topicName: 'Bao đóng đối xứng',
+    difficulty: 'easy',
+    question: 'Bao đóng đối xứng (Symmetric closure) s(R) của quan hệ R trên tập A được xác định bằng công thức nào?',
     options: [
-      { id: 'A', text: 'u là một cận trên của S, và với mọi cận trên v khác của S thì u ≤ v' },
-      { id: 'B', text: 'u là phần tử lớn nhất thuộc S' },
-      { id: 'C', text: 'u nhỏ hơn tất cả các phần tử của S' },
-      { id: 'D', text: 'u không so sánh được với phần tử nào trong S' },
+      { id: 'A', text: 's(R) = R ∩ R⁻¹' },
+      { id: 'B', text: 's(R) = R ∪ R⁻¹ (với R⁻¹ = {(b, a) | (a, b) ∈ R})' },
+      { id: 'C', text: 's(R) = R ∪ Δ_A' },
+      { id: 'D', text: 's(R) = R \\ R⁻¹' },
     ],
-    correctId: 'A',
-    explanation: 'LUB (Supremum) của S là phần tử u bao trùm tất cả các phần tử của S (x ≤ u, ∀x ∈ S), và nếu có bất kỳ cận trên v nào khác thì u ≤ v (u là nhỏ nhất trong số các cận trên).',
-    actionLink: { view: 'relation', tab: 'hasse' },
+    correctId: 'B',
+    explanation: 'Slide Chương 4 trang 8: Bao đóng đối xứng thu được bằng cách thêm các cặp nghịch đảo (b, a) nếu (a, b) ∈ R: s(R) = R ∪ R⁻¹ (ma trận M_{s(R)} = M_R + M_Rᵀ).',
+    actionLink: { view: 'relation', tab: 'closure' },
   },
   {
     id: 'rel_q22',
     topic: 'relation',
-    topicName: 'Định nghĩa Dàn (Lattice)',
-    difficulty: 'hard',
-    question: 'Một tập sắp thứ tự bộ phận (POSET) được gọi là một Dàn (Lattice) khi thỏa mãn điều kiện nào?',
+    topicName: 'Thuật toán Warshall',
+    difficulty: 'medium',
+    question: 'Thuật toán Warshall được sử dụng để tìm bao đóng nào của quan hệ hai ngôi hữu hạn?',
     options: [
-      { id: 'A', text: 'Mọi cặp phần tử {a, b} đều có duy nhất Cận trên nhỏ nhất (Join a ∨ b) và duy nhất Cận dưới lớn nhất (Meet a ∧ b)' },
-      { id: 'B', text: 'Tập đó phải là một thứ tự toàn phần' },
-      { id: 'C', text: 'Tập không chứa phần tử tối đại nào' },
-      { id: 'D', text: 'Biểu đồ Hasse không có nhánh rẽ nào' },
+      { id: 'A', text: 'Bao đóng bắc cầu (Transitive closure)' },
+      { id: 'B', text: 'Bao đóng phản xạ' },
+      { id: 'C', text: 'Bao đóng đối xứng' },
+      { id: 'D', text: 'Bao đóng tương đương' },
     ],
     correctId: 'A',
-    explanation: 'Định nghĩa Dàn (Lattice): Là POSET mà trong đó hai phần tử bất kỳ luôn tồn tại duy nhất supremum (phép nối / join ∨) và infimum (phép gặp / meet ∧).',
-    actionLink: { view: 'relation', tab: 'hasse' },
+    explanation: 'Thuật toán Warshall tính ma trận đường đi / bao đóng bắc cầu t(R) qua n bước lặp trung gian: W_k[i, j] = W_{k-1}[i, j] + (W_{k-1}[i, k] * W_{k-1}[k, j]).',
+    actionLink: { view: 'relation', tab: 'closure' },
   },
   {
     id: 'rel_q23',
     topic: 'relation',
-    topicName: 'Biểu đồ Hasse quan hệ ước số',
+    topicName: 'Ma trận đối xứng',
     difficulty: 'easy',
-    question: 'Cho tập A = {1, 2, 4, 8} với quan hệ "chia hết" a | b. Biểu đồ Hasse của POSET này có hình dạng gì?',
+    question: 'Nếu quan hệ R trên tập A có ma trận Boolean đối xứng qua đường chéo chính (M_R = M_Rᵀ) thì R có tính chất gì?',
     options: [
-      { id: 'A', text: 'Một xích thẳng đứng gồm 4 nút: 1 ở dưới cùng, nối lên 2, nối lên 4, và 8 ở trên cùng' },
-      { id: 'B', text: 'Một hình vuông với các đường chéo' },
-      { id: 'C', text: '4 nút nằm ngang rời rạc không có cạnh nối' },
-      { id: 'D', text: 'Một tam giác có 1 đỉnh ở tâm' },
+      { id: 'A', text: 'Phản xạ' },
+      { id: 'B', text: 'Phản đối xứng' },
+      { id: 'C', text: 'Đối xứng' },
+      { id: 'D', text: 'Bắc cầu' },
     ],
-    correctId: 'A',
-    explanation: 'Vì 1 | 2 | 4 | 8, hai phần tử bất kỳ đều so sánh được với nhau (1 < 2 < 4 < 8). Do đó đây là một thứ tự toàn phần và Biểu đồ Hasse là một đường thẳng (xích) đứng: 1 → 2 → 4 → 8.',
-    actionLink: { view: 'relation', tab: 'hasse' },
+    correctId: 'C',
+    explanation: 'Slide Chương 4 trang 9: M_R = M_Rᵀ đồng nghĩa với M_R[i, j] = M_R[j, i] với mọi i, j. Do đó quan hệ R có tính chất Đối xứng.',
+    actionLink: { view: 'relation', tab: 'matrix' },
   },
   {
     id: 'rel_q24',
     topic: 'relation',
-    topicName: 'Phần tử Tối tiểu vs Nhỏ nhất',
+    topicName: 'Định lý phân hoạch tập hợp',
     difficulty: 'medium',
-    question: 'Trong một POSET, sự khác nhau giữa Phần tử tối tiểu (Minimal) và Phần tử nhỏ nhất (Least element) là:',
+    question: 'Định lý về phân hoạch khẳng định: Các lớp tương đương của một quan hệ tương đương R trên tập A chia tập A thành:',
     options: [
-      { id: 'A', text: 'Phần tử nhỏ nhất phải so sánh được và nhỏ hơn mọi phần tử khác; trong khi phần tử tối tiểu chỉ cần không có phần tử nào nhỏ hơn nó' },
-      { id: 'B', text: 'Phần tử tối tiểu luôn luôn duy nhất, còn phần tử nhỏ nhất có thể có nhiều' },
-      { id: 'C', text: 'Hai khái niệm này hoàn toàn đồng nhất trong mọi POSET' },
-      { id: 'D', text: 'Phần tử nhỏ nhất nằm ở đỉnh trên cùng của biểu đồ Hasse' },
+      { id: 'A', text: 'Các tập con không rỗng, đôi một rời nhau và hợp của chúng bằng tập A' },
+      { id: 'B', text: 'Các tập con có ít nhất 2 phần tử chung' },
+      { id: 'C', text: 'Một tập rỗng duy nhất' },
+      { id: 'D', text: 'Các tập con có số lượng phần tử bằng nhau' },
     ],
     correctId: 'A',
-    explanation: 'Phần tử nhỏ nhất m thỏa mãn m ≤ x với MỌI x (nếu tồn tại thì duy nhất). Phần tử tối tiểu a chỉ cần thỏa mãn: không tồn tại x nào mà x < a. Một POSET có thể có nhiều phần tử tối tiểu nhưng chỉ có tối đa một phần tử nhỏ nhất.',
-    actionLink: { view: 'relation', tab: 'hasse' },
+    explanation: 'Slide Chương 4 trang 19-20: Các lớp tương đương tạo nên một phân hoạch trên A, nghĩa là chúng chia A thành các tập con không rỗng, đôi một rời nhau ([a] ∩ [b] = ∅ nếu [a] ≠ [b]) và hợp lại bằng toàn bộ A.',
+    actionLink: { view: 'relation', tab: 'equivalence' },
   },
   {
     id: 'rel_q25',
     topic: 'relation',
-    topicName: 'Số quan hệ trên một tập',
-    difficulty: 'hard',
-    question: 'Cho tập A có n phần tử. Tổng số quan hệ hai ngôi KHÁC NHAU có thể định nghĩa trên tập A là bao nhiêu?',
+    topicName: 'Kiểm tra tính bắc cầu',
+    difficulty: 'medium',
+    question: 'Cho tập A = {1, 2, 3, 4} và quan hệ R = {(1, 2), (2, 3)}. Để R có tính chất bắc cầu, ta bắt buộc phải bổ sung thêm cặp phần tử nào vào R?',
     options: [
-      { id: 'A', text: '2^(n²)' },
-      { id: 'B', text: '2ⁿ' },
-      { id: 'C', text: 'n²' },
-      { id: 'D', text: 'n!' },
+      { id: 'A', text: '(2, 1)' },
+      { id: 'B', text: '(1, 3)' },
+      { id: 'C', text: '(3, 2)' },
+      { id: 'D', text: '(1, 1)' },
     ],
-    correctId: 'A',
-    explanation: 'Một quan hệ hai ngôi trên A là một tập con bất kỳ của tích Descartes A × A. Vì |A × A| = n², số tập con của nó là 2^(|A × A|) = 2^(n²).',
-    actionLink: { view: 'relation', tab: 'matrix' },
+    correctId: 'B',
+    explanation: 'Slide Chương 4 trang 11: Do (1, 2) ∈ R và (2, 3) ∈ R, theo điều kiện bắc cầu bắt buộc phải có cặp (1, 3) ∈ R.',
+    actionLink: { view: 'relation', tab: 'properties' },
   },
 
   // =========================================================================
-  // CHƯƠNG 5: LÝ THUYẾT ĐỒ THỊ & THUẬT TOÁN TỐI ƯU
+  // CHƯƠNG 5: LÝ THUYẾT ĐỒ THỊ, EULER, HAMILTON, CÂY & CÁC THUẬT TOÁN
   // =========================================================================
   {
     id: 'graph_q01',
     topic: 'graph',
-    topicName: 'Đồ thị cơ bản',
+    topicName: 'Định lý Bắt tay',
     difficulty: 'easy',
     question: 'Một đơn đồ thị vô hướng có 5 đỉnh với bậc lần lượt là 2, 3, 3, 4, 4. Tổng số cạnh của đồ thị này là bao nhiêu?',
     options: [
@@ -1622,152 +1241,154 @@ export const STATIC_QUESTION_BANK = [
       { id: 'D', text: '7 cạnh' },
     ],
     correctId: 'A',
-    explanation: 'Theo Định lý bắt tay (Handshaking Lemma): Tổng bậc của tất cả các đỉnh bằng 2 lần số cạnh (Σ deg(v) = 2|E|). Tổng bậc = 2 + 3 + 3 + 4 + 4 = 16. Do đó số cạnh |E| = 16 / 2 = 8 cạnh.',
+    explanation: 'Theo Định lý bắt tay ở slide Chương 5 trang 13: Tổng bậc của tất cả các đỉnh bằng 2 lần số cạnh (∑ deg(v) = 2|E|). Tổng bậc = 2 + 3 + 3 + 4 + 4 = 16. Do đó số cạnh |E| = 16 / 2 = 8 cạnh.',
   },
   {
     id: 'graph_q02',
     topic: 'graph',
-    topicName: 'Đồ thị cơ bản',
+    topicName: 'Khuyên và bậc của đỉnh',
     difficulty: 'easy',
-    question: 'Đơn đồ thị đầy đủ K₅ (5 đỉnh, mỗi cặp đỉnh đều có cạnh nối) có tất cả bao nhiêu cạnh?',
+    question: 'Trong đồ thị vô hướng, cạnh nối một đỉnh với chính nó được gọi là gì và đóng góp bao nhiêu vào bậc của đỉnh đó?',
     options: [
-      { id: 'A', text: '5 cạnh' },
-      { id: 'B', text: '10 cạnh' },
-      { id: 'C', text: '20 cạnh' },
-      { id: 'D', text: '25 cạnh' },
+      { id: 'A', text: 'Cạnh song song, tính 1 bậc' },
+      { id: 'B', text: 'Khuyên (loop), tính 2 bậc' },
+      { id: 'C', text: 'Cạnh treo, tính 1 bậc' },
+      { id: 'D', text: 'Cầu, tính 0 bậc' },
     ],
     correctId: 'B',
-    explanation: 'Số cạnh của đồ thị đầy đủ Kn được tính theo công thức tổ hợp C(n, 2) = n(n - 1) / 2. Với K₅, số cạnh là 5 × 4 / 2 = 10 cạnh.',
+    explanation: 'Slide Chương 5 trang 6 và 11: Cạnh nối một đỉnh với chính nó gọi là khuyên. Riêng khuyên tại một đỉnh được tính hai lần cho bậc của nó.',
   },
   {
     id: 'graph_q03',
     topic: 'graph',
-    topicName: 'Bậc của đỉnh',
-    difficulty: 'medium',
-    question: 'Trong bất kỳ đồ thị vô hướng nào, số lượng đỉnh có bậc lẻ luôn luôn là:',
+    topicName: 'Hệ quả số đỉnh bậc lẻ',
+    difficulty: 'easy',
+    question: 'Hệ quả trực tiếp của Định lý Bắt tay (Handshaking Theorem) trong đồ thị vô hướng là gì?',
     options: [
-      { id: 'A', text: 'Một số lẻ' },
-      { id: 'B', text: 'Một số chẵn' },
-      { id: 'C', text: 'Một số chia hết cho 4' },
-      { id: 'D', text: 'Tùy thuộc vào số đỉnh' },
+      { id: 'A', text: 'Mọi đỉnh đều có bậc chẵn' },
+      { id: 'B', text: 'Số cạnh luôn là số chẵn' },
+      { id: 'C', text: 'Trong mọi đồ thị vô hướng, số đỉnh có bậc lẻ luôn là một số chẵn' },
+      { id: 'D', text: 'Đồ thị luôn có ít nhất một đỉnh cô lập' },
     ],
-    correctId: 'B',
-    explanation: 'Vì tổng bậc tất cả các đỉnh bằng 2|E| (luôn là số chẵn), nên tổng bậc của các đỉnh bậc lẻ phải là số chẵn. Điều này suy ra số lượng đỉnh có bậc lẻ bắt buộc phải là một số chẵn.',
+    correctId: 'C',
+    explanation: 'Slide Chương 5 trang 13: Vì tổng bậc của tất cả các đỉnh luôn bằng 2|E| (số chẵn), nên số lượng đỉnh có bậc lẻ bắt buộc phải là một số chẵn để tổng không bị lẻ.',
   },
   {
     id: 'graph_q04',
     topic: 'graph',
-    topicName: 'Đồ thị phẳng & Euler',
-    difficulty: 'medium',
-    question: 'Theo công thức Euler cho một đơn đồ thị phẳng liên thông có V đỉnh, E cạnh và F miền mặt phẳng (faces), hệ thức nào sau đây luôn đúng?',
+    topicName: 'Bán bậc đồ thị có hướng',
+    difficulty: 'easy',
+    question: 'Trong đồ thị có hướng G = (V, E), định lý về tổng bán bậc khẳng định hệ thức nào sau đây?',
     options: [
-      { id: 'A', text: 'V + E + F = 2' },
-      { id: 'B', text: 'V - E + F = 2' },
-      { id: 'C', text: 'V + E - F = 1' },
-      { id: 'D', text: 'E = V + F' },
+      { id: 'A', text: '∑ deg⁺(v) = 2|E|' },
+      { id: 'B', text: '∑ deg⁺(v) = ∑ deg⁻(v) = |E|' },
+      { id: 'C', text: '∑ deg⁺(v) + ∑ deg⁻(v) = |E|' },
+      { id: 'D', text: 'deg⁺(v) = deg⁻(v) với mọi đỉnh' },
     ],
     correctId: 'B',
-    explanation: 'Công thức Euler cho đồ thị phẳng liên thông: V - E + F = 2 (Đỉnh trừ Cạnh cộng Miền bằng 2). Đây là bất biến tôpô nền tảng của hình học phẳng.',
+    explanation: 'Slide Chương 5 trang 14: Trong đồ thị có hướng, mỗi cung e = (u, v) đi ra khỏi đúng 1 đỉnh u (đóng góp 1 vào deg⁺) và đi vào đúng 1 đỉnh v (đóng góp 1 vào deg⁻). Do đó: ∑ deg⁺(v) = ∑ deg⁻(v) = |E|.',
   },
   {
     id: 'graph_q05',
     topic: 'graph',
-    topicName: 'Định lý Kuratowski',
-    difficulty: 'hard',
-    question: 'Theo Định lý Kuratowski, một đồ thị là đồ thị phẳng khi và chỉ khi nó không chứa đồ thị con đồng phôi (homeomorphic) với hai đồ thị cơ sở nào?',
+    topicName: 'Đỉnh treo và Đỉnh cô lập',
+    difficulty: 'easy',
+    question: 'Một đỉnh v trong đồ thị vô hướng có bậc deg(v) = 1 được gọi là loại đỉnh gì?',
     options: [
-      { id: 'A', text: 'K₃ và K₄' },
-      { id: 'B', text: 'K₅ (đồ thị đầy đủ 5 đỉnh) và K₃,₃ (đồ thị hai phía đầy đủ 3-3)' },
-      { id: 'C', text: 'K₄ và C₅' },
-      { id: 'D', text: 'Đồ thị Petersen' },
+      { id: 'A', text: 'Đỉnh treo' },
+      { id: 'B', text: 'Đỉnh cô lập' },
+      { id: 'C', text: 'Đỉnh khớp' },
+      { id: 'D', text: 'Đỉnh Euler' },
     ],
-    correctId: 'B',
-    explanation: 'Định lý Kuratowski (1930): Đồ thị là phẳng ⇔ không chứa đồ thị con đồng phôi với K₅ (đồ thị phi phẳng nhỏ nhất) hoặc K₃,₃ (bài toán 3 nhà 3 giếng).',
+    correctId: 'A',
+    explanation: 'Slide Chương 5 trang 11 quy định rõ: deg(v) = 1 gọi là đỉnh treo; deg(v) = 0 gọi là đỉnh cô lập.',
   },
   {
     id: 'euler_q01',
     topic: 'graph',
-    topicName: 'Đồ thị Euler',
+    topicName: 'Định lý Chu trình Euler',
     difficulty: 'easy',
-    question: 'Điều kiện cần và đủ để một đồ thị vô hướng liên thông có Chu trình Euler (Eulerian Circuit) là:',
+    question: 'Định lý Euler khẳng định: Một đồ thị vô hướng liên thông có Chu trình Euler khi và chỉ khi:',
     options: [
-      { id: 'A', text: 'Mọi đỉnh đều có bậc lẻ' },
-      { id: 'B', text: 'Có đúng 2 đỉnh bậc lẻ' },
-      { id: 'C', text: 'Mọi đỉnh đều có bậc chẵn' },
-      { id: 'D', text: 'Số đỉnh bằng số cạnh' },
+      { id: 'A', text: 'Có đúng 2 đỉnh bậc lẻ' },
+      { id: 'B', text: 'Mọi đỉnh đều có bậc chẵn (khác 0)' },
+      { id: 'C', text: 'Có ít nhất một đỉnh bậc chẵn' },
+      { id: 'D', text: 'Số cạnh bằng số đỉnh trừ 1' },
     ],
-    correctId: 'C',
-    explanation: 'Định lý Euler khẳng định: Một đồ thị liên thông có chu trình Euler khi và chỉ khi mọi đỉnh của đồ thị đều có bậc chẵn (deg(v) là số chẵn với mọi v).',
-    actionLink: { view: 'lab', algoKey: 'euler', preset: 'euler_circuit' },
+    correctId: 'B',
+    explanation: 'Slide Chương 5 trang 35: Đồ thị vô hướng liên thông có chu trình Euler khi và chỉ khi mọi đỉnh của nó đều có bậc chẵn khác 0.',
+    actionLink: { view: 'lab', algoKey: 'euler' },
   },
   {
     id: 'euler_q02',
     topic: 'graph',
-    topicName: 'Đồ thị Euler',
-    difficulty: 'medium',
-    question: 'Một đồ thị liên thông có đúng 2 đỉnh bậc lẻ thì đồ thị đó có tính chất nào?',
+    topicName: 'Đường đi Euler',
+    difficulty: 'easy',
+    question: 'Một đồ thị vô hướng liên thông có Đường đi Euler (mở, vẽ được một nét không quay về đỉnh xuất phát) khi và chỉ khi:',
     options: [
-      { id: 'A', text: 'Có chu trình Euler' },
-      { id: 'B', text: 'Có đường đi Euler (bắt đầu ở 1 đỉnh lẻ và kết thúc ở đỉnh lẻ còn lại)' },
-      { id: 'C', text: 'Không có đường đi lẫn chu trình Euler' },
-      { id: 'D', text: 'Là đồ thị hai phía' },
+      { id: 'A', text: 'Có đúng 2 đỉnh bậc lẻ' },
+      { id: 'B', text: 'Mọi đỉnh đều có bậc lẻ' },
+      { id: 'C', text: 'Có đúng 1 đỉnh bậc lẻ' },
+      { id: 'D', text: 'Không có đỉnh bậc chẵn nào' },
     ],
-    correctId: 'B',
-    explanation: 'Nếu đồ thị liên thông có đúng 2 đỉnh bậc lẻ, đồ thị có Đường đi Euler (Eulerian Trail) xuất phát từ một trong hai đỉnh lẻ đó và kết thúc ở đỉnh lẻ còn lại.',
-    actionLink: { view: 'lab', algoKey: 'euler', preset: 'euler_path' },
+    correctId: 'A',
+    explanation: 'Slide Chương 5 trang 35: Đồ thị vô hướng liên thông có đường đi Euler (không đóng) khi và chỉ khi nó có đúng 2 đỉnh bậc lẻ (2 đỉnh này chính là đỉnh xuất phát và đỉnh kết thúc của đường đi).',
+    actionLink: { view: 'lab', algoKey: 'euler' },
   },
   {
     id: 'euler_q03',
     topic: 'graph',
     topicName: 'Thuật toán Fleury',
-    difficulty: 'hard',
-    question: 'Thuật toán Fleury dùng để xây dựng chu trình/đường đi Euler đưa ra nguyên tắc quan trọng nào khi lựa chọn cạnh tiếp theo để đi qua?',
+    difficulty: 'medium',
+    question: 'Trong thuật toán Fleury tìm chu trình Euler, quy tắc cốt lõi khi chọn cạnh đi tiếp là gì?',
     options: [
-      { id: 'A', text: 'Luôn chọn cạnh có trọng số nhỏ nhất' },
-      { id: 'B', text: 'Không bao giờ đi qua cạnh là CẦU (cạnh cắt liên thông) trừ khi không còn sự lựa chọn nào khác' },
-      { id: 'C', text: 'Luôn ưu tiên đi qua đỉnh có bậc lớn nhất' },
-      { id: 'D', text: 'Chỉ chọn các cạnh tạo thành chu trình con' },
+      { id: 'A', text: 'Chỉ đi qua cạnh cầu (bridge) nếu không còn cạnh nào khác để chọn' },
+      { id: 'B', text: 'Luôn ưu tiên chọn cạnh cầu đầu tiên' },
+      { id: 'C', text: 'Luôn chọn cạnh có trọng số lớn nhất' },
+      { id: 'D', text: 'Đi qua cạnh có đỉnh bậc lẻ trước' },
     ],
-    correctId: 'B',
-    explanation: 'Nguyên tắc vàng của Fleury: "Đừng đốt cháy cầu nối phía sau bạn". Khi xóa cạnh đã đi qua, nếu cạnh đó là CẦU (làm đồ thị còn lại tách thành 2 thành phần liên thông), ta không được chọn nó trừ phi đó là cạnh duy nhất còn lại từ đỉnh hiện tại.',
-    actionLink: { view: 'lab', algoKey: 'euler', preset: 'euler_circuit' },
+    correctId: 'A',
+    explanation: 'Slide Chương 5 trang 38: Thuật toán Fleury quy định nguyên tắc: "Chỉ chọn cạnh cầu nếu không còn cạnh nào khác để chọn. Bổ sung cạnh vừa chọn vào chu trình và xóa cạnh ấy khỏi đồ thị".',
+    actionLink: { view: 'lab', algoKey: 'euler' },
   },
   {
     id: 'hamilton_q01',
     topic: 'graph',
-    topicName: 'Đồ thị Hamilton',
-    difficulty: 'medium',
-    question: 'Điểm khác biệt cốt lõi giữa Chu trình Euler và Chu trình Hamilton là:',
+    topicName: 'Định nghĩa Chu trình Hamilton',
+    difficulty: 'easy',
+    question: 'Khái niệm Chu trình Hamilton trong đồ thị được định nghĩa là chu trình:',
     options: [
-      { id: 'A', text: 'Euler đi qua mỗi đỉnh đúng 1 lần; Hamilton đi qua mỗi cạnh đúng 1 lần' },
-      { id: 'B', text: 'Euler đi qua mỗi cạnh đúng 1 lần; Hamilton đi qua mỗi đỉnh (trừ đỉnh đầu/cuối) đúng 1 lần' },
-      { id: 'C', text: 'Chu trình Hamilton chỉ áp dụng cho đồ thị có hướng' },
-      { id: 'D', text: 'Chu trình Euler luôn dài hơn chu trình Hamilton' },
+      { id: 'A', text: 'Đi qua mọi cạnh đúng một lần rồi quay về đỉnh ban đầu' },
+      { id: 'B', text: 'Đi qua mọi đỉnh đúng một lần rồi quay về đỉnh ban đầu' },
+      { id: 'C', text: 'Đi qua ít nhất một nửa số đỉnh' },
+      { id: 'D', text: 'Có độ dài ngắn nhất trong đồ thị' },
     ],
     correctId: 'B',
-    explanation: 'Chu trình Euler tập trung vào cạnh: đi qua MỌI CẠNH đúng 1 lần. Chu trình Hamilton tập trung vào đỉnh: đi qua MỌI ĐỈNH đúng 1 lần rồi quay về đỉnh xuất phát.',
+    explanation: 'Slide Chương 5 trang 42: Chu trình Hamilton là chu trình bắt đầu từ một đỉnh v, đi qua tất cả các đỉnh còn lại mỗi đỉnh đúng một lần rồi quay trở về v.',
+    actionLink: { view: 'lab', algoKey: 'hamilton' },
   },
   {
     id: 'hamilton_q02',
     topic: 'graph',
-    topicName: 'Đồ thị Hamilton',
-    difficulty: 'hard',
-    question: 'Định lý Dirac: Đơn đồ thị vô hướng có n đỉnh (n ≥ 3) chắc chắn có chu trình Hamilton nếu bậc của mọi đỉnh thỏa mãn điều kiện nào?',
+    topicName: 'Định lý Dirac (Hamilton)',
+    difficulty: 'medium',
+    question: 'Định lý Dirac (1952) khẳng định điều kiện đủ để đơn đồ thị có n đỉnh (n ≥ 3) là đồ thị Hamilton là gì?',
     options: [
-      { id: 'A', text: 'deg(v) ≥ n / 2' },
-      { id: 'B', text: 'deg(v) ≥ n - 1' },
-      { id: 'C', text: 'deg(v) ≤ n / 2' },
-      { id: 'D', text: 'deg(v) là số chẵn' },
+      { id: 'A', text: 'Mọi đỉnh của đồ thị đều có bậc deg(v) ≥ n/2' },
+      { id: 'B', text: 'Mọi đỉnh đều có bậc chẵn' },
+      { id: 'C', text: 'Tổng số cạnh |E| ≥ n²' },
+      { id: 'D', text: 'Đồ thị không chứa chu trình tam giác' },
     ],
     correctId: 'A',
-    explanation: 'Định lý Dirac (1952): Nếu đơn đồ thị n đỉnh (n ≥ 3) có deg(v) ≥ n / 2 với mọi đỉnh v thì đồ thị đó là đồ thị Hamilton.',
+    explanation: 'Slide Chương 5 trang 45: Định lý Dirac (1952): Nếu G là đơn đồ thị có n đỉnh (n ≥ 3) và mỗi đỉnh của G đều có bậc không nhỏ hơn n/2 thì G là một đồ thị Hamilton.',
+    actionLink: { view: 'lab', algoKey: 'hamilton' },
   },
   {
     id: 'mst_q01',
     topic: 'graph',
-    topicName: 'Cây khung nhỏ nhất',
+    topicName: 'Số cạnh của Cây (Tree)',
     difficulty: 'easy',
-    question: 'Một cây khung (Spanning Tree) của một đồ thị liên thông có n đỉnh sẽ có chính xác bao nhiêu cạnh?',
+    question: 'Một Cây (Tree) có n đỉnh (n ≥ 1) luôn có chính xác bao nhiêu cạnh?',
     options: [
       { id: 'A', text: 'n cạnh' },
       { id: 'B', text: 'n - 1 cạnh' },
@@ -1775,44 +1396,44 @@ export const STATIC_QUESTION_BANK = [
       { id: 'D', text: '2n cạnh' },
     ],
     correctId: 'B',
-    explanation: 'Theo định nghĩa cây trong lý thuyết đồ thị: Cây là đồ thị liên thông phi chu trình. Cây có n đỉnh luôn luôn chứa đúng n - 1 cạnh.',
+    explanation: 'Slide Chương 5 trang 48: Định lý: Đơn đồ thị T là một cây n đỉnh khi và chỉ khi T liên thông và có đúng n - 1 cạnh (không chứa chu trình).',
   },
   {
     id: 'mst_q02',
     topic: 'graph',
     topicName: 'Thuật toán Kruskal',
-    difficulty: 'medium',
-    question: 'Thuật toán Kruskal xây dựng cây khung nhỏ nhất (MST) theo chiến lược nào sau đây?',
+    difficulty: 'easy',
+    question: 'Đặc điểm cơ bản của thuật toán Kruskal tìm cây khung nhỏ nhất (MST) là:',
     options: [
-      { id: 'A', text: 'Bắt đầu từ một đỉnh gốc, mở rộng dần tập đỉnh liên thông' },
-      { id: 'B', text: 'Sắp xếp tất cả các cạnh theo trọng số tăng dần, lần lượt chọn cạnh nhỏ nhất không tạo thành chu trình' },
-      { id: 'C', text: 'Xóa dần các cạnh có trọng số lớn nhất cho đến khi đồ thị hết chu trình' },
-      { id: 'D', text: 'Duyệt theo chiều rộng (BFS)' },
+      { id: 'A', text: 'Sắp xếp các cạnh tăng dần theo trọng số, lần lượt kết nạp cạnh nhỏ nhất không tạo thành chu trình' },
+      { id: 'B', text: 'Bắt đầu từ 1 đỉnh và loang dần sang các đỉnh lân cận' },
+      { id: 'C', text: 'Tìm đường đi ngắn nhất giữa từng cặp đỉnh' },
+      { id: 'D', text: 'Xóa dần các đỉnh có bậc lớn nhất' },
     ],
-    correctId: 'B',
-    explanation: 'Thuật toán Kruskal sắp xếp toàn bộ cạnh theo trọng số không giảm. Sau đó dùng cấu trúc tập rời rạc (Disjoint Set Union) để nạp từng cạnh nhỏ nhất mà không tạo chu trình cho tới khi đủ n - 1 cạnh.',
-    actionLink: { view: 'lab', algoKey: 'kruskal', preset: 'building' },
+    correctId: 'A',
+    explanation: 'Slide Chương 5 trang 58: Thuật toán Kruskal ưu tiên các cạnh có trọng số nhỏ hơn, kết nạp cạnh khi nó không tạo chu trình với tập cạnh đã chọn trước đó cho đến khi đủ n - 1 cạnh.',
+    actionLink: { view: 'lab', algoKey: 'kruskal' },
   },
   {
     id: 'mst_q03',
     topic: 'graph',
     topicName: 'Thuật toán Prim',
     difficulty: 'medium',
-    question: 'Thuật toán Prim khác với thuật toán Kruskal ở điểm mấu chốt nào trong quá trình thực thi?',
+    question: 'Đặc điểm cơ bản của thuật toán Prim tìm cây khung nhỏ nhất (MST) là:',
     options: [
-      { id: 'A', text: 'Prim chỉ áp dụng cho đồ thị có hướng' },
-      { id: 'B', text: 'Cây con của Prim luôn duy trì tính liên thông ở mọi bước mở rộng, trong khi Kruskal có thể tạo ra một rừng các cụm rời rạc' },
-      { id: 'C', text: 'Prim cho kết quả tổng trọng số nhỏ hơn Kruskal' },
-      { id: 'D', text: 'Kruskal dùng hàng đợi ưu tiên còn Prim không dùng' },
+      { id: 'A', text: 'Bắt đầu từ một đỉnh và mở rộng từng bước bằng cạnh có trọng số nhỏ nhất nối đỉnh đã xét với đỉnh chưa xét' },
+      { id: 'B', text: 'Xét tất cả các cạnh theo thứ tự giảm dần trọng số' },
+      { id: 'C', text: 'Chia đồ thị thành hai phần bằng nhau' },
+      { id: 'D', text: 'Xóa cạnh cầu' },
     ],
-    correctId: 'B',
-    explanation: 'Tại mỗi bước trung gian, thuật toán Prim luôn mở rộng một cây liên thông duy nhất từ tập đỉnh đã xét. Trong khi đó, Kruskal gom các cạnh độc lập nên có thể chứa nhiều cây con rời rạc trước khi nối lại ở bước cuối.',
-    actionLink: { view: 'lab', algoKey: 'prim', preset: 'prim_slide' },
+    correctId: 'A',
+    explanation: 'Slide Chương 5 trang 56: Thuật toán Prim xuất phát từ một cây chỉ chứa đúng 1 đỉnh và mở rộng từng bước một, mỗi bước thêm một cạnh có trọng số nhỏ nhất nối cây hiện tại với một đỉnh ngoài cây.',
+    actionLink: { view: 'lab', algoKey: 'prim' },
   },
   {
     id: 'dijkstra_q01',
     topic: 'graph',
-    topicName: 'Thuật toán Dijkstra',
+    topicName: 'Điều kiện thuật toán Dijkstra',
     difficulty: 'easy',
     question: 'Điều kiện tiên quyết để thuật toán Dijkstra đảm bảo tìm được đường đi ngắn nhất chính xác là gì?',
     options: [
@@ -1822,218 +1443,211 @@ export const STATIC_QUESTION_BANK = [
       { id: 'D', text: 'Mọi đỉnh phải có bậc chẵn' },
     ],
     correctId: 'B',
-    explanation: 'Thuật toán Dijkstra dựa trên chiến lược tham lam (Greedy): một khi đỉnh đã được "chốt nhãn tối ưu", khoảng cách của nó sẽ không đổi. Nếu có cạnh trọng số âm, giả định này bị phá vỡ và Dijkstra có thể cho kết quả sai (khi đó phải dùng Bellman-Ford).',
-    actionLink: { view: 'lab', algoKey: 'dijkstra', preset: 'building' },
+    explanation: 'Slide Chương 5 trang 61: Thuật toán Dijkstra tìm đường đi ngắn nhất trong đồ thị có trọng số w(i, j) > 0 (không âm). Nếu có cạnh âm, giả định tối ưu Greedy bị phá vỡ.',
+    actionLink: { view: 'lab', algoKey: 'dijkstra' },
   },
   {
     id: 'dijkstra_q02',
     topic: 'graph',
-    topicName: 'Thuật toán Dijkstra',
-    difficulty: 'hard',
-    question: 'Nếu triển khai thuật toán Dijkstra sử dụng Cấu trúc dữ liệu Min-Heap (Binary Heap), độ phức tạp thời gian của thuật toán với V đỉnh và E cạnh là bao nhiêu?',
+    topicName: 'Công thức cập nhật nhãn Dijkstra',
+    difficulty: 'medium',
+    question: 'Trong thuật toán Dijkstra, bước cập nhật nhãn khoảng cách khi xét đỉnh x kề với đỉnh v vừa cố định (relaxation) được thực hiện theo công thức nào?',
     options: [
-      { id: 'A', text: 'O(V²)' },
-      { id: 'B', text: 'O((V + E) log V)' },
-      { id: 'C', text: 'O(V × E)' },
-      { id: 'D', text: 'O(2^V)' },
+      { id: 'A', text: 'L(x) = min{L(x), L(v) + w(v, x)}' },
+      { id: 'B', text: 'L(x) = L(x) + w(v, x)' },
+      { id: 'C', text: 'L(x) = max{L(x), L(v) + w(v, x)}' },
+      { id: 'D', text: 'L(x) = w(v, x)' },
     ],
-    correctId: 'B',
-    explanation: 'Khi dùng Min-Heap (như MinHeap.js trong dự án), mỗi thao tác trích xuất đỉnh nhỏ nhất mất O(log V) và mỗi thao tác cập nhật nhãn khoảng cách cạnh (relax) mất O(log V). Tổng thời gian đạt O((V + E) log V).',
-    actionLink: { view: 'lab', algoKey: 'dijkstra', preset: 'building' },
+    correctId: 'A',
+    explanation: 'Slide Chương 5 trang 62 (Bước 4 thuật toán Dijkstra): Với mỗi x ∈ T kề với v, cập nhật: L(x) = min{L(x), L(v) + w(v, x)}.',
+    actionLink: { view: 'lab', algoKey: 'dijkstra' },
   },
   {
     id: 'dijkstra_q03',
     topic: 'graph',
-    topicName: 'Thuật toán Dijkstra',
-    difficulty: 'medium',
-    question: 'Trong bước duyệt các đỉnh kề của đỉnh u đang xét, phép toán "nới lỏng cạnh" (relax) giữa u và v với trọng số w(u, v) thực hiện kiểm tra điều kiện nào?',
+    topicName: 'Khởi tạo nhãn Dijkstra',
+    difficulty: 'easy',
+    question: 'Khi khởi tạo thuật toán Dijkstra với đỉnh nguồn a, nhãn khoảng cách ban đầu L(a) của a và L(x) của các đỉnh x ≠ a được gán lần lượt là:',
     options: [
-      { id: 'A', text: 'Nếu d[u] + w(u, v) < d[v] thì d[v] = d[u] + w(u, v) và p[v] = u' },
-      { id: 'B', text: 'Nếu d[u] > d[v] + w(u, v) thì d[u] = d[v] + w(u, v)' },
-      { id: 'C', text: 'Nếu w(u, v) < d[v] thì gán d[v] = w(u, v)' },
-      { id: 'D', text: 'Nếu d[v] == 0 thì cập nhật d[v] = d[u]' },
+      { id: 'A', text: 'L(a) = ∞ và L(x) = 0' },
+      { id: 'B', text: 'L(a) = 0 và L(x) = ∞' },
+      { id: 'C', text: 'L(a) = 1 và L(x) = 0' },
+      { id: 'D', text: 'L(a) = 0 và L(x) = 1' },
     ],
-    correctId: 'A',
-    explanation: 'Nguyên lý nới lỏng (Relaxation): Nếu đường đi từ nguồn s qua u rồi đến v có tổng chi phí d[u] + w(u, v) nhỏ hơn kỷ lục hiện tại d[v], ta lập tức cập nhật d[v] mới và ghi nhận u là đỉnh đi trước v (p[v] = u).',
-    actionLink: { view: 'lab', algoKey: 'dijkstra', preset: 'building' },
+    correctId: 'B',
+    explanation: 'Slide Chương 5 trang 62 (Bước 1 thuật toán Dijkstra): Gán L(a) = 0. Với mọi đỉnh x ≠ a gán L(x) = ∞.',
+    actionLink: { view: 'lab', algoKey: 'dijkstra' },
   },
   {
     id: 'graph_q06',
     topic: 'graph',
-    topicName: 'Đồ thị hai phía (Bipartite)',
-    difficulty: 'medium',
-    question: 'Định lý Kőnig khẳng định một đồ thị là đồ thị hai phía (Bipartite Graph) khi và chỉ khi đồ thị đó thỏa mãn điều kiện nào?',
+    topicName: 'Ma trận kề đồ thị vô hướng',
+    difficulty: 'easy',
+    question: 'Ma trận kề của một đơn đồ thị vô hướng có n đỉnh luôn có tính chất gì?',
     options: [
-      { id: 'A', text: 'Không chứa bất kỳ chu trình nào có độ dài lẻ' },
-      { id: 'B', text: 'Không chứa bất kỳ chu trình nào có độ dài chẵn' },
-      { id: 'C', text: 'Mọi đỉnh đều có bậc bằng nhau' },
-      { id: 'D', text: 'Là một đồ thị phẳng' },
+      { id: 'A', text: 'Là ma trận đối xứng và có đường chéo chính toàn số 0' },
+      { id: 'B', text: 'Là ma trận tam giác trên' },
+      { id: 'C', text: 'Không đối xứng' },
+      { id: 'D', text: 'Có đường chéo chính toàn số 1' },
     ],
     correctId: 'A',
-    explanation: 'Định lý kinh điển Kőnig (1936): Đồ thị G là hai phía ⇔ G không chứa chu trình đơn độ dài lẻ. Nếu có chu trình lẻ (như tam giác C₃), việc chia các đỉnh vào 2 tập độc lập để các cạnh chỉ nối giữa 2 tập sẽ không thể thực hiện được.',
-    actionLink: { view: 'lab', algoKey: 'euler', preset: 'euler_sample' },
+    explanation: 'Slide Chương 5 trang 21-22: Vì cạnh (u, v) vô hướng nên a_ij = a_ji (ma trận đối xứng). Đơn đồ thị không có khuyên nên đường chéo chính a_ii = 0 với mọi i.',
   },
   {
     id: 'graph_q07',
     topic: 'graph',
-    topicName: 'Định lý Bắt tay',
+    topicName: 'Ma trận liên thuộc',
     difficulty: 'easy',
-    question: 'Một đơn đồ thị vô hướng có 10 đỉnh và mỗi đỉnh đều có bậc bằng 4. Tổng số cạnh của đồ thị này là bao nhiêu?',
+    question: 'Trong ma trận liên thuộc (đỉnh - cạnh) của một đồ thị vô hướng, mỗi cột có đúng bao nhiêu phần tử bằng 1?',
     options: [
-      { id: 'A', text: '20 cạnh' },
-      { id: 'B', text: '40 cạnh' },
-      { id: 'C', text: '10 cạnh' },
-      { id: 'D', text: '15 cạnh' },
+      { id: 'A', text: '1 phần tử' },
+      { id: 'B', text: '0 phần tử' },
+      { id: 'C', text: '2 phần tử (tương ứng 2 đầu mút của cạnh)' },
+      { id: 'D', text: 'n phần tử' },
     ],
-    correctId: 'A',
-    explanation: 'Theo Định lý Bắt tay (Handshaking Lemma): Tổng bậc của tất cả các đỉnh bằng 2 lần số cạnh: ∑ deg(v) = 2|E|. Ta có 10 × 4 = 40 = 2|E| ⇒ |E| = 20 cạnh.',
-    actionLink: { view: 'lab', algoKey: 'dijkstra', preset: 'building' },
+    correctId: 'C',
+    explanation: 'Slide Chương 5 trang 23: Mỗi cột biểu diễn 1 cạnh. Cạnh vô hướng nối 2 đỉnh phân biệt nên ở mỗi cột có đúng hai số 1 tại hai hàng tương ứng hai đỉnh đầu mút.',
   },
   {
     id: 'graph_q08',
     topic: 'graph',
-    topicName: 'Tính chất của Cây (Tree)',
-    difficulty: 'easy',
-    question: 'Một cây (Tree) có 2026 đỉnh thì luôn có chính xác bao nhiêu cạnh?',
+    topicName: 'Đỉnh treo trong Cây',
+    difficulty: 'medium',
+    question: 'Một đồ thị vô hướng T có n đỉnh (n ≥ 2) là một cây (Tree) thì chắc chắn chứa ít nhất bao nhiêu đỉnh treo (đỉnh bậc 1)?',
     options: [
-      { id: 'A', text: '2025 cạnh' },
-      { id: 'B', text: '2026 cạnh' },
-      { id: 'C', text: '1013 cạnh' },
-      { id: 'D', text: '4050 cạnh' },
+      { id: 'A', text: 'Ít nhất 2 đỉnh treo' },
+      { id: 'B', text: 'Ít nhất 1 đỉnh treo' },
+      { id: 'C', text: 'Không có đỉnh treo nào' },
+      { id: 'D', text: 'Đúng n đỉnh treo' },
     ],
     correctId: 'A',
-    explanation: 'Một trong các tính chất đặc trưng cơ bản nhất của Cây: Cây là đồ thị vô hướng liên thông và không có chu trình. Cây có n đỉnh thì luôn có đúng n - 1 cạnh. Với n = 2026, số cạnh là 2026 - 1 = 2025 cạnh.',
-    actionLink: { view: 'lab', algoKey: 'kruskal', preset: 'kruskal_slide' },
+    explanation: 'Slide Chương 5 trang 48: Định lý: Nếu 1 cây T gồm n đỉnh với n ≥ 2 thì T chứa ít nhất 2 đỉnh treo (đỉnh có deg(v) = 1).',
   },
   {
     id: 'graph_q09',
     topic: 'graph',
-    topicName: 'Sắc số của Đồ thị',
-    difficulty: 'medium',
-    question: 'Định lý Bốn Màu (Four Color Theorem) nổi tiếng khẳng định điều gì về việc tô màu đỉnh cho đồ thị phẳng?',
+    topicName: 'Đồ thị đầy đủ K_n',
+    difficulty: 'easy',
+    question: 'Đồ thị đầy đủ K_n với n đỉnh có tổng cộng bao nhiêu cạnh?',
     options: [
-      { id: 'A', text: 'Mọi đồ thị phẳng đều có sắc số đỉnh (Chromatic Number) không vượt quá 4 (χ(G) ≤ 4)' },
-      { id: 'B', text: 'Chỉ cần đúng 3 màu cho bất kỳ đồ thị phẳng nào' },
-      { id: 'C', text: 'Mọi đồ thị liên thông đều tô được bằng 4 màu' },
-      { id: 'D', text: 'Đồ thị phẳng luôn có đúng 4 đỉnh' },
+      { id: 'A', text: 'n(n - 1) / 2 cạnh' },
+      { id: 'B', text: 'n cạnh' },
+      { id: 'C', text: 'n² cạnh' },
+      { id: 'D', text: 'n(n + 1) / 2 cạnh' },
     ],
     correctId: 'A',
-    explanation: 'Định lý Bốn Màu (chứng minh bởi Appel & Haken, 1976): Mọi bản đồ phẳng (tương ứng đồ thị phẳng) đều có thể tô màu các miền/đỉnh sao cho hai đỉnh kề nhau không trùng màu chỉ bằng tối đa 4 màu (χ(G) ≤ 4).',
+    explanation: 'Slide Chương 5 trang 7: Đồ thị đủ K_n là đơn đồ thị mà 2 đỉnh bất kỳ luôn kề nhau. Số cạnh bằng số cặp đỉnh: C(n, 2) = n(n - 1) / 2 cạnh.',
   },
   {
     id: 'graph_q10',
     topic: 'graph',
-    topicName: 'Biểu diễn Đồ thị',
-    difficulty: 'medium',
-    question: 'Với một đồ thị thưa (số cạnh E rất nhỏ so với V²), phương pháp biểu diễn nào sau đây tiết kiệm bộ nhớ nhất?',
+    topicName: 'Đồ thị hai phía (Lưỡng phân)',
+    difficulty: 'easy',
+    question: 'Đồ thị hai phía (bipartite graph) là đồ thị có tập đỉnh V có thể chia thành hai tập con V₁ và V₂ rời nhau sao cho:',
     options: [
-      { id: 'A', text: 'Danh sách kề (Adjacency List) với không gian O(V + E)' },
-      { id: 'B', text: 'Ma trận kề (Adjacency Matrix) với không gian O(V²)' },
-      { id: 'C', text: 'Ma trận trọng số V × V' },
-      { id: 'D', text: 'Bảng chân trị 2^V' },
+      { id: 'A', text: 'Mọi cạnh đều nằm trong tập V₁' },
+      { id: 'B', text: 'Mọi cạnh của đồ thị chỉ nối một đỉnh thuộc V₁ với một đỉnh thuộc V₂ (không có cạnh nối hai đỉnh cùng thuộc một tập)' },
+      { id: 'C', text: 'Có cạnh nối giữa mọi cặp đỉnh trong V₁' },
+      { id: 'D', text: 'Đồ thị có chu trình độ dài lẻ' },
     ],
-    correctId: 'A',
-    explanation: 'Với đồ thị thưa, Ma trận kề lãng phí O(V²) ô nhớ (đa số chứa số 0). Danh sách kề chỉ lưu các đỉnh kề thực tế nên chỉ tốn O(V + E) bộ nhớ, tối ưu vượt trội cho đồ thị lớn như mạng xã hội, bản đồ giao thông.',
+    correctId: 'B',
+    explanation: 'Slide Chương 5 trang 8: Định nghĩa đồ thị hai phía: tập đỉnh được chia thành 2 tập không giao nhau V₁, V₂ sao cho không có cạnh nào nối 2 đỉnh thuộc cùng một tập.',
   },
   {
     id: 'graph_q11',
     topic: 'graph',
-    topicName: 'Đường đi Euler có hướng',
-    difficulty: 'hard',
-    question: 'Điều kiện để một đồ thị CÓ HƯỚNG liên thông yếu có Chu trình Euler là gì?',
+    topicName: 'Nhận biết Cây theo số cạnh',
+    difficulty: 'medium',
+    question: 'Một đồ thị vô hướng liên thông có 6 đỉnh và 5 cạnh. Khẳng định nào sau đây chắc chắn đúng về đồ thị này?',
     options: [
-      { id: 'A', text: 'Tại mọi đỉnh v, bán bậc vào bằng bán bậc ra: deg⁻(v) = deg⁺(v)' },
-      { id: 'B', text: 'Tổng bậc vào bằng tổng bậc ra' },
-      { id: 'C', text: 'Mọi đỉnh đều có bậc vào lớn hơn 0' },
-      { id: 'D', text: 'Đồ thị không có chu trình' },
+      { id: 'A', text: 'Đồ thị này là một cây (Tree) và không chứa chu trình' },
+      { id: 'B', text: 'Đồ thị có chu trình Euler' },
+      { id: 'C', text: 'Đồ thị có chu trình Hamilton' },
+      { id: 'D', text: 'Đồ thị không liên thông' },
     ],
     correctId: 'A',
-    explanation: 'Trong đồ thị có hướng, để đi vào đỉnh nào rồi cũng rời khỏi đỉnh đó được mà không bị lặp cạnh, tại MỌI đỉnh v, số cạnh đi vào phải bằng chính xác số cạnh đi ra: deg⁻(v) = deg⁺(v).',
-    actionLink: { view: 'lab', algoKey: 'euler', preset: 'euler_sample' },
+    explanation: 'Slide Chương 5 trang 48: Đơn đồ thị T có n đỉnh là một cây khi và chỉ khi T liên thông và có đúng n - 1 cạnh. Ở đây n = 6 và số cạnh là 5, nên đồ thị chắc chắn là một Cây.',
   },
   {
     id: 'hamilton_q03',
     topic: 'graph',
-    topicName: 'Định lý Ore về Chu trình Hamilton',
-    difficulty: 'hard',
-    question: 'Định lý Ore (1960) phát biểu điều kiện đủ để đơn đồ thị có n đỉnh (n ≥ 3) tồn tại Chu trình Hamilton là:',
+    topicName: 'Điều kiện đỉnh bậc trong Hamilton',
+    difficulty: 'easy',
+    question: 'Nếu một đồ thị vô hướng chứa một đỉnh v có bậc deg(v) = 1 (đỉnh treo) thì đồ thị đó có chu trình Hamilton hay không?',
     options: [
-      { id: 'A', text: 'Với mọi cặp đỉnh u, v không kề nhau, deg(u) + deg(v) ≥ n' },
-      { id: 'B', text: 'Với mọi đỉnh v, deg(v) ≥ n/2' },
-      { id: 'C', text: 'Mọi đỉnh đều có bậc lẻ' },
-      { id: 'D', text: 'Số cạnh E ≥ n² / 2' },
+      { id: 'A', text: 'Không thể có chu trình Hamilton (vì chu trình Hamilton đòi hỏi mọi đỉnh có bậc ít nhất là 2)' },
+      { id: 'B', text: 'Chắc chắn có chu trình Hamilton' },
+      { id: 'C', text: 'Luôn có chu trình Euler' },
+      { id: 'D', text: 'Tùy thuộc vào số đỉnh còn lại' },
     ],
     correctId: 'A',
-    explanation: 'Định lý Ore tổng quát hóa định lý Dirac: Nếu trong đơn đồ thị n đỉnh (n ≥ 3), mọi cặp đỉnh không kề nhau u, v đều có tổng bậc deg(u) + deg(v) ≥ n thì G chắc chắn có chu trình Hamilton.',
-    actionLink: { view: 'lab', algoKey: 'hamilton', preset: 'hamilton_dodeca' },
+    explanation: 'Slide Chương 5 trang 46: Quy tắc xác định chu trình Hamilton: "Nếu G có đỉnh bậc < 2 thì G không có chu trình Hamilton", vì chu trình Hamilton phải đi vào và đi ra khỏi mỗi đỉnh qua 2 cạnh phân biệt.',
+    actionLink: { view: 'lab', algoKey: 'hamilton' },
   },
   {
     id: 'mst_q04',
     topic: 'graph',
-    topicName: 'Tính duy nhất của Cây khung nhỏ nhất',
+    topicName: 'Số cạnh của Cây khung',
     difficulty: 'medium',
-    question: 'Điều kiện nào sau đây đảm bảo chắc chắn rằng đồ thị liên thông có trọng số G chỉ có DUY NHẤT một Cây khung nhỏ nhất (MST)?',
+    question: 'Cho đồ thị liên thông G có 7 đỉnh. Bất kỳ cây khung (Spanning tree) nào của G cũng phải chứa đúng bao nhiêu cạnh?',
     options: [
-      { id: 'A', text: 'Tất cả trọng số các cạnh trong đồ thị đều đôi một khác nhau' },
-      { id: 'B', text: 'Đồ thị là đồ thị phẳng' },
-      { id: 'C', text: 'Đồ thị có ít hơn 10 đỉnh' },
-      { id: 'D', text: 'Mọi đỉnh đều có bậc bằng 3' },
+      { id: 'A', text: '6 cạnh (n - 1)' },
+      { id: 'B', text: '7 cạnh' },
+      { id: 'C', text: '5 cạnh' },
+      { id: 'D', text: '12 cạnh' },
     ],
     correctId: 'A',
-    explanation: 'Định lý về MST: Nếu tất cả các cạnh trong đồ thị đều có trọng số phân biệt (không có 2 cạnh nào cùng trọng số), thì đồ thị liên thông có duy nhất một cây khung nhỏ nhất. Khi có cạnh trùng trọng số thì có thể tồn tại nhiều MST khác nhau nhưng cùng tổng trọng số.',
-    actionLink: { view: 'lab', algoKey: 'kruskal', preset: 'kruskal_slide' },
+    explanation: 'Slide Chương 5 trang 52: Cây khung của đồ thị n đỉnh là đồ thị con chứa toàn bộ n đỉnh, liên thông và không có chu trình. Mọi cây n đỉnh đều có đúng n - 1 cạnh. Với n = 7, cây khung có đúng 7 - 1 = 6 cạnh.',
+    actionLink: { view: 'lab', algoKey: 'kruskal' },
   },
   {
     id: 'dijkstra_q04',
     topic: 'graph',
-    topicName: 'Mối quan hệ Dijkstra & BFS',
-    difficulty: 'medium',
-    question: 'Trong trường hợp đặc biệt nào thì Thuật toán Dijkstra hoạt động tương đương hoàn toàn với Thuật toán tìm kiếm theo chiều rộng (BFS)?',
+    topicName: 'Trọng số âm & Bellman-Ford',
+    difficulty: 'easy',
+    question: 'Trong đồ thị có trọng số xuất hiện cạnh mang trọng số âm (w(e) < 0), thuật toán Dijkstra có thể cho kết quả sai. Thuật toán nào sau đây được học để thay thế trong trường hợp có trọng số âm?',
     options: [
-      { id: 'A', text: 'Khi tất cả các cạnh đều có trọng số dương bằng nhau (ví dụ w(e) = 1)' },
-      { id: 'B', text: 'Khi đồ thị là một cây' },
-      { id: 'C', text: 'Khi đồ thị không có chu trình Euler' },
-      { id: 'D', text: 'Khi tất cả trọng số đều âm' },
+      { id: 'A', text: 'Thuật toán Kruskal' },
+      { id: 'B', text: 'Thuật toán Bellman-Ford' },
+      { id: 'C', text: 'Thuật toán Prim' },
+      { id: 'D', text: 'Thuật toán Fleury' },
     ],
-    correctId: 'A',
-    explanation: 'Khi tất cả trọng số cạnh bằng nhau (w = 1), khoảng cách ngắn nhất tỉ lệ thuận với số cạnh đi qua. Khi đó hàng đợi ưu tiên Min-Heap của Dijkstra suy biến thành hàng đợi thông thường (FIFO Queue) của thuật toán BFS với độ phức tạp giảm xuống O(V + E).',
-    actionLink: { view: 'lab', algoKey: 'dijkstra', preset: 'building' },
+    correctId: 'B',
+    explanation: 'Slide Chương 5 trang 60: Thuật toán Bellman-Ford tìm đường đi ngắn nhất từ một nguồn trong đồ thị có thể chứa trọng số âm.',
+    actionLink: { view: 'lab', algoKey: 'dijkstra' },
   },
 ];
 
 /**
- * Procedurally generates a custom examination paper tailored to requirements.
+ * Procedurally generates an exam paper by drawing questions from STATIC_QUESTION_BANK.
  * 
- * @param {Object} options
- * @param {number} [options.count=5] - Number of questions (5, 10, 15, 20)
- * @param {'all'|'logic'|'counting'|'relation'|'graph'} [options.topic='all']
- * @param {'all'|'easy'|'medium'|'hard'} [options.difficulty='all']
- * @returns {Object} Exam model with questions, answer key, and metadata
+ * @param {Object} [options={}]
+ * @param {number} [options.count=5]
+ * @param {string} [options.topic='all']
+ * @param {string} [options.difficulty='all']
+ * @returns {Object} Exam specification
  */
-export function generateExamPaper(options = {}) {
-  const {
-    count = 5,
-    topic = 'all',
-    difficulty = 'all',
-  } = options;
-
+export function generateExamPaper({
+  count = 5,
+  topic = QUIZ_TOPICS.ALL,
+  difficulty = QUIZ_DIFFICULTIES.ALL,
+} = {}) {
   let pool = [...STATIC_QUESTION_BANK];
 
-  if (topic !== 'all') {
+  if (topic !== QUIZ_TOPICS.ALL) {
     pool = pool.filter(q => q.topic === topic);
   }
 
-  if (difficulty !== 'all') {
+  if (difficulty !== QUIZ_DIFFICULTIES.ALL) {
     pool = pool.filter(q => q.difficulty === difficulty);
   }
 
-  // If pool is smaller than count, include other questions to fulfill count
-  if (pool.length < count) {
-    const remaining = STATIC_QUESTION_BANK.filter(q => !pool.some(p => p.id === q.id));
-    pool = pool.concat(remaining);
+  // Fallback if pool is smaller than requested count
+  if (pool.length === 0) {
+    pool = [...STATIC_QUESTION_BANK];
   }
 
-  // Shuffle array using Fisher-Yates
+  // Shuffle pool using Fisher-Yates
   const shuffled = [...pool];
   for (let i = shuffled.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -2041,11 +1655,8 @@ export function generateExamPaper(options = {}) {
   }
 
   const selectedQuestions = shuffled.slice(0, Math.min(count, shuffled.length));
-
-  // Generate unique Exam Code (e.g. 102, 205, 301)
   const examCode = Math.floor(100 + Math.random() * 900);
 
-  // Build Answer Key map: { 1: 'B', 2: 'C', ... }
   const answerKey = {};
   selectedQuestions.forEach((q, idx) => {
     answerKey[idx + 1] = q.correctId;
@@ -2104,7 +1715,9 @@ export function exportExamToLatex(exam) {
   latex += `\\begin{enumerate}[\\bfseries Câu 1:]\n`;
 
   exam.questions.forEach((q) => {
-    latex += `  \\item ${q.question}\n`;
+    // Strip HTML svg tags from question text for LaTeX export
+    const cleanQuestion = q.question.replace(/<br><svg[\s\S]*?<\/svg>/gi, ' (Quan sát hình vẽ đính kèm trong đề thi)').replace(/<[^>]+>/g, '');
+    latex += `  \\item ${cleanQuestion}\n`;
     latex += `  \\begin{multicols}{2}\n`;
     latex += `  \\begin{enumerate}[A.]\n`;
     q.options.forEach((opt) => {

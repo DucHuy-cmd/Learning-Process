@@ -91,8 +91,8 @@ export class LogicLabView {
             <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;">
               <span style="font-size:11px;color:var(--dim);font-weight:700;text-transform:uppercase;margin-right:2px;">Chèn ký hiệu:</span>
               <button type="button" class="btn-key" data-insert="¬" title="Phủ định (NOT: ~ hoặc !)">¬</button>
-              <button type="button" class="btn-key" data-insert=" ∧ " title="Hội (AND: ^ hoặc &)">∧</button>
-              <button type="button" class="btn-key" data-insert=" ∨ " title="Tuyển (OR: v hoặc |)">∨</button>
+              <button type="button" class="btn-key" data-insert=" * " title="Phép hội / Nhân logic (AND: *)">*</button>
+              <button type="button" class="btn-key" data-insert=" + " title="Phép tuyển / Cộng logic (OR: +)">+</button>
               <button type="button" class="btn-key" data-insert=" → " title="Kéo theo (IMPLIES: ->)">→</button>
               <button type="button" class="btn-key" data-insert=" ↔ " title="Tương đương (IFF: <->)">↔</button>
               <button type="button" class="btn-key" data-insert=" ⊕ " title="Tuyển loại trừ (XOR)">⊕</button>
@@ -131,17 +131,17 @@ export class LogicLabView {
                 <select id="logicPresetSelect" class="form-input" style="padding:5px 10px;font-size:12px;border-radius:6px;background:var(--panel);color:var(--text);border:1px solid var(--line);max-width:260px;">
                   <option value="">-- Chọn bài mẫu / Luật logic --</option>
                   <optgroup label="📖 Mạch Giáo Trình & Bìa K">
-                    <option value="case_sgk">📖 Mạch Giáo Trình: (x₁ ∧ x₂) ∨ x₁</option>
-                    <option value="case_and">1. Cổng AND 3 ngõ vào (p ∧ q ∧ r)</option>
-                    <option value="case_or">2. Cổng OR 3 ngõ vào (p ∨ q ∨ r)</option>
+                    <option value="case_sgk">📖 Mạch Giáo Trình: (x₁ * x₂) + x₁</option>
+                    <option value="case_and">1. Cổng AND 3 ngõ vào (p * q * r)</option>
+                    <option value="case_or">2. Cổng OR 3 ngõ vào (p + q + r)</option>
                     <option value="case_xor">3. Cổng XOR (p ⊕ q)</option>
-                    <option value="case_mux">4. Bộ chọn kênh MUX ((¬s ∧ p) ∨ (s ∧ q))</option>
+                    <option value="case_mux">4. Bộ chọn kênh MUX ((¬s * p) + (s * q))</option>
                     <option value="case_corners">5. Bìa K 4 Góc biên</option>
                   </optgroup>
                   <optgroup label="⚖️ Tương Đương Logic Kinh Điển">
                     <option value="demorgan_1">Luật De Morgan (Hội sang Tuyển)</option>
                     <option value="demorgan_2">Luật De Morgan (Tuyển sang Hội)</option>
-                    <option value="implication_law">Luật Kéo theo (¬p ∨ q)</option>
+                    <option value="implication_law">Luật Kéo theo (¬p + q)</option>
                     <option value="contrapositive">Luật Phản đảo (¬q → ¬p)</option>
                     <option value="distributive_and">Luật Phân phối (Hội đối với Tuyển)</option>
                     <option value="distributive_or">Luật Phân phối (Tuyển đối với Hội)</option>
@@ -154,7 +154,7 @@ export class LogicLabView {
                     <option value="disjunctive_syllogism">Tam đoạn luận tuyển</option>
                   </optgroup>
                   <optgroup label="🧩 Hằng Sai & SAT">
-                    <option value="contradiction_simple">Mâu thuẫn cơ bản (p ∧ ¬p)</option>
+                    <option value="contradiction_simple">Mâu thuẫn cơ bản (p * ¬p)</option>
                     <option value="sat_chain_4">Chuỗi SAT 4 biến</option>
                   </optgroup>
                 </select>
@@ -195,7 +195,7 @@ export class LogicLabView {
             <div>
               <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
                 <div style="flex:1;min-width:280px;">
-                  <input type="text" id="inputLogicSingle" class="form-input" style="width:100%;font-family:monospace;font-size:15px;padding:9px 14px;border-radius:6px;background:var(--panel-alt);color:var(--text);border:1px solid var(--line);" value="((p → q) ∧ (q → r)) → (p → r)" placeholder="Ví dụ: (p -> q) ^ (q -> r) -> (p -> r)" />
+                  <input type="text" id="inputLogicSingle" class="form-input" style="width:100%;font-family:monospace;font-size:15px;padding:9px 14px;border-radius:6px;background:var(--panel-alt);color:var(--text);border:1px solid var(--line);" value="((p → q) * (q → r)) → (p → r)" placeholder="Ví dụ: (p -> q) * (q -> r) -> (p -> r)" />
                 </div>
                 <button type="button" class="btn-primary" id="btnSolveSingle" style="padding:9px 20px;font-size:13.5px;font-weight:600;white-space:nowrap;">
                   ⚡ Tạo bảng chân trị
@@ -382,7 +382,7 @@ export class LogicLabView {
                 <label for="inputEquiv2" style="display:block;font-size:13px;font-weight:600;color:var(--text);margin-bottom:6px;">
                   Biểu thức 2 (E₂):
                 </label>
-                <input type="text" id="inputEquiv2" class="form-input" style="width:100%;font-family:monospace;font-size:14px;padding:9px 12px;border-radius:6px;background:var(--panel-alt);color:var(--text);border:1px solid var(--line);" value="¬p ∨ q" placeholder="Ví dụ: ~p v q" />
+                <input type="text" id="inputEquiv2" class="form-input" style="width:100%;font-family:monospace;font-size:14px;padding:9px 12px;border-radius:6px;background:var(--panel-alt);color:var(--text);border:1px solid var(--line);" value="¬p + q" placeholder="Ví dụ: ~p + q" />
               </div>
             </div>
 

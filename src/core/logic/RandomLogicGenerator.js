@@ -13,7 +13,7 @@
 import { parseLogicExpression } from './LogicParser.js';
 import { generateTruthTable, checkEquivalence } from './TruthTableEngine.js';
 
-const OPERATORS_BINARY = ['∧', '∨', '→', '↔', '⊕'];
+const OPERATORS_BINARY = ['*', '+', '→', '↔', '⊕'];
 const VAR_POOL = ['p', 'q', 'r', 's', 't'];
 
 /**
@@ -73,17 +73,17 @@ export function generateRandomProposition(options = {}) {
   // Curated templates for guaranteed tautologies and contradictions
   const tautologyTemplates = [
     // Modus Ponens variant
-    (vars) => `((${vars[0]} → ${vars[1]}) ∧ ${vars[0]}) → ${vars[1]}`,
+    (vars) => `((${vars[0]} → ${vars[1]}) * ${vars[0]}) → ${vars[1]}`,
     // Hypothetical Syllogism
     (vars) => vars.length >= 3
-      ? `((${vars[0]} → ${vars[1]}) ∧ (${vars[1]} → ${vars[2]})) → (${vars[0]} → ${vars[2]})`
-      : `((${vars[0]} → ${vars[1]}) ∧ ${vars[0]}) → ${vars[1]}`,
+      ? `((${vars[0]} → ${vars[1]}) * (${vars[1]} → ${vars[2]})) → (${vars[0]} → ${vars[2]})`
+      : `((${vars[0]} → ${vars[1]}) * ${vars[0]}) → ${vars[1]}`,
     // De Morgan equivalence
-    (vars) => `¬(${vars[0]} ∧ ${vars[1]}) ↔ (¬${vars[0]} ∨ ¬${vars[1]})`,
+    (vars) => `¬(${vars[0]} * ${vars[1]}) ↔ (¬${vars[0]} + ¬${vars[1]})`,
     // Law of excluded middle
-    (vars) => `${vars[0]} ∨ ¬${vars[0]}`,
+    (vars) => `${vars[0]} + ¬${vars[0]}`,
     // Implication definition equivalence
-    (vars) => `(${vars[0]} → ${vars[1]}) ↔ (¬${vars[0]} ∨ ${vars[1]})`,
+    (vars) => `(${vars[0]} → ${vars[1]}) ↔ (¬${vars[0]} + ${vars[1]})`,
     // Contrapositive equivalence
     (vars) => `(${vars[0]} → ${vars[1]}) ↔ (¬${vars[1]} → ¬${vars[0]})`,
     // Double negation
@@ -91,48 +91,48 @@ export function generateRandomProposition(options = {}) {
   ];
 
   const contradictionTemplates = [
-    (vars) => `${vars[0]} ∧ ¬${vars[0]}`,
-    (vars) => `(${vars[0]} ↔ ${vars[1]}) ∧ (${vars[0]} ⊕ ${vars[1]})`,
-    (vars) => `(${vars[0]} → ${vars[1]}) ∧ ${vars[0]} ∧ ¬${vars[1]}`,
+    (vars) => `${vars[0]} * ¬${vars[0]}`,
+    (vars) => `(${vars[0]} ↔ ${vars[1]}) * (${vars[0]} ⊕ ${vars[1]})`,
+    (vars) => `(${vars[0]} → ${vars[1]}) * ${vars[0]} * ¬${vars[1]}`,
     (vars) => vars.length >= 3
-      ? `((${vars[0]} ∨ ${vars[1]}) → ${vars[2]}) ∧ ${vars[0]} ∧ ¬${vars[2]}`
-      : `(${vars[0]} ∨ ${vars[1]}) ∧ ¬${vars[0]} ∧ ¬${vars[1]}`,
+      ? `((${vars[0]} + ${vars[1]}) → ${vars[2]}) * ${vars[0]} * ¬${vars[2]}`
+      : `(${vars[0]} + ${vars[1]}) * ¬${vars[0]} * ¬${vars[1]}`,
   ];
 
   const circuitTemplates2 = [
     (v) => `${v[0]} ⊕ ${v[1]}`,
-    (v) => `(${v[0]} ∧ ¬${v[1]}) ∨ (¬${v[0]} ∧ ${v[1]})`,
-    (v) => `(${v[0]} ∧ ${v[1]}) ∨ (¬${v[0]} ∧ ¬${v[1]})`,
-    (v) => `${v[0]} ∧ ¬${v[1]}`,
-    (v) => `¬${v[0]} ∨ ¬${v[1]}`,
-    (v) => `(${v[0]} ∨ ${v[1]}) ∧ ¬(${v[0]} ∧ ${v[1]})`,
+    (v) => `(${v[0]} * ¬${v[1]}) + (¬${v[0]} * ${v[1]})`,
+    (v) => `(${v[0]} * ${v[1]}) + (¬${v[0]} * ¬${v[1]})`,
+    (v) => `${v[0]} * ¬${v[1]}`,
+    (v) => `¬${v[0]} + ¬${v[1]}`,
+    (v) => `(${v[0]} + ${v[1]}) * ¬(${v[0]} * ${v[1]})`,
   ];
 
   const circuitTemplates3 = [
     // Majority voter (Hàm biểu quyết số đông)
-    (v) => `(${v[0]} ∧ ${v[1]}) ∨ (${v[1]} ∧ ${v[2]}) ∨ (${v[0]} ∧ ${v[2]})`,
+    (v) => `(${v[0]} * ${v[1]}) + (${v[1]} * ${v[2]}) + (${v[0]} * ${v[2]})`,
     // Multiplexer 2-to-1 MUX
-    (v) => `(¬${v[2]} ∧ ${v[0]}) ∨ (${v[2]} ∧ ${v[1]})`,
+    (v) => `(¬${v[2]} * ${v[0]}) + (${v[2]} * ${v[1]})`,
     // Chained SOP
-    (v) => `(${v[0]} ∧ ¬${v[1]}) ∨ (${v[1]} ∧ ${v[2]})`,
-    (v) => `(${v[0]} ∧ ${v[1]} ∧ ¬${v[2]}) ∨ (¬${v[0]} ∧ ${v[2]})`,
-    (v) => `(${v[0]} ⊕ ${v[1]}) ∧ ${v[2]}`,
-    (v) => `(${v[0]} ∧ ¬${v[1]} ∧ ${v[2]}) ∨ (¬${v[0]} ∧ ${v[1]} ∧ ¬${v[2]})`,
-    (v) => `(${v[0]} ∧ ${v[1]}) ∨ (¬${v[0]} ∧ ¬${v[1]} ∧ ${v[2]})`,
-    (v) => `(${v[0]} ∨ ${v[1]}) ∧ (¬${v[1]} ∨ ${v[2]})`,
-    (v) => `(${v[0]} ∧ ¬${v[1]}) ∨ (${v[1]} ∧ ¬${v[2]}) ∨ (¬${v[0]} ∧ ${v[2]})`,
-    (v) => `(¬${v[0]} ∧ ${v[1]}) ∨ (${v[0]} ∧ ${v[2]})`,
+    (v) => `(${v[0]} * ¬${v[1]}) + (${v[1]} * ${v[2]})`,
+    (v) => `(${v[0]} * ${v[1]} * ¬${v[2]}) + (¬${v[0]} * ${v[2]})`,
+    (v) => `(${v[0]} ⊕ ${v[1]}) * ${v[2]}`,
+    (v) => `(${v[0]} * ¬${v[1]} * ${v[2]}) + (¬${v[0]} * ${v[1]} * ¬${v[2]})`,
+    (v) => `(${v[0]} * ${v[1]}) + (¬${v[0]} * ¬${v[1]} * ${v[2]})`,
+    (v) => `(${v[0]} + ${v[1]}) * (¬${v[1]} + ${v[2]})`,
+    (v) => `(${v[0]} * ¬${v[1]}) + (${v[1]} * ¬${v[2]}) + (¬${v[0]} * ${v[2]})`,
+    (v) => `(¬${v[0]} * ${v[1]}) + (${v[0]} * ${v[2]})`,
   ];
 
   const circuitTemplates4 = [
-    (v) => `(${v[0]} ∧ ${v[1]}) ∨ (${v[2]} ∧ ${v[3]})`,
-    (v) => `(${v[0]} ∧ ¬${v[1]}) ∨ (${v[2]} ∧ ¬${v[3]})`,
-    (v) => `(${v[0]} ∧ ${v[1]} ∧ ${v[2]}) ∨ (¬${v[2]} ∧ ${v[3]})`,
-    (v) => `(¬${v[0]} ∧ ¬${v[1]} ∧ ¬${v[2]} ∧ ¬${v[3]}) ∨ (${v[0]} ∧ ¬${v[1]} ∧ ¬${v[2]} ∧ ¬${v[3]}) ∨ (¬${v[0]} ∧ ¬${v[1]} ∧ ${v[2]} ∧ ¬${v[3]}) ∨ (${v[0]} ∧ ¬${v[1]} ∧ ${v[2]} ∧ ¬${v[3]})`,
-    (v) => `(${v[0]} ∧ ${v[1]}) ∨ (${v[1]} ∧ ${v[2]}) ∨ (${v[2]} ∧ ${v[3]})`,
-    (v) => `(¬${v[0]} ∧ ${v[1]} ∧ ${v[2]}) ∨ (${v[0]} ∧ ¬${v[1]} ∧ ${v[3]}) ∨ (${v[2]} ∧ ${v[3]})`,
-    (v) => `(${v[0]} ∧ ¬${v[1]} ∧ ${v[2]}) ∨ (${v[1]} ∧ ¬${v[3]}) ∨ (¬${v[0]} ∧ ${v[3]})`,
-    (v) => `(${v[0]} ∧ ${v[1]}) ∨ (¬${v[1]} ∧ ${v[2]}) ∨ (${v[2]} ∧ ¬${v[3]})`,
+    (v) => `(${v[0]} * ${v[1]}) + (${v[2]} * ${v[3]})`,
+    (v) => `(${v[0]} * ¬${v[1]}) + (${v[2]} * ¬${v[3]})`,
+    (v) => `(${v[0]} * ${v[1]} * ${v[2]}) + (¬${v[2]} * ${v[3]})`,
+    (v) => `(¬${v[0]} * ¬${v[1]} * ¬${v[2]} * ¬${v[3]}) + (${v[0]} * ¬${v[1]} * ¬${v[2]} * ¬${v[3]}) + (¬${v[0]} * ¬${v[1]} * ${v[2]} * ¬${v[3]}) + (${v[0]} * ¬${v[1]} * ${v[2]} * ¬${v[3]})`,
+    (v) => `(${v[0]} * ${v[1]}) + (${v[1]} * ${v[2]}) + (${v[2]} * ${v[3]})`,
+    (v) => `(¬${v[0]} * ${v[1]} * ${v[2]}) + (${v[0]} * ¬${v[1]} * ${v[3]}) + (${v[2]} * ${v[3]})`,
+    (v) => `(${v[0]} * ¬${v[1]} * ${v[2]}) + (${v[1]} * ¬${v[3]}) + (¬${v[0]} * ${v[3]})`,
+    (v) => `(${v[0]} * ${v[1]}) + (¬${v[1]} * ${v[2]}) + (${v[2]} * ¬${v[3]})`,
   ];
 
   if (type === 'circuit') {
@@ -201,7 +201,7 @@ export function generateRandomProposition(options = {}) {
   }
 
   // Fallback if loop didn't match specific contingency
-  const fallback = `(${activeVars[0]} ∧ ${activeVars[1]}) → ${activeVars[0]}`;
+  const fallback = `(${activeVars[0]} * ${activeVars[1]}) → ${activeVars[0]}`;
   return {
     expression: fallback,
     type: 'random',
@@ -219,14 +219,14 @@ export function generateEquivalencePracticePair(variableCount = 2) {
   const vars = VAR_POOL.slice(0, Math.max(2, Math.min(3, variableCount)));
   const pairs = [
     {
-      expr1: `¬(${vars[0]} ∧ ${vars[1]})`,
-      expr2: `¬${vars[0]} ∨ ¬${vars[1]}`,
+      expr1: `¬(${vars[0]} * ${vars[1]})`,
+      expr2: `¬${vars[0]} + ¬${vars[1]}`,
       isEquivalent: true,
       explanation: 'Luật De Morgan: Phủ định của hội bằng tuyển các phủ định.',
     },
     {
       expr1: `${vars[0]} → ${vars[1]}`,
-      expr2: `¬${vars[0]} ∨ ${vars[1]}`,
+      expr2: `¬${vars[0]} + ${vars[1]}`,
       isEquivalent: true,
       explanation: 'Quy tắc kéo theo biểu diễn qua phép tuyển.',
     },
@@ -238,13 +238,13 @@ export function generateEquivalencePracticePair(variableCount = 2) {
     },
     {
       expr1: `${vars[0]} ↔ ${vars[1]}`,
-      expr2: `(${vars[0]} → ${vars[1]}) ∧ (${vars[1]} → ${vars[0]})`,
+      expr2: `(${vars[0]} → ${vars[1]}) * (${vars[1]} → ${vars[0]})`,
       isEquivalent: true,
       explanation: 'Định nghĩa phép tương đương qua hai phép kéo theo.',
     },
     {
       expr1: `${vars[0]} ⊕ ${vars[1]}`,
-      expr2: `(${vars[0]} ∨ ${vars[1]}) ∧ ¬(${vars[0]} ∧ ${vars[1]})`,
+      expr2: `(${vars[0]} + ${vars[1]}) * ¬(${vars[0]} * ${vars[1]})`,
       isEquivalent: true,
       explanation: 'Định nghĩa phép XOR: hoặc p hoặc q đúng nhưng không đồng thời cả hai.',
     },
@@ -256,16 +256,16 @@ export function generateEquivalencePracticePair(variableCount = 2) {
       explanation: 'Mệnh đề thuận và mệnh đề đảo không tương đương nhau (p → q ≢ q → p).',
     },
     {
-      expr1: `¬(${vars[0]} ∧ ${vars[1]})`,
-      expr2: `¬${vars[0]} ∧ ¬${vars[1]}`,
+      expr1: `¬(${vars[0]} * ${vars[1]})`,
+      expr2: `¬${vars[0]} * ¬${vars[1]}`,
       isEquivalent: false,
-      explanation: 'Lỗi thường gặp: áp dụng sai luật De Morgan (phải đổi dấu ∧ thành ∨).',
+      explanation: 'Lỗi thường gặp: áp dụng sai luật De Morgan (phải đổi dấu * thành +).',
     },
     {
-      expr1: `${vars[0]} ∨ (${vars[0]} ∧ ${vars[1]})`,
+      expr1: `${vars[0]} + (${vars[0]} * ${vars[1]})`,
       expr2: `${vars[1]}`,
       isEquivalent: false,
-      explanation: 'Luật hấp thụ p ∨ (p ∧ q) ≡ p chứ không phải q.',
+      explanation: 'Luật hấp thụ p + (p * q) ≡ p chứ không phải q.',
     },
   ];
 

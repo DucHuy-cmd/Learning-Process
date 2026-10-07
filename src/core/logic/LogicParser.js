@@ -39,9 +39,9 @@ export class ASTNode {
       case TokenType.NOT:
         return `¬${this.left ? this._wrapUnary(this.left) : ''}`;
       case TokenType.AND:
-        return `${this._wrapBinary(this.left)} ∧ ${this._wrapBinary(this.right)}`;
+        return `${this._wrapBinary(this.left)} * ${this._wrapBinary(this.right)}`;
       case TokenType.OR:
-        return `${this._wrapBinary(this.left)} ∨ ${this._wrapBinary(this.right)}`;
+        return `${this._wrapBinary(this.left)} + ${this._wrapBinary(this.right)}`;
       case TokenType.XOR:
         return `${this._wrapBinary(this.left)} ⊕ ${this._wrapBinary(this.right)}`;
       case TokenType.IMP:

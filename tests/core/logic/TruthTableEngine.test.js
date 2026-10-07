@@ -39,8 +39,8 @@ describe('TruthTableEngine Unit Tests', () => {
   it('computes correct DNF and CNF normal forms', () => {
     const res = generateTruthTable('p ⊕ q');
     // p XOR q is true when (1,0) or (0,1)
-    expect(res.normalForms.dnf).toContain('p ∧ ¬q');
-    expect(res.normalForms.dnf).toContain('¬p ∧ q');
+    expect(res.normalForms.dnf).toContain('p * ¬q');
+    expect(res.normalForms.dnf).toContain('¬p * q');
   });
 
   it('correctly validates logical equivalence (A ≡ B)', () => {

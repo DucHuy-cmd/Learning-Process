@@ -394,12 +394,12 @@ export class HelpGuideModal {
               <code>~p</code> hoặc <code>!p</code>
             </div>
             <div class="syntax-item">
-              <span class="syntax-name">Phép Hội AND ($p \land q$):</span>
-              <code>p &amp; q</code> hoặc <code>p ^ q</code>
+              <span class="syntax-name">Phép Hội AND ($p * q$):</span>
+              <code>p * q</code>, <code>p q</code> (viết liền), hoặc <code>p &amp; q</code>
             </div>
             <div class="syntax-item">
-              <span class="syntax-name">Phép Tuyển OR ($p \lor q$):</span>
-              <code>p | q</code> hoặc <code>p v q</code>
+              <span class="syntax-name">Phép Tuyển OR ($p + q$):</span>
+              <code>p + q</code> hoặc <code>p | q</code>
             </div>
             <div class="syntax-item">
               <span class="syntax-name">Phép Kéo theo ($p \rightarrow q$):</span>

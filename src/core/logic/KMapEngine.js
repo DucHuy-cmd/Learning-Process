@@ -120,7 +120,7 @@ export function buildKMap(truthTableResult) {
     groups.forEach(g => {
       if (g.term) groupTerms.push(g.term);
     });
-    minimalSop = groupTerms.length > 0 ? groupTerms.join(' ∨ ') : '0';
+    minimalSop = groupTerms.length > 0 ? groupTerms.join(' + ') : '0';
   }
 
   return {
@@ -291,5 +291,5 @@ function extractGroupTerm(cells, variables) {
   }
 
   if (parts.length === 0) return '1';
-  return parts.length > 1 ? `(${parts.join(' ∧ ')})` : parts[0];
+  return parts.length > 1 ? `(${parts.join(' * ')})` : parts[0];
 }

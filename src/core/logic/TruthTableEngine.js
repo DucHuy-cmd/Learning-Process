@@ -117,16 +117,16 @@ export function generateTruthTable(expressionText, options = {}) {
     if (finalValue) {
       // DNF Minterm: variable if true, ¬variable if false
       const mintermParts = variables.map(v => (assignment[v] ? v : `¬${v}`));
-      dnfMinterms.push(mintermParts.length > 1 ? `(${mintermParts.join(' ∧ ')})` : mintermParts[0]);
+      dnfMinterms.push(mintermParts.length > 1 ? `(${mintermParts.join(' * ')})` : mintermParts[0]);
     } else {
       // CNF Maxterm: ¬variable if true, variable if false
       const maxtermParts = variables.map(v => (assignment[v] ? `¬${v}` : v));
-      cnfMaxterms.push(maxtermParts.length > 1 ? `(${maxtermParts.join(' ∨ ')})` : maxtermParts[0]);
+      cnfMaxterms.push(maxtermParts.length > 1 ? `(${maxtermParts.join(' + ')})` : maxtermParts[0]);
     }
   }
 
-  const dnf = dnfMinterms.length > 0 ? dnfMinterms.join(' ∨ ') : '0 (Mâu thuẫn)';
-  const cnf = cnfMaxterms.length > 0 ? cnfMaxterms.join(' ∧ ') : '1 (Hằng đúng)';
+  const dnf = dnfMinterms.length > 0 ? dnfMinterms.join(' + ') : '0 (Mâu thuẫn)';
+  const cnf = cnfMaxterms.length > 0 ? cnfMaxterms.join(' * ') : '1 (Hằng đúng)';
 
   return {
     expression: expressionText,
