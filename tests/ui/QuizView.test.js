@@ -428,6 +428,7 @@ describe('QuizView UI Component', () => {
     expect(quizView.activeExamSession).not.toBeNull();
     expect(container.querySelector('.active-exam-room')).not.toBeNull();
     expect(container.querySelector('#activeExamTimer')).not.toBeNull();
+    expect(container.querySelector('.quiz-header').getAttribute('style')).toContain('display:none');
 
     // 3. Jump to question and answer
     const qButtons = container.querySelectorAll('.exam-q-jump-btn');

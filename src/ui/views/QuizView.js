@@ -265,10 +265,10 @@ export class QuizView {
       : 0;
 
     this.container.innerHTML = `
-      <div class="quiz-view-container" style="max-width:1300px;margin:0 auto;padding:20px 24px 60px;">
+      <div class="quiz-view-container" style="max-width:1300px;margin:0 auto;padding:${this.activeExamSession ? '12px 16px 40px' : '20px 24px 60px'};">
         
         <!-- Header -->
-        <div class="quiz-header" style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
+        <div class="quiz-header" style="${this.activeExamSession ? 'display:none;' : 'display:flex;'}justify-content:space-between;align-items:flex-start;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
           <div>
             <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
               <span class="pill-badge" style="background:rgba(16,185,129,0.15);color:#10b981;border:1px solid rgba(16,185,129,0.3);padding:2px 10px;border-radius:12px;font-size:11.5px;font-weight:600;">
@@ -277,9 +277,6 @@ export class QuizView {
               <span style="font-size:12px;color:var(--dim);">Toán Rời Rạc &amp; Cấu Trúc Dữ Liệu</span>
             </div>
             <h1 style="font-size:24px;font-weight:700;color:var(--text);margin:0;">Luyện Tập &amp; Thi Trắc Nghiệm Toán Rời Rạc</h1>
-            <p style="font-size:13.5px;color:var(--dim);margin:4px 0 0;">
-              Ngân hàng 150 câu hỏi tự luyện tập phản xạ, thi trực tuyến tính giờ Thang Điểm 10 và quản lý kết quả bài thi.
-            </p>
           </div>
 
           <!-- Main Nav Tabs -->
@@ -521,7 +518,7 @@ export class QuizView {
           <div style="font-size:48px;margin-bottom:16px;">🔐</div>
           <h2 style="font-size:20px;font-weight:700;color:var(--text);margin:0 0 10px;">Đăng Nhập Tài Khoản Sinh Viên Để Làm Đề Thi</h2>
           <p style="font-size:14px;color:var(--dim);margin:0 0 24px;line-height:1.6;">
-            Các bài kiểm tra định kỳ và đề thi khảo sát được phân phối trực tiếp cho từng sinh viên. Kết quả thi được chấm theo Thang Điểm 10 và tính điểm trung bình (GPA) đưa lên Bảng Vàng danh dự.
+            Các bài kiểm tra định kỳ và đề thi khảo sát được phân phối trực tiếp cho từng sinh viên. Kết quả thi được chấm theo Thang Điểm 10.
           </p>
           <button type="button" class="btn-primary" id="btnMyExamsLogin" style="padding:12px 28px;font-size:14px;font-weight:700;">
             🔑 Đăng Nhập / Đăng Ký Ngay
@@ -555,7 +552,7 @@ export class QuizView {
           <p style="font-size:13px;color:var(--dim);margin:4px 0 0;">
             ${isAdmin 
               ? 'Xem tất cả các đề thi được tạo trong hệ thống, theo dõi tiến độ thi của sinh viên hoặc làm bài thi thử.' 
-              : 'Quy chế thi trực tuyến: Mỗi đề thi chỉ được làm <strong>1 lần duy nhất</strong>. Thang điểm 10. Điểm trung bình các đề thi sẽ quyết định thứ hạng trên Bảng Vàng.'}
+              : 'Quy chế thi trực tuyến: Mỗi đề thi chỉ được làm <strong>1 lần duy nhất</strong>. Thang điểm 10.'}
           </p>
         </div>
 
