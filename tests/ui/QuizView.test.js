@@ -466,6 +466,42 @@ describe('QuizView UI Component', () => {
     authManager.logout();
   });
 
+  it('blocks a banned exam but still allows the student to start a different exam', () => {
+    authManager.register({ username: 'sv_exam_scope', fullName: 'Thí Sinh B', email: 'tsb@toanrr.edu.vn', password: '123456' });
+    const user = authManager.getCurrentUser();
+    examManager.clearAllData();
+    const [bannedExam] = examManager.getExams();
+    const otherExam = examManager.createExam({
+      title: 'Đề thi vẫn được phép làm',
+      questionIds: ['logic_q01'],
+    }).exam;
+    examManager.recordExamViolation(bannedExam.id, user.id);
+    examManager.recordExamViolation(bannedExam.id, user.id);
+    examManager.recordExamViolation(bannedExam.id, user.id);
+
+    const quizView = new QuizView({ container });
+    quizView.setTab('myExams');
+
+    const examCards = Array.from(container.querySelectorAll('.exam-card'));
+    const bannedCard = examCards.find(card => card.textContent.includes('BỊ CẤM THI LẠI ĐỀ NÀY'));
+    expect(bannedCard).not.toBeNull();
+    expect(bannedCard.querySelector('.btn-start-exam')).toBeNull();
+
+    const otherExamButton = container.querySelector(`.btn-start-exam[data-exam-id="${otherExam.id}"]`);
+    expect(otherExamButton).not.toBeNull();
+    window.confirm = () => true;
+    const requestFullscreen = vi.fn().mockResolvedValue();
+    Object.defineProperty(document.documentElement, 'requestFullscreen', {
+      configurable: true,
+      value: requestFullscreen,
+    });
+    otherExamButton.click();
+    expect(quizView.activeExamSession.exam.id).toBe(otherExam.id);
+    expect(requestFullscreen).toHaveBeenCalledTimes(1);
+    quizView._submitActiveExam();
+    authManager.logout();
+  });
+
   it('allows Admin to create new exam, assign to students, and view gradebook in Studio', () => {
     authManager.login('admin', 'admin123');
     const quizView = new QuizView({ container });

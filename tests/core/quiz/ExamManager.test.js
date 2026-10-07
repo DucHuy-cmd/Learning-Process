@@ -56,6 +56,21 @@ describe('ExamManager Core Module', () => {
     expect(memoryManager.getSubmission(created.exam.id, 'user_memory_test')).toEqual(submitted.submission);
   });
 
+  it('bans only the student and exam that reached three violations', () => {
+    const otherExam = manager.createExam({
+      title: 'Đề kiểm tra khác',
+      questionIds: ['logic_q01'],
+    }).exam;
+    manager.recordExamViolation(DEFAULT_EXAMS[0].id, 'student_one');
+    manager.recordExamViolation(DEFAULT_EXAMS[0].id, 'student_one');
+    const thirdViolation = manager.recordExamViolation(DEFAULT_EXAMS[0].id, 'student_one');
+
+    expect(thirdViolation.record).toMatchObject({ count: 3, banned: true });
+    expect(manager.getExamViolationRecord(DEFAULT_EXAMS[0].id, 'student_one').banned).toBe(true);
+    expect(manager.getExamViolationRecord(otherExam.id, 'student_one').banned).toBe(false);
+    expect(manager.getExamViolationRecord(DEFAULT_EXAMS[0].id, 'student_two').banned).toBe(false);
+  });
+
   it('rejects submissions from students who were not assigned the exam', () => {
     const created = manager.createExam({
       title: 'Đề chỉ dành cho một sinh viên',
