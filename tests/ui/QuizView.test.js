@@ -622,29 +622,24 @@ describe('QuizView UI Component', () => {
     authManager.logout();
   });
 
-  it('renders Question Palette Grid in Practice Mode and supports fast jumping with answer status coloring', () => {
+  it('does not render Question Palette Grid in Practice Mode and supports clearing all exams from Studio', () => {
     const quizView = new QuizView({ container });
     const jumpBtns = Array.from(container.querySelectorAll('.btn-practice-jump'));
-    expect(jumpBtns.length).toBe(quizView.practiceQuestions.length);
+    expect(jumpBtns.length).toBe(0);
 
-    // Initial state: first button is current, none answered
-    expect(jumpBtns[0].classList.contains('current')).toBe(true);
-    expect(jumpBtns[0].classList.contains('answered')).toBe(false);
+    // Switch to studio tab as admin and check clear all exams button
+    authManager.login('admin', 'admin123');
+    quizView.setTab('studio');
+    quizView.studioSubTab = 'assign';
+    quizView.render();
 
-    // Click jump to question index 4 (Câu 5)
-    jumpBtns[4].click();
-    expect(quizView.currentIndex).toBe(4);
-    const updatedJumpBtns = Array.from(container.querySelectorAll('.btn-practice-jump'));
-    expect(updatedJumpBtns[4].classList.contains('current')).toBe(true);
+    const btnClearAll = container.querySelector('#btnAdminClearAllExams');
+    expect(btnClearAll).not.toBeNull();
+    window.confirm = () => true;
+    btnClearAll.click();
 
-    // Answer the question
-    const optBtn = container.querySelector('.btn-quiz-option');
-    expect(optBtn).not.toBeNull();
-    optBtn.click();
-
-    // After answering, the button should have answered class
-    const reloadedJumpBtns = Array.from(container.querySelectorAll('.btn-practice-jump'));
-    expect(reloadedJumpBtns[4].classList.contains('answered')).toBe(true);
+    expect(examManager.getExams().length).toBe(0);
+    authManager.logout();
   });
 
   it('supports Chapter filter and batch selection in Admin Studio manual question assignment', () => {

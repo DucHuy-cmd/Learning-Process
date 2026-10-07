@@ -390,38 +390,7 @@ export class QuizView {
 
       </div>
 
-      <!-- Bảng câu hỏi chuyển nhanh (Question Palette Grid) -->
-      ${total > 0 ? `
-        <div style="background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 16px;margin-bottom:16px;">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
-            <div style="font-size:12px;font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:0.5px;display:flex;align-items:center;gap:6px;">
-              <span>📑</span> Bảng câu hỏi (Bấm số để chuyển nhanh):
-            </div>
-            <div style="display:flex;gap:12px;font-size:11.5px;color:var(--dim);">
-              <span style="display:flex;align-items:center;gap:4px;">
-                <span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#10b981;border:1px solid #10b981;"></span> Đã làm
-              </span>
-              <span style="display:flex;align-items:center;gap:4px;">
-                <span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:var(--panel-alt);border:1px solid var(--line);"></span> Chưa làm
-              </span>
-              <span style="display:flex;align-items:center;gap:4px;">
-                <span style="display:inline-block;width:10px;height:10px;border-radius:3px;border:2px solid var(--accent);background:transparent;"></span> Đang xem
-              </span>
-            </div>
-          </div>
-          <div class="exam-q-jump-grid" style="margin-bottom:0;max-height:140px;overflow-y:auto;">
-            ${this.practiceQuestions.map((pq, idx) => {
-              const isAns = Boolean(this.userAnswers[pq.id]);
-              const isCurr = idx === this.currentIndex;
-              return `
-                <button type="button" class="exam-q-jump-btn btn-practice-jump ${isAns ? 'answered' : ''} ${isCurr ? 'current' : ''}" data-jump-idx="${idx}" title="Câu ${idx + 1}: ${isAns ? 'Đã chọn đáp án' : 'Chưa chọn'}">
-                  ${idx + 1}
-                </button>
-              `;
-            }).join('')}
-          </div>
-        </div>
-      ` : ''}
+
 
       <!-- Question Card -->
       ${total === 0 ? `
@@ -1132,10 +1101,14 @@ export class QuizView {
 
         <!-- Assigned Exams Table & Gradebook -->
         <div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:22px;">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
             <h3 style="font-size:16px;font-weight:700;color:var(--text);margin:0;">
               📑 Danh Sách Các Đề Thi Đã Phân Phối (${assignedExamsList.length})
             </h3>
+            <button type="button" class="btn-danger" id="btnAdminClearAllExams" style="display:inline-flex;align-items:center;gap:6px;padding:7px 14px;font-size:12.5px;font-weight:700;border-radius:8px;cursor:pointer;background:#ef4444;color:#fff;border:none;">
+              <span>🗑️</span>
+              <span>Xóa Toàn Bộ Đề Thi &amp; Dữ Liệu Sinh Viên</span>
+            </button>
           </div>
 
           <div style="overflow-x:auto;">
@@ -1944,17 +1917,6 @@ export class QuizView {
       });
     }
 
-    // Jump to specific question in Practice Mode
-    this.container.querySelectorAll('.btn-practice-jump').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        const targetIdx = parseInt(e.currentTarget.getAttribute('data-jump-idx'), 10);
-        if (!isNaN(targetIdx) && targetIdx >= 0 && targetIdx < this.practiceQuestions.length) {
-          this.currentIndex = targetIdx;
-          this.render();
-        }
-      });
-    });
-
     // Practice Option Buttons Click
     this.container.querySelectorAll('.btn-quiz-option').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -2370,6 +2332,29 @@ export class QuizView {
         this.render();
       });
     });
+
+    // Clear All Assigned Exams & Student Exam Submissions
+    const btnClearAllExams = this.container.querySelector('#btnAdminClearAllExams');
+    if (btnClearAllExams) {
+      btnClearAllExams.addEventListener('click', async () => {
+        if (typeof window !== 'undefined' && window.confirm && !window.confirm(
+          '⚠️ CẢNH BÁO QUAN TRỌNG:\n\nBạn có chắc chắn muốn xóa TOÀN BỘ đề thi đã giao và tất cả dữ liệu bài làm, điểm số thi trong tài khoản sinh viên không?\n\nHành động này không thể hoàn tác!'
+        )) {
+          return;
+        }
+
+        examManager.clearAllExams();
+        quizHistoryManager.clearAllExamHistory();
+        if (cloudSyncManager && cloudSyncManager.isConnected) {
+          try {
+            await cloudSyncManager.serverClearAllExams();
+          } catch {}
+        }
+
+        this._showAlert('✅ Đã xóa toàn bộ đề thi và làm sạch dữ liệu bài làm của sinh viên thành công!');
+        this.render();
+      });
+    }
 
     // 5. Teacher's A4 & LaTeX Print Studio Events
     const selCount = this.container.querySelector('#selStudioCount');

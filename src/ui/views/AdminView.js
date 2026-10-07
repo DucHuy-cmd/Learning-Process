@@ -15,6 +15,7 @@ import { authManager } from '../../core/auth/AuthManager.js';
 import { cloudSyncManager } from '../../core/sync/CloudSyncManager.js';
 import { quizHistoryManager } from '../../core/quiz/QuizHistoryManager.js';
 import { aiHistoryManager } from '../../core/ai/AiHistoryManager.js';
+import { examManager } from '../../core/quiz/ExamManager.js';
 
 export class AdminView {
   /**
@@ -92,7 +93,11 @@ export class AdminView {
               <span>🔄</span>
               <span>Đồng bộ Máy chủ</span>
             </button>
-            <button type="button" class="btn-danger" id="btnAdminFullDatabaseReset" style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;font-size:12.5px;font-weight:700;border-radius:8px;cursor:pointer;background:#ef4444;color:#fff;border:none;">
+            <button type="button" class="btn-danger" id="btnAdminClearAllExams" style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;font-size:12.5px;font-weight:700;border-radius:8px;cursor:pointer;background:#ef4444;color:#fff;border:none;">
+              <span>🗑️</span>
+              <span>Xóa Đề Thi &amp; Điểm Sinh Viên</span>
+            </button>
+            <button type="button" class="btn-danger" id="btnAdminFullDatabaseReset" style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;font-size:12.5px;font-weight:700;border-radius:8px;cursor:pointer;background:#dc2626;color:#fff;border:none;">
               <span>🔥</span>
               <span>Xóa Sạch &amp; Reset Database</span>
             </button>
@@ -486,7 +491,34 @@ export class AdminView {
       });
     }
 
-    // 4. Full Database Reset Button (Nuclear option: clears users, scores, AI chat)
+    // 4. Clear All Exams & Student Submissions Button
+    const btnClearExams = this.container.querySelector('#btnAdminClearAllExams');
+    if (btnClearExams) {
+      btnClearExams.addEventListener('click', async () => {
+        if (typeof window !== 'undefined' && window.confirm && !window.confirm(
+          '⚠️ CẢNH BÁO QUAN TRỌNG:\n\nBạn có chắc chắn muốn xóa TOÀN BỘ đề thi đã giao và tất cả dữ liệu bài làm, điểm số thi trong tài khoản sinh viên không?\n\nHành động này không thể hoàn tác!'
+        )) {
+          return;
+        }
+
+        btnClearExams.disabled = true;
+        btnClearExams.textContent = '⏳ Đang xóa...';
+
+        examManager.clearAllExams();
+        quizHistoryManager.clearAllExamHistory();
+
+        try {
+          await cloudSyncManager.serverClearAllExams();
+          await cloudSyncManager.syncExams(examManager);
+          await cloudSyncManager.syncExamSubmissions(examManager);
+        } catch {}
+
+        await this.render();
+        this._showAlert('✓ Đã xóa sạch toàn bộ đề thi và làm sạch dữ liệu bài làm trong tài khoản sinh viên!', 'success');
+      });
+    }
+
+    // 5. Full Database Reset Button (Nuclear option: clears users, scores, AI chat, exams)
     const btnFullReset = this.container.querySelector('#btnAdminFullDatabaseReset');
     if (btnFullReset) {
       btnFullReset.addEventListener('click', async () => {
@@ -502,6 +534,8 @@ export class AdminView {
 
         authManager.resetUsersToDefault();
         quizHistoryManager.clearLeaderboard();
+        quizHistoryManager.clearAllExamHistory();
+        examManager.clearAllExams();
         if (aiHistoryManager && typeof aiHistoryManager._writeAll === 'function') {
           aiHistoryManager._writeAll({});
         }
@@ -510,6 +544,8 @@ export class AdminView {
           await cloudSyncManager.adminResetDatabase();
           await cloudSyncManager.syncUsers(authManager);
           await cloudSyncManager.syncQuizLeaderboard(quizHistoryManager);
+          await cloudSyncManager.syncExams(examManager);
+          await cloudSyncManager.syncExamSubmissions(examManager);
         } catch {}
 
         await this.render();

@@ -138,4 +138,20 @@ describe('Assigned exam API', () => {
     expect(otherExamSubmission.statusCode).toBe(201);
   });
 
+  it('clears all exams and submissions on the server', async () => {
+    serverExams.push({ id: 'test_clear_exam', title: 'Đề xóa', durationMinutes: 10, questionIds: ['logic_q01'], assignedTo: ['all'] });
+    serverExamSubmissions.push({ id: 'test_clear_sub', examId: 'test_clear_exam', userId: 'user_1', score: 10 });
+
+    const result = await sendRequest({
+      method: 'POST',
+      url: '/api/exams/clear-all',
+      body: {},
+    });
+
+    expect(result.statusCode).toBe(200);
+    expect(result.data.success).toBe(true);
+    expect(serverExams.length).toBe(0);
+    expect(serverExamSubmissions.length).toBe(0);
+  });
+
 });

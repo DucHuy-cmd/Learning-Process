@@ -117,14 +117,51 @@ export class ExamManager {
 
   /**
    * Returns list of exams assigned to a given user.
+   * Prevents newly created student accounts from receiving obsolete past exams.
    * @param {string} userId
+   * @param {Object} [userContext]
    * @returns {Array<Object>}
    */
-  getExamsForUser(userId) {
+  getExamsForUser(userId, userContext = null) {
     if (!userId || userId === 'guest') return [];
+
+    let user = userContext;
+    if (!user && this.storage) {
+      try {
+        const usersRaw = this.storage.getItem('trr_registered_users');
+        if (usersRaw) {
+          const list = JSON.parse(usersRaw);
+          user = list.find(u => u.id === userId || u.username === userId);
+        }
+        if (!user) {
+          const currRaw = this.storage.getItem('trr_current_user');
+          if (currRaw) {
+            const curr = JSON.parse(currRaw);
+            if (curr && (curr.id === userId || curr.username === userId)) user = curr;
+          }
+        }
+      } catch {}
+    }
+
     return this.getExams().filter(exam => {
       if (!Array.isArray(exam.assignedTo)) return false;
-      return exam.assignedTo.includes('all') || exam.assignedTo.includes(userId);
+      // If targeted specifically to this student ID, always include
+      if (exam.assignedTo.includes(userId)) return true;
+
+      // If assigned to 'all':
+      if (exam.assignedTo.includes('all')) {
+        // Keep initial demo seed exam visible for backward compatibility if present
+        if (exam.id === 'exam_intro_eval_2026') return true;
+        // If user has a registration timestamp, ensure exam was not created before user registered
+        if (user && user.createdAt && exam.createdAt) {
+          const userTime = new Date(user.createdAt).getTime();
+          const examTime = new Date(exam.createdAt).getTime();
+          // Allow 2 minutes tolerance for same-session registration/assignment
+          return examTime >= (userTime - 120000);
+        }
+        return true;
+      }
+      return false;
     });
   }
 
@@ -513,6 +550,25 @@ export class ExamManager {
         badge,
       };
     });
+  }
+
+  /**
+   * Completely clears all exams, submissions, and violations from storage.
+   * @returns {{ success: boolean }}
+   */
+  clearAllExams() {
+    this.memoryExams = [];
+    this.memorySubmissions = [];
+    this.memoryExamViolations = [];
+    if (this.storage) {
+      try {
+        this.storage.setItem(STORAGE_KEY_EXAMS, JSON.stringify([]));
+        this.storage.setItem(STORAGE_KEY_SUBMISSIONS, JSON.stringify([]));
+        this.storage.setItem(STORAGE_KEY_EXAM_VIOLATIONS, JSON.stringify([]));
+      } catch {}
+    }
+    this._notifyListeners('exams_cleared', []);
+    return { success: true };
   }
 
   /**

@@ -186,6 +186,7 @@ export async function handleRequest(req, res) {
         password: data.password || '123456',
         avatar: data.avatar || '👤',
         role: 'student',
+        createdAt: data.createdAt || new Date().toISOString(),
       };
       serverUsers.push(newUser);
       saveDatabase();
@@ -327,7 +328,6 @@ export async function handleRequest(req, res) {
     for (const k of Object.keys(serverQuizStats)) delete serverQuizStats[k];
     for (const k of Object.keys(serverAiSessions)) delete serverAiSessions[k];
     serverExams.length = 0;
-    serverExams.push(...DEFAULT_EXAMS);
     serverExamSubmissions.length = 0;
     saveDatabase();
     if (isKVConfigured()) {
@@ -649,6 +649,24 @@ export async function handleRequest(req, res) {
       sendJson(res, 400, { success: false, error: 'Dữ liệu không hợp lệ.' });
       return;
     }
+  }
+
+  // Route: POST /api/exams/clear-all or DELETE /api/exams (Quản trị viên xóa toàn bộ đề thi & dữ liệu bài làm)
+  if ((req.method === 'POST' && (pathname === '/api/exams/clear-all' || pathname.endsWith('/exams/clear-all'))) ||
+      (req.method === 'DELETE' && pathname === '/api/exams')) {
+    serverExams.length = 0;
+    serverExamSubmissions.length = 0;
+    for (const k of Object.keys(serverQuizStats)) {
+      if (serverQuizStats[k] && Array.isArray(serverQuizStats[k].history)) {
+        serverQuizStats[k].history = [];
+      }
+    }
+    saveDatabase();
+    if (isKVConfigured()) {
+      writeToKV().catch(() => {});
+    }
+    sendJson(res, 200, { success: true, message: 'Đã xóa toàn bộ đề thi và làm sạch dữ liệu bài làm của sinh viên thành công.' });
+    return;
   }
 
   // Route: DELETE /api/exams/:id

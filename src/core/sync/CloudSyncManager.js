@@ -471,16 +471,12 @@ export class CloudSyncManager {
       if (!res.ok) return;
       const data = await res.json();
       if (data.success && Array.isArray(data.exams)) {
-        if (examManager && examManager.storage) {
-          const localExams = examManager.getExams();
-          const serverMap = new Map();
-          data.exams.forEach(e => serverMap.set(e.id, e));
-          localExams.forEach(e => {
-            if (!serverMap.has(e.id)) serverMap.set(e.id, e);
-          });
-          const merged = Array.from(serverMap.values());
-          examManager.storage.setItem('trr_assigned_exams_v1', JSON.stringify(merged));
-          examManager._notifyListeners('exams_synced', merged);
+        if (examManager) {
+          examManager.memoryExams = [...data.exams];
+          if (examManager.storage) {
+            examManager.storage.setItem('trr_assigned_exams_v1', JSON.stringify(data.exams));
+          }
+          examManager._notifyListeners('exams_synced', data.exams);
         }
       }
     } catch {}
@@ -523,6 +519,24 @@ export class CloudSyncManager {
   }
 
   /**
+   * Requests server to clear all exams, submissions, and student exam records.
+   * @returns {Promise<Object|null>}
+   */
+  async serverClearAllExams() {
+    if (typeof fetch === 'undefined') return null;
+    try {
+      const res = await fetch(`${this.baseUrl}/api/exams/clear-all`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (!res.ok) return null;
+      return await res.json();
+    } catch {
+      return null;
+    }
+  }
+
+  /**
    * Synchronizes exam submissions from server to local ExamManager.
    * @param {Object} examManager
    */
@@ -533,14 +547,12 @@ export class CloudSyncManager {
       if (!res.ok) return;
       const data = await res.json();
       if (data.success && Array.isArray(data.submissions)) {
-        if (examManager && examManager.storage) {
-          const localSubs = examManager.getSubmissions();
-          const subMap = new Map();
-          localSubs.forEach(s => subMap.set(`${s.examId}_${s.userId}`, s));
-          data.submissions.forEach(s => subMap.set(`${s.examId}_${s.userId}`, s));
-          const merged = Array.from(subMap.values());
-          examManager.storage.setItem('trr_exam_submissions_v1', JSON.stringify(merged));
-          examManager._notifyListeners('submissions_synced', merged);
+        if (examManager) {
+          examManager.memorySubmissions = [...data.submissions];
+          if (examManager.storage) {
+            examManager.storage.setItem('trr_exam_submissions_v1', JSON.stringify(data.submissions));
+          }
+          examManager._notifyListeners('submissions_synced', data.submissions);
         }
       }
     } catch {}

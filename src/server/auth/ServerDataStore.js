@@ -59,7 +59,7 @@ export function loadDatabase() {
       }
       if (Array.isArray(data.exams)) {
         serverExams.length = 0;
-        serverExams.push(...(data.exams.length > 0 ? data.exams : DEFAULT_EXAMS));
+        serverExams.push(...data.exams);
       }
       if (Array.isArray(data.examSubmissions)) {
         serverExamSubmissions.length = 0;
@@ -125,7 +125,7 @@ export async function fetchFromKV() {
       }
       if (Array.isArray(data.exams)) {
         serverExams.length = 0;
-        serverExams.push(...(data.exams.length > 0 ? data.exams : DEFAULT_EXAMS));
+        serverExams.push(...data.exams);
       }
       if (Array.isArray(data.examSubmissions)) {
         serverExamSubmissions.length = 0;

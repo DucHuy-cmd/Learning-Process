@@ -67,6 +67,19 @@ export class QuizHistoryManager {
   }
 
   /**
+   * Clears all exam history and submissions from all user accounts.
+   */
+  clearAllExamHistory() {
+    const map = this._readMap();
+    for (const userId of Object.keys(map)) {
+      if (map[userId] && Array.isArray(map[userId].history)) {
+        map[userId].history = [];
+      }
+    }
+    this._writeMap(map);
+  }
+
+  /**
    * Removes a specific user's stats from the leaderboard.
    * @param {string} userId
    */
