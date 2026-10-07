@@ -714,7 +714,8 @@ export class QuizView {
               CẢNH BÁO: Bạn đã bị cộng thêm 1 vi phạm do không quay lại toàn màn hình trong thời gian quy định.
               Tổng số vi phạm: ${session.violationCount}/3.
             </p>
-          ` : lockdownCountdown !== null ? `
+          ` : ''}
+          ${lockdownCountdown !== null ? `
             <p class="exam-lockdown-countdown" role="status">
               Quay lại toàn màn hình trong <strong id="examLockdownCountdown">${lockdownCountdown}</strong> giây để tránh bị cộng thêm 1 vi phạm.
             </p>
@@ -1702,7 +1703,7 @@ export class QuizView {
     this._examLockdownHandlers = null;
   }
 
-  _requestExamFullscreen() {
+  _requestExamFullscreen({ preserveLockdownState = false } = {}) {
     if (typeof document === 'undefined' || typeof document.documentElement.requestFullscreen !== 'function') {
       return;
     }
@@ -1716,12 +1717,12 @@ export class QuizView {
         session.lockdownWarning = false;
         this.render();
       }).catch(() => {
-        if (this.activeExamSession !== session) return;
+        if (this.activeExamSession !== session || preserveLockdownState) return;
         session.lockdownPending = true;
         this.render();
       });
     } catch {
-      if (this.activeExamSession === session) {
+      if (this.activeExamSession === session && !preserveLockdownState) {
         session.lockdownPending = true;
         this.render();
       }
@@ -1755,7 +1756,7 @@ export class QuizView {
     this._cancelExamLockdownCountdown(session);
     session.lockdownCountdown = 20;
     session.lockdownTimerId = setInterval(() => {
-      if (this.activeExamSession !== session || !session.lockdownPending) {
+      if (this.activeExamSession !== session || !session.lockdownPending || session.timeRemaining <= 0) {
         this._cancelExamLockdownCountdown(session);
         return;
       }
@@ -1772,7 +1773,7 @@ export class QuizView {
   }
 
   _cancelExamLockdownCountdown(session) {
-    if (session.lockdownTimerId) {
+    if (session.lockdownTimerId !== null) {
       clearInterval(session.lockdownTimerId);
       session.lockdownTimerId = null;
     }
@@ -1780,7 +1781,7 @@ export class QuizView {
   }
 
   _recordExamLockdownTimeoutViolation(session) {
-    if (this.activeExamSession !== session || !session.lockdownPending) return;
+    if (this.activeExamSession !== session || !session.lockdownPending || session.timeRemaining <= 0) return;
     const currentUser = authManager.getCurrentUser();
     if (!currentUser) return;
 
@@ -1797,6 +1798,7 @@ export class QuizView {
     }
 
     session.lockdownWarning = true;
+    this._startExamLockdownCountdown(session);
     this.render();
   }
 
@@ -1827,6 +1829,7 @@ export class QuizView {
       answers: this.activeExamSession.answers,
       timeSpentSeconds,
       optionOrder: this.activeExamSession.optionOrder,
+      integrityBan,
     });
 
     if (result.success && cloudSyncManager && cloudSyncManager.isConnected) {
@@ -2035,9 +2038,13 @@ export class QuizView {
       const btnResumeExamLockdown = this.container.querySelector('#btnResumeExamLockdown');
       if (btnResumeExamLockdown) {
         btnResumeExamLockdown.addEventListener('click', () => {
-          this._cancelExamLockdownCountdown(this.activeExamSession);
+          const session = this.activeExamSession;
+          if (!session) return;
+          this._cancelExamLockdownCountdown(session);
+          session.lockdownPending = false;
+          session.lockdownWarning = false;
           this.render();
-          this._requestExamFullscreen();
+          this._requestExamFullscreen({ preserveLockdownState: true });
         });
       }
 

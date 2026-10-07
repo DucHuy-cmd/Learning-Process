@@ -503,7 +503,7 @@ describe('QuizView UI Component', () => {
     authManager.logout();
   });
 
-  it('adds one violation after the 20-second lockdown countdown without requesting fullscreen', () => {
+  it('repeats the 20-second lockdown countdown until the third violation bans the exam without requesting fullscreen', () => {
     vi.useFakeTimers();
     authManager.register({ username: 'sv_lockdown_timeout', fullName: 'Thí Sinh C', email: 'tsc@toanrr.edu.vn', password: '123456' });
     examManager.clearAllData();
@@ -532,13 +532,23 @@ describe('QuizView UI Component', () => {
     expect(session.violationCount).toBe(2);
     expect(container.querySelector('.exam-lockdown-warning').textContent).toContain('CẢNH BÁO');
     expect(container.querySelector('.exam-lockdown-warning').textContent).toContain('cộng thêm 1 vi phạm');
+    expect(session.lockdownCountdown).toBe(20);
+    expect(container.querySelector('#examLockdownCountdown').textContent).toBe('20');
+    expect(session.lockdownTimerId).not.toBeNull();
     expect(requestFullscreen).not.toHaveBeenCalled();
 
-    quizView._submitActiveExam();
+    session.answers[session.questions[0].id] = session.questions[0].correctId;
+    vi.advanceTimersByTime(20000);
+    expect(session.violationCount).toBe(3);
+    expect(session.lockdownTimerId).toBeNull();
+    expect(quizView.activeExamSession).toBeNull();
+    expect(examManager.getExamViolationRecord(session.exam.id, authManager.getCurrentUser().id))
+      .toMatchObject({ count: 3, banned: true });
+    expect(examManager.getSubmission(session.exam.id, authManager.getCurrentUser().id).score).toBe(0);
     authManager.logout();
   });
 
-  it('cancels the lockdown countdown when the student manually continues', async () => {
+  it('cancels repeated lockdown countdowns when the student manually continues', async () => {
     vi.useFakeTimers();
     authManager.register({ username: 'sv_lockdown_resume', fullName: 'Thí Sinh D', email: 'tsd@toanrr.edu.vn', password: '123456' });
     examManager.clearAllData();
@@ -555,13 +565,17 @@ describe('QuizView UI Component', () => {
     });
 
     quizView._recordExamLockdownViolation();
+    vi.advanceTimersByTime(20000);
+    expect(session.violationCount).toBe(2);
+    expect(session.lockdownTimerId).not.toBeNull();
     container.querySelector('#btnResumeExamLockdown').click();
 
     expect(session.lockdownTimerId).toBeNull();
     expect(session.lockdownCountdown).toBeNull();
+    expect(session.lockdownPending).toBe(false);
     expect(requestFullscreen).toHaveBeenCalledTimes(1);
-    vi.advanceTimersByTime(20000);
-    expect(session.violationCount).toBe(1);
+    vi.advanceTimersByTime(40000);
+    expect(session.violationCount).toBe(2);
 
     await Promise.resolve();
     quizView._submitActiveExam();

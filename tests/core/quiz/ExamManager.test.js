@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { ExamManager, DEFAULT_EXAMS } from '../../../src/core/quiz/ExamManager.js';
+import { STATIC_QUESTION_BANK } from '../../../src/core/quiz/QuizBank.js';
 
 class MockStorage {
   constructor() {
@@ -69,6 +70,25 @@ describe('ExamManager Core Module', () => {
     expect(manager.getExamViolationRecord(DEFAULT_EXAMS[0].id, 'student_one').banned).toBe(true);
     expect(manager.getExamViolationRecord(otherExam.id, 'student_one').banned).toBe(false);
     expect(manager.getExamViolationRecord(DEFAULT_EXAMS[0].id, 'student_two').banned).toBe(false);
+  });
+
+  it('forces a zero score when submitting an exam after an integrity ban', () => {
+    const exam = manager.getExams()[0];
+    const answers = Object.fromEntries(exam.questionIds.map(questionId => {
+      const question = STATIC_QUESTION_BANK.find(item => item.id === questionId);
+      return [questionId, question.correctId];
+    }));
+
+    const submitted = manager.submitExam({
+      examId: exam.id,
+      userId: 'student_banned',
+      answers,
+      integrityBan: true,
+    });
+
+    expect(submitted.success).toBe(true);
+    expect(submitted.submission.correctCount).toBe(exam.questionIds.length);
+    expect(submitted.submission.score).toBe(0);
   });
 
   it('rejects submissions from students who were not assigned the exam', () => {
