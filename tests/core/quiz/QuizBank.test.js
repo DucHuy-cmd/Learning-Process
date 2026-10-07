@@ -17,7 +17,7 @@ describe('QuizBank Core Engine & Exam Generator', () => {
       STATIC_QUESTION_BANK.forEach(q => {
         expect(q.id).toBeDefined();
         expect(typeof q.id).toBe('string');
-        expect(['logic', 'counting', 'relation', 'graph']).toContain(q.topic);
+        expect(['logic', 'boolean', 'counting', 'relation', 'graph']).toContain(q.topic);
         expect(['easy', 'medium', 'hard']).toContain(q.difficulty);
         expect(q.question).toBeDefined();
         expect(q.question.length).toBeGreaterThan(10);
@@ -32,17 +32,19 @@ describe('QuizBank Core Engine & Exam Generator', () => {
       });
     });
 
-    it('covers all 4 academic chapters: Logic, Counting, Relation, and Graph domains', () => {
+    it('covers all 5 academic chapters: Logic, Boolean, Counting, Relation, and Graph domains', () => {
       const logicQs = STATIC_QUESTION_BANK.filter(q => q.topic === 'logic');
+      const booleanQs = STATIC_QUESTION_BANK.filter(q => q.topic === 'boolean');
       const countingQs = STATIC_QUESTION_BANK.filter(q => q.topic === 'counting');
       const relationQs = STATIC_QUESTION_BANK.filter(q => q.topic === 'relation');
       const graphQs = STATIC_QUESTION_BANK.filter(q => q.topic === 'graph');
 
-      expect(STATIC_QUESTION_BANK.length).toBeGreaterThanOrEqual(50);
-      expect(logicQs.length).toBeGreaterThanOrEqual(10);
-      expect(countingQs.length).toBeGreaterThanOrEqual(10);
-      expect(relationQs.length).toBeGreaterThanOrEqual(10);
-      expect(graphQs.length).toBeGreaterThanOrEqual(10);
+      expect(STATIC_QUESTION_BANK.length).toBe(125);
+      expect(logicQs.length).toBe(25);
+      expect(booleanQs.length).toBe(25);
+      expect(countingQs.length).toBe(25);
+      expect(relationQs.length).toBe(25);
+      expect(graphQs.length).toBe(25);
     });
   });
 
@@ -67,7 +69,7 @@ describe('QuizBank Core Engine & Exam Generator', () => {
     });
 
     it('filters questions by topic when requested', () => {
-      ['logic', 'counting', 'relation', 'graph'].forEach(topic => {
+      ['logic', 'boolean', 'counting', 'relation', 'graph'].forEach(topic => {
         const exam = generateExamPaper({ count: 5, topic });
         exam.questions.forEach(q => {
           expect(q.topic).toBe(topic);

@@ -154,10 +154,10 @@ describe('QuizView UI Component', () => {
     }
   });
 
-  it('supports setTopic to dynamically filter questions across all 4 chapters', () => {
+  it('supports setTopic to dynamically filter questions across all 5 chapters', () => {
     const quizView = new QuizView({ container });
 
-    ['logic', 'counting', 'relation', 'graph'].forEach(topic => {
+    ['logic', 'boolean', 'counting', 'relation', 'graph'].forEach(topic => {
       quizView.setTopic(topic);
       expect(quizView.practiceFilter.topic).toBe(topic);
       expect(quizView.practiceQuestions.length).toBeGreaterThan(0);
@@ -604,6 +604,75 @@ describe('QuizView UI Component', () => {
     const btnClose = container.querySelector('#btnCloseGradebook');
     btnClose.click();
     expect(quizView.gradebookExamId).toBeNull();
+
+    authManager.logout();
+  });
+
+  it('renders Question Palette Grid in Practice Mode and supports fast jumping with answer status coloring', () => {
+    const quizView = new QuizView({ container });
+    const jumpBtns = Array.from(container.querySelectorAll('.btn-practice-jump'));
+    expect(jumpBtns.length).toBe(quizView.practiceQuestions.length);
+
+    // Initial state: first button is current, none answered
+    expect(jumpBtns[0].classList.contains('current')).toBe(true);
+    expect(jumpBtns[0].classList.contains('answered')).toBe(false);
+
+    // Click jump to question index 4 (Câu 5)
+    jumpBtns[4].click();
+    expect(quizView.currentIndex).toBe(4);
+    const updatedJumpBtns = Array.from(container.querySelectorAll('.btn-practice-jump'));
+    expect(updatedJumpBtns[4].classList.contains('current')).toBe(true);
+
+    // Answer the question
+    const optBtn = container.querySelector('.btn-quiz-option');
+    expect(optBtn).not.toBeNull();
+    optBtn.click();
+
+    // After answering, the button should have answered class
+    const reloadedJumpBtns = Array.from(container.querySelectorAll('.btn-practice-jump'));
+    expect(reloadedJumpBtns[4].classList.contains('answered')).toBe(true);
+  });
+
+  it('supports Chapter filter and batch selection in Admin Studio manual question assignment', () => {
+    authManager.login('admin', 'admin123');
+    const quizView = new QuizView({ container });
+    quizView.setTab('studio');
+    quizView.studioSubTab = 'assign';
+    quizView.render();
+
+    const selMode = container.querySelector('#selAssignSelectionMode');
+    expect(selMode).not.toBeNull();
+    selMode.value = 'manual';
+    selMode.dispatchEvent(new window.Event('change'));
+
+    const manualList = container.querySelector('#manualQuestionList');
+    expect(manualList.style.display).toBe('block');
+
+    const selChapter = container.querySelector('#selManualChapterFilter');
+    expect(selChapter).not.toBeNull();
+
+    // Filter to logic only
+    selChapter.value = 'logic';
+    selChapter.dispatchEvent(new window.Event('change'));
+
+    const rows = Array.from(container.querySelectorAll('.manual-q-row'));
+    const visibleLogicRows = rows.filter(r => r.style.display !== 'none');
+    expect(visibleLogicRows.length).toBe(25);
+    visibleLogicRows.forEach(r => expect(r.getAttribute('data-topic')).toBe('logic'));
+
+    // Batch select visible questions
+    const btnSelectVisible = container.querySelector('#btnManualSelectVisible');
+    btnSelectVisible.click();
+
+    const checkedBoxes = Array.from(container.querySelectorAll('.chk-assign-question:checked'));
+    expect(checkedBoxes.length).toBe(25);
+    expect(container.querySelector('#manualSelectedCounter').textContent).toContain('Đã chọn: 25 câu');
+
+    // Deselect all
+    const btnDeselectAll = container.querySelector('#btnManualDeselectAll');
+    btnDeselectAll.click();
+    const remainingChecked = Array.from(container.querySelectorAll('.chk-assign-question:checked'));
+    expect(remainingChecked.length).toBe(0);
 
     authManager.logout();
   });

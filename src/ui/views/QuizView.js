@@ -198,7 +198,9 @@ export class QuizView {
   setTopic(topic) {
     if (topic) {
       let normalizedTopic = topic;
-      if (['dijkstra', 'mst', 'euler_hamilton'].includes(topic)) {
+      if (['circuit', 'kmap', 'boolean'].includes(topic)) {
+        normalizedTopic = 'boolean';
+      } else if (['dijkstra', 'mst', 'euler_hamilton'].includes(topic)) {
         normalizedTopic = 'graph';
       }
       this.practiceFilter.topic = normalizedTopic;
@@ -342,14 +344,15 @@ export class QuizView {
         
         <!-- Filter Controls Card -->
         <div style="background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;">
-          <div style="font-size:12px;color:var(--dim);font-weight:600;text-transform:uppercase;margin-bottom:10px;">Lọc Chuyên Đề &amp; Độ Khó (Kho 100 Câu)</div>
+          <div style="font-size:12px;color:var(--dim);font-weight:600;text-transform:uppercase;margin-bottom:10px;">Lọc Chuyên Đề &amp; Độ Khó (Kho 125 Câu)</div>
           <div style="display:flex;gap:10px;flex-wrap:wrap;">
             <select id="selPracticeTopic" class="form-input" style="flex:1;min-width:140px;padding:6px 10px;font-size:12.5px;border-radius:6px;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);">
-              <option value="all" ${this.practiceFilter.topic === 'all' ? 'selected' : ''}>🌟 Tất cả các chương (100 câu)</option>
-              <option value="logic" ${this.practiceFilter.topic === 'logic' ? 'selected' : ''}>⚡ Chương 1 &amp; 2: Cơ sở Logic &amp; Mệnh đề (25 câu)</option>
+              <option value="all" ${this.practiceFilter.topic === 'all' ? 'selected' : ''}>🌟 Tất cả các chương (125 câu)</option>
+              <option value="logic" ${this.practiceFilter.topic === 'logic' ? 'selected' : ''}>⚡ Chương 1: Cơ sở Logic &amp; Suy luận (25 câu)</option>
+              <option value="boolean" ${this.practiceFilter.topic === 'boolean' ? 'selected' : ''}>🔌 Chương 2: Đại số Boole &amp; Mạch Logic (25 câu)</option>
               <option value="counting" ${this.practiceFilter.topic === 'counting' ? 'selected' : ''}>🎲 Chương 3: Đại số Tổ hợp &amp; Đếm (25 câu)</option>
-              <option value="relation" ${this.practiceFilter.topic === 'relation' ? 'selected' : ''}>🔗 Chương 4: Quan hệ 2 ngôi &amp; Đại số Bool (25 câu)</option>
-              <option value="graph" ${this.practiceFilter.topic === 'graph' ? 'selected' : ''}>🌐 Chương 5: Lý thuyết Đồ thị &amp; Thuật toán (25 câu)</option>
+              <option value="relation" ${this.practiceFilter.topic === 'relation' ? 'selected' : ''}>🔗 Chương 4: Quan hệ 2 ngôi &amp; Thứ tự (25 câu)</option>
+              <option value="graph" ${this.practiceFilter.topic === 'graph' ? 'selected' : ''}>🌐 Chương 5: Lý thuyết Đồ thị &amp; Cây (25 câu)</option>
             </select>
             <select id="selPracticeDiff" class="form-input" style="flex:1;min-width:130px;padding:6px 10px;font-size:12.5px;border-radius:6px;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);">
               <option value="all" ${this.practiceFilter.difficulty === 'all' ? 'selected' : ''}>Tất cả độ khó</option>
@@ -386,6 +389,39 @@ export class QuizView {
         </div>
 
       </div>
+
+      <!-- Bảng câu hỏi chuyển nhanh (Question Palette Grid) -->
+      ${total > 0 ? `
+        <div style="background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 16px;margin-bottom:16px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
+            <div style="font-size:12px;font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:0.5px;display:flex;align-items:center;gap:6px;">
+              <span>📑</span> Bảng câu hỏi (Bấm số để chuyển nhanh):
+            </div>
+            <div style="display:flex;gap:12px;font-size:11.5px;color:var(--dim);">
+              <span style="display:flex;align-items:center;gap:4px;">
+                <span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#10b981;border:1px solid #10b981;"></span> Đã làm
+              </span>
+              <span style="display:flex;align-items:center;gap:4px;">
+                <span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:var(--panel-alt);border:1px solid var(--line);"></span> Chưa làm
+              </span>
+              <span style="display:flex;align-items:center;gap:4px;">
+                <span style="display:inline-block;width:10px;height:10px;border-radius:3px;border:2px solid var(--accent);background:transparent;"></span> Đang xem
+              </span>
+            </div>
+          </div>
+          <div class="exam-q-jump-grid" style="margin-bottom:0;max-height:140px;overflow-y:auto;">
+            ${this.practiceQuestions.map((pq, idx) => {
+              const isAns = Boolean(this.userAnswers[pq.id]);
+              const isCurr = idx === this.currentIndex;
+              return `
+                <button type="button" class="exam-q-jump-btn btn-practice-jump ${isAns ? 'answered' : ''} ${isCurr ? 'current' : ''}" data-jump-idx="${idx}" title="Câu ${idx + 1}: ${isAns ? 'Đã chọn đáp án' : 'Chưa chọn'}">
+                  ${idx + 1}
+                </button>
+              `;
+            }).join('')}
+          </div>
+        </div>
+      ` : ''}
 
       <!-- Question Card -->
       ${total === 0 ? `
@@ -596,7 +632,7 @@ export class QuizView {
                 <div>
                   <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:10px;">
                     <span class="exam-status-badge ${isBanned ? 'banned' : (isCompleted ? 'completed' : 'pending')}">
-                      ${isBanned ? '🚫 KHÔNG THỂ THI LẠI ĐỀ NÀY (3/3)' : (isCompleted ? `✅ ĐÃ HOÀN THÀNH: ${sub.score} / 10` : '⏳ CHƯA LÀM (Chỉ 1 lượt)')}
+                      ${isBanned ? '🚫 BỊ CẤM THI LẠI ĐỀ NÀY (3/3)' : (isCompleted ? `✅ ĐÃ HOÀN THÀNH: ${sub.score} / 10` : '⏳ CHƯA LÀM (Chỉ 1 lượt)')}
                     </span>
                     <span style="font-size:11px;color:var(--dim);">
                       ${new Date(exam.createdAt).toLocaleDateString('vi-VN')}
@@ -989,25 +1025,61 @@ export class QuizView {
               <div>
                 <label style="display:block;font-size:12.5px;font-weight:600;color:var(--text);margin-bottom:6px;">Chuyên đề lấy câu hỏi:</label>
                 <select id="selAssignTopic" class="form-input" style="width:100%;padding:8px 12px;border-radius:6px;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);font-size:13px;">
-                  <option value="all">🌟 Tổng hợp cả 4 chuyên đề</option>
-                  <option value="logic">⚡ Chương 1 & 2: Cơ sở Logic & Mệnh đề</option>
-                  <option value="counting">🎲 Chương 3: Đại số Tổ hợp & Đếm</option>
-                  <option value="relation">🔗 Chương 4: Quan hệ 2 ngôi & Đại số Bool</option>
-                  <option value="graph">🌐 Chương 5: Lý thuyết Đồ thị & Thuật toán</option>
+                  <option value="all">🌟 Tổng hợp cả 5 chuyên đề</option>
+                  <option value="logic">⚡ Chương 1: Cơ sở Logic &amp; Suy luận</option>
+                  <option value="boolean">🔌 Chương 2: Đại số Boole &amp; Mạch Logic</option>
+                  <option value="counting">🎲 Chương 3: Đại số Tổ hợp &amp; Đếm</option>
+                  <option value="relation">🔗 Chương 4: Quan hệ 2 ngôi &amp; Thứ tự</option>
+                  <option value="graph">🌐 Chương 5: Lý thuyết Đồ thị &amp; Cây</option>
                 </select>
               </div>
             </div>
           </div>
 
-          <div id="manualQuestionList" style="display:none;max-height:220px;overflow-y:auto;background:var(--panel-alt);border:1px solid var(--line);border-radius:8px;padding:12px;margin-bottom:16px;">
-            <div style="font-size:12px;color:var(--dim);margin-bottom:8px;">Chọn chính xác các câu hỏi cho đề thi:</div>
-            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:6px;">
-              ${STATIC_QUESTION_BANK.map((question, index) => `
-                <label style="display:flex;align-items:flex-start;gap:8px;padding:6px 8px;background:var(--panel);border:1px solid var(--line);border-radius:6px;font-size:11.5px;">
-                  <input type="checkbox" class="chk-assign-question" value="${question.id}" />
-                  <span><strong>${index + 1}. ${this._escapeHtml(question.topicName || question.topic)}</strong> — ${this._escapeHtml(question.question)}</span>
-                </label>
-              `).join('')}
+          <div id="manualQuestionList" style="display:none;background:var(--panel-alt);border:1px solid var(--line);border-radius:8px;padding:14px;margin-bottom:16px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:10px;flex-wrap:wrap;">
+              <div style="display:flex;align-items:center;gap:8px;">
+                <label for="selManualChapterFilter" style="font-size:12.5px;font-weight:700;color:var(--text);">Lọc theo chương:</label>
+                <select id="selManualChapterFilter" class="form-input" style="padding:6px 12px;font-size:12.5px;border-radius:6px;background:var(--panel);border:1px solid var(--line);color:var(--text);">
+                  <option value="all">📚 Tất cả các chương (125 câu)</option>
+                  <option value="logic">⚡ Chương 1: Cơ sở Logic &amp; Suy luận (25 câu)</option>
+                  <option value="boolean">🔌 Chương 2: Đại số Boole &amp; Mạch Logic (25 câu)</option>
+                  <option value="counting">🎲 Chương 3: Đại số Tổ hợp &amp; Đếm (25 câu)</option>
+                  <option value="relation">🔗 Chương 4: Quan hệ 2 ngôi &amp; Thứ tự (25 câu)</option>
+                  <option value="graph">🌐 Chương 5: Lý thuyết Đồ thị &amp; Cây (25 câu)</option>
+                </select>
+              </div>
+
+              <div style="display:flex;align-items:center;gap:8px;">
+                <button type="button" class="btn-secondary" id="btnManualSelectVisible" style="font-size:11.5px;padding:5px 10px;">
+                  Chọn tất cả chương này
+                </button>
+                <button type="button" class="btn-secondary" id="btnManualDeselectAll" style="font-size:11.5px;padding:5px 10px;">
+                  Bỏ chọn tất cả
+                </button>
+                <span id="manualSelectedCounter" style="font-size:11.5px;font-weight:700;background:var(--accent);color:#000;padding:3px 9px;border-radius:12px;">
+                  Đã chọn: 0 câu
+                </span>
+              </div>
+            </div>
+
+            <div id="manualQuestionsContainer" style="max-height:260px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;padding-right:4px;">
+              ${STATIC_QUESTION_BANK.map((question, index) => {
+                const cleanQText = question.question.replace(/<br><svg[\s\S]*?<\/svg>/gi, ' [Sơ đồ mạch logic]').replace(/<[^>]+>/g, '');
+                return `
+                  <label class="manual-q-row" data-topic="${question.topic}" style="display:flex;align-items:flex-start;gap:10px;padding:8px 12px;background:var(--panel);border:1px solid var(--line);border-radius:6px;font-size:12px;cursor:pointer;transition:background 0.15s ease;">
+                    <input type="checkbox" class="chk-assign-question" value="${question.id}" style="margin-top:2px;cursor:pointer;" />
+                    <div style="flex:1;">
+                      <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;flex-wrap:wrap;">
+                        <span style="font-weight:700;color:var(--text);">Câu ${index + 1} [${question.id}]</span>
+                        <span style="font-size:10.5px;padding:1px 6px;border-radius:4px;background:var(--panel-alt);border:1px solid var(--line);color:var(--accent);">${this._escapeHtml(question.topicName || question.topic)}</span>
+                        <span style="font-size:10.5px;color:var(--dim);">${question.difficulty === 'easy' ? '🟢 Dễ' : question.difficulty === 'medium' ? '🟡 Trung bình' : '🔴 Nâng cao'}</span>
+                      </div>
+                      <div style="color:var(--text);line-height:1.4;">${this._escapeHtml(cleanQText)}</div>
+                    </div>
+                  </label>
+                `;
+              }).join('')}
             </div>
           </div>
 
@@ -1171,11 +1243,12 @@ export class QuizView {
             <div style="display:flex;align-items:center;gap:6px;">
               <span style="color:var(--dim);">Chuyên đề:</span>
               <select id="selStudioTopic" class="form-input" style="padding:4px 8px;font-size:12px;border-radius:4px;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);">
-                <option value="all" ${this.studioConfig.topic === 'all' ? 'selected' : ''}>🌟 Toàn diện cả 4 chương</option>
-                <option value="logic" ${this.studioConfig.topic === 'logic' ? 'selected' : ''}>⚡ Chương 1 &amp; 2: Cơ sở Logic &amp; Mệnh đề</option>
+                <option value="all" ${this.studioConfig.topic === 'all' ? 'selected' : ''}>🌟 Toàn diện cả 5 chương</option>
+                <option value="logic" ${this.studioConfig.topic === 'logic' ? 'selected' : ''}>⚡ Chương 1: Cơ sở Logic &amp; Suy luận</option>
+                <option value="boolean" ${this.studioConfig.topic === 'boolean' ? 'selected' : ''}>🔌 Chương 2: Đại số Boole &amp; Mạch Logic</option>
                 <option value="counting" ${this.studioConfig.topic === 'counting' ? 'selected' : ''}>🎲 Chương 3: Đại số Tổ hợp &amp; Đếm</option>
-                <option value="relation" ${this.studioConfig.topic === 'relation' ? 'selected' : ''}>🔗 Chương 4: Quan hệ 2 ngôi &amp; Đại số Bool</option>
-                <option value="graph" ${this.studioConfig.topic === 'graph' ? 'selected' : ''}>🌐 Chương 5: Lý thuyết Đồ thị &amp; Thuật toán</option>
+                <option value="relation" ${this.studioConfig.topic === 'relation' ? 'selected' : ''}>🔗 Chương 4: Quan hệ 2 ngôi &amp; Thứ tự</option>
+                <option value="graph" ${this.studioConfig.topic === 'graph' ? 'selected' : ''}>🌐 Chương 5: Lý thuyết Đồ thị &amp; Cây</option>
               </select>
             </div>
 
@@ -1868,6 +1941,17 @@ export class QuizView {
       });
     }
 
+    // Jump to specific question in Practice Mode
+    this.container.querySelectorAll('.btn-practice-jump').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const targetIdx = parseInt(e.currentTarget.getAttribute('data-jump-idx'), 10);
+        if (!isNaN(targetIdx) && targetIdx >= 0 && targetIdx < this.practiceQuestions.length) {
+          this.currentIndex = targetIdx;
+          this.render();
+        }
+      });
+    });
+
     // Practice Option Buttons Click
     this.container.querySelectorAll('.btn-quiz-option').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -2050,6 +2134,58 @@ export class QuizView {
         randomQuestionControls.style.display = isManual ? 'none' : 'contents';
         manualQuestionList.style.display = isManual ? 'block' : 'none';
       });
+
+      const selManualChapterFilter = this.container.querySelector('#selManualChapterFilter');
+      const manualRows = Array.from(this.container.querySelectorAll('.manual-q-row'));
+      const counterEl = this.container.querySelector('#manualSelectedCounter');
+
+      const updateSelectedCounter = () => {
+        if (!counterEl) return;
+        const checkedCount = this.container.querySelectorAll('.chk-assign-question:checked').length;
+        counterEl.textContent = `Đã chọn: ${checkedCount} câu`;
+      };
+
+      if (selManualChapterFilter) {
+        selManualChapterFilter.addEventListener('change', () => {
+          const filterVal = selManualChapterFilter.value;
+          manualRows.forEach(row => {
+            const topic = row.getAttribute('data-topic');
+            if (filterVal === 'all' || topic === filterVal) {
+              row.style.display = 'flex';
+            } else {
+              row.style.display = 'none';
+            }
+          });
+        });
+      }
+
+      const btnManualSelectVisible = this.container.querySelector('#btnManualSelectVisible');
+      if (btnManualSelectVisible) {
+        btnManualSelectVisible.addEventListener('click', () => {
+          manualRows.forEach(row => {
+            if (row.style.display !== 'none') {
+              const chk = row.querySelector('.chk-assign-question');
+              if (chk) chk.checked = true;
+            }
+          });
+          updateSelectedCounter();
+        });
+      }
+
+      const btnManualDeselectAll = this.container.querySelector('#btnManualDeselectAll');
+      if (btnManualDeselectAll) {
+        btnManualDeselectAll.addEventListener('click', () => {
+          this.container.querySelectorAll('.chk-assign-question').forEach(chk => {
+            chk.checked = false;
+          });
+          updateSelectedCounter();
+        });
+      }
+
+      this.container.querySelectorAll('.chk-assign-question').forEach(chk => {
+        chk.addEventListener('change', updateSelectedCounter);
+      });
+      updateSelectedCounter();
     }
 
     // Radio assign target toggle

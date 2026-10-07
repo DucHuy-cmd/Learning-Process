@@ -250,8 +250,8 @@ export class AuthModal {
           <div id="authAlert" class="auth-alert" style="display:none;"></div>
 
           <div class="auth-field">
-            <label for="loginUsername">Tên đăng nhập hoặc Email</label>
-            <input type="text" id="loginUsername" placeholder="Nhập tên đăng nhập hoặc email..." required autocomplete="username">
+            <label for="loginUsername">Email</label>
+            <input type="text" id="loginUsername" placeholder="Nhập địa chỉ email của bạn..." required autocomplete="email">
           </div>
 
           <div class="auth-field">
@@ -272,7 +272,8 @@ export class AuthModal {
         const alertBox = bodyContainer.querySelector('#authAlert');
 
         // 1. If not admin and server is connected, verify against authoritative server first
-        if (username.toLowerCase() !== 'admin') {
+        const isTargetAdmin = username.toLowerCase() === 'admin' || username.toLowerCase() === 'admin@toanrr.edu.vn';
+        if (!isTargetAdmin) {
           try {
             const isOnline = await cloudSyncManager.checkConnection();
             if (isOnline) {
