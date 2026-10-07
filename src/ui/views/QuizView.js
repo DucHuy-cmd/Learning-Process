@@ -666,12 +666,23 @@ export class QuizView {
     const s = Math.max(0, session.timeRemaining) % 60;
     const timeFormatted = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
     const isUrgent = session.timeRemaining <= 120;
+    const lockdownCountdown = session.lockdownCountdown;
     const lockdownOverlay = session.lockdownPending ? `
       <div class="exam-lockdown-overlay" role="dialog" aria-modal="true" aria-labelledby="examLockdownTitle">
         <div class="exam-lockdown-dialog">
           <div class="exam-lockdown-icon">🔒</div>
           <h2 id="examLockdownTitle">Phòng thi đã bị thoát toàn màn hình</h2>
           <p>Vi phạm ${session.violationCount}/3. Đủ 3 lần sẽ bị cấm thi lại đề này; những đề khác không bị ảnh hưởng.</p>
+          ${session.lockdownWarning ? `
+            <p class="exam-lockdown-warning" role="alert">
+              CẢNH BÁO: Bạn đã bị cộng thêm 1 vi phạm do không quay lại toàn màn hình trong thời gian quy định.
+              Tổng số vi phạm: ${session.violationCount}/3.
+            </p>
+          ` : lockdownCountdown !== null ? `
+            <p class="exam-lockdown-countdown" role="status">
+              Quay lại toàn màn hình trong <strong id="examLockdownCountdown">${lockdownCountdown}</strong> giây để tránh bị cộng thêm 1 vi phạm.
+            </p>
+          ` : ''}
           <button type="button" class="btn-primary" id="btnResumeExamLockdown">Quay lại phòng thi toàn màn hình</button>
         </div>
       </div>
@@ -1548,6 +1559,9 @@ export class QuizView {
       startedAt: Date.now(),
       violationCount: violationRecord.count || 0,
       lockdownPending: false,
+      lockdownCountdown: null,
+      lockdownTimerId: null,
+      lockdownWarning: false,
       fullscreenActive: false,
     };
 
@@ -1589,7 +1603,9 @@ export class QuizView {
         if (isFullscreen) {
           session.fullscreenActive = true;
           if (session.lockdownPending) {
+            this._cancelExamLockdownCountdown(session);
             session.lockdownPending = false;
+            session.lockdownWarning = false;
             this.render();
           }
         } else if (session.fullscreenActive) {
@@ -1621,8 +1637,10 @@ export class QuizView {
     try {
       Promise.resolve(document.documentElement.requestFullscreen()).then(() => {
         if (this.activeExamSession !== session) return;
+        this._cancelExamLockdownCountdown(session);
         session.fullscreenActive = true;
         session.lockdownPending = false;
+        session.lockdownWarning = false;
         this.render();
       }).catch(() => {
         if (this.activeExamSession !== session) return;
@@ -1650,11 +1668,62 @@ export class QuizView {
     }
     session.violationCount = result.record.count;
     session.lockdownPending = true;
+    session.lockdownWarning = false;
 
     if (session.violationCount >= 3) {
       this._finishExamForViolationBan();
       return;
     }
+    this._startExamLockdownCountdown(session);
+    this.render();
+  }
+
+  _startExamLockdownCountdown(session) {
+    this._cancelExamLockdownCountdown(session);
+    session.lockdownCountdown = 20;
+    session.lockdownTimerId = setInterval(() => {
+      if (this.activeExamSession !== session || !session.lockdownPending) {
+        this._cancelExamLockdownCountdown(session);
+        return;
+      }
+
+      session.lockdownCountdown--;
+      const countdownEl = this.container?.querySelector('#examLockdownCountdown');
+      if (countdownEl) countdownEl.textContent = String(session.lockdownCountdown);
+
+      if (session.lockdownCountdown <= 0) {
+        this._cancelExamLockdownCountdown(session);
+        this._recordExamLockdownTimeoutViolation(session);
+      }
+    }, 1000);
+  }
+
+  _cancelExamLockdownCountdown(session) {
+    if (session.lockdownTimerId) {
+      clearInterval(session.lockdownTimerId);
+      session.lockdownTimerId = null;
+    }
+    session.lockdownCountdown = null;
+  }
+
+  _recordExamLockdownTimeoutViolation(session) {
+    if (this.activeExamSession !== session || !session.lockdownPending) return;
+    const currentUser = authManager.getCurrentUser();
+    if (!currentUser) return;
+
+    const result = examManager.recordExamViolation(session.exam.id, currentUser.id);
+    if (!result.success) {
+      this._showAlert(`Không thể lưu vi phạm thi: ${result.error}`);
+      return;
+    }
+
+    session.violationCount = result.record.count;
+    if (session.violationCount >= 3) {
+      this._finishExamForViolationBan();
+      return;
+    }
+
+    session.lockdownWarning = true;
     this.render();
   }
 
@@ -1665,6 +1734,7 @@ export class QuizView {
   _submitActiveExam({ integrityBan = false } = {}) {
     if (!this.activeExamSession) return;
 
+    this._cancelExamLockdownCountdown(this.activeExamSession);
     if (this.activeExamSession.timerId) {
       clearInterval(this.activeExamSession.timerId);
       this.activeExamSession.timerId = null;
@@ -1881,6 +1951,8 @@ export class QuizView {
       const btnResumeExamLockdown = this.container.querySelector('#btnResumeExamLockdown');
       if (btnResumeExamLockdown) {
         btnResumeExamLockdown.addEventListener('click', () => {
+          this._cancelExamLockdownCountdown(this.activeExamSession);
+          this.render();
           this._requestExamFullscreen();
         });
       }
