@@ -304,6 +304,7 @@ export class ExamManager {
    * @param {Object} [data.userInfo]
    * @param {Record<string, string>} data.answers - Map of questionId -> selectedOptionId
    * @param {number} [data.timeSpentSeconds=0]
+   * @param {boolean} [data.integrityBan=false] - Force a zero score after an integrity ban.
    * @returns {{ success: boolean, error?: string, submission?: Object }}
    */
   submitExam({
@@ -313,6 +314,7 @@ export class ExamManager {
     answers = {},
     timeSpentSeconds = 0,
     optionOrder = {},
+    integrityBan = false,
   }) {
     if (!answers || typeof answers !== 'object' || Array.isArray(answers)) {
       return { success: false, error: 'Danh sách đáp án không hợp lệ.' };
@@ -355,7 +357,7 @@ export class ExamManager {
 
     // Score on scale 10, rounded to 1 decimal place
     const rawScore = totalQuestions > 0 ? (correctCount / totalQuestions) * 10 : 0;
-    const score = Math.round(rawScore * 10) / 10;
+    const score = integrityBan ? 0 : Math.round(rawScore * 10) / 10;
 
     const submission = {
       id: `sub_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
