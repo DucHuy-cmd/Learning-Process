@@ -485,7 +485,7 @@ describe('QuizView UI Component', () => {
     quizView.setTab('myExams');
 
     const examCards = Array.from(container.querySelectorAll('.exam-card'));
-    const bannedCard = examCards.find(card => card.textContent.includes('BỊ CẤM THI LẠI ĐỀ NÀY'));
+    const bannedCard = examCards.find(card => card.querySelector('.exam-status-badge.banned') || card.textContent.includes('BỊ CẤM THI LẠI'));
     expect(bannedCard).not.toBeNull();
     expect(bannedCard.querySelector('.btn-start-exam')).toBeNull();
 

@@ -598,7 +598,7 @@ export class QuizView {
                 <div>
                   <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:10px;">
                     <span class="exam-status-badge ${isBanned ? 'banned' : (isCompleted ? 'completed' : 'pending')}">
-                      ${isBanned ? `🚫 VI PHẠM (3/3): ${sub ? sub.score : 0} / 10 ĐIỂM` : (isCompleted ? `✅ ĐÃ HOÀN THÀNH: ${sub.score} / 10` : '⏳ CHƯA LÀM (Chỉ 1 lượt)')}
+                      ${isBanned ? `🚫 VI PHẠM (3/3): ${sub ? sub.score : 0} / 10 ĐIỂM (BỊ CẤM THI LẠI ĐỀ NÀY)` : (isCompleted ? `✅ ĐÃ HOÀN THÀNH: ${sub.score} / 10` : '⏳ CHƯA LÀM (Chỉ 1 lượt)')}
                     </span>
                     <span style="font-size:11px;color:var(--dim);">
                       ${new Date(exam.createdAt).toLocaleDateString('vi-VN')}
@@ -625,7 +625,7 @@ export class QuizView {
                     </button>
                   ` : isBanned ? `
                     <div class="exam-ban-notice">
-                      Đã vi phạm quy chế ${violationRecord.count} lần. Bạn bị xử lý 0 điểm cho đề thi này.
+                      Đã vi phạm quy chế ${violationRecord.count} lần. Bạn bị xử lý 0 điểm và bị cấm thi lại đề này.
                     </div>
                   ` : `
                     <div style="font-size:12px;color:#f59e0b;font-weight:600;">
