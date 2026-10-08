@@ -138,6 +138,28 @@ describe('Assigned exam API', () => {
     expect(otherExamSubmission.statusCode).toBe(201);
   });
 
+  it('forces score to 0 when submission has integrityBan=true', async () => {
+    const examId = `exam_integrity_${Date.now()}`;
+    serverExams.unshift({
+      id: examId,
+      title: 'Đề kiểm tra vi phạm',
+      durationMinutes: 15,
+      questionIds: ['logic_q01'],
+      assignedTo: ['all'],
+    });
+    const payload = {
+      examId,
+      userId: 'user_cheater',
+      userInfo: { username: 'cheater', fullName: 'Sinh viên vi phạm' },
+      answers: { logic_q01: 'B' },
+      integrityBan: true,
+    };
+    const res = await sendRequest({ method: 'POST', url: '/api/exam-submissions', body: payload });
+    expect(res.statusCode).toBe(201);
+    expect(res.data.submission.score).toBe(0);
+    expect(res.data.submission.integrityBan).toBe(true);
+  });
+
   it('clears all exams and submissions on the server', async () => {
     serverExams.push({ id: 'test_clear_exam', title: 'Đề xóa', durationMinutes: 10, questionIds: ['logic_q01'], assignedTo: ['all'] });
     serverExamSubmissions.push({ id: 'test_clear_sub', examId: 'test_clear_exam', userId: 'user_1', score: 10 });

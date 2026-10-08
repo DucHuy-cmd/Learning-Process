@@ -702,7 +702,7 @@ export async function handleRequest(req, res) {
     try {
       const bodyBuffer = await readRequestBody(req);
       const data = JSON.parse(bodyBuffer.toString('utf8') || '{}');
-      const { examId, userId, userInfo = {}, answers = {}, optionOrder = {}, timeSpentSeconds = 0 } = data;
+      const { examId, userId, userInfo = {}, answers = {}, optionOrder = {}, timeSpentSeconds = 0, integrityBan = false } = data;
 
       if (!userId || userId === 'guest') {
         sendJson(res, 400, { success: false, error: 'Yêu cầu đăng nhập tài khoản sinh viên.' });
@@ -753,7 +753,7 @@ export async function handleRequest(req, res) {
       });
 
       const rawScore = totalQuestions > 0 ? (correctCount / totalQuestions) * 10 : 0;
-      const score = Math.round(rawScore * 10) / 10;
+      const score = integrityBan ? 0 : Math.round(rawScore * 10) / 10;
 
       const submission = {
         id: `sub_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
@@ -769,6 +769,7 @@ export async function handleRequest(req, res) {
         score,
         correctCount,
         totalQuestions,
+        integrityBan: Boolean(integrityBan),
         timeSpentSeconds: Number.isFinite(Number(timeSpentSeconds)) ? Math.max(0, Math.round(Number(timeSpentSeconds))) : 0,
         submittedAt: new Date().toISOString(),
       };

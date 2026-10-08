@@ -552,7 +552,7 @@ export class QuizView {
           <p style="font-size:13px;color:var(--dim);margin:4px 0 0;">
             ${isAdmin 
               ? 'Xem tất cả các đề thi được tạo trong hệ thống, theo dõi tiến độ thi của sinh viên hoặc làm bài thi thử.' 
-              : 'Quy chế thi trực tuyến: Mỗi đề thi chỉ được làm <strong>1 lần duy nhất</strong>. Thang điểm 10.'}
+              : 'Quy chế thi trực tuyến: Mỗi thí sinh chỉ có duy nhất 1 lượt làm. Màn hình sẽ tự động khóa khi vào thi, <strong style="color:#ef4444;">VI PHẠM</strong> 3 lần sẽ bị 0đ.'}
           </p>
         </div>
 
@@ -598,7 +598,7 @@ export class QuizView {
                 <div>
                   <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:10px;">
                     <span class="exam-status-badge ${isBanned ? 'banned' : (isCompleted ? 'completed' : 'pending')}">
-                      ${isBanned ? '🚫 BỊ CẤM THI LẠI ĐỀ NÀY (3/3)' : (isCompleted ? `✅ ĐÃ HOÀN THÀNH: ${sub.score} / 10` : '⏳ CHƯA LÀM (Chỉ 1 lượt)')}
+                      ${isBanned ? `🚫 VI PHẠM (3/3): ${sub ? sub.score : 0} / 10 ĐIỂM` : (isCompleted ? `✅ ĐÃ HOÀN THÀNH: ${sub.score} / 10` : '⏳ CHƯA LÀM (Chỉ 1 lượt)')}
                     </span>
                     <span style="font-size:11px;color:var(--dim);">
                       ${new Date(exam.createdAt).toLocaleDateString('vi-VN')}
@@ -618,18 +618,18 @@ export class QuizView {
                 <div style="border-top:1px solid var(--line);padding-top:14px;margin-top:10px;display:flex;justify-content:space-between;align-items:center;">
                   ${isCompleted ? `
                     <div style="font-size:12px;color:var(--dim);">
-                      Đúng ${sub.correctCount}/${sub.totalQuestions} câu • ${Math.floor(sub.timeSpentSeconds / 60)}p ${sub.timeSpentSeconds % 60}s
+                      ${isBanned || sub.integrityBan ? '<span style="color:#ef4444;font-weight:700;">⚠️ Vi phạm 3 lần • Xử lý 0 điểm</span>' : `Đúng ${sub.correctCount}/${sub.totalQuestions} câu • ${Math.floor(sub.timeSpentSeconds / 60)}p ${sub.timeSpentSeconds % 60}s`}
                     </div>
                     <button type="button" class="btn-sm btn-review-exam" data-exam-id="${exam.id}" style="background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);font-weight:600;padding:6px 14px;border-radius:6px;cursor:pointer;">
                       👁️ Xem lại bài thi
                     </button>
                   ` : isBanned ? `
                     <div class="exam-ban-notice">
-                      Đã vi phạm quy chế ${violationRecord.count} lần. Bạn không thể thi lại đề này; các đề thi khác vẫn được phép làm.
+                      Đã vi phạm quy chế ${violationRecord.count} lần. Bạn bị xử lý 0 điểm cho đề thi này.
                     </div>
                   ` : `
                     <div style="font-size:12px;color:#f59e0b;font-weight:600;">
-                      ⚠️ Chỉ 1 lần làm bài • 3 vi phạm sẽ cấm thi lại đề này
+                      ⚠️ Duy nhất 1 lượt làm • <strong style="color:#ef4444;">VI PHẠM</strong> 3 lần sẽ bị 0đ
                     </div>
                     <button type="button" class="btn-primary btn-start-exam" data-exam-id="${exam.id}" style="font-size:13px;font-weight:700;padding:8px 18px;border-radius:6px;">
                       ▶️ Bắt Đầu Làm Bài
@@ -674,7 +674,7 @@ export class QuizView {
         <div class="exam-lockdown-dialog">
           <div class="exam-lockdown-icon">🔒</div>
           <h2 id="examLockdownTitle">Phòng thi đã bị thoát toàn màn hình</h2>
-          <p>Vi phạm ${session.violationCount}/3. Đủ 3 lần sẽ bị cấm thi lại đề này; những đề khác không bị ảnh hưởng.</p>
+          <p>Vi phạm ${session.violationCount}/3. <strong style="color:#ef4444;">VI PHẠM</strong> đủ 3 lần sẽ bị 0đ và cấm thi lại đề này.</p>
           ${session.lockdownWarning ? `
             <p class="exam-lockdown-warning" role="alert">
               CẢNH BÁO: Bạn đã bị cộng thêm 1 vi phạm do không quay lại toàn màn hình trong thời gian quy định.
@@ -808,6 +808,7 @@ export class QuizView {
     const isAdmin = authManager.isAdmin();
     const exam = examManager.getExamById(sub.examId);
     const questions = exam ? exam.questionIds.map(id => STATIC_QUESTION_BANK.find(q => q.id === id)).filter(Boolean) : [];
+    const isIntegrityBanned = Boolean(sub.integrityBan || (sub.userId && examManager.getExamViolationRecord(sub.examId, sub.userId).banned));
 
     return `
       <div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:24px;margin-bottom:24px;">
@@ -827,11 +828,13 @@ export class QuizView {
           </div>
 
           <!-- Score Card -->
-          <div style="background:rgba(16,185,129,0.12);border:2px solid #10b981;border-radius:12px;padding:12px 24px;text-align:center;">
-            <div style="font-size:12px;color:#10b981;font-weight:700;text-transform:uppercase;">Kết Quả Chính Thức</div>
-            <div style="font-size:28px;font-weight:900;color:#10b981;">${sub.score} <span style="font-size:16px;font-weight:normal;">/ 10 điểm</span></div>
-            <div style="font-size:12.5px;color:var(--dim);margin-top:2px;">
-              Đúng ${sub.correctCount}/${sub.totalQuestions} câu • ${Math.floor(sub.timeSpentSeconds / 60)}p ${sub.timeSpentSeconds % 60}s
+          <div style="background:${isIntegrityBanned ? 'rgba(239,68,68,0.12)' : 'rgba(16,185,129,0.12)'};border:2px solid ${isIntegrityBanned ? '#ef4444' : '#10b981'};border-radius:12px;padding:12px 24px;text-align:center;">
+            <div style="font-size:12px;color:${isIntegrityBanned ? '#ef4444' : '#10b981'};font-weight:700;text-transform:uppercase;">
+              ${isIntegrityBanned ? 'Vi Phạm Quy Chế (0đ)' : 'Kết Quả Chính Thức'}
+            </div>
+            <div style="font-size:28px;font-weight:900;color:${isIntegrityBanned ? '#ef4444' : '#10b981'};">${sub.score} <span style="font-size:16px;font-weight:normal;">/ 10 điểm</span></div>
+            <div style="font-size:12.5px;color:${isIntegrityBanned ? '#ef4444' : 'var(--dim)'};margin-top:2px;">
+              ${isIntegrityBanned ? 'Xử lý 0 điểm do vi phạm quy chế 3 lần' : `Đúng ${sub.correctCount}/${sub.totalQuestions} câu • ${Math.floor(sub.timeSpentSeconds / 60)}p ${sub.timeSpentSeconds % 60}s`}
             </div>
           </div>
         </div>
@@ -839,12 +842,14 @@ export class QuizView {
         ${!isAdmin ? `
           <!-- Student Result Notice: ONLY SCORE IS SHOWN, NO ANSWERS -->
           <div style="background:var(--panel-alt);border:1px solid var(--line);border-radius:12px;padding:32px 24px;text-align:center;margin-top:20px;">
-            <div style="font-size:42px;margin-bottom:12px;">🛡️</div>
-            <h3 style="font-size:18px;font-weight:700;color:var(--text);margin:0 0 8px;">
-              Bài Thi Đã Được Nộp &amp; Chấm Điểm Thành Công!
+            <div style="font-size:42px;margin-bottom:12px;">${isIntegrityBanned ? '🚫' : '🛡️'}</div>
+            <h3 style="font-size:18px;font-weight:700;color:${isIntegrityBanned ? '#ef4444' : 'var(--text)'};margin:0 0 8px;">
+              ${isIntegrityBanned ? 'Bài Thi Bị Xử Lý 0 Điểm Do Vi Phạm Quy Chế!' : 'Bài Thi Đã Được Nộp &amp; Chấm Điểm Thành Công!'}
             </h3>
             <p style="font-size:14px;color:var(--dim);max-width:540px;margin:0 auto 20px;line-height:1.6;">
-              Theo quy chế khảo thí và bảo mật đề thi trực tuyến, hệ thống <strong>chỉ công bố điểm số chính thức và số câu đúng</strong>, không hiển thị lại bộ câu hỏi và đáp án chi tiết.
+              ${isIntegrityBanned
+                ? 'Hệ thống ghi nhận bạn đã vi phạm quy chế thi cử quá 3 lần (thoát toàn màn hình hoặc chuyển tab/cửa sổ thi). Bài thi đã tự động nộp với mức điểm phạt là <strong>0 điểm</strong>.'
+                : 'Theo quy chế khảo thí và bảo mật đề thi trực tuyến, hệ thống <strong>chỉ công bố điểm số chính thức và số câu đúng</strong>, không hiển thị lại bộ câu hỏi và đáp án chi tiết.'}
             </p>
             <button type="button" class="btn-primary" id="btnBackToExamsFromScore" style="padding:10px 24px;font-weight:700;font-size:13.5px;">
               📋 Quay Về Danh Sách Đề Thi
@@ -1448,8 +1453,8 @@ export class QuizView {
                           </div>
                         </div>
                       </td>
-                      <td style="text-align:right;font-weight:800;color:var(--brand);font-size:15px;">
-                        ${sub.score} / 10
+                      <td style="text-align:right;font-weight:800;color:${sub.integrityBan || sub.score === 0 ? '#ef4444' : 'var(--brand)'};font-size:15px;">
+                        ${sub.score} / 10 ${sub.integrityBan || (sub.userId && examManager.getExamViolationRecord(sub.examId, sub.userId).banned) ? '<span class="pill-badge" style="background:rgba(239,68,68,0.2);color:#ef4444;font-size:10.5px;padding:2px 6px;margin-left:4px;border-radius:6px;">Vi phạm 3 lần (0đ)</span>' : ''}
                       </td>
                       <td style="text-align:center;font-weight:600;">
                         ${sub.correctCount} / ${sub.totalQuestions}
@@ -1508,7 +1513,9 @@ export class QuizView {
       const durationStr = `${minutes}p ${seconds}s`;
       const dateStr = new Date(s.submittedAt).toLocaleString('vi-VN');
       let rating = 'Yếu / Chưa đạt';
-      if (s.score >= 9.0) rating = 'Xuất sắc';
+      if (s.integrityBan || (s.userId && examManager.getExamViolationRecord(s.examId, s.userId).banned)) {
+        rating = 'Vi phạm quy chế (0đ)';
+      } else if (s.score >= 9.0) rating = 'Xuất sắc';
       else if (s.score >= 8.0) rating = 'Giỏi';
       else if (s.score >= 6.5) rating = 'Khá';
       else if (s.score >= 5.0) rating = 'Trung bình';
@@ -1576,7 +1583,7 @@ export class QuizView {
     }
 
     const confirmStart = typeof window !== 'undefined' && window.confirm
-      ? window.confirm(`Bắt đầu làm đề thi: "${exam.title}"?\n\nLưu ý quan trọng:\n- Thời gian làm bài: ${exam.durationMinutes} phút.\n- Mỗi thí sinh chỉ có DUY NHẤT 1 LƯỢT LÀM.\n- Màn hình sẽ tự khóa toàn màn hình khi vào thi; rời cửa sổ thi sẽ tính là vi phạm.\n- Đủ 3 vi phạm sẽ cấm thi lại đề này; các đề khác không bị ảnh hưởng.\n- Đồng hồ đếm ngược sẽ bắt đầu ngay bây giờ!\n\nBạn đã sẵn sàng chưa?`)
+      ? window.confirm(`Bắt đầu làm đề thi: "${exam.title}"?\n\nLưu ý quan trọng:\n- Mỗi thí sinh chỉ có duy nhất 1 lượt làm.\n- Màn hình sẽ tự động khóa khi vào thi, VI PHẠM 3 lần sẽ bị 0đ (thoát toàn màn hình hoặc rời cửa sổ thi sẽ tính là VI PHẠM).\n- Thời gian làm bài: ${exam.durationMinutes} phút.\n- Đồng hồ đếm ngược sẽ bắt đầu ngay bây giờ!\n\nBạn đã sẵn sàng chưa?`)
       : true;
 
     if (!confirmStart) return;
@@ -1810,12 +1817,12 @@ export class QuizView {
 
     if (result.success) {
       this._showAlert(integrityBan
-        ? `🚫 Bạn đã bị cấm thi lại đề này sau 3 lần vi phạm. Bài làm hiện tại đã được nộp.\n\nĐiểm số: ${result.submission.score} / 10 điểm`
+        ? `🚫 Bạn đã bị xử lý 0 ĐIỂM và cấm thi lại đề này do VI PHẠM quy chế 3 lần.\n\nĐiểm số: 0 / 10 điểm`
         : `🎉 Bạn đã nộp bài thi thành công!\n\nĐiểm số: ${result.submission.score} / 10 điểm\nSố câu đúng: ${result.submission.correctCount} / ${result.submission.totalQuestions}\n\nKết quả đã được ghi nhận vào Bảng Xếp Hạng chính thức!`);
       this.reviewSubmission = result.submission;
     } else {
       this._showAlert(integrityBan
-        ? `Bạn đã bị cấm thi lại đề này sau 3 lần vi phạm; các đề thi khác vẫn được phép làm. ${result.error || ''}`
+        ? `Bạn đã bị xử lý 0 điểm và cấm thi lại đề này do VI PHẠM quy chế 3 lần. ${result.error || ''}`
         : (result.error || 'Có lỗi xảy ra khi nộp bài thi.'));
     }
 

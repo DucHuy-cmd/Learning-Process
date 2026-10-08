@@ -565,7 +565,7 @@ export class CloudSyncManager {
   async serverSubmitExam(submissionData) {
     if (typeof fetch === 'undefined') return null;
     try {
-      const { examId, userId, username, fullName, className, avatar, answers, optionOrder, timeSpentSeconds } = submissionData;
+      const { examId, userId, username, fullName, className, avatar, answers, optionOrder, timeSpentSeconds, integrityBan = false } = submissionData;
       const res = await fetch(`${this.baseUrl}/api/exam-submissions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -576,6 +576,7 @@ export class CloudSyncManager {
           answers,
           optionOrder,
           timeSpentSeconds,
+          integrityBan,
         }),
       });
       if (!res.ok) return null;

@@ -583,6 +583,25 @@ describe('QuizView UI Component', () => {
     authManager.logout();
   });
 
+  it('displays accurate start exam notice and rules on student dashboard', () => {
+    authManager.register({ username: 'sv_notice_check', fullName: 'Thí Sinh Notice', email: 'tsn@toanrr.edu.vn', password: '123456' });
+    examManager.clearAllData();
+    const quizView = new QuizView({ container });
+    quizView.setTab('myExams');
+
+    expect(container.textContent).toContain('Mỗi thí sinh chỉ có duy nhất 1 lượt làm');
+    expect(container.textContent).toContain('VI PHẠM 3 lần sẽ bị 0đ');
+
+    let confirmPrompt = '';
+    window.confirm = (msg) => { confirmPrompt = msg; return false; };
+    container.querySelector('.btn-start-exam').click();
+
+    expect(confirmPrompt).toContain('Mỗi thí sinh chỉ có duy nhất 1 lượt làm');
+    expect(confirmPrompt).toContain('VI PHẠM 3 lần sẽ bị 0đ');
+    expect(confirmPrompt).toContain('Bạn đã sẵn sàng chưa');
+    authManager.logout();
+  });
+
   it('allows Admin to create new exam, assign to students, and view gradebook in Studio', () => {
     authManager.login('admin', 'admin123');
     const quizView = new QuizView({ container });

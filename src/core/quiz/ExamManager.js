@@ -423,6 +423,7 @@ export class ExamManager {
       score,
       correctCount,
       totalQuestions,
+      integrityBan: Boolean(integrityBan),
       timeSpentSeconds: Math.max(0, Math.round(timeSpentSeconds)),
       submittedAt: new Date().toISOString(),
     };
