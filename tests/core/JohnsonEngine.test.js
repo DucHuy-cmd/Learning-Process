@@ -10,6 +10,7 @@ import { AlgorithmStatus, AlgorithmAction } from '../../src/core/models/Types.js
 import {
   johnson,
   johnsonStrict,
+  getJohnsonPath,
   NegativeCycleError,
   JOHNSON_NEGATIVE_CYCLE_MESSAGE,
 } from '../../src/core/algorithms/JohnsonEngine.js';
@@ -464,6 +465,69 @@ describe('JohnsonEngine', () => {
           expect(typeof action).toBe('string');
         }
       });
+    });
+  });
+
+  describe('Source -> Destination path query', () => {
+    const graph = makeGraph(SAMPLE_IDS, SAMPLE_EDGES);
+    const finalStep = (res) => res.steps[res.steps.length - 1];
+    const summaries = (res) =>
+      formatTable(finalStep(res), graph, { algorithmKey: 'johnson' })
+        .rows.map((r) => r.summaryText)
+        .filter(Boolean);
+
+    it('extracts the shortest path and its weight (A -> E goes through the negative arcs)', () => {
+      const res = johnson(graph, { sourceId: 'A', targetId: 'E' });
+      expect(res.pathQuery).toEqual({
+        sourceId: 'A',
+        targetId: 'E',
+        reachable: true,
+        path: ['A', 'B', 'F', 'E'],
+        weight: -3,
+      });
+      expect(res.distances.A.E).toBe(-3);
+    });
+
+    it('does not change the step flow (still n + 3 steps) and is optional', () => {
+      const plain = johnson(graph);
+      const withQuery = johnson(graph, { sourceId: 'A', targetId: 'F' });
+      expect(plain.pathQuery).toBe(null);
+      expect(withQuery.steps).toHaveLength(plain.steps.length);
+      expect(withQuery.distances).toEqual(plain.distances);
+      expect(plain.steps.every((s) => s.state.query === undefined)).toBe(true);
+    });
+
+    it('renders exactly two result lines in the final table: route, then weight', () => {
+      const lines = summaries(johnson(graph, { sourceId: 'A', targetId: 'E' }));
+      expect(lines).toContain('A -> B -> F -> E');
+      expect(lines).toContain('Trọng số: -3');
+    });
+
+    it('works when source equals destination', () => {
+      const res = johnson(graph, { sourceId: 'C', targetId: 'C' });
+      expect(res.pathQuery.path).toEqual(['C']);
+      expect(res.pathQuery.weight).toBe(0);
+    });
+
+    it('reports an unreachable destination instead of a path', () => {
+      const res = johnson(graph, { sourceId: 'E', targetId: 'A' });
+      expect(res.pathQuery.reachable).toBe(false);
+      expect(summaries(res)).toContain('Không có đường đi từ E đến A');
+    });
+
+    it('ignores unknown vertices and getJohnsonPath agrees with the stored query', () => {
+      expect(johnson(graph, { sourceId: 'A', targetId: 'ZZ' }).pathQuery).toBe(null);
+      const res = johnson(graph);
+      expect(getJohnsonPath(res, 'A', 'D')).toEqual(
+        johnson(graph, { sourceId: 'A', targetId: 'D' }).pathQuery
+      );
+    });
+
+    it('is wired through the registry using the same option names as Dijkstra', () => {
+      const res = registryRun('johnson', graph, { startNodeId: 'B', endNodeId: 'E' });
+      expect(res.pathQuery.path).toEqual(['B', 'F', 'E']);
+      expect(res.pathQuery.weight).toBe(-5);
+      expect(registryRun('johnson', graph).pathQuery).toBe(null);
     });
   });
 });
