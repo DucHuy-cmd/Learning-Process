@@ -323,6 +323,26 @@ export function formatJohnsonTable(step, graph, context, helpers) {
     }
 
     case 'final-matrix': {
+      // Optional Source -> Destination result (exactly two lines: route, then weight).
+      const query = state.query;
+      const queryRows = [];
+      if (query) {
+        if (query.reachable) {
+          queryRows.push(
+            band(query.path.map(label).join(' -> '), { stepLabel: '★' }),
+            band(`${lang === 'en' ? 'Weight' : 'Trọng số'}: ${fmt(query.weight, inf)}`, { stepLabel: '★' })
+          );
+        } else {
+          queryRows.push(
+            band(
+              lang === 'en'
+                ? `No path from ${label(query.sourceId)} to ${label(query.targetId)}`
+                : `Không có đường đi từ ${label(query.sourceId)} đến ${label(query.targetId)}`,
+              { stepLabel: '★' }
+            )
+          );
+        }
+      }
       const rows = [
         band(
           lang === 'en'
@@ -331,6 +351,7 @@ export function formatJohnsonTable(step, graph, context, helpers) {
         ),
         head('d(u, v)', nodeIds.map(label)),
         ...matrixRows(state.dist, 'jh-final'),
+        ...queryRows,
         band(
           lang === 'en'
             ? 'A cell showing ∞ means there is no path from u to v.'
