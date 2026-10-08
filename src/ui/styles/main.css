@@ -410,6 +410,28 @@ body.theme-light .nav-dropdown-menu {
   color: var(--blue-light);
 }
 
+/* ---------------------------------------------------------------------
+   Relation Lab > Warshall controls: uniform look for the 4 step buttons
+   (Về W₀ / Lùi / Tiếp / W_n). RelationLabView disables two of them at the
+   first/last step with inline `opacity:0.4`, which washes the background
+   out to near-white next to the enabled pair. Keep the SAME background and
+   border in every state; only the text is muted when disabled.
+   Styling only: scoped to this bar, no logic or markup changes.
+   --------------------------------------------------------------------- */
+.warshall-controls-bar .btn-sm {
+  background: var(--panel-alt);
+  border: 1px solid var(--line);
+  color: var(--text);
+}
+
+.warshall-controls-bar .btn-sm:disabled {
+  opacity: 1 !important; /* overrides the inline opacity:0.4 */
+  background: var(--panel-alt);
+  border-color: var(--line);
+  color: var(--dim);
+  cursor: not-allowed;
+}
+
 /* =====================================================================
    VIEW WRAPPERS
    ===================================================================== */
@@ -2688,6 +2710,21 @@ body.theme-light .spec-warning-box {
   background: rgba(245, 158, 11, 0.15);
   color: var(--accent);
   border: 1px solid rgba(245, 158, 11, 0.35);
+}
+
+/* Relation Lab tab bar: inactive tabs get a visible chip (same padding/size as the
+   active tab, which only differs by the amber fill) + a hover effect that is also
+   visible in light mode (the generic .btn-tab:hover is white-on-white there). */
+.relation-tabs-bar .btn-tab:not(.active) {
+  background: var(--panel-alt);
+  border: 1px solid var(--line);
+  color: var(--dim);
+}
+
+.relation-tabs-bar .btn-tab:not(.active):hover {
+  background: rgba(245, 158, 11, 0.08);
+  border-color: rgba(245, 158, 11, 0.35);
+  color: var(--text);
 }
 
 .btn-style-opt {
