@@ -95,16 +95,16 @@ export class RelationLabView {
 
         <!-- Main Tab Navigation Bar for Chapter 4 -->
         <div class="relation-tabs-bar" style="display:flex;gap:8px;margin-bottom:18px;border-bottom:1px solid var(--line);padding-bottom:10px;flex-wrap:wrap;">
-          <button type="button" class="btn-tab ${this.activeTab === 'matrix' ? 'active' : ''}" data-tab="matrix" id="tabBtnMatrix" style="padding:8px 16px;border-radius:6px;font-size:13.5px;font-weight:700;cursor:pointer;">
+          <button type="button" class="btn-tab ${this.activeTab === 'matrix' ? 'active' : ''}" data-tab="matrix" id="tabBtnMatrix" style="padding:8px 16px;border-radius:6px;font-size:13.5px;font-weight:600;cursor:pointer;">
             🔗 Ma trận Boolean & Đồ thị Quan hệ
           </button>
-          <button type="button" class="btn-tab ${this.activeTab === 'properties' ? 'active' : ''}" data-tab="properties" id="tabBtnProperties" style="padding:8px 16px;border-radius:6px;font-size:13.5px;font-weight:600;cursor:pointer;opacity:${this.activeTab === 'properties' ? '1' : '0.7'};">
+          <button type="button" class="btn-tab ${this.activeTab === 'properties' ? 'active' : ''}" data-tab="properties" id="tabBtnProperties" style="padding:8px 16px;border-radius:6px;font-size:13.5px;font-weight:600;cursor:pointer;">
             🔍 Thanh tra 4 Tính chất Quan hệ
           </button>
-          <button type="button" class="btn-tab ${this.activeTab === 'warshall' ? 'active' : ''}" data-tab="warshall" id="tabBtnWarshall" style="padding:8px 16px;border-radius:6px;font-size:13.5px;font-weight:600;cursor:pointer;opacity:${this.activeTab === 'warshall' ? '1' : '0.7'};">
+          <button type="button" class="btn-tab ${this.activeTab === 'warshall' ? 'active' : ''}" data-tab="warshall" id="tabBtnWarshall" style="padding:8px 16px;border-radius:6px;font-size:13.5px;font-weight:600;cursor:pointer;">
             ⚡ Thuật toán Warshall & Bao đóng
           </button>
-          <button type="button" class="btn-tab ${this.activeTab === 'hasse' ? 'active' : ''}" data-tab="hasse" id="tabBtnHasse" style="padding:8px 16px;border-radius:6px;font-size:13.5px;font-weight:600;cursor:pointer;opacity:${this.activeTab === 'hasse' ? '1' : '0.7'};">
+          <button type="button" class="btn-tab ${this.activeTab === 'hasse' ? 'active' : ''}" data-tab="hasse" id="tabBtnHasse" style="padding:8px 16px;border-radius:6px;font-size:13.5px;font-weight:600;cursor:pointer;">
             👑 Lớp Tương đương & Biểu đồ Hasse
           </button>
         </div>
@@ -1283,10 +1283,10 @@ export class RelationLabView {
 
           <!-- Subtab Toggle Buttons -->
           <div style="display:flex;align-items:center;gap:8px;background:var(--card-bg);padding:4px;border-radius:8px;border:1px solid var(--line);">
-            <button type="button" class="btn-sm ${this.activeWarshallSubtab === 'warshall' ? 'btn-primary' : ''}" id="btnSubtabWarshall" style="font-size:12.5px;padding:5px 12px;cursor:pointer;">
+            <button type="button" class="btn-sm ${this.activeWarshallSubtab === 'warshall' ? 'btn-primary' : ''}" id="btnSubtabWarshall" style="font-size:12.5px;font-weight:600;padding:5px 12px;cursor:pointer;">
               ⚡ Thuật toán Roy-Warshall từng bước
             </button>
-            <button type="button" class="btn-sm ${this.activeWarshallSubtab === 'closures' ? 'btn-primary' : ''}" id="btnSubtabClosures" style="font-size:12.5px;padding:5px 12px;cursor:pointer;">
+            <button type="button" class="btn-sm ${this.activeWarshallSubtab === 'closures' ? 'btn-primary' : ''}" id="btnSubtabClosures" style="font-size:12.5px;font-weight:600;padding:5px 12px;cursor:pointer;">
               🔄 So sánh 3 Loại Bao đóng
             </button>
           </div>
@@ -2471,5 +2471,3 @@ export class RelationLabView {
     this.render(container);
   }
 }
-
-
