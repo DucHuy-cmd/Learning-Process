@@ -770,7 +770,7 @@ export class LabView {
     const endSelect = this.container.querySelector('#endNodeSelect');
 
     const startNodeId = (this.currentAlgo !== 'kruskal' && startSelect) ? startSelect.value : null;
-    const targetNodeId = ((this.currentAlgo === 'dijkstra' || this.currentAlgo === 'bellman_ford' || this.currentAlgo === 'bellmanford') && endSelect) ? endSelect.value : null;
+    const targetNodeId = ((this.currentAlgo === 'dijkstra' || this.currentAlgo === 'bellman_ford' || this.currentAlgo === 'bellmanford' || this.currentAlgo === 'johnson') && endSelect) ? endSelect.value : null;
 
     this.graphCanvas.setSelectionRoles({ startNodeId, targetNodeId });
   }
@@ -811,7 +811,7 @@ export class LabView {
       }
     }
 
-    if (algoKey === 'dijkstra' || algoKey === 'bellman_ford' || algoKey === 'bellmanford') {
+    if (algoKey === 'dijkstra' || algoKey === 'bellman_ford' || algoKey === 'bellmanford' || algoKey === 'johnson') {
       if (endWrap) {
         endWrap.style.display = 'flex';
         endWrap.style.visibility = 'visible';
@@ -843,6 +843,8 @@ export class LabView {
         helpEl.textContent = '💡 Hamilton duyệt qua mỗi đỉnh đúng một lần bắt đầu từ đỉnh nguồn.';
       } else if (algoKey === 'bellman_ford' || algoKey === 'bellmanford') {
         helpEl.textContent = '💡 Bellman-Ford tìm đường đi ngắn nhất từ đỉnh nguồn, hỗ trợ trọng số âm và phát hiện chu trình âm.';
+      } else if (algoKey === 'johnson') {
+        helpEl.textContent = '💡 Johnson tìm đường đi ngắn nhất mọi cặp đỉnh: Bellman-Ford từ đỉnh giả q, tái trọng số, rồi Dijkstra cho từng đỉnh nguồn. Chọn Nguồn và Đích để xem đường đi ngắn nhất.';
       } else {
         helpEl.textContent = '💡 Tìm đường đi có tổng trọng số ngắn nhất từ đỉnh nguồn tới đích.';
       }
@@ -881,7 +883,7 @@ export class LabView {
     const startSelect = this.container.querySelector('#startNodeSelect');
     const endSelect = this.container.querySelector('#endNodeSelect');
 
-    if (this.currentAlgo === 'dijkstra' || this.currentAlgo === 'bellman_ford' || this.currentAlgo === 'bellmanford') {
+    if (this.currentAlgo === 'dijkstra' || this.currentAlgo === 'bellman_ford' || this.currentAlgo === 'bellmanford' || this.currentAlgo === 'johnson') {
       if (!startSelect.value || startSelect.value === nodeId) {
         startSelect.value = nodeId;
       } else if (!endSelect.value || endSelect.value !== nodeId) {
@@ -907,7 +909,7 @@ export class LabView {
 
     const options = {};
     if (startSelect && startSelect.value) options.startNodeId = startSelect.value;
-    if ((this.currentAlgo === 'dijkstra' || this.currentAlgo === 'bellman_ford' || this.currentAlgo === 'bellmanford') && endSelect && endSelect.value) {
+    if ((this.currentAlgo === 'dijkstra' || this.currentAlgo === 'bellman_ford' || this.currentAlgo === 'bellmanford' || this.currentAlgo === 'johnson') && endSelect && endSelect.value) {
       options.endNodeId = endSelect.value;
     }
     if (this.currentAlgo === 'hamilton') {
@@ -1160,4 +1162,3 @@ export class LabView {
     }
   }
 }
-
