@@ -91,11 +91,16 @@ function pickPseudoId(existing) {
  *
  * @param {import('../models/Graph.js').Graph} graph - Graph (directed recommended; undirected edges
  *   are treated as two opposite arcs, so a negative undirected edge is a negative cycle).
+ * @param {Object} [options]
+ * @param {string} [options.sourceId] - Optional source vertex for the path query.
+ * @param {string} [options.targetId] - Optional destination vertex for the path query.
+ *   When both are valid, the shortest path is stored in `result.pathQuery` and in the state of the
+ *   final step (no extra step is recorded, so the step flow is unchanged).
  * @returns {Object} Standardized AlgorithmResult with extra fields:
  *   `potentials` {id->h}, `reweightedEdges`, `reweightedDistances` (d'), `distances` (d, matrix
  *   object-of-objects), `distanceMatrix` (array rows), `nodeIds`, `pseudoNodeId`.
  */
-export function johnson(graph) {
+export function johnson(graph, options = {}) {
   // 1. INPUT VALIDATION
   if (!graph || typeof graph.getNodes !== 'function' || typeof graph.hasNode !== 'function') {
     return invalid('Invalid graph instance provided', 'Graph is missing or invalid');
@@ -335,6 +340,15 @@ export function johnson(graph) {
 
   const distanceMatrix = nodeIds.map((u) => nodeIds.map((v) => dist[u][v]));
 
+  // Optional Source -> Destination query (extracted from the all-pairs result).
+  const opts = options && typeof options === 'object' ? options : {};
+  const pathQuery = (opts.sourceId != null && opts.targetId != null)
+    ? buildPathQuery({ nodeIds, predecessors, dist }, opts.sourceId, opts.targetId)
+    : null;
+  if (pathQuery) {
+    steps[steps.length - 1].state.query = pathQuery;
+  }
+
   return {
     status: AlgorithmStatus.SUCCESS,
     type: 'johnson',
@@ -353,8 +367,62 @@ export function johnson(graph) {
     distances: dist,
     distanceMatrix,
     predecessors,
+    pathQuery,
     warnings: [],
   };
+}
+
+/**
+ * Rebuilds the shortest path source -> target from the data Johnson already computed.
+ * Dijkstra ran on the reweighted graph, but reweighting preserves shortest paths, so its
+ * predecessor tree is also valid for the original weights; the weight is d(source, target).
+ *
+ * @param {Object} data
+ * @param {string[]} data.nodeIds
+ * @param {Object} data.predecessors - { source: { v: previousNodeId|null } }
+ * @param {Object} data.dist - final matrix d(u, v)
+ * @param {string} sourceId
+ * @param {string} targetId
+ * @returns {{sourceId:string,targetId:string,reachable:boolean,path:string[],weight:number|null}|null}
+ *   null when source/target are missing or not vertices of the graph.
+ */
+function buildPathQuery({ nodeIds, predecessors, dist }, sourceId, targetId) {
+  if (!nodeIds.includes(sourceId) || !nodeIds.includes(targetId)) return null;
+  const d = dist[sourceId][targetId];
+  if (d === Infinity || d === undefined) {
+    return { sourceId, targetId, reachable: false, path: [], weight: null };
+  }
+  const path = [targetId];
+  const seen = new Set(path);
+  let cur = targetId;
+  while (cur !== sourceId) {
+    const prev = predecessors[sourceId] ? predecessors[sourceId][cur] : null;
+    if (!prev || seen.has(prev)) {
+      return { sourceId, targetId, reachable: false, path: [], weight: null };
+    }
+    path.push(prev);
+    seen.add(prev);
+    cur = prev;
+  }
+  path.reverse();
+  return { sourceId, targetId, reachable: true, path, weight: d };
+}
+
+/**
+ * Extracts the shortest path between two vertices from a finished Johnson result.
+ *
+ * @param {Object} result - Result returned by {@link johnson} (status SUCCESS)
+ * @param {string} sourceId
+ * @param {string} targetId
+ * @returns {{sourceId:string,targetId:string,reachable:boolean,path:string[],weight:number|null}|null}
+ */
+export function getJohnsonPath(result, sourceId, targetId) {
+  if (!result || !result.distances || !result.predecessors || !Array.isArray(result.nodeIds)) return null;
+  return buildPathQuery(
+    { nodeIds: result.nodeIds, predecessors: result.predecessors, dist: result.distances },
+    sourceId,
+    targetId
+  );
 }
 
 function cloneMatrix(m) {
