@@ -396,7 +396,18 @@ export function run(algoKey, graph, options = {}) {
     }
 
     case 'johnson': {
-      result = johnson(adaptedGraph);
+      // Optional Source/Destination for the path query (aliases mirror Dijkstra's).
+      const sourceId =
+        opts.startNodeId !== undefined ? opts.startNodeId : opts.start !== undefined ? opts.start : null;
+      const targetId =
+        opts.endNodeId !== undefined
+          ? opts.endNodeId
+          : opts.end !== undefined
+            ? opts.end
+            : opts.target !== undefined
+              ? opts.target
+              : null;
+      result = johnson(adaptedGraph, { sourceId, targetId });
       break;
     }
 
