@@ -332,7 +332,7 @@ export class QuizView {
       <div style="background:rgba(56,189,248,0.08);border:1px solid rgba(56,189,248,0.25);border-radius:10px;padding:12px 18px;margin-bottom:16px;display:flex;align-items:center;gap:12px;">
         <span style="font-size:22px;">💡</span>
         <div style="font-size:13px;color:var(--text);line-height:1.5;">
-          <strong>Chế độ Tự Luyện Tập (150 Câu Hỏi):</strong> Bạn có thể thoải mái làm bài và thử sai để củng cố kiến thức theo 5 chuyên đề. Điểm tự luyện tập <em>không tính vào Bảng Xếp Hạng chính thức</em>. Để làm bài thi tính điểm xếp hạng theo Thang Điểm 10, hãy chuyển sang tab <strong>"📝 Đề Thi Của Tôi"</strong>.
+          <strong>Chế độ Tự Luyện Tập:</strong> Bạn có thể thoải mái làm bài và thử sai để củng cố kiến thức theo 5 chuyên đề. Điểm tự luyện tập <em>không tính vào Bảng Xếp Hạng chính thức</em>. Để làm bài thi theo Thang Điểm 10, hãy chuyển sang tab <strong>"📝 Đề Thi Của Tôi"</strong>.
         </div>
       </div>
 
@@ -341,7 +341,7 @@ export class QuizView {
         
         <!-- Filter Controls Card -->
         <div style="background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;">
-          <div style="font-size:12px;color:var(--dim);font-weight:600;text-transform:uppercase;margin-bottom:10px;">Lọc Chuyên Đề &amp; Độ Khó (Kho 150 Câu)</div>
+          <div style="font-size:12px;color:var(--dim);font-weight:600;text-transform:uppercase;margin-bottom:10px;">Lọc Chuyên Đề &amp; Độ Khó</div>
           <div style="display:flex;gap:10px;flex-wrap:wrap;">
             <select id="selPracticeTopic" class="form-input" style="flex:1;min-width:140px;padding:6px 10px;font-size:12.5px;border-radius:6px;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);">
               <option value="all" ${this.practiceFilter.topic === 'all' ? 'selected' : ''}>🌟 Tất cả các chương (150 câu)</option>
@@ -956,7 +956,7 @@ export class QuizView {
             <span class="pill-badge" style="background:rgba(16,185,129,0.15);color:#10b981;font-size:11.5px;padding:2px 8px;border-radius:10px;">Thang Điểm 10 • 1 Lần Làm</span>
           </div>
           <p style="font-size:13px;color:var(--dim);margin:0 0 16px;">
-            Hệ thống sẽ tự động bốc ngẫu nhiên câu hỏi từ Kho 150 Câu Hỏi Toán Rời Rạc và giao bài cho sinh viên được chọn.
+            Hệ thống sẽ tự động bốc ngẫu nhiên câu hỏi từ ngân hàng câu hỏi Toán Rời Rạc và giao bài cho sinh viên được chọn.
           </p>
 
           <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));gap:16px;margin-bottom:16px;">
