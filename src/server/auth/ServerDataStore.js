@@ -96,6 +96,7 @@ export async function fetchFromKV() {
   try {
     const res = await fetch(`${KV_URL}/get/trr:database`, {
       headers: { Authorization: `Bearer ${KV_TOKEN}` },
+      signal: AbortSignal.timeout(3000),
     });
     if (!res.ok) return false;
     const json = await res.json();
@@ -158,6 +159,7 @@ export async function writeToKV() {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(['SET', 'trr:database', payload]),
+      signal: AbortSignal.timeout(3000),
     });
     return res.ok;
   } catch (err) {
@@ -187,6 +189,89 @@ export function saveDatabase() {
   // Also write to Cloud KV if configured
   if (isKVConfigured()) {
     writeToKV().catch(() => {});
+  }
+}
+
+export async function executeKVCommand(commandArray) {
+  const { url: KV_URL, token: KV_TOKEN } = getKVConfig();
+  if (!KV_URL || !KV_TOKEN || typeof fetch === 'undefined') return null;
+  try {
+    const res = await fetch(KV_URL, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${KV_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(commandArray),
+      signal: AbortSignal.timeout(3000),
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (err) {
+    console.warn('[ServerDataStore] Error executing KV command:', err);
+    return null;
+  }
+}
+
+/**
+ * Saves a single exam submission atomically using Redis HSET.
+ * Prevents race conditions and lost data when 100 students submit simultaneously.
+ * @param {Object} submission
+ * @returns {Promise<boolean>}
+ */
+export async function saveSubmissionToKV(submission) {
+  if (!submission || !submission.examId || !submission.userId) return false;
+  try {
+    const res = await executeKVCommand(['HSET', `trr:subs:${submission.examId}`, submission.userId, JSON.stringify(submission)]);
+    return Boolean(res);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Fetches all submissions for an exam directly from atomic Redis hash.
+ * @param {string} examId
+ * @returns {Promise<Array<Object>>}
+ */
+export async function fetchSubmissionsFromKV(examId) {
+  if (!examId) return [];
+  try {
+    const json = await executeKVCommand(['HVALS', `trr:subs:${examId}`]);
+    if (json && Array.isArray(json.result)) {
+      return json.result.map(item => {
+        try {
+          return typeof item === 'string' ? JSON.parse(item) : item;
+        } catch {
+          return null;
+        }
+      }).filter(Boolean);
+    }
+  } catch {
+    // fallback
+  }
+  return [];
+}
+
+/**
+ * Clears KV submissions for an exam or all exams.
+ * @param {string} [examId]
+ * @returns {Promise<boolean>}
+ */
+export async function clearSubmissionsFromKV(examId = null) {
+  try {
+    if (examId) {
+      await executeKVCommand(['DEL', `trr:subs:${examId}`]);
+    } else {
+      for (const exam of serverExams) {
+        if (exam && exam.id) {
+          await executeKVCommand(['DEL', `trr:subs:${exam.id}`]);
+        }
+      }
+    }
+    return true;
+  } catch {
+    return false;
   }
 }
 

@@ -107,6 +107,7 @@ export class CloudSyncManager {
             this.baseUrl = 'http://localhost:3000';
           }
           this._notify();
+          this.flushPendingSubmissions().catch(() => {});
           return true;
         }
       } catch {
@@ -537,53 +538,162 @@ export class CloudSyncManager {
   }
 
   /**
-   * Synchronizes exam submissions from server to local ExamManager.
+   * Synchronizes exam submissions from server to local ExamManager with safe merging.
    * @param {Object} examManager
+   * @param {string} [examId]
    */
-  async syncExamSubmissions(examManager) {
+  async syncExamSubmissions(examManager, examId = null) {
     if (typeof fetch === 'undefined') return;
     try {
-      const res = await fetch(`${this.baseUrl}/api/exam-submissions`);
+      const url = examId 
+        ? `${this.baseUrl}/api/exam-submissions?examId=${encodeURIComponent(examId)}`
+        : `${this.baseUrl}/api/exam-submissions`;
+      const res = await fetch(url);
       if (!res.ok) return;
       const data = await res.json();
       if (data.success && Array.isArray(data.submissions)) {
         if (examManager) {
-          examManager.memorySubmissions = [...data.submissions];
+          const map = new Map(examManager.memorySubmissions.map(s => [`${s.examId}:${s.userId}`, s]));
+          data.submissions.forEach(s => {
+            if (s && s.examId && s.userId) map.set(`${s.examId}:${s.userId}`, s);
+          });
+          examManager.memorySubmissions = Array.from(map.values());
           if (examManager.storage) {
-            examManager.storage.setItem('trr_exam_submissions_v1', JSON.stringify(data.submissions));
+            examManager.storage.setItem('trr_exam_submissions_v1', JSON.stringify(examManager.memorySubmissions));
           }
-          examManager._notifyListeners('submissions_synced', data.submissions);
+          examManager._notifyListeners('submissions_synced', examManager.memorySubmissions);
         }
       }
     } catch {}
   }
 
   /**
-   * Pushes an exam submission to server.
-   * @param {Object} submissionData
+   * Retrieves pending submissions queue from localStorage.
+   * @private
+   * @returns {Array<Object>}
    */
-  async serverSubmitExam(submissionData) {
-    if (typeof fetch === 'undefined') return null;
+  _getPendingSubmissions() {
+    if (typeof window === 'undefined' || !window.localStorage) return [];
     try {
-      const { examId, userId, username, fullName, className, avatar, answers, optionOrder, timeSpentSeconds, integrityBan = false } = submissionData;
-      const res = await fetch(`${this.baseUrl}/api/exam-submissions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          examId,
-          userId,
-          userInfo: { username, fullName, className, avatar },
-          answers,
-          optionOrder,
-          timeSpentSeconds,
-          integrityBan,
-        }),
-      });
-      if (!res.ok) return null;
-      return await res.json();
+      const raw = window.localStorage.getItem('trr_pending_submissions_v1');
+      return raw ? JSON.parse(raw) : [];
     } catch {
-      return null;
+      return [];
     }
+  }
+
+  /**
+   * Saves a submission to the pending queue in localStorage.
+   * @private
+   * @param {Object} submission
+   */
+  _savePendingSubmission(submission) {
+    if (typeof window === 'undefined' || !window.localStorage || !submission) return;
+    try {
+      const pending = this._getPendingSubmissions().filter(
+        s => !(s.examId === submission.examId && s.userId === submission.userId)
+      );
+      pending.push(submission);
+      window.localStorage.setItem('trr_pending_submissions_v1', JSON.stringify(pending));
+    } catch {}
+  }
+
+  /**
+   * Removes a submission from the pending queue.
+   * @param {string} examId
+   * @param {string} userId
+   */
+  _removePendingSubmission(examId, userId) {
+    if (typeof window === 'undefined' || !window.localStorage) return;
+    try {
+      const pending = this._getPendingSubmissions().filter(
+        s => !(s.examId === examId && s.userId === userId)
+      );
+      window.localStorage.setItem('trr_pending_submissions_v1', JSON.stringify(pending));
+    } catch {}
+  }
+
+  /**
+   * Checks whether a submission is still pending upload.
+   * @param {string} examId
+   * @param {string} userId
+   * @returns {boolean}
+   */
+  hasPendingSubmission(examId, userId) {
+    return this._getPendingSubmissions().some(
+      s => s.examId === examId && s.userId === userId
+    );
+  }
+
+  /**
+   * Automatically flushes all pending submissions in the queue.
+   */
+  async flushPendingSubmissions() {
+    const pending = this._getPendingSubmissions();
+    if (pending.length === 0) return;
+    for (const sub of pending) {
+      await this.serverSubmitExam(sub, 1).catch(() => {});
+    }
+  }
+
+  /**
+   * Pushes an exam submission to server with auto-retry and persistent queue.
+   * Ensures 100 students submitting simultaneously never lose their results.
+   * @param {Object} submissionData
+   * @param {number} [maxRetries=3]
+   * @returns {Promise<Object|null>}
+   */
+  async serverSubmitExam(submissionData, maxRetries = 3) {
+    if (typeof fetch === 'undefined') return null;
+    const { examId, userId, username, fullName, className, avatar, answers, optionOrder, timeSpentSeconds, integrityBan = false } = submissionData;
+    
+    // Store in offline queue in case network drops
+    this._savePendingSubmission(submissionData);
+
+    if (!this.isConnected) {
+      return { success: false, queued: true };
+    }
+
+    let attempt = 0;
+    while (attempt <= maxRetries) {
+      try {
+        const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+        const timer = controller ? setTimeout(() => controller.abort(), 8000) : null;
+
+        const res = await fetch(`${this.baseUrl}/api/exam-submissions`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            examId,
+            userId,
+            userInfo: { username, fullName, className, avatar },
+            answers,
+            optionOrder,
+            timeSpentSeconds,
+            integrityBan,
+          }),
+          signal: controller ? controller.signal : undefined,
+        });
+
+        if (timer) clearTimeout(timer);
+
+        if (res.ok || res.status === 409) {
+          // Success or already registered on server
+          this._removePendingSubmission(examId, userId);
+          return await res.json().catch(() => ({ success: true }));
+        }
+      } catch {
+        // Network timeout / packet loss
+      }
+
+      attempt++;
+      if (attempt <= maxRetries) {
+        // Exponential backoff: 1s, 2s, 3s
+        await new Promise(r => setTimeout(r, 1000 * attempt));
+      }
+    }
+
+    return null;
   }
 }
 

@@ -16,7 +16,7 @@ import { extractBoundary, readRequestBody, parseMultipartData } from './parseMul
 import { isAIConfigured, analyzeGraphFileBackend, executeGeminiChat } from './ai/AIProviderAdapter.js';
 import { validateGraphSpecification, MAX_FILE_SIZE_BYTES } from '../app/ai/GraphVisionAdapter.js';
 
-import { serverUsers, serverAiSessions, serverQuizStats, serverExams, serverExamSubmissions, saveDatabase, isKVConfigured, fetchFromKV } from './auth/ServerDataStore.js';
+import { serverUsers, serverAiSessions, serverQuizStats, serverExams, serverExamSubmissions, saveDatabase, isKVConfigured, fetchFromKV, saveSubmissionToKV, fetchSubmissionsFromKV, clearSubmissionsFromKV } from './auth/ServerDataStore.js';
 import { DEFAULT_EXAMS } from '../core/quiz/ExamManager.js';
 import { STATIC_QUESTION_BANK } from '../core/quiz/QuizBank.js';
 
@@ -594,6 +594,11 @@ export async function handleRequest(req, res) {
 
   // Route: GET /api/exams
   if (req.method === 'GET' && pathname === '/api/exams') {
+    if (isKVConfigured()) {
+      try {
+        await fetchFromKV();
+      } catch {}
+    }
     sendJson(res, 200, { success: true, exams: serverExams });
     return;
   }
@@ -664,6 +669,7 @@ export async function handleRequest(req, res) {
     saveDatabase();
     if (isKVConfigured()) {
       writeToKV().catch(() => {});
+      clearSubmissionsFromKV().catch(() => {});
     }
     sendJson(res, 200, { success: true, message: 'Đã xóa toàn bộ đề thi và làm sạch dữ liệu bài làm của sinh viên thành công.' });
     return;
@@ -690,6 +696,26 @@ export async function handleRequest(req, res) {
   if (req.method === 'GET' && pathname === '/api/exam-submissions') {
     const examId = parsedUrl.searchParams.get('examId');
     const userId = parsedUrl.searchParams.get('userId');
+
+    // Live sync from atomic KV hash to ensure 100 students' concurrent submissions are immediately visible
+    if (isKVConfigured()) {
+      try {
+        if (examId) {
+          const kvSubs = await fetchSubmissionsFromKV(examId);
+          if (Array.isArray(kvSubs) && kvSubs.length > 0) {
+            const map = new Map(serverExamSubmissions.map(s => [`${s.examId}:${s.userId}`, s]));
+            kvSubs.forEach(s => {
+              if (s && s.examId && s.userId) map.set(`${s.examId}:${s.userId}`, s);
+            });
+            serverExamSubmissions.length = 0;
+            serverExamSubmissions.push(...map.values());
+          }
+        } else {
+          await fetchFromKV();
+        }
+      } catch {}
+    }
+
     let list = [...serverExamSubmissions];
     if (examId) list = list.filter(s => s.examId === examId);
     if (userId) list = list.filter(s => s.userId === userId);
@@ -774,7 +800,17 @@ export async function handleRequest(req, res) {
         submittedAt: new Date().toISOString(),
       };
 
-      serverExamSubmissions.push(submission);
+      // Atomic save to Redis hash (HSET) so 100 simultaneous submissions never overwrite each other
+      if (isKVConfigured()) {
+        saveSubmissionToKV(submission).catch(() => {});
+      }
+
+      const existingIdx = serverExamSubmissions.findIndex(s => s.examId === examId && s.userId === userId);
+      if (existingIdx >= 0) {
+        serverExamSubmissions[existingIdx] = submission;
+      } else {
+        serverExamSubmissions.push(submission);
+      }
       saveDatabase();
       sendJson(res, 201, { success: true, submission });
       return;
