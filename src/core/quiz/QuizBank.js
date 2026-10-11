@@ -2386,6 +2386,100 @@ function shuffle(items) {
   return shuffled;
 }
 
+export const STORAGE_KEY_CUSTOM_QUESTIONS = 'trr_custom_questions_v1';
+
+/**
+ * Separate custom/AI-generated question bank (never mutates STATIC_QUESTION_BANK).
+ */
+export const customQuestionBank = [];
+
+// Load custom questions from localStorage if in browser environment
+if (typeof window !== 'undefined' && window.localStorage) {
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY_CUSTOM_QUESTIONS);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        customQuestionBank.push(...parsed);
+      }
+    }
+  } catch {}
+}
+
+/**
+ * Returns a shallow copy of custom question bank.
+ * @returns {Array<Object>}
+ */
+export function getCustomQuestionBank() {
+  return [...customQuestionBank];
+}
+
+/**
+ * Sets the custom question bank.
+ * @param {Array<Object>} questions
+ * @returns {Array<Object>}
+ */
+export function setCustomQuestionBank(questions) {
+  if (Array.isArray(questions)) {
+    customQuestionBank.length = 0;
+    customQuestionBank.push(...questions);
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        window.localStorage.setItem(STORAGE_KEY_CUSTOM_QUESTIONS, JSON.stringify(customQuestionBank));
+      } catch {}
+    }
+  }
+  return [...customQuestionBank];
+}
+
+/**
+ * Adds or updates a custom question.
+ * @param {Object} question
+ * @returns {boolean}
+ */
+export function addCustomQuestion(question) {
+  if (!question || !question.id) return false;
+  const idx = customQuestionBank.findIndex(q => q.id === question.id);
+  if (idx >= 0) {
+    customQuestionBank[idx] = question;
+  } else {
+    customQuestionBank.unshift(question);
+  }
+  if (typeof window !== 'undefined' && window.localStorage) {
+    try {
+      window.localStorage.setItem(STORAGE_KEY_CUSTOM_QUESTIONS, JSON.stringify(customQuestionBank));
+    } catch {}
+  }
+  return true;
+}
+
+/**
+ * Removes a custom question by ID.
+ * @param {string} id
+ * @returns {boolean}
+ */
+export function removeCustomQuestion(id) {
+  const idx = customQuestionBank.findIndex(q => q.id === id);
+  if (idx >= 0) {
+    customQuestionBank.splice(idx, 1);
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        window.localStorage.setItem(STORAGE_KEY_CUSTOM_QUESTIONS, JSON.stringify(customQuestionBank));
+      } catch {}
+    }
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Returns all available questions: STATIC_QUESTION_BANK + customQuestionBank.
+ * @returns {Array<Object>}
+ */
+export function getAllQuestions() {
+  return [...STATIC_QUESTION_BANK, ...customQuestionBank];
+}
+
 /**
  * Generates an academic examination paper from the question bank.
  * Advanced (hard) questions account for strictly 10% of total questions (e.g. 1 hard question in a 10-question exam).
@@ -2401,7 +2495,7 @@ export function generateExamPaper({
   topic = QUIZ_TOPICS.ALL,
   difficulty = QUIZ_DIFFICULTIES.ALL,
 } = {}) {
-  let pool = [...STATIC_QUESTION_BANK];
+  let pool = getAllQuestions();
 
   if (topic !== QUIZ_TOPICS.ALL) {
     pool = pool.filter(q => q.topic === topic);

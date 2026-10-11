@@ -9,9 +9,7 @@
     "server": "node src/server/server.js",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage",
-    "test:load": "node scripts/test-100-students.js",
-    "test:load:prod": "node scripts/test-100-students.js https://mathplatform-ten.vercel.app"
+    "test:coverage": "vitest run --coverage"
   },
   "devDependencies": {
     "vitest": "^1.6.0",

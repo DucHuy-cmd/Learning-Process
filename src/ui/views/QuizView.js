@@ -32,6 +32,7 @@
 
 import {
   STATIC_QUESTION_BANK,
+  getAllQuestions,
   generateExamPaper,
   exportExamToLatex,
   QUIZ_TOPICS,
@@ -41,6 +42,7 @@ import { authManager } from '../../core/auth/AuthManager.js';
 import { quizHistoryManager } from '../../core/quiz/QuizHistoryManager.js';
 import { cloudSyncManager } from '../../core/sync/CloudSyncManager.js';
 import { examManager } from '../../core/quiz/ExamManager.js';
+import { LogicSourceModal } from '../components/LogicSourceModal.js';
 
 function shuffle(items) {
   const shuffled = [...items];
@@ -99,7 +101,6 @@ export class QuizView {
     // Teacher's Exam Studio State
     this.studioSubTab = 'assign'; // 'assign' | 'print'
     this.gradebookExamId = null; // Exam ID for gradebook modal
-    this.gradebookPollTimer = null; // Auto-polling timer for live submissions
     this.studioConfig = {
       count: 10,
       topic: 'all',
@@ -810,7 +811,6 @@ export class QuizView {
     const exam = examManager.getExamById(sub.examId);
     const questions = exam ? exam.questionIds.map(id => STATIC_QUESTION_BANK.find(q => q.id === id)).filter(Boolean) : [];
     const isIntegrityBanned = Boolean(sub.integrityBan || (sub.userId && examManager.getExamViolationRecord(sub.examId, sub.userId).banned));
-    const isPendingSync = Boolean(cloudSyncManager && typeof cloudSyncManager.hasPendingSubmission === 'function' && cloudSyncManager.hasPendingSubmission(sub.examId, sub.userId));
 
     return `
       <div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:24px;margin-bottom:24px;">
@@ -842,39 +842,6 @@ export class QuizView {
         </div>
 
         ${!isAdmin ? `
-          <!-- Pending Sync or Synced Status Banner -->
-          ${isPendingSync ? `
-            <div style="background:rgba(245,158,11,0.12);border:1px solid #f59e0b;border-radius:10px;padding:16px 20px;margin-bottom:20px;text-align:left;">
-              <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
-                <div>
-                  <div style="font-weight:700;color:#f59e0b;font-size:14px;display:flex;align-items:center;gap:6px;">
-                    ⚠️ Bài thi đã lưu an toàn trên máy (Đang chờ đồng bộ máy chủ)
-                  </div>
-                  <div style="font-size:13px;color:var(--text);margin-top:4px;line-height:1.5;">
-                    Đường truyền mạng phòng thi có thể đang bận. Hệ thống sẽ tự động gửi lại ngầm. Bạn có thể bấm nút bên phải để gửi lại ngay hoặc sao chép mã xác thực nộp bài.
-                  </div>
-                </div>
-                <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                  <button type="button" class="btn-sm" id="btnRetrySyncExam" style="background:#f59e0b;color:#000;font-weight:700;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;">
-                    🔄 Thử Gửi Lại Ngay
-                  </button>
-                  <button type="button" class="btn-sm" id="btnCopyExamProof" style="background:var(--panel);border:1px solid var(--line);color:var(--text);padding:8px 14px;border-radius:6px;cursor:pointer;">
-                    📋 Sao Chép Mã Xác Thực
-                  </button>
-                </div>
-              </div>
-            </div>
-          ` : `
-            <div style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.3);border-radius:10px;padding:12px 18px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
-              <div style="font-size:13px;color:#10b981;font-weight:600;display:flex;align-items:center;gap:6px;">
-                <span>✅</span> Bài làm đã được ghi nhận và đồng bộ an toàn lên máy chủ phòng thi.
-              </div>
-              <button type="button" class="btn-sm" id="btnCopyExamProof" style="background:var(--panel);border:1px solid var(--line);color:var(--text);font-size:12.5px;padding:6px 14px;border-radius:6px;cursor:pointer;">
-                📋 Sao Chép Mã Xác Thực Bài Nộp
-              </button>
-            </div>
-          `}
-
           <!-- Student Result Notice: ONLY SCORE IS SHOWN, NO ANSWERS -->
           <div style="background:var(--panel-alt);border:1px solid var(--line);border-radius:12px;padding:32px 24px;text-align:center;margin-top:20px;">
             <div style="font-size:42px;margin-bottom:12px;">${isIntegrityBanned ? '🚫' : '🛡️'}</div>
@@ -886,14 +853,9 @@ export class QuizView {
                 ? 'Hệ thống ghi nhận bạn đã vi phạm quy chế thi cử quá 3 lần (thoát toàn màn hình hoặc chuyển tab/cửa sổ thi). Bài thi đã tự động nộp với mức điểm phạt là <strong>0 điểm</strong>.'
                 : 'Theo quy chế khảo thí và bảo mật đề thi trực tuyến, hệ thống <strong>chỉ công bố điểm số chính thức và số câu đúng</strong>, không hiển thị lại bộ câu hỏi và đáp án chi tiết.'}
             </p>
-            <div style="display:flex;justify-content:center;gap:12px;flex-wrap:wrap;">
-              <button type="button" class="btn-primary" id="btnBackToExamsFromScore" style="padding:10px 24px;font-weight:700;font-size:13.5px;">
-                📋 Quay Về Danh Sách Đề Thi
-              </button>
-              <button type="button" class="btn-secondary" id="btnCopyExamProofBottom" style="padding:10px 20px;font-size:13.5px;font-weight:600;">
-                📋 Sao Chép Mã Xác Thực Bài Nộp
-              </button>
-            </div>
+            <button type="button" class="btn-primary" id="btnBackToExamsFromScore" style="padding:10px 24px;font-weight:700;font-size:13.5px;">
+              📋 Quay Về Danh Sách Đề Thi
+            </button>
           </div>
         ` : `
           <!-- Questions Review List (Admin only) -->
@@ -1062,7 +1024,11 @@ export class QuizView {
                 </select>
               </div>
 
-              <div style="display:flex;align-items:center;gap:8px;">
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                <button type="button" class="btn-primary" id="btnStudioAddQuestionAi" style="font-size:11.5px;padding:5px 12px;display:inline-flex;align-items:center;gap:4px;cursor:pointer;">
+                  <span>📷</span>
+                  <span>Thêm câu hỏi từ ảnh đề (AI)</span>
+                </button>
                 <button type="button" class="btn-secondary" id="btnManualSelectVisible" style="font-size:11.5px;padding:5px 10px;">
                   Chọn tất cả chương này
                 </button>
@@ -1076,7 +1042,7 @@ export class QuizView {
             </div>
 
             <div id="manualQuestionsContainer" style="max-height:260px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;padding-right:4px;">
-              ${STATIC_QUESTION_BANK.map((question, index) => {
+              ${getAllQuestions().map((question, index) => {
                 const cleanQText = question.question.replace(/<br><svg[\s\S]*?<\/svg>/gi, ' [Sơ đồ mạch logic]').replace(/<[^>]+>/g, '');
                 return `
                   <label class="manual-q-row" data-topic="${question.topic}" style="display:flex;align-items:flex-start;gap:10px;padding:8px 12px;background:var(--panel);border:1px solid var(--line);border-radius:6px;font-size:12px;cursor:pointer;transition:background 0.15s ease;">
@@ -1084,6 +1050,7 @@ export class QuizView {
                     <div style="flex:1;">
                       <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;flex-wrap:wrap;">
                         <span style="font-weight:700;color:var(--text);">Câu ${index + 1} [${question.id}]</span>
+                        ${question.source === 'ai_vision' ? `<span style="font-size:10px;padding:1px 6px;border-radius:4px;background:rgba(59,130,246,0.18);color:#38bdf8;font-weight:700;">🤖 AI Vision</span>` : ''}
                         <span style="font-size:10.5px;padding:1px 6px;border-radius:4px;background:var(--panel-alt);border:1px solid var(--line);color:var(--accent);">${this._escapeHtml(question.topicName || question.topic)}</span>
                         <span style="font-size:10.5px;color:var(--dim);">${question.difficulty === 'easy' ? '🟢 Dễ' : question.difficulty === 'medium' ? '🟡 Trung bình' : '🔴 Nâng cao'}</span>
                       </div>
@@ -1431,24 +1398,16 @@ export class QuizView {
     return `
       <div class="gradebook-modal-backdrop" id="gradebookModalBackdrop">
         <div class="gradebook-modal-card">
-          <div style="padding:18px 24px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+          <div style="padding:18px 24px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;">
             <div>
-              <div style="display:flex;align-items:center;gap:8px;">
-                <span style="font-size:12px;color:var(--accent);font-weight:700;text-transform:uppercase;">
-                  📊 Sổ Điểm Điện Tử &amp; Danh Sách Nộp Bài
-                </span>
-                <span class="pill-badge" style="background:rgba(16,185,129,0.15);color:#10b981;font-size:11px;padding:2px 8px;border-radius:12px;border:1px solid rgba(16,185,129,0.3);display:inline-flex;align-items:center;gap:4px;">
-                  🟢 Tự động cập nhật (Mỗi 5s)
-                </span>
+              <div style="font-size:12px;color:var(--accent);font-weight:700;text-transform:uppercase;">
+                📊 Sổ Điểm Điện Tử &amp; Danh Sách Nộp Bài
               </div>
               <h3 style="font-size:18px;font-weight:700;color:var(--text);margin:2px 0 0;">
                 ${this._escapeHtml(exam.title)}
               </h3>
             </div>
             <div style="display:flex;gap:10px;align-items:center;">
-              <button type="button" class="btn-sm" id="btnRefreshGradebook" style="background:var(--panel-alt);border:1px solid var(--line);color:var(--text);padding:6px 12px;font-size:13px;border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:5px;">
-                🔄 Làm mới
-              </button>
               <button type="button" class="btn-sm" id="btnExportGradebookExcel" style="background:#10b981;color:#fff;border:none;padding:6px 14px;font-size:13px;border-radius:6px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;">
                 📥 Xuất File Excel (.csv)
               </button>
@@ -1537,33 +1496,6 @@ export class QuizView {
   _showAlert(msg) {
     if (typeof window !== 'undefined' && typeof window.alert === 'function') {
       window.alert(msg);
-    }
-  }
-
-  _startGradebookPolling() {
-    this._stopGradebookPolling();
-    if (typeof window === 'undefined' || typeof setInterval === 'undefined') return;
-    this.gradebookPollTimer = setInterval(async () => {
-      if (!this.gradebookExamId) {
-        this._stopGradebookPolling();
-        return;
-      }
-      if (cloudSyncManager) {
-        try {
-          await cloudSyncManager.syncExamSubmissions(examManager, this.gradebookExamId);
-        } catch {}
-        const modalBackdrop = this.container ? this.container.querySelector('#gradebookModalBackdrop') : null;
-        if (modalBackdrop && this.gradebookExamId) {
-          this.render();
-        }
-      }
-    }, 5000);
-  }
-
-  _stopGradebookPolling() {
-    if (this.gradebookPollTimer) {
-      clearInterval(this.gradebookPollTimer);
-      this.gradebookPollTimer = null;
     }
   }
 
@@ -1664,7 +1596,8 @@ export class QuizView {
     if (!confirmStart) return;
 
     // Resolve questions
-    let questions = exam.questionIds.map(id => STATIC_QUESTION_BANK.find(q => q.id === id)).filter(Boolean);
+    const allQuestions = getAllQuestions();
+    let questions = exam.questionIds.map(id => allQuestions.find(q => q.id === id)).filter(Boolean);
     if (exam.shuffleQuestions) {
       questions = shuffle(questions);
     }
@@ -1884,7 +1817,7 @@ export class QuizView {
       integrityBan,
     });
 
-    if (result.success && cloudSyncManager) {
+    if (result.success && cloudSyncManager && cloudSyncManager.isConnected) {
       cloudSyncManager.serverSubmitExam(result.submission).catch(() => {});
     }
 
@@ -2074,66 +2007,6 @@ export class QuizView {
       });
     }
 
-    const copyProofHandler = () => {
-      const sub = this.reviewSubmission;
-      if (!sub) return;
-      let proofSig = '';
-      try {
-        proofSig = btoa(encodeURIComponent(`${sub.id || sub.examId}:${sub.userId}:${sub.score}:${sub.submittedAt}`)).slice(0, 24);
-      } catch {
-        proofSig = `${sub.examId}-${sub.userId}-${Date.now()}`;
-      }
-      const proofText = [
-        `========================================`,
-        `XÁC THỰC BÀI NỘP TRẮC NGHIỆM TOÁN RỜI RẠC`,
-        `========================================`,
-        `Thí sinh: ${sub.fullName || 'N/A'} (@${sub.username || 'unknown'}) - Lớp: ${sub.className || 'N/A'}`,
-        `Đề thi: ${sub.examTitle || sub.examId}`,
-        `Điểm số: ${sub.score} / 10 điểm (Đúng: ${sub.correctCount}/${sub.totalQuestions})`,
-        `Thời gian làm: ${Math.floor((sub.timeSpentSeconds || 0) / 60)}p ${(sub.timeSpentSeconds || 0) % 60}s`,
-        `Thời điểm nộp: ${new Date(sub.submittedAt).toLocaleString('vi-VN')}`,
-        `Mã chứng thực: TRR-${proofSig}`,
-        `========================================`
-      ].join('\n');
-
-      if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(proofText).then(() => {
-          this._showAlert('✅ Đã sao chép mã xác thực bài thi vào bộ nhớ tạm!\n\nBạn có thể gửi mã này hoặc chụp ảnh màn hình cho giảng viên để đối chiếu điểm thi.');
-        }).catch(() => {
-          this._showAlert(`Mã xác thực bài nộp của bạn:\n\n${proofText}`);
-        });
-      } else {
-        this._showAlert(`Mã xác thực bài nộp của bạn:\n\n${proofText}`);
-      }
-    };
-
-    const btnCopyExamProof = this.container.querySelector('#btnCopyExamProof');
-    if (btnCopyExamProof) {
-      btnCopyExamProof.addEventListener('click', copyProofHandler);
-    }
-
-    const btnCopyExamProofBottom = this.container.querySelector('#btnCopyExamProofBottom');
-    if (btnCopyExamProofBottom) {
-      btnCopyExamProofBottom.addEventListener('click', copyProofHandler);
-    }
-
-    const btnRetrySyncExam = this.container.querySelector('#btnRetrySyncExam');
-    if (btnRetrySyncExam && this.reviewSubmission) {
-      btnRetrySyncExam.addEventListener('click', async () => {
-        btnRetrySyncExam.disabled = true;
-        btnRetrySyncExam.textContent = '🔄 Đang gửi...';
-        if (cloudSyncManager) {
-          const res = await cloudSyncManager.serverSubmitExam(this.reviewSubmission);
-          if (res && res.success) {
-            this._showAlert('🎉 Đã đồng bộ bài thi lên máy chủ thành công!');
-          } else {
-            this._showAlert('⚠️ Chưa thể kết nối tới máy chủ. Hệ thống vẫn đang lưu an toàn bài thi trên thiết bị của bạn và sẽ tự động gửi lại khi có mạng.');
-          }
-        }
-        this.render();
-      });
-    }
-
     // In Active Exam Room Events
     if (this.activeExamSession) {
       const btnResumeExamLockdown = this.container.querySelector('#btnResumeExamLockdown');
@@ -2294,6 +2167,33 @@ export class QuizView {
         chk.addEventListener('change', updateSelectedCounter);
       });
       updateSelectedCounter();
+
+      const btnStudioAddQuestionAi = this.container.querySelector('#btnStudioAddQuestionAi');
+      if (btnStudioAddQuestionAi) {
+        btnStudioAddQuestionAi.addEventListener('click', () => {
+          if (!this.logicModal) {
+            this.logicModal = new LogicSourceModal({
+              container: document.body,
+              adminMode: true,
+              onSaveQuizQuestion: async (questionData) => {
+                const currentUser = authManager.getCurrentUser();
+                const authHeaders = {
+                  'x-user-id': currentUser?.id || 'user_admin',
+                  'Authorization': `Bearer ${currentUser?.id || 'user_admin'}`,
+                };
+                questionData.createdBy = currentUser?.id || 'user_admin';
+                const res = await cloudSyncManager.saveCustomQuestion(questionData, authHeaders);
+                if (res && res.success) {
+                  this.render();
+                  return { success: true };
+                }
+                return { success: false, error: res?.error || 'Lỗi khi lưu câu hỏi.' };
+              },
+            });
+          }
+          this.logicModal.open('quiz');
+        });
+      }
     }
 
     // Radio assign target toggle
@@ -2360,7 +2260,7 @@ export class QuizView {
             return;
           }
         } else {
-          let pool = [...STATIC_QUESTION_BANK];
+          let pool = getAllQuestions();
           if (topic !== 'all') {
             pool = pool.filter(q => q.topic === topic);
           }
@@ -2410,30 +2310,13 @@ export class QuizView {
       btn.addEventListener('click', () => {
         const examId = btn.getAttribute('data-exam-id');
         this.gradebookExamId = examId;
-        if (cloudSyncManager) {
-          cloudSyncManager.syncExamSubmissions(examManager, examId).catch(() => {});
-        }
-        this._startGradebookPolling();
         this.render();
       });
     });
 
-    const btnRefreshGradebook = this.container.querySelector('#btnRefreshGradebook');
-    if (btnRefreshGradebook && this.gradebookExamId) {
-      btnRefreshGradebook.addEventListener('click', async () => {
-        btnRefreshGradebook.disabled = true;
-        btnRefreshGradebook.textContent = '🔄 Đang tải...';
-        if (cloudSyncManager) {
-          await cloudSyncManager.syncExamSubmissions(examManager, this.gradebookExamId).catch(() => {});
-        }
-        this.render();
-      });
-    }
-
     const btnCloseGradebook = this.container.querySelector('#btnCloseGradebook');
     if (btnCloseGradebook) {
       btnCloseGradebook.addEventListener('click', () => {
-        this._stopGradebookPolling();
         this.gradebookExamId = null;
         this.render();
       });
@@ -2462,7 +2345,6 @@ export class QuizView {
     if (gradebookBackdrop) {
       gradebookBackdrop.addEventListener('click', (e) => {
         if (e.target === gradebookBackdrop) {
-          this._stopGradebookPolling();
           this.gradebookExamId = null;
           this.render();
         }

@@ -115,6 +115,7 @@ export class LogicParser {
   constructor(input) {
     this.tokens = tokenizeLogic(input);
     this.current = 0;
+    this.depth = 0;
   }
 
   peek() {
@@ -169,7 +170,15 @@ export class LogicParser {
   }
 
   expression() {
-    return this.equivalence();
+    this.depth++;
+    if (this.depth > 120) {
+      throw new Error('Biểu thức lồng nhau quá sâu (vượt quá 120 cấp ngoặc).');
+    }
+    try {
+      return this.equivalence();
+    } finally {
+      this.depth--;
+    }
   }
 
   // Equivalence: ↔ (Left-associative)

@@ -11,7 +11,7 @@
  * - Offline-First persistence in LocalStorage with Cloud Synchronization.
  */
 
-import { STATIC_QUESTION_BANK } from './QuizBank.js';
+import { STATIC_QUESTION_BANK, getAllQuestions } from './QuizBank.js';
 
 export const STORAGE_KEY_EXAMS = 'trr_assigned_exams_v1';
 export const STORAGE_KEY_SUBMISSIONS = 'trr_exam_submissions_v1';
@@ -186,7 +186,7 @@ export class ExamManager {
     if (!Array.isArray(questionIds) || questionIds.length === 0 || questionIds.length !== new Set(questionIds).size) {
       return { success: false, error: 'Vui lòng chọn ít nhất 1 câu hỏi cho đề thi.' };
     }
-    const availableQuestionIds = new Set(STATIC_QUESTION_BANK.map(question => question.id));
+    const availableQuestionIds = new Set(getAllQuestions().map(question => question.id));
     if (questionIds.some(id => !availableQuestionIds.has(id))) {
       return { success: false, error: 'Danh sách câu hỏi chứa câu hỏi không tồn tại.' };
     }
@@ -380,7 +380,7 @@ export class ExamManager {
 
     // Calculate score on scale 10
     const questionMap = new Map();
-    STATIC_QUESTION_BANK.forEach(q => questionMap.set(q.id, q));
+    getAllQuestions().forEach(q => questionMap.set(q.id, q));
 
     const totalQuestions = exam.questionIds.length;
     let correctCount = 0;

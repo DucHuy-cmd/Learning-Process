@@ -13,8 +13,10 @@
  */
 
 import { GRAPH_VISION_SYSTEM_PROMPT } from './graphVisionPrompt.js';
+import { buildLogicVisionPrompt } from './logicVisionPrompt.js';
 
 let activeCustomProvider = null;
+let activeCustomLogicProvider = null;
 
 /**
  * Sets a custom backend AI provider function (useful for tests or custom server models).
@@ -33,15 +35,56 @@ export function getBackendAIProvider() {
 }
 
 /**
+ * Sets a custom backend Logic AI provider function (useful for tests or mock logic specs).
+ * @param {Function|null} provider - async (file, options) => Object (raw LogicSpecification / QuizSpecification)
+ */
+export function setBackendLogicAIProvider(provider) {
+  activeCustomLogicProvider = typeof provider === 'function' ? provider : null;
+}
+
+/**
+ * Gets the currently registered custom backend Logic AI provider.
+ * @returns {Function|null}
+ */
+export function getBackendLogicAIProvider() {
+  return activeCustomLogicProvider;
+}
+
+/**
+ * Checks whether an API key is non-empty and not a known template placeholder.
+ * @param {string|undefined|null} key
+ * @returns {boolean}
+ */
+export function isValidApiKey(key) {
+  if (!key || typeof key !== 'string') return false;
+  const trimmed = key.trim();
+  if (!trimmed) return false;
+  const placeholders = [
+    'AIzaSyYourGeminiApiKeyHere',
+    'sk-proj-YourOpenAiApiKeyHere',
+    'your_api_key_here',
+    'YOUR_API_KEY_HERE',
+    'your-api-key',
+    'YOUR_GEMINI_API_KEY',
+    'AIzaSyDummyKey',
+  ];
+  if (placeholders.includes(trimmed)) return false;
+  if (trimmed.includes('YourGeminiApiKeyHere') || trimmed.includes('YourOpenAiApiKeyHere')) return false;
+  const lower = trimmed.toLowerCase();
+  if (lower.includes('dummy') || lower.includes('placeholder') || lower === 'your_api_key') return false;
+  return true;
+}
+
+/**
  * Checks whether any AI Vision credentials or custom providers are configured.
  * @returns {boolean}
  */
 export function isAIConfigured() {
-  if (activeCustomProvider) return true;
+  if (activeCustomProvider || activeCustomLogicProvider) return true;
   return Boolean(
-    process.env.AI_API_KEY ||
-    process.env.GEMINI_API_KEY ||
-    process.env.OPENAI_API_KEY
+    isValidApiKey(process.env.AI_API_KEY) ||
+    isValidApiKey(process.env.GEMINI_API_KEY) ||
+    isValidApiKey(process.env.OPENAI_API_KEY)
   );
 }
 
@@ -488,6 +531,310 @@ export async function analyzeGraphFileBackend(file, options = {}) {
 
   // Default to Gemini Vision (Google Generative AI)
   return await callGeminiVision(file, options);
+}
+
+/**
+ * Calls Google Gemini Vision API for Logic Lab.
+ * @param {Object} file - { filename, type, data: Buffer, size }
+ * @param {Object} options
+ * @returns {Promise<Object>} Raw LogicSpecification or QuizSpecification object
+ */
+async function callGeminiVisionLogic(file, options = {}) {
+  const apiKey = options.apiKey || process.env.GEMINI_API_KEY || process.env.AI_API_KEY;
+  if (!apiKey || !isValidApiKey(apiKey)) {
+    throw new Error('Google Gemini API Key chưa được thiết lập hoặc đang là giá trị mẫu. Vui lòng cập nhật GEMINI_API_KEY thật trong file .env trên máy chủ.');
+  }
+
+  const mode = options.mode || 'expression';
+  const promptText = buildLogicVisionPrompt(mode);
+
+  const parts = [{ text: promptText }];
+  if (file.isText || file.text || (file.type && file.type.startsWith('text/'))) {
+    const textContent = file.text || (file.data ? file.data.toString('utf8') : '');
+    parts.push({
+      text: `Dưới đây là văn bản mô tả bài toán logic:\n\n${textContent}\n\nHãy phân tích và xuất dữ liệu JSON theo schema mode="${mode}".`,
+    });
+  } else {
+    const mimeType = file.type || 'image/png';
+    const base64Data = Buffer.isBuffer(file.data)
+      ? file.data.toString('base64')
+      : (typeof file.data === 'string' ? file.data : Buffer.from(file.data).toString('base64'));
+    parts.push({
+      inlineData: {
+        mimeType,
+        data: base64Data,
+      },
+    });
+  }
+
+  const requestBody = {
+    contents: [{ parts }],
+    generationConfig: {
+      temperature: 0.1,
+      responseMimeType: 'application/json',
+    },
+  };
+
+  const candidateList = [];
+  const seenCandidates = new Set();
+  const addCandidate = (cand) => {
+    if (!cand || !cand.name) return;
+    const key = `${cand.apiVersion || 'v1beta'}:${cand.name}`;
+    if (!seenCandidates.has(key)) {
+      seenCandidates.add(key);
+      candidateList.push({
+        name: cand.name,
+        apiVersion: cand.apiVersion || 'v1beta',
+      });
+    }
+  };
+
+  const primaryModel = options.model || process.env.GEMINI_MODEL || process.env.AI_MODEL;
+  if (primaryModel && primaryModel !== 'auto') {
+    addCandidate({ name: primaryModel, apiVersion: 'v1beta' });
+    addCandidate({ name: primaryModel, apiVersion: 'v1' });
+  }
+
+  if (cachedBackendWorkingModel) {
+    addCandidate(cachedBackendWorkingModel);
+  }
+
+  try {
+    const discovered = await fetchBackendAvailableModels(apiKey);
+    for (const d of discovered) addCandidate(d);
+  } catch {}
+
+  for (const fb of BACKEND_FALLBACK_GEMINI_MODELS) {
+    addCandidate(fb);
+  }
+
+  let lastError = null;
+  let response = null;
+
+  for (const cand of candidateList) {
+    const url = `https://generativelanguage.googleapis.com/${cand.apiVersion}/models/${encodeURIComponent(cand.name)}:generateContent`;
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': apiKey,
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      if (res.ok) {
+        response = res;
+        cachedBackendWorkingModel = cand;
+        break;
+      }
+
+      const errText = await res.text();
+      let msg = `Lỗi ${res.status}`;
+      let errorStatus = '';
+      try {
+        const j = JSON.parse(errText);
+        if (j.error) {
+          if (j.error.message) msg = j.error.message;
+          if (j.error.status) errorStatus = j.error.status;
+        }
+      } catch {}
+
+      const msgLower = msg.toLowerCase();
+
+      // Case 1: Invalid API Key -> FAIL FAST
+      if (
+        msgLower.includes('api key not valid') ||
+        msgLower.includes('invalid api key') ||
+        msgLower.includes('api_key_invalid') ||
+        (errorStatus === 'INVALID_ARGUMENT' && msgLower.includes('api key'))
+      ) {
+        throw new Error('Google Gemini API Key trên máy chủ không hợp lệ. Vui lòng kiểm tra lại GEMINI_API_KEY trong file .env.');
+      }
+
+      // Case 2: Quota Exceeded / Rate Limit -> FAIL FAST
+      if (res.status === 429 || errorStatus === 'RESOURCE_EXHAUSTED' || msgLower.includes('quota') || msgLower.includes('exhausted')) {
+        throw new Error('Hạn ngạch Google Gemini API đã hết (429 Quota Exceeded). Vui lòng thử lại sau giây lát.');
+      }
+
+      // Case 3: Project Denied Access -> FAIL FAST
+      if (msgLower.includes('your project has been denied access')) {
+        throw new Error('Dự án Google Cloud chứa API Key này đã bị Google chặn truy cập (Project Denied Access). Vui lòng tạo API Key mới từ Google AI Studio.');
+      }
+
+      // Case 4: High Demand / Server Busy -> Continue next candidate
+      const isHighDemand = msgLower.includes('high demand') ||
+                           msgLower.includes('spikes in demand') ||
+                           msgLower.includes('overloaded') ||
+                           res.status === 503 ||
+                           errorStatus === 'UNAVAILABLE';
+      if (isHighDemand) {
+        lastError = new Error(`Mô hình ${cand.name} (${cand.apiVersion}) đang quá tải: ${msg}`);
+        continue;
+      }
+
+      // Case 5: Model Not Found / Unsupported -> Continue next candidate
+      const isNotFound = res.status === 404 ||
+                         errorStatus === 'NOT_FOUND' ||
+                         msgLower.includes('not found') ||
+                         msgLower.includes('not supported for generatecontent');
+      const isForbidden = res.status === 403 ||
+                          errorStatus === 'PERMISSION_DENIED' ||
+                          msgLower.includes('denied access') ||
+                          msgLower.includes('forbidden');
+      const isModalityError = msgLower.includes('modality') ||
+                              msgLower.includes('not enabled') ||
+                              msgLower.includes('image input') ||
+                              msgLower.includes('not supported');
+
+      if (isNotFound || isForbidden || isModalityError) {
+        lastError = new Error(`Mô hình ${cand.name} (${cand.apiVersion}) không phù hợp hoặc bị từ chối: ${msg}`);
+        continue;
+      }
+
+      lastError = new Error(msg);
+    } catch (err) {
+      if (err.message && (
+        err.message.includes('không hợp lệ') ||
+        err.message.includes('Quota Exceeded') ||
+        err.message.includes('chặn truy cập')
+      )) {
+        throw err;
+      }
+      lastError = err;
+    }
+  }
+
+  if (!response) {
+    throw new Error(lastError ? lastError.message : 'Không thể kết nối đến mô hình Gemini hợp lệ.');
+  }
+
+  const result = await response.json();
+  const candidate = result.candidates?.[0];
+  const textContent = candidate?.content?.parts?.[0]?.text;
+
+  if (!textContent) {
+    throw new Error('Gemini Vision không trả về nội dung hợp lệ.');
+  }
+
+  const cleanJson = cleanJsonResponseText(textContent);
+  try {
+    return JSON.parse(cleanJson);
+  } catch (err) {
+    throw new Error(`Kết quả từ Gemini Vision không phải là JSON hợp lệ: ${err.message}`);
+  }
+}
+
+/**
+ * Calls OpenAI Vision API for Logic Lab.
+ * @param {Object} file - { filename, type, data: Buffer, size }
+ * @param {Object} options
+ * @returns {Promise<Object>} Raw LogicSpecification or QuizSpecification object
+ */
+async function callOpenAIVisionLogic(file, options = {}) {
+  const apiKey = options.apiKey || process.env.OPENAI_API_KEY || process.env.AI_API_KEY;
+  if (!apiKey) {
+    throw new Error('Thiếu API Key cho OpenAI Vision.');
+  }
+
+  const mode = options.mode || 'expression';
+  const promptText = buildLogicVisionPrompt(mode);
+  const model = options.model || process.env.OPENAI_MODEL || process.env.AI_MODEL || 'gpt-4o-mini';
+  const url = 'https://api.openai.com/v1/chat/completions';
+
+  let userContent;
+  if (file.isText || file.text || (file.type && file.type.startsWith('text/'))) {
+    const textContent = file.text || (file.data ? file.data.toString('utf8') : '');
+    userContent = [
+      {
+        type: 'text',
+        text: `Dưới đây là văn bản mô tả bài toán logic:\n\n${textContent}\n\nHãy phân tích và xuất dữ liệu JSON theo schema mode="${mode}".`,
+      },
+    ];
+  } else {
+    const mimeType = file.type || 'image/png';
+    const base64Data = Buffer.isBuffer(file.data)
+      ? file.data.toString('base64')
+      : (typeof file.data === 'string' ? file.data : Buffer.from(file.data).toString('base64'));
+    const dataUrl = `data:${mimeType};base64,${base64Data}`;
+    userContent = [
+      { type: 'text', text: `Vui lòng phân tích hình ảnh này và xuất JSON chuẩn theo schema mode="${mode}".` },
+      { type: 'image_url', image_url: { url: dataUrl } },
+    ];
+  }
+
+  const requestBody = {
+    model: model,
+    messages: [
+      { role: 'system', content: promptText },
+      { role: 'user', content: userContent },
+    ],
+    response_format: { type: 'json_object' },
+    temperature: 0.1,
+  };
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify(requestBody),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`OpenAI Vision API error (${response.status}): ${errText}`);
+  }
+
+  const result = await response.json();
+  const textContent = result.choices?.[0]?.message?.content;
+  if (!textContent) {
+    throw new Error('OpenAI Vision không trả về nội dung hợp lệ.');
+  }
+
+  const cleanJson = cleanJsonResponseText(textContent);
+  try {
+    return JSON.parse(cleanJson);
+  } catch (err) {
+    throw new Error(`Kết quả từ OpenAI Vision không phải là JSON hợp lệ: ${err.message}`);
+  }
+}
+
+/**
+ * Primary backend entry point for AI analysis of an uploaded logic file/image.
+ * 
+ * @param {Object} file - { filename: string, type: string, data: Buffer, size: number }
+ * @param {Object} [options={}] - { mode?: 'expression'|'quiz', mockSpec?: Object, ... }
+ * @returns {Promise<Object>} Raw LogicSpecification / QuizSpecification object
+ */
+export async function analyzeLogicFileBackend(file, options = {}) {
+  if (!file || !file.data) {
+    throw new Error('Không tìm thấy dữ liệu tệp đính kèm.');
+  }
+
+  // 1. Custom / Mock provider
+  if (activeCustomLogicProvider) {
+    return await activeCustomLogicProvider(file, options);
+  }
+
+  // 2. Direct mock support for testing
+  if (options.mockSpec) {
+    return options.mockSpec;
+  }
+
+  // 3. Check configuration
+  if (!isAIConfigured()) {
+    throw new Error('AI_NOT_CONFIGURED');
+  }
+
+  // 4. Determine provider based on environment
+  if (process.env.OPENAI_API_KEY && !process.env.GEMINI_API_KEY) {
+    return await callOpenAIVisionLogic(file, options);
+  }
+
+  // Default to Gemini Vision
+  return await callGeminiVisionLogic(file, options);
 }
 
 /**

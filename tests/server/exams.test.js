@@ -3,11 +3,11 @@ import { EventEmitter } from 'node:events';
 import { handleRequest } from '../../src/server/app.js';
 import { serverExams, serverExamSubmissions } from '../../src/server/auth/ServerDataStore.js';
 
-function createMockHttp({ method, url, body }) {
+function createMockHttp({ method, url, body, headers = {} }) {
   const req = new EventEmitter();
   req.method = method;
   req.url = url;
-  req.headers = { host: 'localhost:3000', 'content-type': 'application/json' };
+  req.headers = { host: 'localhost:3000', 'content-type': 'application/json', ...headers };
 
   const res = {
     statusCode: 200,
@@ -160,13 +160,17 @@ describe('Assigned exam API', () => {
     expect(res.data.submission.integrityBan).toBe(true);
   });
 
-  it('clears all exams and submissions on the server', async () => {
+  it('clears all exams and submissions on the server with admin credentials', async () => {
     serverExams.push({ id: 'test_clear_exam', title: 'Đề xóa', durationMinutes: 10, questionIds: ['logic_q01'], assignedTo: ['all'] });
     serverExamSubmissions.push({ id: 'test_clear_sub', examId: 'test_clear_exam', userId: 'user_1', score: 10 });
 
     const result = await sendRequest({
       method: 'POST',
       url: '/api/exams/clear-all',
+      headers: {
+        'x-user-id': 'user_admin',
+        Authorization: 'Bearer user_admin',
+      },
       body: {},
     });
 
@@ -174,6 +178,17 @@ describe('Assigned exam API', () => {
     expect(result.data.success).toBe(true);
     expect(serverExams.length).toBe(0);
     expect(serverExamSubmissions.length).toBe(0);
+  });
+
+  it('rejects POST /api/exams/clear-all when request is unauthenticated or not from admin', async () => {
+    const result = await sendRequest({
+      method: 'POST',
+      url: '/api/exams/clear-all',
+      body: {},
+    });
+
+    expect(result.statusCode).toBe(403);
+    expect(result.data.error).toBe('FORBIDDEN');
   });
 
 });

@@ -43,6 +43,10 @@ export function tokenizeLogic(input) {
     return [];
   }
 
+  if (str.length > 5000) {
+    throw new Error('Biểu thức logic vượt quá độ dài tối đa cho phép (5000 ký tự).');
+  }
+
   const tokens = [];
   let i = 0;
   const n = str.length;

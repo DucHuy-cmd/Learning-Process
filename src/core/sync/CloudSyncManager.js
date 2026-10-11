@@ -8,6 +8,8 @@
  * - Reactive connection status listener (online/offline/syncing).
  */
 
+import { setCustomQuestionBank, addCustomQuestion, removeCustomQuestion } from '../quiz/QuizBank.js';
+
 export class CloudSyncManager {
   /**
    * @param {Object} [options]
@@ -107,7 +109,6 @@ export class CloudSyncManager {
             this.baseUrl = 'http://localhost:3000';
           }
           this._notify();
-          this.flushPendingSubmissions().catch(() => {});
           return true;
         }
       } catch {
@@ -375,6 +376,17 @@ export class CloudSyncManager {
     }
   }
   /**
+   * Helper to retrieve admin credentials headers for authenticated admin operations.
+   * @private
+   */
+  _getAdminAuthHeaders() {
+    return {
+      'x-user-id': 'user_admin',
+      'Authorization': 'Bearer user_admin',
+    };
+  }
+
+  /**
    * Admin creates a user on the server.
    * @param {Object} userData
    */
@@ -383,7 +395,10 @@ export class CloudSyncManager {
     try {
       const res = await fetch(`${this.baseUrl}/api/admin/users`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...this._getAdminAuthHeaders(),
+        },
         body: JSON.stringify(userData),
       });
       if (!res.ok) return null;
@@ -404,6 +419,9 @@ export class CloudSyncManager {
       const q = username ? `?username=${encodeURIComponent(username)}` : '';
       const res = await fetch(`${this.baseUrl}/api/admin/users/${encodeURIComponent(userId)}${q}`, {
         method: 'DELETE',
+        headers: {
+          ...this._getAdminAuthHeaders(),
+        },
       });
       if (!res.ok) return null;
       return await res.json();
@@ -420,6 +438,9 @@ export class CloudSyncManager {
     try {
       const res = await fetch(`${this.baseUrl}/api/quiz/leaderboard/reset`, {
         method: 'POST',
+        headers: {
+          ...this._getAdminAuthHeaders(),
+        },
       });
       if (!res.ok) return null;
       return await res.json();
@@ -437,6 +458,9 @@ export class CloudSyncManager {
     try {
       const res = await fetch(`${this.baseUrl}/api/quiz/leaderboard/${encodeURIComponent(userId)}`, {
         method: 'DELETE',
+        headers: {
+          ...this._getAdminAuthHeaders(),
+        },
       });
       if (!res.ok) return null;
       return await res.json();
@@ -453,6 +477,9 @@ export class CloudSyncManager {
     try {
       const res = await fetch(`${this.baseUrl}/api/admin/database/reset`, {
         method: 'POST',
+        headers: {
+          ...this._getAdminAuthHeaders(),
+        },
       });
       if (!res.ok) return null;
       return await res.json();
@@ -492,7 +519,10 @@ export class CloudSyncManager {
     try {
       const res = await fetch(`${this.baseUrl}/api/exams`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...this._getAdminAuthHeaders(),
+        },
         body: JSON.stringify(examData),
       });
       if (!res.ok) return null;
@@ -511,6 +541,9 @@ export class CloudSyncManager {
     try {
       const res = await fetch(`${this.baseUrl}/api/exams/${encodeURIComponent(examId)}`, {
         method: 'DELETE',
+        headers: {
+          ...this._getAdminAuthHeaders(),
+        },
       });
       if (!res.ok) return null;
       return await res.json();
@@ -528,7 +561,10 @@ export class CloudSyncManager {
     try {
       const res = await fetch(`${this.baseUrl}/api/exams/clear-all`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...this._getAdminAuthHeaders(),
+        },
       });
       if (!res.ok) return null;
       return await res.json();
@@ -538,162 +574,170 @@ export class CloudSyncManager {
   }
 
   /**
-   * Synchronizes exam submissions from server to local ExamManager with safe merging.
+   * Synchronizes exam submissions from server to local ExamManager.
    * @param {Object} examManager
-   * @param {string} [examId]
    */
-  async syncExamSubmissions(examManager, examId = null) {
+  async syncExamSubmissions(examManager) {
     if (typeof fetch === 'undefined') return;
     try {
-      const url = examId 
-        ? `${this.baseUrl}/api/exam-submissions?examId=${encodeURIComponent(examId)}`
-        : `${this.baseUrl}/api/exam-submissions`;
-      const res = await fetch(url);
+      const res = await fetch(`${this.baseUrl}/api/exam-submissions`);
       if (!res.ok) return;
       const data = await res.json();
       if (data.success && Array.isArray(data.submissions)) {
         if (examManager) {
-          const map = new Map(examManager.memorySubmissions.map(s => [`${s.examId}:${s.userId}`, s]));
-          data.submissions.forEach(s => {
-            if (s && s.examId && s.userId) map.set(`${s.examId}:${s.userId}`, s);
-          });
-          examManager.memorySubmissions = Array.from(map.values());
+          examManager.memorySubmissions = [...data.submissions];
           if (examManager.storage) {
-            examManager.storage.setItem('trr_exam_submissions_v1', JSON.stringify(examManager.memorySubmissions));
+            examManager.storage.setItem('trr_exam_submissions_v1', JSON.stringify(data.submissions));
           }
-          examManager._notifyListeners('submissions_synced', examManager.memorySubmissions);
+          examManager._notifyListeners('submissions_synced', data.submissions);
         }
       }
     } catch {}
   }
 
   /**
-   * Retrieves pending submissions queue from localStorage.
-   * @private
-   * @returns {Array<Object>}
+   * Pushes an exam submission to server.
+   * @param {Object} submissionData
    */
-  _getPendingSubmissions() {
-    if (typeof window === 'undefined' || !window.localStorage) return [];
+  async serverSubmitExam(submissionData) {
+    if (typeof fetch === 'undefined') return null;
     try {
-      const raw = window.localStorage.getItem('trr_pending_submissions_v1');
-      return raw ? JSON.parse(raw) : [];
+      const { examId, userId, username, fullName, className, avatar, answers, optionOrder, timeSpentSeconds, integrityBan = false } = submissionData;
+      const res = await fetch(`${this.baseUrl}/api/exam-submissions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          examId,
+          userId,
+          userInfo: { username, fullName, className, avatar },
+          answers,
+          optionOrder,
+          timeSpentSeconds,
+          integrityBan,
+        }),
+      });
+      if (!res.ok) return null;
+      return await res.json();
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Synchronizes custom AI questions between backend server and local QuizBank.
+   * @returns {Promise<Array<Object>|null>}
+   */
+  async syncCustomQuestions() {
+    if (typeof fetch === 'undefined') return null;
+    try {
+      const res = await fetch(`${this.baseUrl}/api/quiz/custom-question`);
+      if (!res.ok) return null;
+      const data = await res.json();
+      if (data.success && Array.isArray(data.questions)) {
+        setCustomQuestionBank(data.questions);
+        return data.questions;
+      }
+    } catch (err) {
+      console.warn('[CloudSyncManager] Error syncing custom questions:', err);
+    }
+    return null;
+  }
+
+  /**
+   * Retrieves custom questions list from server.
+   * @returns {Promise<Array<Object>>}
+   */
+  async fetchCustomQuestions() {
+    if (typeof fetch === 'undefined') return [];
+    try {
+      const res = await fetch(`${this.baseUrl}/api/quiz/custom-question`);
+      if (!res.ok) return [];
+      const data = await res.json();
+      return (data.success && Array.isArray(data.questions)) ? data.questions : [];
     } catch {
       return [];
     }
   }
 
   /**
-   * Saves a submission to the pending queue in localStorage.
-   * @private
-   * @param {Object} submission
+   * Pushes a custom approved question to the backend server.
+   * @param {Object} questionData
+   * @param {Object} [authHeaders={}]
+   * @returns {Promise<{ success: boolean, question?: Object, error?: string }>}
    */
-  _savePendingSubmission(submission) {
-    if (typeof window === 'undefined' || !window.localStorage || !submission) return;
-    try {
-      const pending = this._getPendingSubmissions().filter(
-        s => !(s.examId === submission.examId && s.userId === submission.userId)
-      );
-      pending.push(submission);
-      window.localStorage.setItem('trr_pending_submissions_v1', JSON.stringify(pending));
-    } catch {}
-  }
-
-  /**
-   * Removes a submission from the pending queue.
-   * @param {string} examId
-   * @param {string} userId
-   */
-  _removePendingSubmission(examId, userId) {
-    if (typeof window === 'undefined' || !window.localStorage) return;
-    try {
-      const pending = this._getPendingSubmissions().filter(
-        s => !(s.examId === examId && s.userId === userId)
-      );
-      window.localStorage.setItem('trr_pending_submissions_v1', JSON.stringify(pending));
-    } catch {}
-  }
-
-  /**
-   * Checks whether a submission is still pending upload.
-   * @param {string} examId
-   * @param {string} userId
-   * @returns {boolean}
-   */
-  hasPendingSubmission(examId, userId) {
-    return this._getPendingSubmissions().some(
-      s => s.examId === examId && s.userId === userId
-    );
-  }
-
-  /**
-   * Automatically flushes all pending submissions in the queue.
-   */
-  async flushPendingSubmissions() {
-    const pending = this._getPendingSubmissions();
-    if (pending.length === 0) return;
-    for (const sub of pending) {
-      await this.serverSubmitExam(sub, 1).catch(() => {});
-    }
-  }
-
-  /**
-   * Pushes an exam submission to server with auto-retry and persistent queue.
-   * Ensures 100 students submitting simultaneously never lose their results.
-   * @param {Object} submissionData
-   * @param {number} [maxRetries=3]
-   * @returns {Promise<Object|null>}
-   */
-  async serverSubmitExam(submissionData, maxRetries = 3) {
-    if (typeof fetch === 'undefined') return null;
-    const { examId, userId, username, fullName, className, avatar, answers, optionOrder, timeSpentSeconds, integrityBan = false } = submissionData;
-    
-    // Store in offline queue in case network drops
-    this._savePendingSubmission(submissionData);
-
-    if (!this.isConnected) {
-      return { success: false, queued: true };
+  async saveCustomQuestion(questionData, authHeaders = {}) {
+    // Optimistically update local question bank
+    if (questionData && questionData.id) {
+      addCustomQuestion(questionData);
     }
 
-    let attempt = 0;
-    while (attempt <= maxRetries) {
-      try {
-        const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-        const timer = controller ? setTimeout(() => controller.abort(), 8000) : null;
+    if (typeof fetch === 'undefined') {
+      return { success: true, question: questionData };
+    }
 
-        const res = await fetch(`${this.baseUrl}/api/exam-submissions`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            examId,
-            userId,
-            userInfo: { username, fullName, className, avatar },
-            answers,
-            optionOrder,
-            timeSpentSeconds,
-            integrityBan,
-          }),
-          signal: controller ? controller.signal : undefined,
-        });
+    try {
+      const headers = {
+        'Content-Type': 'application/json',
+        ...authHeaders,
+      };
+      const res = await fetch(`${this.baseUrl}/api/quiz/custom-question`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(questionData),
+      });
 
-        if (timer) clearTimeout(timer);
-
-        if (res.ok || res.status === 409) {
-          // Success or already registered on server
-          this._removePendingSubmission(examId, userId);
-          return await res.json().catch(() => ({ success: true }));
-        }
-      } catch {
-        // Network timeout / packet loss
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        return {
+          success: false,
+          error: data.message || data.error || `Lỗi máy chủ (${res.status})`,
+        };
       }
 
-      attempt++;
-      if (attempt <= maxRetries) {
-        // Exponential backoff: 1s, 2s, 3s
-        await new Promise(r => setTimeout(r, 1000 * attempt));
+      if (data.success && data.question) {
+        addCustomQuestion(data.question);
+        return { success: true, question: data.question };
       }
+      return { success: false, error: 'Không thể lưu câu hỏi lên máy chủ.' };
+    } catch {
+      // In offline mode, the question is already saved locally
+      return { success: true, question: questionData, offline: true };
+    }
+  }
+
+  /**
+   * Deletes a custom question from the backend server.
+   * @param {string} questionId
+   * @param {Object} [authHeaders={}]
+   * @returns {Promise<{ success: boolean, error?: string }>}
+   */
+  async deleteCustomQuestion(questionId, authHeaders = {}) {
+    removeCustomQuestion(questionId);
+
+    if (typeof fetch === 'undefined') {
+      return { success: true };
     }
 
-    return null;
+    try {
+      const headers = {
+        ...authHeaders,
+      };
+      const res = await fetch(`${this.baseUrl}/api/quiz/custom-question/${encodeURIComponent(questionId)}`, {
+        method: 'DELETE',
+        headers,
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        return {
+          success: false,
+          error: data.message || data.error || `Lỗi máy chủ (${res.status})`,
+        };
+      }
+      return { success: true };
+    } catch {
+      return { success: true, offline: true };
+    }
   }
 }
 

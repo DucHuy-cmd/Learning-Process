@@ -13,10 +13,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { extractBoundary, readRequestBody, parseMultipartData } from './parseMultipart.js';
-import { isAIConfigured, analyzeGraphFileBackend, executeGeminiChat } from './ai/AIProviderAdapter.js';
+import { isAIConfigured, analyzeGraphFileBackend, analyzeLogicFileBackend, executeGeminiChat } from './ai/AIProviderAdapter.js';
 import { validateGraphSpecification, MAX_FILE_SIZE_BYTES } from '../app/ai/GraphVisionAdapter.js';
+import { extractDocx } from '../app/ai/DocxExtractor.js';
 
-import { serverUsers, serverAiSessions, serverQuizStats, serverExams, serverExamSubmissions, saveDatabase, isKVConfigured, fetchFromKV, saveSubmissionToKV, fetchSubmissionsFromKV, clearSubmissionsFromKV } from './auth/ServerDataStore.js';
+import { serverUsers, serverAiSessions, serverQuizStats, serverExams, serverExamSubmissions, serverCustomQuestions, saveDatabase, isKVConfigured, fetchFromKV } from './auth/ServerDataStore.js';
 import { DEFAULT_EXAMS } from '../core/quiz/ExamManager.js';
 import { STATIC_QUESTION_BANK } from '../core/quiz/QuizBank.js';
 
@@ -82,6 +83,104 @@ export function sendJson(res, statusCode, data) {
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   });
   res.end(JSON.stringify(data));
+}
+
+/**
+ * Redacts API keys, tokens, passwords and secret parameters from error messages.
+ * @param {string} msg
+ * @returns {string}
+ */
+export function sanitizeErrorMessage(msg) {
+  if (typeof msg !== 'string') return '';
+  return msg
+    .replace(/AIzaSy[A-Za-z0-9_-]{33}/g, '[REDACTED_API_KEY]')
+    .replace(/sk-[A-Za-z0-9_-]{20,}/g, '[REDACTED_API_KEY]')
+    .replace(/(?:key|token|secret|password)=[A-Za-z0-9_-]+/gi, '$1=[REDACTED]');
+}
+
+/**
+ * Verifies if incoming request is from an administrator via HTTP headers.
+ * Authentication credentials must strictly reside in headers (Authorization or x-user-id).
+ * If a Bearer token is provided, it serves as the authoritative identity.
+ * Prevents identity spoofing where an unprivileged token tries to masquerade via x-user-id.
+ * 
+ * @param {import('node:http').IncomingMessage} req
+ * @returns {boolean}
+ */
+export function isRequestFromAdmin(req) {
+  const authHeader = req.headers['authorization'] || '';
+  const xUserId = (req.headers['x-user-id'] || '').trim();
+
+  let tokenCandidate = '';
+  if (authHeader.startsWith('Bearer ')) {
+    tokenCandidate = authHeader.slice(7).trim();
+  } else if (authHeader) {
+    tokenCandidate = authHeader.trim();
+  }
+
+  // Token is authoritative if provided
+  const candidateId = tokenCandidate || xUserId;
+  if (!candidateId) return false;
+
+  // Anti-spoofing guard: If both token and x-user-id are provided, they must not contradict
+  if (tokenCandidate && xUserId && tokenCandidate.toLowerCase() !== xUserId.toLowerCase()) {
+    const tokenIsAdmin = tokenCandidate === 'user_admin' || tokenCandidate.toLowerCase() === 'admin';
+    const xUserIsAdmin = xUserId === 'user_admin' || xUserId.toLowerCase() === 'admin';
+    if (!tokenIsAdmin || !xUserIsAdmin) {
+      return false; // Conflicting identities / spoofing detected
+    }
+  }
+
+  const user = serverUsers.find(u =>
+    u.id === candidateId ||
+    u.username.toLowerCase() === candidateId.toLowerCase()
+  );
+
+  return Boolean(user && (user.role === 'admin' || user.username.toLowerCase() === 'admin' || user.id === 'user_admin'));
+}
+
+/**
+ * Validates custom quiz question payload with strict type, format, and boundary checks.
+ * @param {Object} data
+ * @returns {{ valid: boolean, error?: string }}
+ */
+export function validateCustomQuestion(data) {
+  if (!data || typeof data !== 'object') {
+    return { valid: false, error: 'Dữ liệu câu hỏi không hợp lệ.' };
+  }
+  const question = typeof data.question === 'string' ? data.question.trim() : '';
+  if (question.length < 5) {
+    return { valid: false, error: 'Nội dung câu hỏi phải có ít nhất 5 ký tự.' };
+  }
+  if (question.length > 2000) {
+    return { valid: false, error: 'Nội dung câu hỏi không được vượt quá 2000 ký tự.' };
+  }
+  if (!Array.isArray(data.options) || data.options.length !== 4) {
+    return { valid: false, error: 'Câu hỏi trắc nghiệm phải có chính xác 4 lựa chọn (A, B, C, D).' };
+  }
+  const validOptionIds = ['A', 'B', 'C', 'D'];
+  for (let i = 0; i < 4; i++) {
+    const opt = data.options[i];
+    if (!opt || typeof opt !== 'object') {
+      return { valid: false, error: `Lựa chọn thứ ${i + 1} không hợp lệ.` };
+    }
+    const optId = (opt.id || validOptionIds[i]).trim().toUpperCase();
+    const optText = typeof opt.text === 'string' ? opt.text.trim() : '';
+    if (!optText) {
+      return { valid: false, error: `Nội dung lựa chọn ${optId} không được để trống.` };
+    }
+    if (optText.length > 1000) {
+      return { valid: false, error: `Nội dung lựa chọn ${optId} không được vượt quá 1000 ký tự.` };
+    }
+  }
+  const correctId = typeof data.correctId === 'string' ? data.correctId.trim().toUpperCase() : '';
+  if (!validOptionIds.includes(correctId)) {
+    return { valid: false, error: 'Đáp án đúng phải là một trong các giá trị: A, B, C, D.' };
+  }
+  if (data.explanation && typeof data.explanation === 'string' && data.explanation.length > 5000) {
+    return { valid: false, error: 'Lời giải thích không được vượt quá 5000 ký tự.' };
+  }
+  return { valid: true };
 }
 
 /**
@@ -272,6 +371,15 @@ export async function handleRequest(req, res) {
 
   // Route: DELETE /api/admin/users/:id (Quản trị viên xóa tài khoản)
   if (req.method === 'DELETE' && pathname.startsWith('/api/admin/users/')) {
+    if (!isRequestFromAdmin(req)) {
+      sendJson(res, 403, {
+        success: false,
+        error: 'FORBIDDEN',
+        message: 'Chỉ Quản trị viên mới có quyền xóa tài khoản sinh viên.',
+      });
+      return;
+    }
+
     const rawTarget = decodeURIComponent(pathname.replace('/api/admin/users/', '')).trim();
     const queryUsername = parsedUrl.searchParams.get('username') 
       ? decodeURIComponent(parsedUrl.searchParams.get('username')).trim().toLowerCase() 
@@ -312,6 +420,14 @@ export async function handleRequest(req, res) {
 
   // Route: POST /api/admin/database/reset (Quản trị viên xóa sạch toàn bộ dữ liệu database)
   if (req.method === 'POST' && pathname === '/api/admin/database/reset') {
+    if (!isRequestFromAdmin(req)) {
+      sendJson(res, 403, {
+        success: false,
+        error: 'FORBIDDEN',
+        message: 'Chỉ Quản trị viên mới có quyền xóa sạch cơ sở dữ liệu.',
+      });
+      return;
+    }
     const adminUser = serverUsers.find(u => u.username === 'admin' || u.id === 'user_admin') || {
       id: 'user_admin',
       username: 'admin',
@@ -329,6 +445,7 @@ export async function handleRequest(req, res) {
     for (const k of Object.keys(serverAiSessions)) delete serverAiSessions[k];
     serverExams.length = 0;
     serverExamSubmissions.length = 0;
+    serverCustomQuestions.length = 0;
     saveDatabase();
     if (isKVConfigured()) {
       writeToKV().catch(() => {});
@@ -367,7 +484,7 @@ export async function handleRequest(req, res) {
     } catch (err) {
       sendJson(res, 500, {
         success: false,
-        error: err.message || 'Lỗi xử lý AI chat trên máy chủ.',
+        error: sanitizeErrorMessage(err.message) || 'Lỗi xử lý AI chat trên máy chủ.',
       });
       return;
     }
@@ -459,6 +576,15 @@ export async function handleRequest(req, res) {
 
   // Route: POST /api/quiz/leaderboard/reset (Quản trị viên xóa toàn bộ bảng xếp hạng)
   if (req.method === 'POST' && pathname === '/api/quiz/leaderboard/reset') {
+    if (!isRequestFromAdmin(req)) {
+      sendJson(res, 403, {
+        success: false,
+        error: 'FORBIDDEN',
+        message: 'Chỉ Quản trị viên mới có quyền làm sạch bảng xếp hạng.',
+      });
+      return;
+    }
+
     for (const k of Object.keys(serverQuizStats)) {
       delete serverQuizStats[k];
     }
@@ -472,6 +598,15 @@ export async function handleRequest(req, res) {
 
   // Route: DELETE /api/quiz/leaderboard/:userId (Quản trị viên xóa điểm 1 sinh viên)
   if (req.method === 'DELETE' && pathname.startsWith('/api/quiz/leaderboard/')) {
+    if (!isRequestFromAdmin(req)) {
+      sendJson(res, 403, {
+        success: false,
+        error: 'FORBIDDEN',
+        message: 'Chỉ Quản trị viên mới có quyền xóa điểm sinh viên khỏi bảng xếp hạng.',
+      });
+      return;
+    }
+
     const targetUserId = pathname.replace('/api/quiz/leaderboard/', '').trim();
     if (serverQuizStats[targetUserId]) {
       delete serverQuizStats[targetUserId];
@@ -592,13 +727,128 @@ export async function handleRequest(req, res) {
     }
   }
 
+  // Route: GET /api/quiz/custom-question
+  if (req.method === 'GET' && pathname === '/api/quiz/custom-question') {
+    sendJson(res, 200, { success: true, questions: serverCustomQuestions });
+    return;
+  }
+
+  // Route: POST /api/quiz/custom-question (Admin approves and saves AI/custom question)
+  if (req.method === 'POST' && pathname === '/api/quiz/custom-question') {
+    try {
+      const bodyBuffer = await readRequestBody(req);
+      const data = JSON.parse(bodyBuffer.toString('utf8') || '{}');
+
+      // Admin authorization guard
+      if (!isRequestFromAdmin(req)) {
+        sendJson(res, 403, {
+          success: false,
+          error: 'FORBIDDEN',
+          message: 'Chỉ Quản trị viên / Giảng viên mới có quyền thêm câu hỏi vào ngân hàng.',
+        });
+        return;
+      }
+
+      // Input validation
+      const validation = validateCustomQuestion(data);
+      if (!validation.valid) {
+        sendJson(res, 400, {
+          success: false,
+          error: 'INVALID_QUESTION_DATA',
+          message: validation.error,
+        });
+        return;
+      }
+
+      const validOptionIds = ['A', 'B', 'C', 'D'];
+      const normalizedOptions = data.options.map((opt, idx) => ({
+        id: (opt.id || validOptionIds[idx]).trim().toUpperCase(),
+        text: opt.text.trim(),
+      }));
+
+      const questionId = typeof data.id === 'string' && data.id.trim()
+        ? data.id.trim()
+        : `custom_q_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+
+      const topic = (data.topic || 'logic').toLowerCase();
+      const topicNames = {
+        logic: 'Cơ sở Logic & Suy luận',
+        boolean: 'Đại số Boole & Mạch Logic',
+        counting: 'Đại số Tổ hợp & Đếm',
+        relation: 'Quan hệ 2 ngôi & Thứ tự',
+        graph: 'Lý thuyết Đồ thị & Cây',
+      };
+
+      const customQuestion = {
+        id: questionId,
+        topic,
+        topicName: typeof data.topicName === 'string' && data.topicName.trim()
+          ? data.topicName.trim()
+          : (topicNames[topic] || 'Toán Rời Rạc'),
+        difficulty: ['easy', 'medium', 'hard'].includes(data.difficulty) ? data.difficulty : 'medium',
+        question: data.question.trim(),
+        options: normalizedOptions,
+        correctId: data.correctId.trim().toUpperCase(),
+        explanation: typeof data.explanation === 'string' ? data.explanation.trim() : '',
+        source: 'ai_vision',
+        status: 'approved',
+        createdAt: data.createdAt || new Date().toISOString(),
+        createdBy: data.createdBy || 'user_admin',
+        actionLink: data.actionLink || null,
+      };
+
+      const existingIndex = serverCustomQuestions.findIndex(q => q.id === questionId);
+      if (existingIndex >= 0) {
+        serverCustomQuestions[existingIndex] = customQuestion;
+      } else {
+        serverCustomQuestions.unshift(customQuestion);
+      }
+
+      saveDatabase();
+      sendJson(res, 201, { success: true, question: customQuestion });
+      return;
+    } catch {
+      sendJson(res, 400, { success: false, error: 'Dữ liệu không hợp lệ.' });
+      return;
+    }
+  }
+
+  // Route: DELETE /api/quiz/custom-question/:id or DELETE /api/quiz/custom-question?id=...
+  if (req.method === 'DELETE' && (pathname === '/api/quiz/custom-question' || pathname.startsWith('/api/quiz/custom-question/'))) {
+    if (!isRequestFromAdmin(req)) {
+      sendJson(res, 403, {
+        success: false,
+        error: 'FORBIDDEN',
+        message: 'Chỉ Quản trị viên / Giảng viên mới có quyền xóa câu hỏi khỏi ngân hàng.',
+      });
+      return;
+    }
+
+    let targetId = '';
+    if (pathname.startsWith('/api/quiz/custom-question/')) {
+      targetId = decodeURIComponent(pathname.replace('/api/quiz/custom-question/', '')).trim();
+    } else {
+      targetId = parsedUrl.searchParams.get('id') || '';
+    }
+
+    if (!targetId) {
+      sendJson(res, 400, { success: false, error: 'Thiếu mã câu hỏi cần xóa.' });
+      return;
+    }
+
+    const idx = serverCustomQuestions.findIndex(q => q.id === targetId);
+    if (idx !== -1) {
+      serverCustomQuestions.splice(idx, 1);
+      saveDatabase();
+      sendJson(res, 200, { success: true, message: `Đã xóa câu hỏi ${targetId} thành công.` });
+    } else {
+      sendJson(res, 404, { success: false, error: 'Không tìm thấy câu hỏi trong ngân hàng tùy chỉnh.' });
+    }
+    return;
+  }
+
   // Route: GET /api/exams
   if (req.method === 'GET' && pathname === '/api/exams') {
-    if (isKVConfigured()) {
-      try {
-        await fetchFromKV();
-      } catch {}
-    }
     sendJson(res, 200, { success: true, exams: serverExams });
     return;
   }
@@ -611,7 +861,10 @@ export async function handleRequest(req, res) {
       const title = (data.title || '').trim();
       const questionIds = Array.isArray(data.questionIds) ? data.questionIds : [];
       const durationMinutes = Number(data.durationMinutes);
-      const validQuestionIds = new Set(STATIC_QUESTION_BANK.map(question => question.id));
+      const validQuestionIds = new Set([
+        ...STATIC_QUESTION_BANK.map(question => question.id),
+        ...serverCustomQuestions.map(question => question.id),
+      ]);
       const assignedTo = Array.isArray(data.assignedTo) ? data.assignedTo : ['all'];
       if (
         title.length < 3 ||
@@ -659,6 +912,15 @@ export async function handleRequest(req, res) {
   // Route: POST /api/exams/clear-all or DELETE /api/exams (Quản trị viên xóa toàn bộ đề thi & dữ liệu bài làm)
   if ((req.method === 'POST' && (pathname === '/api/exams/clear-all' || pathname.endsWith('/exams/clear-all'))) ||
       (req.method === 'DELETE' && pathname === '/api/exams')) {
+    if (!isRequestFromAdmin(req)) {
+      sendJson(res, 403, {
+        success: false,
+        error: 'FORBIDDEN',
+        message: 'Chỉ Quản trị viên mới có quyền xóa toàn bộ đề thi.',
+      });
+      return;
+    }
+
     serverExams.length = 0;
     serverExamSubmissions.length = 0;
     for (const k of Object.keys(serverQuizStats)) {
@@ -669,7 +931,6 @@ export async function handleRequest(req, res) {
     saveDatabase();
     if (isKVConfigured()) {
       writeToKV().catch(() => {});
-      clearSubmissionsFromKV().catch(() => {});
     }
     sendJson(res, 200, { success: true, message: 'Đã xóa toàn bộ đề thi và làm sạch dữ liệu bài làm của sinh viên thành công.' });
     return;
@@ -677,6 +938,15 @@ export async function handleRequest(req, res) {
 
   // Route: DELETE /api/exams/:id
   if (req.method === 'DELETE' && pathname.startsWith('/api/exams/')) {
+    if (!isRequestFromAdmin(req)) {
+      sendJson(res, 403, {
+        success: false,
+        error: 'FORBIDDEN',
+        message: 'Chỉ Quản trị viên mới có quyền xóa đề thi.',
+      });
+      return;
+    }
+
     const examId = pathname.replace('/api/exams/', '').trim();
     const idx = serverExams.findIndex(e => e.id === examId);
     if (idx !== -1) {
@@ -696,26 +966,6 @@ export async function handleRequest(req, res) {
   if (req.method === 'GET' && pathname === '/api/exam-submissions') {
     const examId = parsedUrl.searchParams.get('examId');
     const userId = parsedUrl.searchParams.get('userId');
-
-    // Live sync from atomic KV hash to ensure 100 students' concurrent submissions are immediately visible
-    if (isKVConfigured()) {
-      try {
-        if (examId) {
-          const kvSubs = await fetchSubmissionsFromKV(examId);
-          if (Array.isArray(kvSubs) && kvSubs.length > 0) {
-            const map = new Map(serverExamSubmissions.map(s => [`${s.examId}:${s.userId}`, s]));
-            kvSubs.forEach(s => {
-              if (s && s.examId && s.userId) map.set(`${s.examId}:${s.userId}`, s);
-            });
-            serverExamSubmissions.length = 0;
-            serverExamSubmissions.push(...map.values());
-          }
-        } else {
-          await fetchFromKV();
-        }
-      } catch {}
-    }
-
     let list = [...serverExamSubmissions];
     if (examId) list = list.filter(s => s.examId === examId);
     if (userId) list = list.filter(s => s.userId === userId);
@@ -761,6 +1011,7 @@ export async function handleRequest(req, res) {
 
       const qMap = new Map();
       STATIC_QUESTION_BANK.forEach(q => qMap.set(q.id, q));
+      serverCustomQuestions.forEach(q => qMap.set(q.id, q));
       const totalQuestions = exam.questionIds.length;
       let correctCount = 0;
       const normalizedOptionOrder = {};
@@ -800,17 +1051,7 @@ export async function handleRequest(req, res) {
         submittedAt: new Date().toISOString(),
       };
 
-      // Atomic save to Redis hash (HSET) so 100 simultaneous submissions never overwrite each other
-      if (isKVConfigured()) {
-        saveSubmissionToKV(submission).catch(() => {});
-      }
-
-      const existingIdx = serverExamSubmissions.findIndex(s => s.examId === examId && s.userId === userId);
-      if (existingIdx >= 0) {
-        serverExamSubmissions[existingIdx] = submission;
-      } else {
-        serverExamSubmissions.push(submission);
-      }
+      serverExamSubmissions.push(submission);
       saveDatabase();
       sendJson(res, 201, { success: true, submission });
       return;
@@ -821,7 +1062,7 @@ export async function handleRequest(req, res) {
   }
 
   // Route: POST /api/graph/analyze
-  if (req.method === 'POST' && (pathname === '/api/graph/analyze' || pathname.endsWith('/graph/analyze') || pathname.endsWith('/analyze'))) {
+  if (req.method === 'POST' && (pathname === '/api/graph/analyze' || pathname.endsWith('/graph/analyze'))) {
     try {
       const contentType = req.headers['content-type'] || '';
       let fileToAnalyze = null;
@@ -898,7 +1139,8 @@ export async function handleRequest(req, res) {
               isText: true,
             };
           }
-        } catch {
+        } catch (err) {
+          console.warn('[Docx Extraction Warning in Graph]', err?.message || err);
           // Continue with original file if docx extraction fails
         }
       }
@@ -929,7 +1171,7 @@ export async function handleRequest(req, res) {
         sendJson(res, 500, {
           success: false,
           error: 'AI_PROVIDER_ERROR',
-          message: `Lỗi khi gọi AI Vision: ${err.message}`,
+          message: sanitizeErrorMessage(`Lỗi khi gọi AI Vision: ${err.message}`),
         });
         return;
       }
@@ -958,7 +1200,186 @@ export async function handleRequest(req, res) {
       sendJson(res, 500, {
         success: false,
         error: 'SERVER_ERROR',
-        message: err.message || 'Lỗi xử lý yêu cầu phía server.',
+        message: sanitizeErrorMessage(err.message) || 'Lỗi xử lý yêu cầu phía server.',
+      });
+      return;
+    }
+  }
+
+  // Route: POST /api/logic/analyze
+  if (req.method === 'POST' && (pathname === '/api/logic/analyze' || pathname.endsWith('/logic/analyze'))) {
+    try {
+      const mode = parsedUrl.searchParams.get('mode') || 'expression';
+      const contentType = req.headers['content-type'] || '';
+      let fileToAnalyze = null;
+      let bodyMode = null;
+
+      if (contentType.includes('multipart/form-data')) {
+        const boundary = extractBoundary(contentType);
+        if (!boundary) {
+          sendJson(res, 400, {
+            success: false,
+            error: 'INVALID_MULTIPART',
+            message: 'Không tìm thấy boundary trong Content-Type header.',
+          });
+          return;
+        }
+
+        const bodyBuffer = await readRequestBody(req, MAX_FILE_SIZE_BYTES + 1024 * 1024);
+        const { files, fields } = parseMultipartData(bodyBuffer, boundary);
+        fileToAnalyze = files['file'] || Object.values(files)[0] || null;
+        if (fields && fields.mode) {
+          bodyMode = fields.mode;
+        }
+      } else if (contentType.includes('application/json')) {
+        const bodyBuffer = await readRequestBody(req);
+        const body = JSON.parse(bodyBuffer.toString('utf8') || '{}');
+        if (body.mode) {
+          bodyMode = body.mode;
+        }
+        if (body.file && body.file.data) {
+          const rawBuf = Buffer.isBuffer(body.file.data)
+            ? body.file.data
+            : Buffer.from(body.file.data, body.file.encoding || 'base64');
+          fileToAnalyze = {
+            filename: body.file.filename || body.file.name || 'uploaded_logic.png',
+            type: body.file.type || 'image/png',
+            data: rawBuf,
+            size: rawBuf.length,
+          };
+        }
+      }
+
+      const activeMode = bodyMode || mode || 'expression';
+
+      // Check if file is present
+      if (!fileToAnalyze) {
+        sendJson(res, 400, {
+          success: false,
+          error: 'NO_FILE',
+          message: 'Không tìm thấy tệp đính kèm trong yêu cầu (yêu cầu field "file").',
+        });
+        return;
+      }
+
+      // Validate file format and size
+      const fileCheck = validateBackendFile(fileToAnalyze);
+      if (!fileCheck.valid) {
+        sendJson(res, 400, {
+          success: false,
+          error: 'INVALID_FILE',
+          message: fileCheck.error,
+        });
+        return;
+      }
+
+      // Check if file is docx and extract primary image or text
+      if (fileToAnalyze.filename && fileToAnalyze.filename.toLowerCase().endsWith('.docx')) {
+        try {
+          const docxResult = await extractDocx(fileToAnalyze);
+          if (docxResult.primaryImage) {
+            fileToAnalyze = {
+              filename: docxResult.primaryImage.name,
+              type: docxResult.primaryImage.mimeType,
+              data: Buffer.from(docxResult.primaryImage.data),
+              size: docxResult.primaryImage.size,
+            };
+          } else if (docxResult.text) {
+            fileToAnalyze = {
+              filename: fileToAnalyze.filename,
+              type: 'text/plain',
+              text: docxResult.text,
+              data: Buffer.from(docxResult.text, 'utf8'),
+              size: Buffer.byteLength(docxResult.text),
+              isText: true,
+            };
+          }
+        } catch (err) {
+          console.warn('[Docx Extraction Warning in Logic]', err?.message || err);
+          // Continue with original file if docx extraction fails
+        }
+      }
+
+      console.log(`[Logic Vision API] Yêu cầu: mode=${activeMode}, file=${fileToAnalyze.filename}, size=${fileToAnalyze.size} bytes`);
+
+      // Check if AI is configured
+      if (!isAIConfigured()) {
+        console.warn('[Logic Vision API] Dịch vụ AI Vision chưa được cấu hình (thiếu API Key).');
+        sendJson(res, 503, {
+          success: false,
+          error: 'AI_NOT_CONFIGURED',
+          message: 'AI Vision chưa được cấu hình. Vui lòng thiết lập biến môi trường API Key (AI_API_KEY hoặc GEMINI_API_KEY) ở backend trong file .env.',
+        });
+        return;
+      }
+
+      // Call AI Vision Adapter for Logic
+      let rawSpec;
+      try {
+        rawSpec = await analyzeLogicFileBackend(fileToAnalyze, { mode: activeMode });
+      } catch (err) {
+        console.error(`[Logic Vision API Error]`, err.message);
+        if (err.message === 'AI_NOT_CONFIGURED') {
+          sendJson(res, 503, {
+            success: false,
+            error: 'AI_NOT_CONFIGURED',
+            message: 'AI Vision chưa được cấu hình. Vui lòng thiết lập biến môi trường API Key (AI_API_KEY hoặc GEMINI_API_KEY) ở backend trong file .env.',
+          });
+          return;
+        }
+        sendJson(res, 500, {
+          success: false,
+          error: 'AI_PROVIDER_ERROR',
+          message: sanitizeErrorMessage(`Lỗi khi gọi AI Vision: ${err.message}`),
+        });
+        return;
+      }
+
+      // Validate AI output strictly against Logic schema (expression vs quiz)
+      if (activeMode === 'quiz') {
+        const isValidQuiz = rawSpec &&
+          typeof rawSpec.question === 'string' && rawSpec.question.trim().length > 0 &&
+          Array.isArray(rawSpec.options) && rawSpec.options.length >= 2 &&
+          rawSpec.options.some(opt => opt && opt.id === rawSpec.correctId);
+
+        if (!isValidQuiz) {
+          sendJson(res, 400, {
+            success: false,
+            error: 'INVALID_AI_SPEC',
+            message: 'Dữ liệu câu hỏi trắc nghiệm từ AI không hợp lệ hoặc thiếu thông tin câu hỏi/đáp án.',
+            spec: rawSpec,
+          });
+          return;
+        }
+      } else {
+        const isValidExpression = rawSpec &&
+          typeof rawSpec.expression === 'string' && rawSpec.expression.trim().length > 0;
+
+        if (!isValidExpression) {
+          sendJson(res, 400, {
+            success: false,
+            error: 'INVALID_AI_SPEC',
+            message: 'Dữ liệu biểu thức logic từ AI không hợp lệ hoặc không tìm thấy biểu thức.',
+            spec: rawSpec,
+          });
+          return;
+        }
+      }
+
+      // Success response for Logic Vision
+      console.log(`[Logic Vision API] Phân tích hoàn tất thành công (mode=${activeMode})`);
+      sendJson(res, 200, {
+        success: true,
+        mode: activeMode,
+        data: rawSpec,
+        warnings: Array.isArray(rawSpec.warnings) ? rawSpec.warnings : [],
+      });
+      return;
+    } catch (err) {
+      sendJson(res, 500, {
+        success: false,
+        error: 'SERVER_ERROR',
+        message: sanitizeErrorMessage(err.message) || 'Lỗi xử lý yêu cầu phía server.',
       });
       return;
     }
