@@ -22,6 +22,7 @@ import { LOGIC_PRESETS } from '../../core/logic/LogicPresets.js';
 import { generateRandomProposition, generateEquivalencePracticePair } from '../../core/logic/RandomLogicGenerator.js';
 import { buildKMap } from '../../core/logic/KMapEngine.js';
 import { buildCircuitModel, extractSopTermsFromExpression } from '../../core/logic/CircuitEngine.js';
+import { LogicSourceModal } from '../components/LogicSourceModal.js';
 
 export class LogicLabView {
   /**
@@ -52,6 +53,7 @@ export class LogicLabView {
     this.currentCircuit = null;
     this.circuitAssignment = {};
     this.lastActiveInput = null;
+    this.logicSourceModal = null;
 
     if (this.container) {
       this.render();
@@ -167,6 +169,7 @@ export class LogicLabView {
                   <button type="button" class="btn-sm btn-circuit-preset" data-preset="case_xor" style="padding:3px 8px;font-size:11px;border-radius:10px;background:var(--panel);border:1px solid var(--line);">XOR</button>
                   <button type="button" class="btn-sm btn-circuit-preset" data-preset="case_mux" style="padding:3px 8px;font-size:11px;border-radius:10px;background:var(--panel);border:1px solid var(--line);">MUX</button>
                   <button type="button" class="btn-sm btn-circuit-preset" data-preset="case_corners" style="padding:3px 8px;font-size:11px;border-radius:10px;background:var(--panel);border:1px solid var(--line);">4 Góc</button>
+                  <button type="button" class="btn-sm" id="btnOpenLogicVision" style="padding:3px 9px;font-size:11px;border-radius:10px;background:var(--panel);border:1px solid var(--accent);color:var(--accent);font-weight:700;display:inline-flex;align-items:center;gap:4px;" title="Chụp hoặc tải ảnh đề bài logic để AI tự nhận diện">📷 Nhập từ ảnh</button>
                 </div>
               </div>
 
@@ -519,6 +522,7 @@ export class LogicLabView {
     this.statCardsGrid = this.container.querySelector('#logicStatCardsGrid');
 
     this.presetSelect = this.container.querySelector('#logicPresetSelect');
+    this.btnOpenLogicVision = this.container.querySelector('#btnOpenLogicVision');
     this.inputSingle = this.container.querySelector('#inputLogicSingle');
     this.btnSolveSingle = this.container.querySelector('#btnSolveSingle');
     this.chkShowSteps = this.container.querySelector('#chkShowSteps');
@@ -664,6 +668,35 @@ export class LogicLabView {
           this.solveSingle();
         }
       });
+    });
+
+    // Logic Vision AI Modal Trigger
+    this.btnOpenLogicVision?.addEventListener('click', () => {
+      this.pause();
+      if (!this.logicSourceModal) {
+        this.logicSourceModal = new LogicSourceModal({
+          container: document.body,
+          adminMode: false,
+          onApplyExpression: ({ expression, expression2, exerciseType, navigation }) => {
+            if (expression2 || exerciseType === 'equivalence') {
+              this.switchTab('equiv');
+              if (this.inputEquiv1) this.inputEquiv1.value = expression;
+              if (this.inputEquiv2) this.inputEquiv2.value = expression2 || '';
+              this.solveEquiv();
+            } else {
+              this.switchTab(navigation?.targetTab || 'single');
+              if (navigation?.targetSubTab) {
+                this.switchSubTab(navigation.targetSubTab);
+              }
+              if (this.inputSingle) {
+                this.inputSingle.value = expression;
+              }
+              this.solveSingle();
+            }
+          },
+        });
+      }
+      this.logicSourceModal.open('expression');
     });
 
     // Solve Single Table
