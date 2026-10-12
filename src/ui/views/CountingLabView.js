@@ -225,7 +225,7 @@ export class CountingLabView {
             <button type="button" class="btn-sm" id="btnGenInjective" title="Sinh đơn ánh ngẫu nhiên" ${this.domain.length > this.codomain.length ? 'disabled style="opacity:0.4;cursor:not-allowed;"' : ''}>🎯 Sinh Đơn ánh</button>
             <button type="button" class="btn-sm" id="btnGenSurjective" title="Sinh toàn ánh ngẫu nhiên" ${this.domain.length < this.codomain.length ? 'disabled style="opacity:0.4;cursor:not-allowed;"' : ''}>🌐 Sinh Toàn ánh</button>
             <button type="button" class="btn-sm" id="btnGenBijective" title="Sinh song ánh ngẫu nhiên" ${this.domain.length !== this.codomain.length ? 'disabled style="opacity:0.4;cursor:not-allowed;"' : ''}>👑 Sinh Song ánh</button>
-            <button type="button" class="btn-sm" id="btnToggleInverse" style="background:${this.isInverseActive ? 'var(--accent2)' : 'var(--panel-alt)'};color:${this.isInverseActive ? '#fff' : 'var(--text)'};border:1px solid ${this.isInverseActive ? 'var(--accent2)' : 'var(--line)'};font-weight:600;" ${!isBijective ? 'disabled title="Chỉ khả dụng khi ánh xạ là SONG ÁNH!" style="opacity:0.4;cursor:not-allowed;"' : ''}>🔄 ${this.isInverseActive ? 'Đang bật f⁻¹' : 'Xem hàm ngược f⁻¹'}</button>
+            <button type="button" class="btn-sm" id="btnToggleInverse" style="background:${this.isInverseActive ? 'var(--accent2)' : 'var(--panel-alt)'};color:${this.isInverseActive ? '#fff' : 'var(--text)'};border:1px solid ${this.isInverseActive ? 'var(--accent2)' : 'var(--line)'};" ${!isBijective ? 'disabled title="Chỉ khả dụng khi ánh xạ là SONG ÁNH!" style="opacity:0.4;cursor:not-allowed;"' : ''}>🔄 ${this.isInverseActive ? 'Đang bật f⁻¹' : 'Xem hàm ngược f⁻¹'}</button>
             <button type="button" class="btn-sm" id="btnClearEdges" title="Xóa tất cả các đường nối">🧹 Xóa mũi tên</button>
           </div>
         </div>
@@ -561,7 +561,7 @@ export class CountingLabView {
             <button type="button" class="btn-sm" id="btnDirichletEven" title="Dàn đều nhất có thể">⚖️ Dàn đều (Xấu nhất)</button>
             <button type="button" class="btn-sm" id="btnDirichletRandom" title="Phân phối ngẫu nhiên N vật">🎲 Thả ngẫu nhiên</button>
             <button type="button" class="btn-sm" id="btnDirichletClear" title="Làm rỗng các chuồng">🧹 Làm rỗng</button>
-            <button type="button" class="btn-sm" id="btnToggleProof" style="background:${this.showProof ? 'var(--accent)' : 'var(--panel-alt)'};color:${this.showProof ? '#000' : 'var(--text)'};border:1px solid ${this.showProof ? 'var(--accent)' : 'var(--line)'};font-weight:600;">📖 ${this.showProof ? 'Đóng chứng minh' : 'Xem chứng minh phản chứng'}</button>
+            <button type="button" class="btn-sm" id="btnToggleProof" style="background:${this.showProof ? 'var(--accent)' : 'var(--panel-alt)'};color:${this.showProof ? '#000' : 'var(--text)'};border:1px solid ${this.showProof ? 'var(--accent)' : 'var(--line)'};">📖 ${this.showProof ? 'Đóng chứng minh' : 'Xem chứng minh phản chứng'}</button>
           </div>
         </div>
       </div>
