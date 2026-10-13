@@ -276,37 +276,36 @@ export class AuthModal {
           const isOnline = await cloudSyncManager.checkConnection();
           if (isOnline) {
             const remoteResult = await cloudSyncManager.login(username, password);
-              if (remoteResult && remoteResult.success && remoteResult.user) {
-                // Verified active user on server -> sync into local
-                const users = authManager.getUsers();
-                const idx = users.findIndex(u => u.id === remoteResult.user.id || u.username.toLowerCase() === username.toLowerCase());
-                if (idx === -1) {
-                  users.push({ ...remoteResult.user, password });
-                } else {
-                  users[idx] = { ...users[idx], ...remoteResult.user, password };
-                }
-                if (authManager.storage) {
-                  try {
-                    authManager.storage.setItem('trr_registered_users', JSON.stringify(users));
-                  } catch {}
-                }
-                authManager.currentUser = { ...remoteResult.user };
-                authManager._persistCurrent();
-                authManager._notifyListeners('login', authManager.currentUser);
-                this.close();
-                return;
-              } else if (remoteResult && remoteResult.error) {
-                // Server rejected -> if user was deleted on server, purge locally as well
-                if (remoteResult.error.includes('không tồn tại')) {
-                  authManager.deleteUser(username, username);
-                }
-                alertBox.textContent = remoteResult.error;
-                alertBox.style.display = 'block';
-                return;
+            if (remoteResult && remoteResult.success && remoteResult.user) {
+              // Verified active user on server -> sync into local
+              const users = authManager.getUsers();
+              const idx = users.findIndex(u => u.id === remoteResult.user.id || u.username.toLowerCase() === username.toLowerCase());
+              if (idx === -1) {
+                users.push({ ...remoteResult.user, password });
+              } else {
+                users[idx] = { ...users[idx], ...remoteResult.user, password };
               }
+              if (authManager.storage) {
+                try {
+                  authManager.storage.setItem('trr_registered_users', JSON.stringify(users));
+                } catch {}
+              }
+              authManager.currentUser = { ...remoteResult.user };
+              authManager._persistCurrent();
+              authManager._notifyListeners('login', authManager.currentUser);
+              this.close();
+              return;
+            } else if (remoteResult && remoteResult.error) {
+              // Server rejected -> if user was deleted on server, purge locally as well
+              if (remoteResult.error.includes('không tồn tại')) {
+                authManager.deleteUser(username, username);
+              }
+              alertBox.textContent = remoteResult.error;
+              alertBox.style.display = 'block';
+              return;
             }
-          } catch {}
-        }
+          }
+        } catch {}
 
         // 2. Local check (for admin or offline mode)
         const localResult = authManager.login(username, password);
