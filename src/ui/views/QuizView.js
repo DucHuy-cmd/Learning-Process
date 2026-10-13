@@ -435,15 +435,15 @@ export class QuizView {
           <!-- Options List (Hàng dọc A B C D) -->
           <div class="quiz-options-list" style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px;width:100%;">
             ${q.options.map((opt) => {
-              let btnStyle = `display:flex;align-items:center;gap:14px;padding:12px 18px;border-radius:8px;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);font-size:14px;text-align:left;cursor:pointer;transition:all 0.15s ease;width:100%;white-space:normal !important;word-break:normal !important;line-height:1.5;`;
+              let btnStyle = `display:flex;align-items:flex-start;gap:12px;padding:12px 16px;border-radius:8px;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);font-size:14px;text-align:left;cursor:pointer;transition:all 0.15s ease;width:100%;white-space:normal !important;word-break:break-word !important;overflow-wrap:anywhere !important;line-height:1.5;box-sizing:border-box;`;
               let badgeColor = `background:var(--line);color:var(--text);`;
 
               if (answered) {
                 if (opt.id === q.correctId) {
-                  btnStyle = `display:flex;align-items:center;gap:14px;padding:12px 18px;border-radius:8px;background:rgba(16,185,129,0.15);border:2px solid #10b981;color:var(--text);font-size:14px;text-align:left;width:100%;white-space:normal !important;word-break:normal !important;line-height:1.5;`;
+                  btnStyle = `display:flex;align-items:flex-start;gap:12px;padding:12px 16px;border-radius:8px;background:rgba(16,185,129,0.15);border:2px solid #10b981;color:var(--text);font-size:14px;text-align:left;width:100%;white-space:normal !important;word-break:break-word !important;overflow-wrap:anywhere !important;line-height:1.5;box-sizing:border-box;`;
                   badgeColor = `background:#10b981;color:#ffffff;font-weight:bold;`;
                 } else if (opt.id === selectedOptId) {
-                  btnStyle = `display:flex;align-items:center;gap:14px;padding:12px 18px;border-radius:8px;background:rgba(244,63,94,0.15);border:2px solid #f43f5e;color:var(--text);font-size:14px;text-align:left;width:100%;white-space:normal !important;word-break:normal !important;line-height:1.5;`;
+                  btnStyle = `display:flex;align-items:flex-start;gap:12px;padding:12px 16px;border-radius:8px;background:rgba(244,63,94,0.15);border:2px solid #f43f5e;color:var(--text);font-size:14px;text-align:left;width:100%;white-space:normal !important;word-break:break-word !important;overflow-wrap:anywhere !important;line-height:1.5;box-sizing:border-box;`;
                   badgeColor = `background:#f43f5e;color:#ffffff;font-weight:bold;`;
                 } else {
                   btnStyle += `opacity:0.6;cursor:default;`;
@@ -452,12 +452,12 @@ export class QuizView {
 
               return `
                 <button type="button" class="btn-quiz-option" data-opt-id="${opt.id}" ${answered ? 'disabled' : ''} style="${btnStyle}">
-                  <span style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;font-size:13px;font-weight:700;flex-shrink:0;${badgeColor}">
+                  <span style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;font-size:13px;font-weight:700;flex-shrink:0;margin-top:2px;${badgeColor}">
                     ${opt.id}
                   </span>
-                  <span style="flex:1;font-weight:500;">${opt.text}</span>
-                  ${answered && opt.id === q.correctId ? '<span style="color:#10b981;font-weight:bold;padding-left:10px;white-space:nowrap;">✓ Đúng</span>' : ''}
-                  ${answered && opt.id === selectedOptId && opt.id !== q.correctId ? '<span style="color:#f43f5e;font-weight:bold;padding-left:10px;white-space:nowrap;">✗ Sai</span>' : ''}
+                  <span style="flex:1;min-width:0;font-weight:500;white-space:normal !important;word-break:break-word !important;overflow-wrap:anywhere !important;line-height:1.5;">${opt.text}</span>
+                  ${answered && opt.id === q.correctId ? '<span style="color:#10b981;font-weight:bold;padding-left:10px;white-space:nowrap;flex-shrink:0;margin-top:2px;">✓ Đúng</span>' : ''}
+                  ${answered && opt.id === selectedOptId && opt.id !== q.correctId ? '<span style="color:#f43f5e;font-weight:bold;padding-left:10px;white-space:nowrap;flex-shrink:0;margin-top:2px;">✗ Sai</span>' : ''}
                 </button>
               `;
             }).join('')}
@@ -703,27 +703,32 @@ export class QuizView {
             <div style="font-size:12px;color:var(--accent);font-weight:700;text-transform:uppercase;">
               Phòng Thi Trực Tuyến • Đang Chấm Giờ
             </div>
-            <h2 style="font-size:20px;font-weight:700;color:var(--text);margin:2px 0 0;">
+            <h2 style="font-size:20px;font-weight:700;color:var(--text);margin:2px 0 0;line-height:1.3;word-break:break-word;">
               ${this._escapeHtml(exam.title)}
             </h2>
           </div>
 
-          <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+          <div class="active-exam-actions-wrap" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
             <!-- Countdown Timer -->
             <div class="active-exam-timer-box ${isUrgent ? 'urgent' : ''}" id="activeExamTimer">
               ⏱️ ${timeFormatted}
             </div>
 
             <!-- Submit Button -->
-            <button type="button" class="btn-primary" id="btnSubmitActiveExam" style="background:#10b981;border-color:#10b981;font-weight:700;font-size:14px;padding:10px 22px;">
+            <button type="button" class="btn-primary" id="btnSubmitActiveExam" style="background:#10b981;border-color:#10b981;font-weight:700;font-size:14px;padding:10px 22px;min-height:42px;display:flex;align-items:center;justify-content:center;touch-action:manipulation;">
               📤 Nộp Bài Thi (${answeredCount}/${totalQ})
             </button>
           </div>
         </div>
 
         <!-- Question Fast Jump Grid -->
-        <div style="font-size:12px;font-weight:600;color:var(--dim);margin-bottom:8px;text-transform:uppercase;">
-          Mục lục câu hỏi (Bấm số để chuyển nhanh):
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px;">
+          <div style="font-size:12px;font-weight:600;color:var(--dim);text-transform:uppercase;">
+            Mục lục câu hỏi (Bấm số để chuyển nhanh):
+          </div>
+          <div class="exam-q-jump-hint" style="font-size:11px;color:var(--dim);">
+            ⇄ Vuốt ngang
+          </div>
         </div>
         <div class="exam-q-jump-grid">
           ${questions.map((qItem, idx) => {
@@ -738,7 +743,7 @@ export class QuizView {
         </div>
 
         <!-- Current Question Display -->
-        <div style="background:var(--panel-alt);border:1px solid var(--line);border-radius:10px;padding:24px;margin-bottom:20px;">
+        <div class="exam-question-card" style="background:var(--panel-alt);border:1px solid var(--line);border-radius:10px;padding:24px;margin-bottom:20px;box-sizing:border-box;">
           
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
             <span style="font-size:13px;font-weight:700;background:var(--panel);border:1px solid var(--line);padding:3px 12px;border-radius:6px;color:var(--text);">
@@ -749,7 +754,7 @@ export class QuizView {
             </span>
           </div>
 
-          <div style="font-size:16.5px;font-weight:600;color:var(--text);line-height:1.6;margin-bottom:24px;border-left:4px solid var(--accent);padding-left:14px;">
+          <div style="font-size:16.5px;font-weight:600;color:var(--text);line-height:1.6;margin-bottom:24px;border-left:4px solid var(--accent);padding-left:14px;word-break:break-word;overflow-wrap:break-word;">
             ${currentQ.question}
           </div>
 
@@ -758,21 +763,21 @@ export class QuizView {
             ${displayedOptions.map((opt, optionIndex) => {
               const isSelected = selectedOpt === opt.id;
               const displayLabel = String.fromCharCode(65 + optionIndex);
-              let style = `display:flex;align-items:center;gap:14px;padding:12px 18px;border-radius:8px;background:var(--panel);border:1px solid var(--line);color:var(--text);font-size:14px;text-align:left;cursor:pointer;transition:all 0.15s ease;width:100%;line-height:1.5;`;
+              let style = `display:flex;align-items:flex-start;gap:12px;padding:12px 16px;border-radius:8px;background:var(--panel);border:1px solid var(--line);color:var(--text);font-size:14px;text-align:left;cursor:pointer;transition:all 0.15s ease;width:100%;line-height:1.5;box-sizing:border-box;white-space:normal !important;word-break:break-word !important;overflow-wrap:anywhere !important;`;
               let badgeStyle = `background:var(--line);color:var(--text);`;
 
               if (isSelected) {
-                style = `display:flex;align-items:center;gap:14px;padding:12px 18px;border-radius:8px;background:rgba(56,189,248,0.15);border:2px solid var(--accent);color:var(--text);font-size:14px;text-align:left;cursor:pointer;width:100%;line-height:1.5;`;
+                style = `display:flex;align-items:flex-start;gap:12px;padding:12px 16px;border-radius:8px;background:rgba(56,189,248,0.15);border:2px solid var(--accent);color:var(--text);font-size:14px;text-align:left;cursor:pointer;width:100%;line-height:1.5;box-sizing:border-box;white-space:normal !important;word-break:break-word !important;overflow-wrap:anywhere !important;`;
                 badgeStyle = `background:var(--accent);color:#000;font-weight:bold;`;
               }
 
               return `
-                <button type="button" class="btn-active-exam-opt" data-opt-id="${opt.id}" style="${style}">
-                  <span style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;font-size:13px;font-weight:700;flex-shrink:0;${badgeStyle}">
+                <button type="button" class="btn-active-exam-opt ${isSelected ? 'selected' : ''}" data-opt-id="${opt.id}" style="${style}">
+                  <span class="opt-badge" style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;font-size:13px;font-weight:700;flex-shrink:0;margin-top:2px;${badgeStyle}">
                     ${displayLabel}
                   </span>
-                  <span style="flex:1;font-weight:500;">${opt.text}</span>
-                  ${isSelected ? '<span style="color:var(--accent);font-weight:bold;font-size:13px;">● Đã chọn</span>' : ''}
+                  <span class="opt-text" style="flex:1;min-width:0;font-weight:500;white-space:normal !important;word-break:break-word !important;overflow-wrap:anywhere !important;line-height:1.5;">${opt.text}</span>
+                  ${isSelected ? '<span class="opt-selected-tag" style="color:var(--accent);font-weight:bold;font-size:12.5px;flex-shrink:0;white-space:nowrap;margin-left:8px;margin-top:2px;">● Đã chọn</span>' : ''}
                 </button>
               `;
             }).join('')}
@@ -781,16 +786,16 @@ export class QuizView {
         </div>
 
         <!-- Question Navigation Bottom Bar -->
-        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
-          <button type="button" class="btn-secondary" id="btnExamPrevQ" ${session.currentQIndex === 0 ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : ''}>
+        <div class="exam-navigation-bar" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+          <button type="button" class="btn-secondary" id="btnExamPrevQ" ${session.currentQIndex === 0 ? 'disabled style="opacity:0.5;cursor:not-allowed;min-height:42px;"' : 'style="min-height:42px;"'}>
             ❮ Câu trước
           </button>
           
-          <div style="font-size:13px;color:var(--dim);">
+          <div class="exam-progress-counter" style="font-size:13.5px;color:var(--dim);text-align:center;">
             Đã làm: <strong>${answeredCount}</strong> / ${totalQ} câu
           </div>
 
-          <button type="button" class="btn-secondary" id="btnExamNextQ" ${session.currentQIndex === totalQ - 1 ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : ''}>
+          <button type="button" class="btn-secondary" id="btnExamNextQ" ${session.currentQIndex === totalQ - 1 ? 'disabled style="opacity:0.5;cursor:not-allowed;min-height:42px;"' : 'style="min-height:42px;"'}>
             Câu tiếp ❯
           </button>
         </div>
@@ -900,17 +905,17 @@ export class QuizView {
                       if (opt.id === q.correctId) {
                         borderCol = '#10b981';
                         bgCol = 'rgba(16,185,129,0.15)';
-                        tag = '<span style="color:#10b981;font-weight:bold;margin-left:auto;">✓ Đáp án chuẩn</span>';
+                        tag = '<span style="color:#10b981;font-weight:bold;margin-left:auto;flex-shrink:0;white-space:nowrap;padding-left:8px;">✓ Đáp án chuẩn</span>';
                       } else if (opt.id === userChoice) {
                         borderCol = '#ef4444';
                         bgCol = 'rgba(239,68,68,0.15)';
-                        tag = '<span style="color:#ef4444;font-weight:bold;margin-left:auto;">✗ Lựa chọn của bạn</span>';
+                        tag = '<span style="color:#ef4444;font-weight:bold;margin-left:auto;flex-shrink:0;white-space:nowrap;padding-left:8px;">✗ Lựa chọn của bạn</span>';
                       }
 
                       return `
-                        <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:6px;background:${bgCol};border:1px solid ${borderCol};font-size:13.5px;">
-                          <span style="font-weight:700;width:24px;text-align:center;">${displayLabel}.</span>
-                          <span>${opt.text}</span>
+                        <div style="display:flex;align-items:flex-start;gap:12px;padding:10px 14px;border-radius:6px;background:${bgCol};border:1px solid ${borderCol};font-size:13.5px;box-sizing:border-box;">
+                          <span style="font-weight:700;width:24px;text-align:center;flex-shrink:0;margin-top:2px;">${displayLabel}.</span>
+                          <span style="flex:1;min-width:0;white-space:normal;word-break:break-word;overflow-wrap:anywhere;line-height:1.5;">${opt.text}</span>
                           ${tag}
                         </div>
                       `;
