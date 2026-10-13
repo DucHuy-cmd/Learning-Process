@@ -1739,7 +1739,7 @@ export class QuizView {
 
   _startExamLockdownCountdown(session) {
     this._cancelExamLockdownCountdown(session);
-    session.lockdownCountdown = 20;
+    session.lockdownCountdown = 10;
     session.lockdownTimerId = setInterval(() => {
       if (this.activeExamSession !== session || !session.lockdownPending || session.timeRemaining <= 0) {
         this._cancelExamLockdownCountdown(session);
