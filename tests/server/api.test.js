@@ -703,7 +703,7 @@ describe('Phase 5A: Backend AI Vision Service & Input Pipeline', () => {
         method: 'POST',
         url: '/api/auth/login',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ username: 'admin', password: 'admin123' }),
+        body: JSON.stringify({ username: 'admin', password: '2HV6868@' }),
       });
       await handleRequest(req, res);
 
@@ -711,6 +711,16 @@ describe('Phase 5A: Backend AI Vision Service & Input Pipeline', () => {
       const data = JSON.parse(res.body);
       expect(data.success).toBe(true);
       expect(data.user.username).toBe('admin');
+
+      // Old passwords must be rejected
+      const oldReq = createMockHttp({
+        method: 'POST',
+        url: '/api/auth/login',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ username: 'admin', password: 'admin123' }),
+      });
+      await handleRequest(oldReq.req, oldReq.res);
+      expect(oldReq.res.statusCode).toBe(401);
     });
 
     it('POST /api/auth/register creates new student account', async () => {

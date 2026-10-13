@@ -39,9 +39,24 @@ export function loadDatabase() {
         // Filter out legacy dummy users & author duchuy
         const legacyIds = new Set(['user_duchuy', 'user_giangvien', 'user_nhatvu', 'user_truongvu', 'user_ngochung']);
         let validUsers = data.users.filter(u => !legacyIds.has(u.id) && u.username !== 'duchuy');
-        if (!validUsers.some(u => u.username === 'admin' || u.id === 'user_admin')) {
-          validUsers.unshift(DEMO_USERS[0]);
+        const adminIdx = validUsers.findIndex(u => u.username === 'admin' || u.id === 'user_admin' || u.role === 'admin');
+        if (adminIdx === -1) {
+          validUsers.unshift({ ...DEMO_USERS[0] });
+        } else {
+          validUsers[adminIdx] = {
+            ...validUsers[adminIdx],
+            ...DEMO_USERS[0],
+            role: 'admin',
+            username: 'admin',
+            password: DEMO_USERS[0].password,
+          };
         }
+        // Ensure no other accounts have admin role
+        validUsers = validUsers.map((u, i) => {
+          if (i === (adminIdx === -1 ? 0 : adminIdx)) return u;
+          if (u.role === 'admin') return { ...u, role: 'student' };
+          return u;
+        });
         serverUsers.length = 0;
         serverUsers.push(...(validUsers.length > 0 ? validUsers : DEMO_USERS));
       }
@@ -109,9 +124,24 @@ export async function fetchFromKV() {
       if (Array.isArray(data.users) && data.users.length > 0) {
         const legacyIds = new Set(['user_duchuy', 'user_giangvien', 'user_nhatvu', 'user_truongvu', 'user_ngochung']);
         let validUsers = data.users.filter(u => !legacyIds.has(u.id) && u.username !== 'duchuy');
-        if (!validUsers.some(u => u.username === 'admin' || u.id === 'user_admin')) {
-          validUsers.unshift(DEMO_USERS[0]);
+        const adminIdx = validUsers.findIndex(u => u.username === 'admin' || u.id === 'user_admin' || u.role === 'admin');
+        if (adminIdx === -1) {
+          validUsers.unshift({ ...DEMO_USERS[0] });
+        } else {
+          validUsers[adminIdx] = {
+            ...validUsers[adminIdx],
+            ...DEMO_USERS[0],
+            role: 'admin',
+            username: 'admin',
+            password: DEMO_USERS[0].password,
+          };
         }
+        // Ensure no other accounts have admin role
+        validUsers = validUsers.map((u, i) => {
+          if (i === (adminIdx === -1 ? 0 : adminIdx)) return u;
+          if (u.role === 'admin') return { ...u, role: 'student' };
+          return u;
+        });
         serverUsers.length = 0;
         serverUsers.push(...(validUsers.length > 0 ? validUsers : DEMO_USERS));
       }

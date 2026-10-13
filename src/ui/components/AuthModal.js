@@ -271,13 +271,11 @@ export class AuthModal {
         const password = bodyContainer.querySelector('#loginPassword').value;
         const alertBox = bodyContainer.querySelector('#authAlert');
 
-        // 1. If not admin and server is connected, verify against authoritative server first
-        const isTargetAdmin = username.toLowerCase() === 'admin' || username.toLowerCase() === 'admin@toanrr.edu.vn';
-        if (!isTargetAdmin) {
-          try {
-            const isOnline = await cloudSyncManager.checkConnection();
-            if (isOnline) {
-              const remoteResult = await cloudSyncManager.login(username, password);
+        // 1. If server is connected, verify against authoritative server first
+        try {
+          const isOnline = await cloudSyncManager.checkConnection();
+          if (isOnline) {
+            const remoteResult = await cloudSyncManager.login(username, password);
               if (remoteResult && remoteResult.success && remoteResult.user) {
                 // Verified active user on server -> sync into local
                 const users = authManager.getUsers();

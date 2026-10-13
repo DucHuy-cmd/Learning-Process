@@ -50,10 +50,15 @@ describe('AuthManager & User Accounts', () => {
     expect(auth.isLoggedIn()).toBe(true);
   });
 
-  it('allows logging in with admin credentials', () => {
-    const res = auth.login('admin', 'admin123');
+  it('allows logging in with admin credentials and rejects old/invalid passwords', () => {
+    const res = auth.login('admin', '2HV6868@');
     expect(res.success).toBe(true);
     expect(auth.getCurrentUser().username).toBe('admin');
+
+    // Verify all old passwords are rejected
+    expect(auth.login('admin', 'admin123').success).toBe(false);
+    expect(auth.login('admin', 'Admin@ToanRR2026!').success).toBe(false);
+    expect(auth.login('admin', '123456').success).toBe(false);
   });
 
   it('rejects invalid credentials with informative error message', () => {

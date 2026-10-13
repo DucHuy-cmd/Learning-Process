@@ -20,6 +20,7 @@ import { extractDocx } from '../app/ai/DocxExtractor.js';
 import { serverUsers, serverAiSessions, serverQuizStats, serverExams, serverExamSubmissions, serverCustomQuestions, saveDatabase, isKVConfigured, fetchFromKV } from './auth/ServerDataStore.js';
 import { DEFAULT_EXAMS } from '../core/quiz/ExamManager.js';
 import { STATIC_QUESTION_BANK } from '../core/quiz/QuizBank.js';
+import { DEMO_USERS } from '../core/auth/AuthManager.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -247,11 +248,16 @@ export async function handleRequest(req, res) {
         sendJson(res, 401, { success: false, error: 'Tài khoản không tồn tại.' });
         return;
       }
-      const isValidDemoPass = (found.username === 'admin' && (password === 'Admin@ToanRR2026!' || password === 'admin123' || password === '123456')) ||
-                              (found.username === 'duchuy' && (password === '123456' || password === 'duchuy'));
-      if (!isValidDemoPass && found.password && found.password !== password) {
-        sendJson(res, 401, { success: false, error: 'Mật khẩu không chính xác.' });
-        return;
+      if (found.username === 'admin' || found.id === 'user_admin' || found.role === 'admin') {
+        if (password !== DEMO_USERS[0].password) {
+          sendJson(res, 401, { success: false, error: 'Mật khẩu không chính xác.' });
+          return;
+        }
+      } else {
+        if (found.password && found.password !== password) {
+          sendJson(res, 401, { success: false, error: 'Mật khẩu không chính xác.' });
+          return;
+        }
       }
       const user = { ...found };
       delete user.password;
@@ -434,13 +440,20 @@ export async function handleRequest(req, res) {
       fullName: 'Quản Trị Viên',
       className: 'Quản trị viên',
       email: 'admin@toanrr.edu.vn',
-      password: 'Admin@ToanRR2026!',
+      password: DEMO_USERS[0].password,
       avatar: '👑',
       role: 'admin',
       bio: 'Quản trị viên hệ thống',
     };
     serverUsers.length = 0;
-    serverUsers.push({ ...adminUser, fullName: 'Quản Trị Viên', className: 'Quản trị viên', role: 'admin' });
+    serverUsers.push({
+      ...adminUser,
+      ...DEMO_USERS[0],
+      fullName: 'Quản Trị Viên',
+      className: 'Quản trị viên',
+      role: 'admin',
+      password: DEMO_USERS[0].password,
+    });
     for (const k of Object.keys(serverQuizStats)) delete serverQuizStats[k];
     for (const k of Object.keys(serverAiSessions)) delete serverAiSessions[k];
     serverExams.length = 0;

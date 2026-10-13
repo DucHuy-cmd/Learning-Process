@@ -29,7 +29,7 @@ describe('Admin AI Vision Question Bank UI & Modal Integration', () => {
   beforeEach(() => {
     customQuestionBank.length = 0;
     // Login as admin
-    authManager.login('admin', 'Admin@ToanRR2026!');
+    authManager.login('admin', '2HV6868@');
   });
 
   it('AdminView renders AI Vision section, metric card, and triggers', async () => {

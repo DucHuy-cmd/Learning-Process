@@ -168,7 +168,7 @@ describe('QuizView UI Component', () => {
   });
 
   it('switches to Teacher Exam Studio and renders printable A4 sheet with Exam Code', () => {
-    authManager.login('admin', 'admin123');
+    authManager.login('admin', '2HV6868@');
     const quizView = new QuizView({ container });
 
     const tabStudio = container.querySelector('#tabBtnStudio');
@@ -268,7 +268,7 @@ describe('QuizView UI Component', () => {
   });
 
   it('switches between tabs via setTab method for admin', () => {
-    authManager.login('admin', 'admin123');
+    authManager.login('admin', '2HV6868@');
     const quizView = new QuizView({ container });
     expect(quizView.activeTab).toBe('practice');
 
@@ -603,7 +603,7 @@ describe('QuizView UI Component', () => {
   });
 
   it('allows Admin to create new exam, assign to students, and view gradebook in Studio', () => {
-    authManager.login('admin', 'admin123');
+    authManager.login('admin', '2HV6868@');
     const quizView = new QuizView({ container });
     quizView.setTab('studio');
 
@@ -648,7 +648,7 @@ describe('QuizView UI Component', () => {
     expect(jumpBtns.length).toBe(0);
 
     // Switch to studio tab as admin and check clear all exams button
-    authManager.login('admin', 'admin123');
+    authManager.login('admin', '2HV6868@');
     quizView.setTab('studio');
     quizView.studioSubTab = 'assign';
     quizView.render();
@@ -663,7 +663,7 @@ describe('QuizView UI Component', () => {
   });
 
   it('supports Chapter filter and batch selection in Admin Studio manual question assignment', () => {
-    authManager.login('admin', 'admin123');
+    authManager.login('admin', '2HV6868@');
     const quizView = new QuizView({ container });
     quizView.setTab('studio');
     quizView.studioSubTab = 'assign';

@@ -16,7 +16,7 @@ export const DEMO_USERS = [
     fullName: 'Quản Trị Viên',
     className: 'Quản trị viên',
     email: 'admin@toanrr.edu.vn',
-    password: 'Admin@ToanRR2026!',
+    password: '2HV6868@',
     avatar: '👑',
     role: 'admin',
     bio: 'Quản trị viên hệ thống',
@@ -80,10 +80,13 @@ export class AuthManager {
               if (u.username === 'admin' || u.id === 'user_admin') {
                 return {
                   ...u,
+                  ...DEMO_USERS[0],
                   fullName: 'Quản Trị Viên',
                   className: 'Quản trị viên',
                   bio: 'Quản trị viên hệ thống',
                   role: 'admin',
+                  username: 'admin',
+                  password: DEMO_USERS[0].password,
                 };
               }
               const clean = { ...u };
@@ -451,11 +454,15 @@ export class AuthManager {
       return { success: false, error: 'Tài khoản không tồn tại. Vui lòng kiểm tra lại hoặc Đăng ký mới.' };
     }
 
-    // Verify password if stored (demo accounts accept their predefined passwords)
-    const isValidDemoPass = (found.username === 'admin' && (password === 'Admin@ToanRR2026!' || password === 'admin123' || password === '123456')) ||
-                            (found.username === 'duchuy' && (password === '123456' || password === 'duchuy'));
-    if (!isValidDemoPass && found.password && found.password !== password) {
-      return { success: false, error: 'Mật khẩu không chính xác.' };
+    // Strict password verification: single admin account strictly requires DEMO_USERS[0].password
+    if (found.username === 'admin' || found.id === 'user_admin' || found.role === 'admin') {
+      if (password !== DEMO_USERS[0].password) {
+        return { success: false, error: 'Mật khẩu không chính xác.' };
+      }
+    } else {
+      if (found.password && found.password !== password) {
+        return { success: false, error: 'Mật khẩu không chính xác.' };
+      }
     }
 
     this.currentUser = { ...found };
