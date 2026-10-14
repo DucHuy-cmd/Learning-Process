@@ -785,6 +785,7 @@ describe('Admin Exam Import & Dedicated Answer Key Test Suite', () => {
     quizView.render();
 
     // 3. First exam defaults to "Đề 1"
+    const alertSpy = vi.spyOn(quizView, '_showAlert').mockImplementation(() => {});
     const titleInput1 = container.querySelector('#txtAssignTitle');
     expect(titleInput1).not.toBeNull();
     expect(titleInput1.value).toBe('Đề 1');
@@ -795,6 +796,14 @@ describe('Admin Exam Import & Dedicated Answer Key Test Suite', () => {
     expect(quizView.adminAnswerKeyExamId).not.toBeNull();
     const exam1 = examManager.getExamById(quizView.adminAnswerKeyExamId);
     expect(exam1.title).toBe('Đề 1');
+
+    // Verify alert message contains only title, question count, duration, target, and closing line (NO "Nguồn:")
+    expect(alertSpy).toHaveBeenCalledWith(expect.stringContaining('Đề thi: "Đề 1"'));
+    expect(alertSpy).toHaveBeenCalledWith(expect.stringContaining('Số câu: 2 câu'));
+    expect(alertSpy).toHaveBeenCalledWith(expect.stringContaining('Thời lượng:'));
+    expect(alertSpy).toHaveBeenCalledWith(expect.stringContaining('Đối tượng: Toàn bộ sinh viên'));
+    expect(alertSpy).toHaveBeenCalledWith(expect.stringContaining('Đề thi đã được chuyển vào mục "Quản Lý Đề Thi"'));
+    expect(alertSpy).not.toHaveBeenCalledWith(expect.stringContaining('Nguồn:'));
 
     // 4. Close key modal, next exam defaults to "Đề 2"
     quizView.adminAnswerKeyExamId = null;
@@ -814,6 +823,17 @@ describe('Admin Exam Import & Dedicated Answer Key Test Suite', () => {
     quizView.render();
     const titleInput3 = container.querySelector('#txtAssignTitle');
     expect(titleInput3.value).toBe('Đề 3');
+
+    // 6. Verify exam card does NOT contain redundant filename description
+    quizView.setTab('myExams');
+    quizView.render();
+
+    const card = container.querySelector('.exam-card');
+    expect(card).not.toBeNull();
+    expect(card.querySelector('.exam-card-desc')).toBeNull();
+    expect(card.textContent).not.toContain('File_Seq.docx');
+    expect(card.textContent).toContain('Đề 2');
+    expect(container.textContent).toContain('Đề 1');
 
     authManager.logout();
   });

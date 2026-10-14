@@ -813,7 +813,6 @@ export class QuizView {
                   </div>
 
                   <h3 class="exam-card-title">${this._escapeHtml(exam.title)}</h3>
-                  <p class="exam-card-desc">${this._escapeHtml(exam.description || 'Đề thi trắc nghiệm Toán Rời Rạc.')}</p>
 
                   <div class="exam-meta-row">
                     <span class="exam-meta-pill">⏱️ ${exam.durationMinutes} phút</span>
@@ -2899,14 +2898,9 @@ export class QuizView {
         const customQuestions = [...questionsToAssign];
         const questionIds = customQuestions.map(q => q.id);
 
-        const distSummary = this._getDistributedSummary();
-        const sourceLabel = distSummary.breakdown.length > 0
-          ? distSummary.breakdown.map(b => `${b.fileName} (${b.selectedCount} câu)`).join(', ')
-          : 'File Word tự soạn';
-
         const result = examManager.createExam({
           title,
-          description: `Đề thi ${durationMinutes} phút (${questionIds.length} câu) môn Toán Rời Rạc từ ${sourceLabel}.`,
+          description: `Đề thi trắc nghiệm ${durationMinutes} phút môn Toán Rời Rạc.`,
           durationMinutes,
           questionIds,
           customQuestions,
@@ -2923,7 +2917,7 @@ export class QuizView {
           }
           this.gradebookExamId = null;
           this.adminAnswerKeyExamId = result.exam.id;
-          this._showAlert(`🎉 Tạo và phát đề thi thành công!\n\nĐề thi: "${title}" (Mã: ${result.exam.examCode})\nNguồn: ${sourceLabel}\nSố câu: ${questionIds.length} câu\nThời lượng: ${durationMinutes} phút\nĐối tượng: ${assignedTo.includes('all') ? 'Toàn bộ sinh viên' : assignedTo.length + ' sinh viên'}\n\nĐề thi đã được chuyển vào mục "Quản Lý Đề Thi". Hệ thống đã chuẩn bị sẵn File Đáp Án dành riêng cho Quản trị viên.`);
+          this._showAlert(`🎉 Tạo và phát đề thi thành công!\n\nĐề thi: "${title}" (Mã: ${result.exam.examCode})\nSố câu: ${questionIds.length} câu\nThời lượng: ${durationMinutes} phút\nĐối tượng: ${assignedTo.includes('all') ? 'Toàn bộ sinh viên' : assignedTo.length + ' sinh viên'}\n\nĐề thi đã được chuyển vào mục "Quản Lý Đề Thi". Hệ thống đã chuẩn bị sẵn File Đáp Án dành riêng cho Quản trị viên.`);
           this.studioAssignTitle = null;
           this.render();
         } else {
