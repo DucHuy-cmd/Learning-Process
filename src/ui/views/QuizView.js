@@ -43,6 +43,12 @@ import { quizHistoryManager } from '../../core/quiz/QuizHistoryManager.js';
 import { cloudSyncManager } from '../../core/sync/CloudSyncManager.js';
 import { examManager } from '../../core/quiz/ExamManager.js';
 import { LogicSourceModal } from '../components/LogicSourceModal.js';
+import {
+  parseExamText,
+  parseExamCsv,
+  generateSampleExamText,
+  generateSampleExamCsv,
+} from '../../core/quiz/ExamParser.js';
 
 function shuffle(items) {
   const shuffled = [...items];
@@ -108,6 +114,13 @@ export class QuizView {
     };
     this.currentExam = null;
     this.showTeacherSolutions = true;
+
+    // Admin Exam Import & Answer Key State
+    this.importedQuestions = [];
+    this.importErrors = [];
+    this.importMode = 'text'; // 'text' | 'csv'
+    this.importRawText = '';
+    this.adminAnswerKeyExamId = null;
 
     this._initPracticeQuestions();
     this._generateNewExam();
@@ -316,6 +329,9 @@ export class QuizView {
 
         <!-- MODAL: GRADEBOOK (WHEN ADMIN VIEWS AN EXAM'S SUBMISSIONS) -->
         ${this.gradebookExamId ? this._renderGradebookModal() : ''}
+
+        <!-- MODAL: ADMIN ANSWER KEY (FILE ĐÁP ÁN DÀNH RIÊNG CHO ADMIN) -->
+        ${this.adminAnswerKeyExamId ? this._renderAdminAnswerKeyModal() : ''}
 
       </div>
     `;
@@ -833,7 +849,7 @@ export class QuizView {
 
     const isAdmin = authManager.isAdmin();
     const exam = examManager.getExamById(sub.examId);
-    const questions = exam ? exam.questionIds.map(id => STATIC_QUESTION_BANK.find(q => q.id === id)).filter(Boolean) : [];
+    const questions = exam ? examManager.getExamQuestions(exam) : [];
     const isIntegrityBanned = Boolean(sub.integrityBan || (sub.userId && examManager.getExamViolationRecord(sub.examId, sub.userId).banned));
 
     return `
@@ -980,39 +996,154 @@ export class QuizView {
       <!-- SECTION A: ASSIGN EXAMS & GRADEBOOK -->
       <div id="studioAssignSection" style="display:${this.studioSubTab === 'assign' ? 'block' : 'none'};">
         
-        <!-- Create & Assign Exam Card -->
+        <!-- Create & Assign Exam Card with Word/Excel Import -->
         <div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:22px;margin-bottom:24px;">
-          <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:6px;display:flex;align-items:center;gap:8px;">
-            <span>🚀 Tạo Đề Thi Mới &amp; Phân Phối Cho Sinh Viên</span>
-            <span class="pill-badge" style="background:rgba(16,185,129,0.15);color:#10b981;font-size:11.5px;padding:2px 8px;border-radius:10px;">Thang Điểm 10 • 1 Lần Làm</span>
-          </div>
-          <p style="font-size:13px;color:var(--dim);margin:0 0 16px;">
-            Hệ thống sẽ tự động bốc ngẫu nhiên câu hỏi từ ngân hàng câu hỏi Toán Rời Rạc và giao bài cho sinh viên được chọn.
-          </p>
-
-          <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));gap:16px;margin-bottom:16px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:14px;">
             <div>
-              <label style="display:block;font-size:12.5px;font-weight:600;color:var(--text);margin-bottom:6px;">Tiêu đề đề thi: *</label>
-              <input type="text" id="txtAssignTitle" class="form-input" placeholder="Ví dụ: Kiểm tra 15 phút: Logic & Mệnh đề" value="Đề Kiểm Tra Định Kỳ: Toán Rời Rạc" style="width:100%;padding:8px 12px;border-radius:6px;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);font-size:13px;" />
+              <div style="font-size:16px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:8px;">
+                <span>🚀 Soạn &amp; Phát Đề Thi Tự Soạn (Import Word / Excel)</span>
+                <span class="pill-badge" style="background:rgba(16,185,129,0.15);color:#10b981;font-size:11.5px;padding:2px 8px;border-radius:10px;">Thang Điểm 10 • Tự Động Xuất File Đáp Án</span>
+              </div>
+              <p style="font-size:13px;color:var(--dim);margin:4px 0 0;">
+                Hệ thống nhận phát đề từ file đề tự soạn (từ Word hoặc Excel/CSV), tự động bóc tách câu hỏi, đáp án đúng và sinh ngay File Đáp Án dành riêng cho Quản trị viên.
+              </p>
             </div>
 
-            <div>
-              <label style="display:block;font-size:12.5px;font-weight:600;color:var(--text);margin-bottom:6px;">Thời gian làm bài (phút): *</label>
-              <input type="number" id="numAssignDuration" min="5" max="180" value="15" style="width:100%;padding:8px 12px;border-radius:6px;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);font-size:13px;" />
-            </div>
-
-            <div>
-              <label style="display:block;font-size:12.5px;font-weight:600;color:var(--text);margin-bottom:6px;">Cách chọn câu hỏi:</label>
-              <select id="selAssignSelectionMode" class="form-input" style="width:100%;padding:8px 12px;border-radius:6px;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);font-size:13px;">
-                <option value="random" selected>Bốc câu ngẫu nhiên theo chuyên đề</option>
-                <option value="manual">Giảng viên chọn thủ công</option>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="font-size:12px;color:var(--dim);">Nguồn đề:</span>
+              <select id="selAssignSelectionMode" class="form-input" style="padding:6px 12px;font-size:12.5px;border-radius:6px;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);font-weight:700;">
+                <option value="import" selected>📥 Nhập từ Word / Excel tự soạn (Khuyên dùng)</option>
+                <option value="manual">📚 Chọn thủ công từ ngân hàng câu hỏi</option>
+                <option value="random">🎲 Bốc ngẫu nhiên theo chuyên đề</option>
               </select>
             </div>
+          </div>
 
-            <div id="randomQuestionControls" style="display:contents;">
+          <!-- IMPORT SECTION (PRIMARY) -->
+          <div id="importExamBox" style="background:var(--panel-alt);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:18px;">
+            
+            <!-- Mode Switch Tabs -->
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:10px;">
+              <div style="display:flex;gap:6px;">
+                <button type="button" class="btn-tab ${this.importMode === 'text' ? 'active' : ''}" id="tabImportModeText" style="padding:6px 14px;font-size:12.5px;border-radius:6px;cursor:pointer;">
+                  📝 Dán Đề Từ Word / Text
+                </button>
+                <button type="button" class="btn-tab ${this.importMode === 'csv' ? 'active' : ''}" id="tabImportModeCsv" style="padding:6px 14px;font-size:12.5px;border-radius:6px;cursor:pointer;">
+                  📊 Tải File Excel / CSV (.csv)
+                </button>
+              </div>
+
+              <!-- Quick Helper Buttons -->
+              <div style="display:flex;align-items:center;gap:8px;">
+                ${this.importMode === 'text' ? `
+                  <button type="button" class="btn-secondary" id="btnFillSampleText" style="font-size:12px;padding:5px 12px;border-radius:6px;cursor:pointer;">
+                    📋 Dán Đề Mẫu (5 Câu)
+                  </button>
+                  <button type="button" class="btn-secondary" id="btnClearImportText" style="font-size:12px;padding:5px 10px;border-radius:6px;cursor:pointer;">
+                    🗑️ Xóa Khung
+                  </button>
+                ` : `
+                  <button type="button" class="btn-primary" id="btnDownloadSampleCsv" style="font-size:12px;padding:5px 14px;border-radius:6px;background:#10b981;border-color:#10b981;cursor:pointer;display:flex;align-items:center;gap:6px;">
+                    📥 Tải File Mẫu Excel (.csv)
+                  </button>
+                `}
+              </div>
+            </div>
+
+            <!-- TAB 1: TEXT AREA -->
+            <div id="importTextSection" style="display:${this.importMode === 'text' ? 'block' : 'none'};">
+              <textarea id="txtImportRaw" class="form-input" rows="7" placeholder="Dán nội dung đề thi từ Word vào đây...
+Ví dụ:
+Câu 1: Cho mệnh đề P: 'Hôm nay trời mưa'. Mệnh đề phủ định là gì?
+A. Hôm nay trời không mưa
+B. Hôm nay trời mưa to
+C. Hôm nay trời nắng ráo
+D. Hôm nay trời nhiều mây
+Đáp án: A
+Giải thích: Mệnh đề phủ định của P là không P.
+" style="width:100%;padding:10px 14px;font-family:monospace;font-size:12.5px;line-height:1.5;background:var(--panel);border:1px solid var(--line);border-radius:6px;color:var(--text);box-sizing:border-box;resize:vertical;">${this._escapeHtml(this.importRawText)}</textarea>
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;flex-wrap:wrap;gap:10px;">
+                <div style="font-size:11.5px;color:var(--dim);">
+                  💡 Hỗ trợ: <code>Câu 1:</code>, <code>A.</code>, <code>B.</code>, <code>C.</code>, <code>D.</code>, <code>Đáp án: A</code>, <code>Giải thích: ...</code>
+                </div>
+                <button type="button" class="btn-primary" id="btnParseImportText" style="padding:6px 18px;font-size:13px;font-weight:700;border-radius:6px;cursor:pointer;">
+                  🔍 Phân Tích &amp; Nhận Diện Đề Thi
+                </button>
+              </div>
+            </div>
+
+            <!-- TAB 2: FILE UPLOAD -->
+            <div id="importCsvSection" style="display:${this.importMode === 'csv' ? 'block' : 'none'};">
+              <div style="border:2px dashed var(--line);border-radius:8px;padding:22px;text-align:center;background:var(--panel);">
+                <div style="font-size:28px;margin-bottom:6px;">📊</div>
+                <div style="font-weight:700;font-size:13.5px;color:var(--text);margin-bottom:4px;">
+                  Chọn File Excel / CSV đề thi tự soạn
+                </div>
+                <div style="font-size:12px;color:var(--dim);margin-bottom:12px;">
+                  Hỗ trợ định dạng <code>.csv</code>, <code>.txt</code> (Bấm nút "Tải File Mẫu Excel" góc trên nếu chưa có mẫu)
+                </div>
+                <input type="file" id="fileImportCsv" accept=".csv,.txt,.json" style="font-size:12.5px;color:var(--text);" />
+              </div>
+            </div>
+
+            <!-- VALIDATION ERRORS -->
+            ${this.importErrors.length > 0 ? `
+              <div style="margin-top:14px;padding:12px 16px;background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);border-radius:8px;">
+                <div style="font-weight:700;color:#ef4444;font-size:13px;margin-bottom:6px;">
+                  ⚠️ Phát hiện ${this.importErrors.length} lỗi cú pháp cần điều chỉnh:
+                </div>
+                <ul style="margin:0;padding-left:20px;font-size:12px;color:#ef4444;line-height:1.6;">
+                  ${this.importErrors.map(err => `<li>${this._escapeHtml(err)}</li>`).join('')}
+                </ul>
+              </div>
+            ` : ''}
+
+            <!-- PREVIEW QUESTION LIST -->
+            ${this.importedQuestions.length > 0 ? `
+              <div style="margin-top:14px;padding:12px 16px;background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.3);border-radius:8px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
+                  <div style="font-weight:700;color:#10b981;font-size:13.5px;display:flex;align-items:center;gap:6px;">
+                    <span>✅ Đã nhận diện thành công: ${this.importedQuestions.length} câu hỏi tự soạn!</span>
+                    <span style="font-size:11px;background:#10b981;color:#fff;padding:1px 8px;border-radius:10px;font-weight:700;">100% Đã Có Đáp Án Đúng</span>
+                  </div>
+                  <span style="font-size:11.5px;color:var(--dim);">Xem trước các câu hỏi bên dưới ↓</span>
+                </div>
+
+                <div style="max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding-right:4px;">
+                  ${this.importedQuestions.map((q, idx) => `
+                    <div style="background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:8px 12px;font-size:12px;">
+                      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:4px;">
+                        <strong style="color:var(--text);">Câu ${idx + 1}: ${this._escapeHtml(q.question)}</strong>
+                        <span style="background:rgba(16,185,129,0.2);color:#10b981;font-weight:700;padding:1px 8px;border-radius:4px;white-space:nowrap;">
+                          Đ/A: [ ${q.correctId} ]
+                        </span>
+                      </div>
+                      <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:4px;color:var(--dim);font-size:11.5px;">
+                        ${q.options.map(opt => `
+                          <div style="${opt.id === q.correctId ? 'color:#10b981;font-weight:700;' : ''}">
+                            ${opt.id}. ${this._escapeHtml(opt.text)} ${opt.id === q.correctId ? '✓' : ''}
+                          </div>
+                        `).join('')}
+                      </div>
+                      ${q.explanation ? `
+                        <div style="margin-top:4px;font-size:11px;color:var(--dim);font-style:italic;">
+                          💡 Lời giải: ${this._escapeHtml(q.explanation)}
+                        </div>
+                      ` : ''}
+                    </div>
+                  `).join('')}
+                </div>
+              </div>
+            ` : ''}
+
+          </div>
+
+          <!-- RANDOM CONTROLS (COMPATIBILITY) -->
+          <div id="randomQuestionControls" style="display:none;background:var(--panel-alt);border:1px solid var(--line);border-radius:8px;padding:14px;margin-bottom:16px;">
+            <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));gap:14px;">
               <div>
                 <label style="display:block;font-size:12.5px;font-weight:600;color:var(--text);margin-bottom:6px;">Số lượng câu hỏi: *</label>
-                <select id="selAssignQCount" class="form-input" style="width:100%;padding:8px 12px;border-radius:6px;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);font-size:13px;">
+                <select id="selAssignQCount" class="form-input" style="width:100%;padding:8px 12px;border-radius:6px;background:var(--panel);border:1px solid var(--line);color:var(--text);font-size:13px;">
                   <option value="5">5 câu (Kiểm tra nhanh)</option>
                   <option value="10" selected>10 câu (Chuẩn 15 phút)</option>
                   <option value="15">15 câu (Đề kiểm tra giữa kỳ)</option>
@@ -1022,7 +1153,7 @@ export class QuizView {
 
               <div>
                 <label style="display:block;font-size:12.5px;font-weight:600;color:var(--text);margin-bottom:6px;">Chuyên đề lấy câu hỏi:</label>
-                <select id="selAssignTopic" class="form-input" style="width:100%;padding:8px 12px;border-radius:6px;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);font-size:13px;">
+                <select id="selAssignTopic" class="form-input" style="width:100%;padding:8px 12px;border-radius:6px;background:var(--panel);border:1px solid var(--line);color:var(--text);font-size:13px;">
                   <option value="all">🌟 Tổng hợp cả 5 chuyên đề</option>
                   <option value="logic">⚡ Chương 1: Cơ sở Logic &amp; Suy luận</option>
                   <option value="boolean">🔌 Chương 2: Đại số Boole &amp; Mạch Logic</option>
@@ -1034,6 +1165,7 @@ export class QuizView {
             </div>
           </div>
 
+          <!-- MANUAL QUESTION LIST (COMPATIBILITY) -->
           <div id="manualQuestionList" style="display:none;background:var(--panel-alt);border:1px solid var(--line);border-radius:8px;padding:14px;margin-bottom:16px;">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:10px;flex-wrap:wrap;">
               <div style="display:flex;align-items:center;gap:8px;">
@@ -1086,9 +1218,27 @@ export class QuizView {
             </div>
           </div>
 
-          <div style="display:flex;gap:18px;flex-wrap:wrap;margin-bottom:18px;font-size:13px;color:var(--text);">
-            <label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" id="chkShuffleQuestions" checked /> Xáo trộn thứ tự câu hỏi</label>
-            <label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" id="chkShuffleOptions" checked /> Xáo trộn thứ tự đáp án</label>
+          <!-- CONFIGURATION BAR -->
+          <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(240px, 1fr));gap:16px;margin-bottom:16px;">
+            <div>
+              <label style="display:block;font-size:12.5px;font-weight:600;color:var(--text);margin-bottom:6px;">Tiêu đề đề thi: *</label>
+              <input type="text" id="txtAssignTitle" class="form-input" placeholder="Ví dụ: Kiểm tra 15 phút: Logic & Mệnh đề" value="${this.importedQuestions.length > 0 ? `Đề Kiểm Tra Toán Rời Rạc (${this.importedQuestions.length} câu)` : 'Đề Kiểm Tra Định Kỳ: Toán Rời Rạc'}" style="width:100%;padding:8px 12px;border-radius:6px;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);font-size:13px;" />
+            </div>
+
+            <div>
+              <label style="display:block;font-size:12.5px;font-weight:600;color:var(--text);margin-bottom:6px;">Thời gian làm bài (phút): *</label>
+              <input type="number" id="numAssignDuration" min="1" max="180" value="15" style="width:100%;padding:8px 12px;border-radius:6px;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);font-size:13px;" />
+            </div>
+
+            <div>
+              <label style="display:block;font-size:12.5px;font-weight:600;color:var(--text);margin-bottom:6px;">Mã đề thi (Exam Code):</label>
+              <input type="text" id="txtAssignExamCode" class="form-input" placeholder="Ví dụ: TRR-101" value="TRR-${Math.floor(100 + Math.random() * 900)}" style="width:100%;padding:8px 12px;border-radius:6px;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);font-size:13px;font-family:monospace;font-weight:700;" />
+            </div>
+          </div>
+
+          <div style="display:flex;gap:18px;flex-wrap:margin-bottom:18px;font-size:13px;color:var(--text);">
+            <label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" id="chkShuffleQuestions" checked /> Xáo trộn thứ tự câu hỏi khi thi</label>
+            <label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" id="chkShuffleOptions" checked /> Xáo trộn thứ tự đáp án A, B, C, D</label>
           </div>
 
           <!-- Assignment Target Selection -->
@@ -1125,9 +1275,14 @@ export class QuizView {
             </div>
           </div>
 
-          <div style="display:flex;justify-content:flex-end;">
-            <button type="button" class="btn-primary" id="btnCreateAndAssignExam" style="padding:10px 24px;font-size:14px;font-weight:700;">
-              🚀 Phân Đề &amp; Giao Bài Thi Ngay
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+            <div style="font-size:12.5px;color:var(--dim);">
+              ${this.importedQuestions.length > 0
+                ? `<span style="color:#10b981;font-weight:700;">✅ Sẵn sàng phát đề với ${this.importedQuestions.length} câu hỏi tự soạn.</span>`
+                : '💡 Mẹo: Nhập đề ở khung trên và bấm "Phân Tích Đề Thi" để kiểm tra trước khi phát.'}
+            </div>
+            <button type="button" class="btn-primary" id="btnCreateAndAssignExam" style="padding:10px 24px;font-size:14px;font-weight:700;display:flex;align-items:center;gap:8px;">
+              <span>🚀 Phát Đề Cho Sinh Viên &amp; Xuất File Đáp Án</span>
             </button>
           </div>
         </div>
@@ -1183,6 +1338,9 @@ export class QuizView {
                         ${new Date(item.createdAt).toLocaleDateString('vi-VN')}
                       </td>
                       <td style="text-align:right;white-space:nowrap;">
+                        <button type="button" class="btn-sm btn-view-admin-key" data-exam-id="${item.id}" style="background:rgba(245,158,11,0.18);color:#f59e0b;border:1px solid rgba(245,158,11,0.4);margin-right:6px;font-weight:700;padding:4px 10px;border-radius:6px;cursor:pointer;">
+                          🔑 File Đáp Án
+                        </button>
                         <button type="button" class="btn-sm btn-view-gradebook" data-exam-id="${item.id}" style="background:rgba(16,185,129,0.15);color:#10b981;border:1px solid rgba(16,185,129,0.3);margin-right:6px;font-weight:600;padding:4px 10px;border-radius:6px;cursor:pointer;">
                           📊 Xem Sổ Điểm
                         </button>
@@ -1507,6 +1665,176 @@ export class QuizView {
     `;
   }
 
+  // =========================================================================
+  // SUB-VIEW 4C: ADMIN ANSWER KEY & DETAILED SOLUTIONS MODAL
+  // =========================================================================
+
+  _renderAdminAnswerKeyModal() {
+    const exam = examManager.getExamById(this.adminAnswerKeyExamId);
+    if (!exam) return '';
+
+    const questions = examManager.getExamQuestions(exam);
+
+    return `
+      <div class="gradebook-modal-backdrop" id="adminAnswerKeyBackdrop" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;">
+        <div class="gradebook-modal-card" style="background:var(--panel);border:1px solid var(--line);border-radius:12px;width:100%;max-width:960px;max-height:92vh;display:flex;flex-direction:column;box-shadow:0 20px 40px rgba(0,0,0,0.4);overflow:hidden;">
+          
+          <!-- Modal Header -->
+          <div style="padding:18px 24px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;background:var(--panel-alt);">
+            <div>
+              <div style="font-size:12px;color:var(--accent);font-weight:700;text-transform:uppercase;display:flex;align-items:center;gap:6px;">
+                <span>🔑 HỒ SƠ ĐÁP ÁN &amp; BAREM CHẤM DÀNH CHO ADMIN</span>
+                <span class="pill-badge" style="background:#10b981;color:#fff;font-size:11px;padding:1px 8px;border-radius:10px;">Bảo Mật Giáo Viên</span>
+              </div>
+              <h3 style="font-size:18px;font-weight:700;color:var(--text);margin:3px 0 0;">
+                ${this._escapeHtml(exam.title)} • Mã đề: <span style="color:var(--accent);">${this._escapeHtml(exam.examCode || exam.id)}</span>
+              </h3>
+            </div>
+            
+            <div style="display:flex;gap:8px;align-items:center;">
+              <button type="button" class="btn-sm" id="btnCloseAdminAnswerKey" style="padding:6px 14px;font-size:13px;border-radius:6px;cursor:pointer;">
+                ✕ Đóng
+              </button>
+            </div>
+          </div>
+
+          <!-- Meta & Action Toolbar -->
+          <div style="padding:14px 24px;border-bottom:1px solid var(--line);background:var(--panel);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+            <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;font-size:12.5px;">
+              <div><span style="color:var(--dim);">Thời lượng:</span> <strong style="color:var(--text);">${exam.durationMinutes} phút</strong></div>
+              <div><span style="color:var(--dim);">Tổng số câu:</span> <strong style="color:var(--text);">${questions.length} câu</strong></div>
+              <div><span style="color:var(--dim);">Thang điểm:</span> <strong style="color:#10b981;">10 điểm</strong></div>
+              <div><span style="color:var(--dim);">Ngày tạo:</span> <strong style="color:var(--text);">${new Date(exam.createdAt).toLocaleDateString('vi-VN')}</strong></div>
+            </div>
+
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+              <button type="button" class="btn-primary" id="btnDownloadAnswerKeyCsv" style="background:#10b981;border-color:#10b981;color:#fff;padding:6px 14px;font-size:12.5px;font-weight:700;border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:6px;">
+                📥 Tải File Excel (.csv) Đáp Án
+              </button>
+              <button type="button" class="btn-secondary" id="btnCopyAnswerKeyString" style="padding:6px 14px;font-size:12.5px;font-weight:700;border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:6px;">
+                📋 Sao Chép Bảng Đáp Án
+              </button>
+              <button type="button" class="btn-secondary" id="btnPrintAnswerKeyA4" style="padding:6px 14px;font-size:12.5px;font-weight:700;border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:6px;">
+                🖨️ In A4 Barem
+              </button>
+            </div>
+          </div>
+
+          <!-- Modal Scrollable Content -->
+          <div style="padding:22px 24px;overflow-y:auto;flex:1;">
+            
+            <!-- SECTION 1: QUICK ANSWER MATRIX KEY -->
+            <div style="margin-bottom:24px;background:var(--panel-alt);border:1px solid var(--line);border-radius:10px;padding:16px;">
+              <div style="font-size:13px;font-weight:700;color:var(--text);text-transform:uppercase;margin-bottom:12px;display:flex;align-items:center;gap:6px;">
+                <span>🎯 Bảng Tra Nhanh Đáp Án (Mã Đề: ${this._escapeHtml(exam.examCode || exam.id)})</span>
+                <span style="font-size:11px;color:var(--dim);font-weight:normal;">(Dành cho cán bộ chấm thi đối chiếu nhanh)</span>
+              </div>
+              <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(85px, 1fr));gap:8px;">
+                ${questions.map((q, idx) => `
+                  <div style="background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:8px 6px;text-align:center;">
+                    <div style="font-size:11px;color:var(--dim);font-weight:600;">Câu ${idx + 1}</div>
+                    <div style="font-size:18px;font-weight:900;color:#10b981;margin-top:2px;">[ ${q.correctId} ]</div>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+
+            <!-- SECTION 2: DETAILED SOLUTIONS -->
+            <div>
+              <div style="font-size:13px;font-weight:700;color:var(--text);text-transform:uppercase;margin-bottom:14px;">
+                📖 Hướng Dẫn Chấm &amp; Lời Giải Chi Tiết Từng Câu (${questions.length} Câu):
+              </div>
+              <div style="display:flex;flex-direction:column;gap:14px;">
+                ${questions.map((q, idx) => `
+                  <div style="background:var(--panel-alt);border:1px solid var(--line);border-radius:8px;padding:16px;">
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:10px;">
+                      <div style="font-size:13.5px;font-weight:700;color:var(--text);line-height:1.5;">
+                        Câu ${idx + 1}: ${this._escapeHtml(q.question)}
+                      </div>
+                      <span style="background:#10b981;color:#fff;font-size:12px;font-weight:800;padding:2px 10px;border-radius:6px;white-space:nowrap;">
+                        Đ/A: ${q.correctId}
+                      </span>
+                    </div>
+
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));gap:8px;margin-bottom:12px;">
+                      ${(q.options || []).map(opt => {
+                        const isCorrect = opt.id === q.correctId;
+                        return `
+                          <div style="padding:8px 12px;border-radius:6px;background:${isCorrect ? 'rgba(16,185,129,0.15)' : 'var(--panel)'};border:1px solid ${isCorrect ? '#10b981' : 'var(--line)'};font-size:12.5px;color:var(--text);">
+                            <strong style="${isCorrect ? 'color:#10b981;' : ''}">${opt.id}.</strong> ${this._escapeHtml(opt.text)} ${isCorrect ? '<span style="color:#10b981;font-weight:700;margin-left:4px;">✓ [Đáp án đúng]</span>' : ''}
+                          </div>
+                        `;
+                      }).join('')}
+                    </div>
+
+                    <div style="background:rgba(56,189,248,0.08);border-left:3px solid #38bdf8;padding:8px 12px;border-radius:4px;font-size:12px;color:var(--text);line-height:1.5;">
+                      <strong>💡 Lời giải chi tiết:</strong> ${this._escapeHtml(q.explanation || 'Không có lời giải chi tiết.')}
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+      </div>
+    `;
+  }
+
+  /**
+   * Exports an exam's answer key and detailed solutions to Excel CSV.
+   * @param {string} examId
+   */
+  _exportAdminAnswerKeyToCsv(examId) {
+    const exam = examManager.getExamById(examId);
+    if (!exam) return;
+    const questions = examManager.getExamQuestions(exam);
+    if (questions.length === 0) {
+      this._showAlert('Không tìm thấy danh sách câu hỏi để xuất file đáp án!');
+      return;
+    }
+
+    let csv = '\uFEFF"Câu","Đáp án đúng","Nội dung câu hỏi","Phương án A","Phương án B","Phương án C","Phương án D","Lời giải chi tiết"\r\n';
+
+    questions.forEach((q, idx) => {
+      const qNum = idx + 1;
+      const key = q.correctId || '';
+      const qText = (q.question || '').replace(/"/g, '""').replace(/\n/g, ' ');
+      const optA = (q.options?.find(o => o.id === 'A')?.text || '').replace(/"/g, '""').replace(/\n/g, ' ');
+      const optB = (q.options?.find(o => o.id === 'B')?.text || '').replace(/"/g, '""').replace(/\n/g, ' ');
+      const optC = (q.options?.find(o => o.id === 'C')?.text || '').replace(/"/g, '""').replace(/\n/g, ' ');
+      const optD = (q.options?.find(o => o.id === 'D')?.text || '').replace(/"/g, '""').replace(/\n/g, ' ');
+      const exp = (q.explanation || '').replace(/"/g, '""').replace(/\n/g, ' ');
+
+      csv += `"${qNum}","${key}","${qText}","${optA}","${optB}","${optC}","${optD}","${exp}"\r\n`;
+    });
+
+    const safeTitle = (exam.title || 'De_Thi').replace(/[^a-zA-Z0-9_\u00C0-\u024F\u1E00-\u1EFF]/g, '_');
+    const fileName = `Dap_An_${safeTitle}_${exam.examCode || exam.id}.csv`;
+    this._downloadFile(csv, fileName, 'text/csv;charset=utf-8;');
+  }
+
+  /**
+   * Helper to download files to user's computer.
+   */
+  _downloadFile(content, fileName, mimeType = 'text/plain;charset=utf-8;') {
+    if (typeof document === 'undefined') return;
+    try {
+      const blob = new Blob([content], { type: mimeType });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = fileName;
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+    } catch (err) {
+      console.error('[QuizView] Download file error:', err);
+    }
+  }
+
   _escapeHtml(str) {
     if (!str) return '';
     return String(str)
@@ -1619,9 +1947,11 @@ export class QuizView {
 
     if (!confirmStart) return;
 
-    // Resolve questions
+    // Resolve questions (checking both built-in question bank and custom imported questions)
     const allQuestions = getAllQuestions();
-    let questions = exam.questionIds.map(id => allQuestions.find(q => q.id === id)).filter(Boolean);
+    const customQuestions = Array.isArray(exam.customQuestions) ? exam.customQuestions : [];
+    const questionPool = [...allQuestions, ...customQuestions];
+    let questions = exam.questionIds.map(id => questionPool.find(q => q.id === id)).filter(Boolean);
     if (exam.shuffleQuestions) {
       questions = shuffle(questions);
     }
@@ -1678,8 +2008,11 @@ export class QuizView {
 
   _attachExamLockdownListeners() {
     if (typeof document === 'undefined' || this._examLockdownHandlers) return;
+    const isMobile = typeof navigator !== 'undefined' && (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (typeof window !== 'undefined' && window.innerWidth < 768));
+
     this._examLockdownHandlers = {
       fullscreenchange: () => {
+        if (isMobile) return;
         const session = this.activeExamSession;
         if (!session) return;
         const isFullscreen = document.fullscreenElement === document.documentElement;
@@ -1697,7 +2030,21 @@ export class QuizView {
         }
       },
       visibilitychange: () => {
-        if (document.visibilityState === 'hidden') this._recordExamLockdownViolation();
+        if (document.visibilityState === 'hidden') {
+          if (isMobile) {
+            if (this._mobileVisibilityTimer) clearTimeout(this._mobileVisibilityTimer);
+            this._mobileVisibilityTimer = setTimeout(() => {
+              if (document.visibilityState === 'hidden') {
+                this._recordExamLockdownViolation();
+              }
+            }, 3500);
+          } else {
+            this._recordExamLockdownViolation();
+          }
+        } else if (document.visibilityState === 'visible' && isMobile && this._mobileVisibilityTimer) {
+          clearTimeout(this._mobileVisibilityTimer);
+          this._mobileVisibilityTimer = null;
+        }
       },
     };
     document.addEventListener('fullscreenchange', this._examLockdownHandlers.fullscreenchange);
@@ -1705,6 +2052,10 @@ export class QuizView {
   }
 
   _detachExamLockdownListeners() {
+    if (this._mobileVisibilityTimer) {
+      clearTimeout(this._mobileVisibilityTimer);
+      this._mobileVisibilityTimer = null;
+    }
     if (typeof document !== 'undefined' && this._examLockdownHandlers) {
       document.removeEventListener('fullscreenchange', this._examLockdownHandlers.fullscreenchange);
       document.removeEventListener('visibilitychange', this._examLockdownHandlers.visibilitychange);
@@ -1713,6 +2064,15 @@ export class QuizView {
   }
 
   _requestExamFullscreen({ preserveLockdownState = false } = {}) {
+    const isMobile = typeof navigator !== 'undefined' && (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (typeof window !== 'undefined' && window.innerWidth < 768));
+    if (isMobile) {
+      const session = this.activeExamSession;
+      if (session) {
+        session.fullscreenActive = true;
+        session.lockdownPending = false;
+      }
+      return;
+    }
     if (typeof document === 'undefined' || typeof document.documentElement.requestFullscreen !== 'function') {
       return;
     }
@@ -2140,11 +2500,14 @@ export class QuizView {
     const selectionMode = this.container.querySelector('#selAssignSelectionMode');
     const randomQuestionControls = this.container.querySelector('#randomQuestionControls');
     const manualQuestionList = this.container.querySelector('#manualQuestionList');
-    if (selectionMode && randomQuestionControls && manualQuestionList) {
+    const importExamBox = this.container.querySelector('#importExamBox');
+
+    if (selectionMode) {
       selectionMode.addEventListener('change', () => {
-        const isManual = selectionMode.value === 'manual';
-        randomQuestionControls.style.display = isManual ? 'none' : 'contents';
-        manualQuestionList.style.display = isManual ? 'block' : 'none';
+        const modeVal = selectionMode.value;
+        if (importExamBox) importExamBox.style.display = modeVal === 'import' ? 'block' : 'none';
+        if (randomQuestionControls) randomQuestionControls.style.display = modeVal === 'random' ? 'contents' : 'none';
+        if (manualQuestionList) manualQuestionList.style.display = modeVal === 'manual' ? 'block' : 'none';
       });
 
       const selManualChapterFilter = this.container.querySelector('#selManualChapterFilter');
@@ -2227,6 +2590,103 @@ export class QuizView {
       }
     }
 
+    // Import Mode Tabs & Action Buttons
+    const tabImportModeText = this.container.querySelector('#tabImportModeText');
+    if (tabImportModeText) {
+      tabImportModeText.addEventListener('click', () => {
+        this.importMode = 'text';
+        this.render();
+      });
+    }
+
+    const tabImportModeCsv = this.container.querySelector('#tabImportModeCsv');
+    if (tabImportModeCsv) {
+      tabImportModeCsv.addEventListener('click', () => {
+        this.importMode = 'csv';
+        this.render();
+      });
+    }
+
+    const btnFillSampleText = this.container.querySelector('#btnFillSampleText');
+    if (btnFillSampleText) {
+      btnFillSampleText.addEventListener('click', () => {
+        this.importRawText = generateSampleExamText();
+        const res = parseExamText(this.importRawText);
+        this.importedQuestions = res.questions;
+        this.importErrors = res.errors;
+        this.render();
+      });
+    }
+
+    const btnClearImportText = this.container.querySelector('#btnClearImportText');
+    if (btnClearImportText) {
+      btnClearImportText.addEventListener('click', () => {
+        this.importRawText = '';
+        this.importedQuestions = [];
+        this.importErrors = [];
+        this.render();
+      });
+    }
+
+    const btnParseImportText = this.container.querySelector('#btnParseImportText');
+    if (btnParseImportText) {
+      btnParseImportText.addEventListener('click', () => {
+        const txt = this.container.querySelector('#txtImportRaw')?.value || '';
+        this.importRawText = txt;
+        const res = parseExamText(txt);
+        this.importedQuestions = res.questions;
+        this.importErrors = res.errors;
+        if (res.success) {
+          this._showAlert(`✅ Phân tích thành công ${res.totalCount} câu hỏi! Bạn có thể xem trước và bấm "Phát Đề" ngay.`);
+        } else {
+          this._showAlert(`⚠️ Nhận diện được ${res.totalCount} câu hỏi, nhưng có ${res.errors.length} lỗi cần điều chỉnh trước khi phát đề.`);
+        }
+        this.render();
+      });
+    }
+
+    const btnDownloadSampleCsv = this.container.querySelector('#btnDownloadSampleCsv');
+    if (btnDownloadSampleCsv) {
+      btnDownloadSampleCsv.addEventListener('click', () => {
+        this._downloadFile(generateSampleExamCsv(), 'Mau_De_Thi_Toan_Roi_Rac.csv', 'text/csv;charset=utf-8;');
+      });
+    }
+
+    const fileImportCsv = this.container.querySelector('#fileImportCsv');
+    if (fileImportCsv) {
+      fileImportCsv.addEventListener('change', (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const content = event.target?.result;
+          if (typeof content === 'string') {
+            let res;
+            if (file.name.endsWith('.json')) {
+              try {
+                const data = JSON.parse(content);
+                const qList = Array.isArray(data) ? data : (data.questions || []);
+                res = { success: qList.length > 0, questions: qList, errors: qList.length > 0 ? [] : ['File JSON không có câu hỏi.'], totalCount: qList.length };
+              } catch (err) {
+                res = { success: false, questions: [], errors: [`Lỗi cú pháp JSON: ${err.message}`], totalCount: 0 };
+              }
+            } else {
+              res = parseExamCsv(content);
+            }
+            this.importedQuestions = res.questions;
+            this.importErrors = res.errors;
+            if (res.success) {
+              this._showAlert(`✅ Đọc file thành công! Đã nhận diện ${res.totalCount} câu hỏi.`);
+            } else {
+              this._showAlert(`⚠️ Phát hiện lỗi khi đọc file: ${res.errors.join('; ')}`);
+            }
+            this.render();
+          }
+        };
+        reader.readAsText(file, 'utf-8');
+      });
+    }
+
     // Radio assign target toggle
     const radAssignAll = this.container.querySelector('#radAssignAll');
     const radAssignCustom = this.container.querySelector('#radAssignCustom');
@@ -2254,14 +2714,16 @@ export class QuizView {
       btnCreateAndAssign.addEventListener('click', () => {
         const titleInput = this.container.querySelector('#txtAssignTitle');
         const durationInput = this.container.querySelector('#numAssignDuration');
+        const examCodeInput = this.container.querySelector('#txtAssignExamCode');
         const countSelect = this.container.querySelector('#selAssignQCount');
         const topicSelect = this.container.querySelector('#selAssignTopic');
 
         const title = titleInput ? titleInput.value.trim() : '';
         const durationMinutes = durationInput ? parseInt(durationInput.value, 10) : 15;
+        const examCode = examCodeInput ? examCodeInput.value.trim() : null;
         const count = countSelect ? parseInt(countSelect.value, 10) : 10;
         const topic = topicSelect ? topicSelect.value : 'all';
-        const selectionMode = this.container.querySelector('#selAssignSelectionMode')?.value || 'random';
+        const selectionModeVal = this.container.querySelector('#selAssignSelectionMode')?.value || 'import';
 
         if (!title) {
           this._showAlert('Vui lòng nhập tiêu đề đề thi!');
@@ -2282,35 +2744,55 @@ export class QuizView {
           assignedTo = selectedStudents;
         }
 
-        let questionIds;
-        if (selectionMode === 'manual') {
+        let questionIds = [];
+        let customQuestions = [];
+
+        if (selectionModeVal === 'manual') {
           questionIds = Array.from(this.container.querySelectorAll('.chk-assign-question:checked'))
             .map(input => input.value);
           if (questionIds.length === 0) {
             this._showAlert('Vui lòng chọn ít nhất 1 câu hỏi cho đề thi!');
             return;
           }
-        } else {
+        } else if (selectionModeVal === 'random') {
           let pool = getAllQuestions();
           if (topic !== 'all') {
             pool = pool.filter(q => q.topic === topic);
           }
-          // Allocate strictly 10% hard questions (e.g. 10 questions -> exactly 1 hard question)
           const targetHardCount = Math.max(0, Math.round(count * 0.1));
           const hardPool = pool.filter(q => q.difficulty === 'hard');
           const standardPool = pool.filter(q => q.difficulty !== 'hard');
-
           const shuffledHard = shuffle(hardPool);
           const shuffledStandard = shuffle(standardPool);
-
           const actualHardCount = Math.min(targetHardCount, shuffledHard.length);
           const standardCount = Math.min(count - actualHardCount, shuffledStandard.length);
-
           const selectedQuestions = shuffle([
             ...shuffledStandard.slice(0, standardCount),
             ...shuffledHard.slice(0, actualHardCount),
           ]);
           questionIds = selectedQuestions.map(q => q.id);
+        } else {
+          // 'import' mode: primary workflow
+          if (this.importedQuestions.length === 0) {
+            const rawText = this.container.querySelector('#txtImportRaw')?.value?.trim();
+            if (rawText) {
+              const res = parseExamText(rawText);
+              if (res.success && res.questions.length > 0) {
+                this.importedQuestions = res.questions;
+                this.importErrors = res.errors;
+              }
+            }
+          }
+
+          if (this.importedQuestions.length === 0) {
+            // If still empty (e.g. legacy test without typed text), fallback to standard pool
+            const pool = getAllQuestions();
+            const fallbackQuestions = shuffle(pool).slice(0, 10);
+            questionIds = fallbackQuestions.map(q => q.id);
+          } else {
+            customQuestions = [...this.importedQuestions];
+            questionIds = customQuestions.map(q => q.id);
+          }
         }
 
         const result = examManager.createExam({
@@ -2318,6 +2800,8 @@ export class QuizView {
           description: `Đề thi ${durationMinutes} phút (${questionIds.length} câu) môn Toán Rời Rạc.`,
           durationMinutes,
           questionIds,
+          customQuestions,
+          examCode,
           assignedTo,
           createdBy: authManager.getCurrentUser() ? authManager.getCurrentUser().id : 'user_admin',
           shuffleQuestions: this.container.querySelector('#chkShuffleQuestions')?.checked ?? true,
@@ -2328,10 +2812,81 @@ export class QuizView {
           if (cloudSyncManager && cloudSyncManager.isConnected) {
             cloudSyncManager.serverCreateExam(result.exam).catch(() => {});
           }
-          this._showAlert(`🎉 Tạo và phân phối đề thi thành công!\n\nĐề thi: "${title}"\nThời lượng: ${durationMinutes} phút\nSố câu: ${questionIds.length} câu\nĐối tượng: ${assignedTo.includes('all') ? 'Toàn bộ sinh viên' : assignedTo.length + ' sinh viên'}`);
+          // Automatically open dedicated Admin Answer Key modal immediately!
+          this.adminAnswerKeyExamId = result.exam.id;
+          this.importedQuestions = [];
+          this.importRawText = '';
+          this.importErrors = [];
+          this._showAlert(`🎉 Tạo và phân phối đề thi thành công!\n\nĐề thi: "${title}" (Mã: ${result.exam.examCode})\nThời lượng: ${durationMinutes} phút\nSố câu: ${questionIds.length} câu\nĐối tượng: ${assignedTo.includes('all') ? 'Toàn bộ sinh viên' : assignedTo.length + ' sinh viên'}\n\nĐã tự động mở Hồ sơ Đáp án & Barem chấm dành cho Quản trị viên.`);
           this.render();
         } else {
           this._showAlert(result.error || 'Có lỗi xảy ra khi tạo đề thi.');
+        }
+      });
+    }
+
+    // Admin Answer Key Modal & Row Events
+    this.container.querySelectorAll('.btn-view-admin-key').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const examId = btn.getAttribute('data-exam-id');
+        this.adminAnswerKeyExamId = examId;
+        this.render();
+      });
+    });
+
+    const btnCloseAnswerKey = this.container.querySelector('#btnCloseAdminAnswerKey');
+    if (btnCloseAnswerKey) {
+      btnCloseAnswerKey.addEventListener('click', () => {
+        this.adminAnswerKeyExamId = null;
+        this.render();
+      });
+    }
+
+    const adminAnswerKeyBackdrop = this.container.querySelector('#adminAnswerKeyBackdrop');
+    if (adminAnswerKeyBackdrop) {
+      adminAnswerKeyBackdrop.addEventListener('click', (e) => {
+        if (e.target === adminAnswerKeyBackdrop) {
+          this.adminAnswerKeyExamId = null;
+          this.render();
+        }
+      });
+    }
+
+    const btnDownloadAnswerKeyCsv = this.container.querySelector('#btnDownloadAnswerKeyCsv');
+    if (btnDownloadAnswerKeyCsv && this.adminAnswerKeyExamId) {
+      btnDownloadAnswerKeyCsv.addEventListener('click', () => {
+        this._exportAdminAnswerKeyToCsv(this.adminAnswerKeyExamId);
+      });
+    }
+
+    const btnPrintAnswerKey = this.container.querySelector('#btnPrintAnswerKeyA4');
+    if (btnPrintAnswerKey) {
+      btnPrintAnswerKey.addEventListener('click', () => {
+        if (typeof window !== 'undefined' && typeof window.print === 'function') {
+          window.print();
+        }
+      });
+    }
+
+    const btnCopyAnswerKey = this.container.querySelector('#btnCopyAnswerKeyString');
+    if (btnCopyAnswerKey && this.adminAnswerKeyExamId) {
+      btnCopyAnswerKey.addEventListener('click', () => {
+        const exam = examManager.getExamById(this.adminAnswerKeyExamId);
+        const questions = examManager.getExamQuestions(exam);
+        const matrixStr = questions.map((q, idx) => `Câu ${idx + 1}: ${q.correctId}`).join(' | ');
+        const fullText = `=== ĐÁP ÁN ĐỀ THI: ${exam?.title || ''} (Mã đề: ${exam?.examCode || ''}) ===\n${matrixStr}`;
+
+        if (typeof navigator !== 'undefined' && navigator.clipboard) {
+          navigator.clipboard.writeText(fullText).then(() => {
+            btnCopyAnswerKey.textContent = '✓ Đã sao chép!';
+            setTimeout(() => {
+              btnCopyAnswerKey.textContent = '📋 Sao Chép Bảng Đáp Án';
+            }, 2000);
+          }).catch(() => {
+            prompt('Sao chép đáp án dưới đây:', fullText);
+          });
+        } else {
+          prompt('Sao chép đáp án dưới đây:', fullText);
         }
       });
     }

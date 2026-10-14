@@ -167,6 +167,7 @@ export class ExamManager {
 
   /**
    * Admin creates a new exam and assigns it.
+   * Supports both question IDs from question bank and custom imported questions.
    * @param {Object} data
    * @returns {{ success: boolean, error?: string, exam?: Object }}
    */
@@ -175,6 +176,8 @@ export class ExamManager {
     description = '',
     durationMinutes = 15,
     questionIds = [],
+    customQuestions = [],
+    examCode = null,
     assignedTo = ['all'],
     createdBy = 'user_admin',
     shuffleQuestions = true,
@@ -183,24 +186,43 @@ export class ExamManager {
     if (typeof title !== 'string' || title.trim().length < 3) {
       return { success: false, error: 'Tiêu đề đề thi phải có ít nhất 3 ký tự.' };
     }
-    if (!Array.isArray(questionIds) || questionIds.length === 0 || questionIds.length !== new Set(questionIds).size) {
+
+    const customList = Array.isArray(customQuestions) ? customQuestions : [];
+    const resolvedIds = (Array.isArray(questionIds) && questionIds.length > 0)
+      ? questionIds
+      : customList.map(q => q.id);
+
+    if (!Array.isArray(resolvedIds) || resolvedIds.length === 0 || resolvedIds.length !== new Set(resolvedIds).size) {
       return { success: false, error: 'Vui lòng chọn ít nhất 1 câu hỏi cho đề thi.' };
     }
-    const availableQuestionIds = new Set(getAllQuestions().map(question => question.id));
-    if (questionIds.some(id => !availableQuestionIds.has(id))) {
+
+    const customMap = new Map(customList.map(q => [q.id, q]));
+    const availableQuestionIds = new Set([
+      ...getAllQuestions().map(question => question.id),
+      ...customMap.keys(),
+    ]);
+
+    if (resolvedIds.some(id => !availableQuestionIds.has(id))) {
       return { success: false, error: 'Danh sách câu hỏi chứa câu hỏi không tồn tại.' };
     }
+
     const duration = parseInt(durationMinutes, 10);
     if (isNaN(duration) || duration < 1 || duration > 180) {
       return { success: false, error: 'Thời gian làm bài phải từ 1 đến 180 phút.' };
     }
+
+    const generatedCode = examCode && typeof examCode === 'string' && examCode.trim()
+      ? examCode.trim().toUpperCase()
+      : `TRR-${Math.floor(100 + Math.random() * 900)}`;
 
     const exam = {
       id: `exam_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
       title: title.trim(),
       description: typeof description === 'string' ? description.trim() : '',
       durationMinutes: duration,
-      questionIds: [...questionIds],
+      questionIds: [...resolvedIds],
+      customQuestions: [...customList],
+      examCode: generatedCode,
       assignedTo: Array.isArray(assignedTo) && assignedTo.length > 0 ? assignedTo : ['all'],
       createdAt: new Date().toISOString(),
       createdBy,
@@ -223,6 +245,24 @@ export class ExamManager {
 
     this._notifyListeners('exam_created', exam);
     return { success: true, exam };
+  }
+
+  /**
+   * Resolves question objects for an exam, checking both built-in bank and custom questions.
+   * @param {Object|string} examOrId
+   * @returns {Array<Object>}
+   */
+  getExamQuestions(examOrId) {
+    const exam = typeof examOrId === 'string' ? this.getExamById(examOrId) : examOrId;
+    if (!exam || !Array.isArray(exam.questionIds)) return [];
+
+    const questionMap = new Map();
+    getAllQuestions().forEach(q => questionMap.set(q.id, q));
+    if (Array.isArray(exam.customQuestions)) {
+      exam.customQuestions.forEach(q => questionMap.set(q.id, q));
+    }
+
+    return exam.questionIds.map(id => questionMap.get(id)).filter(Boolean);
   }
 
   /**
@@ -381,6 +421,9 @@ export class ExamManager {
     // Calculate score on scale 10
     const questionMap = new Map();
     getAllQuestions().forEach(q => questionMap.set(q.id, q));
+    if (Array.isArray(exam.customQuestions)) {
+      exam.customQuestions.forEach(q => questionMap.set(q.id, q));
+    }
 
     const totalQuestions = exam.questionIds.length;
     let correctCount = 0;
