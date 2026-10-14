@@ -344,39 +344,49 @@ export class QuizView {
   }
 
   _getStudioPrintExam() {
-    const source = this.studioPrintSource || (this.importedQuestions.length > 0 ? 'all_word' : 'builtin');
-    if (source !== 'builtin' && this.importedQuestions.length > 0) {
-      let pool = this.importedQuestions;
-      if (source !== 'all_word') {
-        const file = this.importedFiles.find(f => f.id === source);
-        if (file && file.questions && file.questions.length > 0) {
-          pool = file.questions;
-        }
-      }
-      const desiredCount = this.studioConfig.count || 20;
-      let selectedQuestions;
-      if (pool.length <= desiredCount) {
-        selectedQuestions = [...pool];
-      } else {
-        selectedQuestions = shuffle(pool).slice(0, desiredCount);
-      }
-      if (!this.printExamCode) {
-        this.printExamCode = `TRR-${Math.floor(100 + Math.random() * 900)}`;
-      }
-      return {
-        id: `print_exam_${Date.now()}`,
-        examCode: this.printExamCode,
-        title: 'ĐỀ THI MÔN: TOÁN RỜI RẠC',
-        totalQuestions: selectedQuestions.length,
-        questions: selectedQuestions,
-        createdAt: new Date().toISOString(),
-      };
+    if (!this.importedQuestions || this.importedQuestions.length === 0) {
+      return null;
     }
 
-    if (!this.currentExam) {
-      this._generateNewExam();
+    const source = (this.studioPrintSource && this.studioPrintSource !== 'builtin') 
+      ? this.studioPrintSource 
+      : 'all_word';
+
+    let pool = this.importedQuestions;
+    if (source !== 'all_word') {
+      const file = this.importedFiles.find(f => f.id === source);
+      if (file && file.questions && file.questions.length > 0) {
+        pool = file.questions;
+      }
     }
-    return this.currentExam;
+
+    if (pool.length === 0) {
+      return null;
+    }
+
+    const desiredCount = (this.studioConfig.count && !isNaN(parseInt(this.studioConfig.count, 10)) && parseInt(this.studioConfig.count, 10) > 0)
+      ? parseInt(this.studioConfig.count, 10)
+      : pool.length;
+
+    let selectedQuestions;
+    if (pool.length <= desiredCount) {
+      selectedQuestions = [...pool];
+    } else {
+      selectedQuestions = shuffle(pool).slice(0, desiredCount);
+    }
+
+    if (!this.printExamCode) {
+      this.printExamCode = `TRR-${Math.floor(100 + Math.random() * 900)}`;
+    }
+
+    return {
+      id: `print_exam_${Date.now()}`,
+      examCode: this.printExamCode,
+      title: 'ĐỀ THI MÔN: TOÁN RỜI RẠC',
+      totalQuestions: selectedQuestions.length,
+      questions: selectedQuestions,
+      createdAt: new Date().toISOString(),
+    };
   }
 
   /**
@@ -1052,7 +1062,6 @@ export class QuizView {
 
   _renderStudioView() {
     const exam = this._getStudioPrintExam();
-    if (!exam) return `<div>Đang tải đề thi...</div>`;
 
     const allStudents = authManager.getUsers().filter(u => u.role !== 'admin');
     const assignedExamsList = examManager.getExams();
@@ -1068,6 +1077,19 @@ export class QuizView {
     const currentCountDisplay = (this.selectedAssignCount === 'all' || !this.selectedAssignCount || isNaN(parseInt(this.selectedAssignCount, 10)))
       ? (currentPoolSize > 0 ? currentPoolSize : 0)
       : Math.min(parseInt(this.selectedAssignCount, 10), currentPoolSize);
+
+    // Compute print pool & size for A4 Studio
+    let printPool = this.importedQuestions;
+    if (this.studioPrintSource && this.studioPrintSource !== 'all_word') {
+      const pf = this.importedFiles.find(file => file.id === this.studioPrintSource);
+      if (pf && pf.questions && pf.questions.length > 0) {
+        printPool = pf.questions;
+      }
+    }
+    const printPoolSize = printPool.length;
+    const currentStudioCount = (this.studioConfig.count && !isNaN(parseInt(this.studioConfig.count, 10)) && parseInt(this.studioConfig.count, 10) > 0)
+      ? Math.min(parseInt(this.studioConfig.count, 10), printPoolSize)
+      : printPoolSize;
 
     return `
       <!-- Studio Subtab Navigation -->
@@ -1328,42 +1350,53 @@ export class QuizView {
       <!-- SECTION B: A4 PRINT & LATEX EXPORTER (PRESERVED) -->
       <div id="studioPrintSection" style="display:${this.studioSubTab === 'print' ? 'block' : 'none'};">
         
-        <!-- Teacher's Studio Controls Bar (No Print) -->
-        <div class="exam-studio-controls no-print" style="background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:24px;">
-          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:12px;">
-            <div>
-              <div style="font-size:14px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:6px;">
-                <span>👩‍🏫 Studio Soạn Đề Thi Trắc Nghiệm Chuẩn A4</span>
-                <span class="pill-badge" style="background:rgba(245,158,11,0.15);color:var(--accent);font-size:11px;padding:2px 8px;border-radius:10px;">
-                  Mã đề: ${exam.examCode}
-                </span>
-              </div>
-              <p style="font-size:12px;color:var(--dim);margin:3px 0 0;">
-                Tạo đề thi chuẩn mẫu Bộ GD&amp;ĐT &amp; Đại học, in trực tiếp ra giấy A4 hoặc chép mã nguồn LaTeX cho Overleaf.
-              </p>
-            </div>
-
-            <!-- Quick Action Buttons -->
-            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-              <button type="button" class="btn-primary" id="btnPrintExam" style="padding:8px 16px;font-size:13px;font-weight:600;">
-                🖨️ In Đề / Xuất PDF (A4)
-              </button>
-              <button type="button" class="btn-secondary" id="btnCopyLatex" style="padding:8px 16px;font-size:13px;font-weight:600;border:1px solid var(--line);">
-                📋 Sao Chép Mã LaTeX (.tex)
-              </button>
-              <button type="button" class="btn-sm" id="btnGenNewExam" style="padding:8px 14px;font-size:13px;background:var(--panel-alt);border:1px solid var(--accent);color:var(--accent);font-weight:600;">
-                🎲 Đổi Mã Đề Khác
-              </button>
-            </div>
+        ${(!exam || !exam.questions || exam.questions.length === 0) ? `
+          <div style="text-align:center;padding:50px 24px;background:var(--panel);border:1px dashed var(--line);border-radius:12px;margin:24px auto;max-width:680px;">
+            <div style="font-size:42px;margin-bottom:12px;">📂</div>
+            <h3 style="font-size:17px;font-weight:700;color:var(--text);margin:0 0 8px;">Chưa Có Câu Hỏi Tự Soạn Nào Để In Ấn</h3>
+            <p style="font-size:13px;color:var(--dim);margin:0 0 22px;line-height:1.6;">
+              Hệ thống đã loại bỏ toàn bộ ngân hàng câu hỏi mẫu mặc định. Chức năng in ấn và xuất LaTeX chỉ nhận đề từ file Word bạn đã tải lên.
+            </p>
+            <button type="button" class="btn-primary" id="btnSwitchToAssignTabFromPrint" style="padding:10px 24px;font-size:13.5px;font-weight:700;cursor:pointer;">
+              📋 Chuyển Sang Tab Nạp File Word
+            </button>
           </div>
+        ` : `
+          <!-- Teacher's Studio Controls Bar (No Print) -->
+          <div class="exam-studio-controls no-print" style="background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:24px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:12px;">
+              <div>
+                <div style="font-size:14px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:6px;">
+                  <span>👩‍🏫 Studio Soạn Đề Thi Trắc Nghiệm Chuẩn A4</span>
+                  <span class="pill-badge" style="background:rgba(245,158,11,0.15);color:var(--accent);font-size:11px;padding:2px 8px;border-radius:10px;">
+                    Mã đề: ${exam.examCode}
+                  </span>
+                </div>
+                <p style="font-size:12px;color:var(--dim);margin:3px 0 0;">
+                  Tạo đề thi chuẩn mẫu Bộ GD&amp;ĐT &amp; Đại học, in trực tiếp ra giấy A4 hoặc chép mã nguồn LaTeX cho Overleaf.
+                </p>
+              </div>
 
-          <!-- Configuration Bar -->
-          <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding-top:12px;border-top:1px solid var(--line);font-size:12.5px;">
-            <div style="display:flex;align-items:center;gap:6px;">
-              <span style="color:var(--dim);">Nguồn đề:</span>
-              <select id="selStudioPrintSource" class="form-input" style="padding:4px 8px;font-size:12px;border-radius:4px;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);font-weight:600;">
-                ${this.importedQuestions.length > 0 ? `
-                  <option value="all_word" ${this.studioPrintSource === 'all_word' ? 'selected' : ''}>
+              <!-- Quick Action Buttons -->
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                <button type="button" class="btn-primary" id="btnPrintExam" style="padding:8px 16px;font-size:13px;font-weight:600;">
+                  🖨️ In Đề / Xuất PDF (A4)
+                </button>
+                <button type="button" class="btn-secondary" id="btnCopyLatex" style="padding:8px 16px;font-size:13px;font-weight:600;border:1px solid var(--line);">
+                  📋 Sao Chép Mã LaTeX (.tex)
+                </button>
+                <button type="button" class="btn-sm" id="btnGenNewExam" style="padding:8px 14px;font-size:13px;background:var(--panel-alt);border:1px solid var(--accent);color:var(--accent);font-weight:600;">
+                  🎲 Đổi Mã Đề Khác
+                </button>
+              </div>
+            </div>
+
+            <!-- Configuration Bar: Nguồn đề + Số lượng câu (chọn thoải mái) -->
+            <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding-top:12px;border-top:1px solid var(--line);font-size:12.5px;">
+              <div style="display:flex;align-items:center;gap:6px;">
+                <span style="color:var(--dim);font-weight:600;">Nguồn đề:</span>
+                <select id="selStudioPrintSource" class="form-input" style="padding:5px 10px;font-size:12.5px;border-radius:6px;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);font-weight:600;">
+                  <option value="all_word" ${this.studioPrintSource === 'all_word' || !this.studioPrintSource ? 'selected' : ''}>
                     📂 Tất cả câu hỏi Word (${this.importedQuestions.length} câu)
                   </option>
                   ${this.importedFiles.map(f => `
@@ -1371,56 +1404,38 @@ export class QuizView {
                       📄 File: ${this._escapeHtml(f.name)} (${f.questionCount} câu)
                     </option>
                   `).join('')}
-                  <option value="builtin" ${this.studioPrintSource === 'builtin' ? 'selected' : ''}>
-                    🌟 Ngân hàng đề mẫu mặc định
-                  </option>
-                ` : `
-                  <option value="builtin" selected>🌟 Ngân hàng đề mẫu mặc định</option>
-                `}
-              </select>
-            </div>
+                </select>
+              </div>
 
-            <div style="display:flex;align-items:center;gap:6px;">
-              <span style="color:var(--dim);">Số lượng câu:</span>
-              <select id="selStudioCount" class="form-input" style="padding:4px 8px;font-size:12px;border-radius:4px;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);">
-                <option value="5" ${this.studioConfig.count === 5 ? 'selected' : ''}>5 câu (Kiểm tra 15 phút)</option>
-                <option value="10" ${this.studioConfig.count === 10 ? 'selected' : ''}>10 câu (Kiểm tra 45 phút)</option>
-                <option value="15" ${this.studioConfig.count === 15 ? 'selected' : ''}>15 câu (Đề thi giữa kỳ)</option>
-                <option value="20" ${this.studioConfig.count === 20 ? 'selected' : ''}>20 câu (Đề thi kết thúc học phần)</option>
-              </select>
-            </div>
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                <span style="color:var(--dim);font-weight:600;">Số lượng câu:</span>
+                <div style="display:flex;align-items:center;gap:6px;">
+                  <input type="number" id="numStudioCount" class="form-input" min="1" max="${printPoolSize || 1}"
+                    value="${currentStudioCount}"
+                    placeholder="Số câu (1 - ${printPoolSize})"
+                    style="width:80px;padding:5px 8px;font-size:13px;border-radius:6px;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);font-weight:700;text-align:center;" />
+                  <span style="font-size:12px;color:var(--dim);font-weight:600;">/ ${printPoolSize} câu</span>
+                </div>
+                <select id="selStudioCount" class="form-input" style="padding:5px 8px;font-size:12px;border-radius:6px;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);font-weight:600;">
+                  <option value="all" ${currentStudioCount === printPoolSize ? 'selected' : ''}>Tất cả (${printPoolSize} câu)</option>
+                  ${[5, 10, 15, 20, 25, 30, 40, 50].filter(n => n < printPoolSize).map(n => `
+                    <option value="${n}" ${currentStudioCount === n ? 'selected' : ''}>${n} câu</option>
+                  `).join('')}
+                  ${![5, 10, 15, 20, 25, 30, 40, 50, printPoolSize].includes(currentStudioCount) && currentStudioCount > 0 ? `
+                    <option value="${currentStudioCount}" selected>Tuỳ chỉnh: ${currentStudioCount} câu</option>
+                  ` : ''}
+                </select>
+              </div>
 
-            <div style="display:flex;align-items:center;gap:6px;">
-              <span style="color:var(--dim);">Chuyên đề:</span>
-              <select id="selStudioTopic" class="form-input" style="padding:4px 8px;font-size:12px;border-radius:4px;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);">
-                <option value="all" ${this.studioConfig.topic === 'all' ? 'selected' : ''}>🌟 Toàn diện cả 5 chương</option>
-                <option value="logic" ${this.studioConfig.topic === 'logic' ? 'selected' : ''}>⚡ Chương 1: Cơ sở Logic &amp; Suy luận</option>
-                <option value="boolean" ${this.studioConfig.topic === 'boolean' ? 'selected' : ''}>🔌 Chương 2: Đại số Boole &amp; Mạch Logic</option>
-                <option value="counting" ${this.studioConfig.topic === 'counting' ? 'selected' : ''}>🎲 Chương 3: Đại số Tổ hợp &amp; Đếm</option>
-                <option value="relation" ${this.studioConfig.topic === 'relation' ? 'selected' : ''}>🔗 Chương 4: Quan hệ 2 ngôi &amp; Thứ tự</option>
-                <option value="graph" ${this.studioConfig.topic === 'graph' ? 'selected' : ''}>🌐 Chương 5: Lý thuyết Đồ thị &amp; Cây</option>
-              </select>
+              <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-left:auto;color:var(--text);font-size:12.5px;">
+                <input type="checkbox" id="chkShowSolutions" ${this.showTeacherSolutions ? 'checked' : ''} />
+                <span>Hiện hướng dẫn giải chi tiết cho Quản trị viên</span>
+              </label>
             </div>
-
-            <div style="display:flex;align-items:center;gap:6px;">
-              <span style="color:var(--dim);">Độ khó:</span>
-              <select id="selStudioDiff" class="form-input" style="padding:4px 8px;font-size:12px;border-radius:4px;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);">
-                <option value="all" ${this.studioConfig.difficulty === 'all' ? 'selected' : ''}>Tổng hợp (Cân đối)</option>
-                <option value="easy" ${this.studioConfig.difficulty === 'easy' ? 'selected' : ''}>Cơ bản (Dễ)</option>
-                <option value="medium" ${this.studioConfig.difficulty === 'medium' ? 'selected' : ''}>Trung bình</option>
-                <option value="hard" ${this.studioConfig.difficulty === 'hard' ? 'selected' : ''}>Nâng cao</option>
-              </select>
-            </div>
-
-            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-left:auto;color:var(--text);">
-              <input type="checkbox" id="chkShowSolutions" ${this.showTeacherSolutions ? 'checked' : ''} />
-              Hiện hướng dẫn giải chi tiết cho Quản trị viên
-            </label>
           </div>
-        </div>
 
-        <!-- A4 PAPER CONTAINER FOR PREVIEW AND PRINTING -->
-        <div class="exam-paper-wrapper" style="background:#f1f5f9;padding:24px;border-radius:8px;">
+          <!-- A4 PAPER CONTAINER FOR PREVIEW AND PRINTING -->
+          <div class="exam-paper-wrapper" style="background:#f1f5f9;padding:24px;border-radius:8px;">
           
           <!-- TRANG 1: ĐỀ THI SINH VIÊN -->
           <div class="exam-paper" style="background:#ffffff;color:#1e293b;max-width:860px;margin:0 auto;padding:40px 48px;box-shadow:0 4px 16px rgba(0,0,0,0.1);border-radius:4px;font-family:'Times New Roman', Times, serif;line-height:1.45;">
@@ -1544,7 +1559,7 @@ export class QuizView {
           </div>
 
         </div>
-
+        `}
       </div>
     `;
   }
@@ -2849,6 +2864,14 @@ export class QuizView {
     }
 
     // 5. Teacher's A4 & LaTeX Print Studio Events
+    const btnSwitchToAssign = this.container.querySelector('#btnSwitchToAssignTabFromPrint');
+    if (btnSwitchToAssign) {
+      btnSwitchToAssign.addEventListener('click', () => {
+        this.studioSubTab = 'assign';
+        this.render();
+      });
+    }
+
     const selPrintSource = this.container.querySelector('#selStudioPrintSource');
     if (selPrintSource) {
       selPrintSource.addEventListener('change', (e) => {
@@ -2857,29 +2880,40 @@ export class QuizView {
       });
     }
 
-    const selCount = this.container.querySelector('#selStudioCount');
-    if (selCount) {
-      selCount.addEventListener('change', (e) => {
-        this.studioConfig.count = parseInt(e.target.value, 10);
-        this._generateNewExam();
+    const numStudioCount = this.container.querySelector('#numStudioCount');
+    const selStudioCount = this.container.querySelector('#selStudioCount');
+
+    if (numStudioCount) {
+      numStudioCount.addEventListener('input', (e) => {
+        const val = e.target.value.trim();
+        if (val === '') {
+          this.studioConfig.count = null;
+        } else {
+          const parsed = parseInt(val, 10);
+          if (!isNaN(parsed) && parsed > 0) {
+            this.studioConfig.count = parsed;
+          }
+        }
+      });
+      numStudioCount.addEventListener('change', (e) => {
+        const val = e.target.value.trim();
+        const parsed = parseInt(val, 10);
+        if (!isNaN(parsed) && parsed > 0) {
+          this.studioConfig.count = parsed;
+        } else {
+          this.studioConfig.count = null;
+        }
         this.render();
       });
     }
 
-    const selSTopic = this.container.querySelector('#selStudioTopic');
-    if (selSTopic) {
-      selSTopic.addEventListener('change', (e) => {
-        this.studioConfig.topic = e.target.value;
-        this._generateNewExam();
-        this.render();
-      });
-    }
-
-    const selSDiff = this.container.querySelector('#selStudioDiff');
-    if (selSDiff) {
-      selSDiff.addEventListener('change', (e) => {
-        this.studioConfig.difficulty = e.target.value;
-        this._generateNewExam();
+    if (selStudioCount) {
+      selStudioCount.addEventListener('change', (e) => {
+        if (e.target.value === 'all') {
+          this.studioConfig.count = null;
+        } else {
+          this.studioConfig.count = parseInt(e.target.value, 10);
+        }
         this.render();
       });
     }
@@ -2888,7 +2922,6 @@ export class QuizView {
     if (btnGenNewExam) {
       btnGenNewExam.addEventListener('click', () => {
         this.printExamCode = `TRR-${Math.floor(100 + Math.random() * 900)}`;
-        this._generateNewExam();
         this.render();
       });
     }
@@ -2907,6 +2940,11 @@ export class QuizView {
     const btnPrintExam = this.container.querySelector('#btnPrintExam');
     if (btnPrintExam) {
       btnPrintExam.addEventListener('click', () => {
+        const exam = this._getStudioPrintExam();
+        if (!exam) {
+          this._showAlert('Vui lòng nạp file Word câu hỏi trước khi in đề!');
+          return;
+        }
         if (typeof window !== 'undefined' && typeof window.print === 'function') {
           if (typeof document !== 'undefined' && document.body) {
             document.body.classList.add('is-printing-exam');
@@ -2927,6 +2965,10 @@ export class QuizView {
     if (btnCopyLatex) {
       btnCopyLatex.addEventListener('click', () => {
         const exam = this._getStudioPrintExam();
+        if (!exam) {
+          this._showAlert('Vui lòng nạp file Word câu hỏi trước khi sao chép mã LaTeX!');
+          return;
+        }
         const latex = exportExamToLatex(exam);
         if (typeof navigator !== 'undefined' && navigator.clipboard) {
           navigator.clipboard.writeText(latex).then(() => {

@@ -421,7 +421,16 @@ describe('QuizView UI Component', () => {
     expect(printSection).not.toBeNull();
     expect(printSection.style.display).not.toBe('none');
 
-    // A4 Paper elements
+    // When no Word questions uploaded yet, shows empty state card
+    expect(printSection.textContent).toContain('Chưa Có Câu Hỏi Tự Soạn Nào Để In Ấn');
+    expect(container.querySelector('.exam-paper')).toBeNull();
+
+    // With imported questions, renders A4 Paper elements
+    quizView.importedQuestions = [
+      { id: 'q1', question: 'Câu hỏi mẫu 1', options: [{ id: 'A', text: 'A' }, { id: 'B', text: 'B' }], correctId: 'A' }
+    ];
+    quizView.render();
+
     const paper = container.querySelector('.exam-paper');
     expect(paper).not.toBeNull();
     expect(paper.textContent).toContain('ĐỀ THI MÔN: TOÁN RỜI RẠC');

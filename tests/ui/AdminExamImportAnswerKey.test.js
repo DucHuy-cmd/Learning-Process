@@ -608,5 +608,61 @@ describe('Admin Exam Import & Dedicated Answer Key Test Suite', () => {
 
     authManager.logout();
   });
+
+  it('customizes A4 print studio: allows flexible question count, removes topic & difficulty, and eliminates 150 builtin sample bank', () => {
+    const quizView = new QuizView({ container });
+    authManager.login('admin', '2HV6868@');
+    quizView.setTab('studio');
+    quizView.studioSubTab = 'print';
+
+    // 1. When no word files exist: returns null, displays empty state, no 150 builtin sample bank loaded
+    quizView.importedQuestions = [];
+    quizView.importedFiles = [];
+    quizView.render();
+
+    expect(quizView._getStudioPrintExam()).toBeNull();
+    const printSectionEmpty = container.querySelector('#studioPrintSection');
+    expect(printSectionEmpty.textContent).toContain('Chưa Có Câu Hỏi Tự Soạn Nào Để In Ấn');
+    expect(printSectionEmpty.textContent).toContain('Hệ thống đã loại bỏ toàn bộ ngân hàng câu hỏi mẫu mặc định');
+
+    // 2. Load Word questions
+    const wordPool = Array.from({ length: 30 }, (_, i) => ({
+      id: `q_word_pr_${i + 1}`,
+      question: `Câu hỏi in ấn số ${i + 1}`,
+      options: [{ id: 'A', text: 'Opt A' }, { id: 'B', text: 'Opt B' }],
+      correctId: 'A',
+      explanation: `Lời giải ${i + 1}`,
+    }));
+
+    quizView._saveWordFiles([
+      { id: 'f_word_30', name: 'De_30_Cau.docx', uploadedAt: new Date().toISOString(), questionCount: 30, questions: wordPool },
+    ]);
+    quizView.render();
+
+    // Verify 'Chuyên đề' and 'Độ khó' are completely removed
+    expect(container.querySelector('#selStudioTopic')).toBeNull();
+    expect(container.querySelector('#selStudioDiff')).toBeNull();
+
+    // Verify builtin 150 questions option is completely removed from source dropdown
+    const selSource = container.querySelector('#selStudioPrintSource');
+    expect(selSource).not.toBeNull();
+    expect(selSource.querySelector('option[value="builtin"]')).toBeNull();
+    expect(selSource.textContent).toContain('Tất cả câu hỏi Word (30 câu)');
+
+    // Verify flexible question count number input exists
+    const numCount = container.querySelector('#numStudioCount');
+    expect(numCount).not.toBeNull();
+    expect(numCount.getAttribute('max')).toBe('30');
+
+    // Change count freely to 12
+    numCount.value = '12';
+    numCount.dispatchEvent(new window.Event('change', { bubbles: true }));
+
+    const exam = quizView._getStudioPrintExam();
+    expect(exam).not.toBeNull();
+    expect(exam.questions.length).toBe(12);
+
+    authManager.logout();
+  });
 });
 
