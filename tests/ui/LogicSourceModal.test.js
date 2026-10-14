@@ -75,19 +75,11 @@ describe('Phase 3: LogicSourceModal UI Component', () => {
       expect(modal.isOpen).toBe(false);
     });
 
-    it('switches between expression and quiz mode tabs', () => {
+    it('opens directly in expression mode without quiz tab', () => {
       modal.open('expression');
       expect(modal.mode).toBe('expression');
-
-      const quizTab = container.querySelector('#tabLogicModeQuiz');
-      quizTab.click();
-      expect(modal.mode).toBe('quiz');
-      expect(quizTab.classList.contains('active')).toBe(true);
-
-      const exprTab = container.querySelector('#tabLogicModeExpr');
-      exprTab.click();
-      expect(modal.mode).toBe('expression');
-      expect(exprTab.classList.contains('active')).toBe(true);
+      expect(container.querySelector('#tabLogicModeQuiz')).toBeNull();
+      expect(container.querySelector('#logicQuizResultBox')).toBeNull();
     });
   });
 
@@ -317,35 +309,10 @@ describe('Phase 3: LogicSourceModal UI Component', () => {
   // =========================================================================
   // 5. MODE QUIZ PREVIEW
   // =========================================================================
-  describe('Mode Quiz: Preview Without Auto-Approval', () => {
-    it('displays quiz preview cards with pending status and does not auto-approve', async () => {
-      modal.switchMode('quiz');
-      const validFile = new File(['data'], 'exam.png', { type: 'image/png' });
-      modal.selectFile(validFile);
-
-      vi.spyOn(LogicVisionAdapter, 'analyzeLogicFile').mockResolvedValue({
-        mode: 'quiz',
-        id: 'logic_custom_123',
-        question: 'Biểu thức nào là hằng đúng?',
-        options: [
-          { id: 'A', text: 'p * ¬p' },
-          { id: 'B', text: 'p + ¬p' },
-          { id: 'C', text: 'p → ¬p' },
-          { id: 'D', text: 'p ↔ ¬p' },
-        ],
-        correctId: 'B',
-        explanation: 'Luật bài trung.',
-        status: 'pending',
-        warnings: [],
-      });
-
-      await modal.startAnalysis();
-
-      expect(container.querySelector('#logicQuizResultBox').style.display).toBe('block');
-      expect(container.querySelector('#quizPreviewQuestion').textContent).toBe('Biểu thức nào là hằng đúng?');
-      expect(container.querySelectorAll('#quizPreviewOptions div')).toHaveLength(4);
-      expect(container.querySelector('#quizPreviewExplanation').textContent).toBe('Luật bài trung.');
-      expect(onPreviewQuizMock).toHaveBeenCalled();
+  describe('Mode Quiz Retirement', () => {
+    it('does not render quiz result box and remains in expression mode', () => {
+      expect(container.querySelector('#logicQuizResultBox')).toBeNull();
+      expect(modal.mode).toBe('expression');
     });
   });
 

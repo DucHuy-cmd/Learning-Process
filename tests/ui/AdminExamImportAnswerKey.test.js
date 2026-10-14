@@ -481,7 +481,7 @@ describe('Admin Exam Import & Dedicated Answer Key Test Suite', () => {
     quizView.render();
 
     expect(container.querySelector('#studioAssignSection').querySelector('#btnAdminClearAllExams')).toBeNull();
-    expect(container.querySelector('#btnGoToExamManagement')).not.toBeNull();
+    expect(container.querySelector('#btnGoToExamManagement')).toBeNull();
     authManager.logout();
   });
 });

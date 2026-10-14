@@ -77,16 +77,6 @@ export class LogicSourceModal {
           </div>
 
           <div class="modal-body">
-            <!-- Mode Switcher Tabs -->
-            <div class="modal-tabs" role="tablist" style="margin-bottom:14px;">
-              <button type="button" class="modal-tab-btn active" data-mode="expression" id="tabLogicModeExpr" role="tab" aria-selected="true">
-                🔍 Trích xuất Biểu thức Logic
-              </button>
-              <button type="button" class="modal-tab-btn" data-mode="quiz" id="tabLogicModeQuiz" role="tab" aria-selected="false">
-                🎯 Tạo Câu hỏi Trắc nghiệm
-              </button>
-            </div>
-
             <!-- Upload Dropzone Area -->
             <div class="file-dropzone" id="logicFileDropzone" tabindex="0" role="button" aria-label="Kéo thả hoặc chọn tệp">
               <input type="file" id="logicFileInput" accept=".png,.jpg,.jpeg,.webp,.pdf,.docx" style="display:none;" />
@@ -177,116 +167,6 @@ export class LogicSourceModal {
               </div>
             </div>
 
-            <!-- Result Box: Quiz Mode (Preview & Editable Review) -->
-            <div id="logicQuizResultBox" style="display:none;margin-top:14px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px;">
-              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--line);flex-wrap:wrap;gap:8px;">
-                <span style="font-weight:700;color:var(--text);font-size:13px;display:flex;align-items:center;gap:6px;">
-                  <span>🎯</span> Duyệt &amp; Biên Tập Câu Hỏi Trắc Nghiệm:
-                </span>
-                <span id="quizStatusBadge" style="padding:2px 8px;border-radius:12px;background:rgba(245,158,11,0.15);color:#f59e0b;font-size:11px;font-weight:700;">
-                  ⏳ Chờ duyệt (Pending)
-                </span>
-              </div>
-
-              <!-- Quiz Preview Card (Pending AI Extraction Summary) -->
-              <div id="quizPreviewCard" style="background:var(--panel-alt);border:1px solid var(--line);border-radius:6px;padding:12px;margin-bottom:14px;">
-                <div style="font-size:11px;font-weight:700;color:var(--dim);text-transform:uppercase;margin-bottom:6px;letter-spacing:0.5px;">
-                  👁️ Xem trước câu hỏi (Chờ duyệt):
-                </div>
-                <div id="quizPreviewQuestion" style="font-weight:600;font-size:13.5px;color:var(--text);margin-bottom:8px;line-height:1.4;"></div>
-                <div id="quizPreviewOptions" style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:6px;margin-bottom:8px;"></div>
-                <div style="font-size:12px;color:var(--dim);line-height:1.4;">
-                  <strong>💡 Lời giải thích:</strong> <span id="quizPreviewExplanation"></span>
-                </div>
-              </div>
-
-              <!-- Topic & Difficulty Controls -->
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
-                <div>
-                  <label for="selQuizTopic" style="display:block;font-size:11.5px;font-weight:600;color:var(--text);margin-bottom:4px;">Chuyên đề:</label>
-                  <select id="selQuizTopic" class="form-input" style="width:100%;padding:6px 10px;font-size:12px;border-radius:6px;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);">
-                    <option value="logic">⚡ Chương 1: Cơ sở Logic &amp; Suy luận</option>
-                    <option value="boolean">🔌 Chương 2: Đại số Boole &amp; Mạch Logic</option>
-                    <option value="counting">🎲 Chương 3: Đại số Tổ hợp &amp; Đếm</option>
-                    <option value="relation">🔗 Chương 4: Quan hệ 2 ngôi &amp; Thứ tự</option>
-                    <option value="graph">🌐 Chương 5: Lý thuyết Đồ thị &amp; Cây</option>
-                  </select>
-                </div>
-                <div>
-                  <label for="selQuizDifficulty" style="display:block;font-size:11.5px;font-weight:600;color:var(--text);margin-bottom:4px;">Độ khó:</label>
-                  <select id="selQuizDifficulty" class="form-input" style="width:100%;padding:6px 10px;font-size:12px;border-radius:6px;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);">
-                    <option value="easy">🟢 Cơ bản (Dễ)</option>
-                    <option value="medium" selected>🟡 Trung bình</option>
-                    <option value="hard">🔴 Nâng cao (Khó)</option>
-                  </select>
-                </div>
-              </div>
-
-              <!-- Question Textarea -->
-              <div style="margin-bottom:12px;">
-                <label for="txtQuizQuestion" style="display:block;font-size:11.5px;font-weight:600;color:var(--text);margin-bottom:4px;">Nội dung câu hỏi: *</label>
-                <textarea id="txtQuizQuestion" rows="3" class="form-input" style="width:100%;padding:8px 10px;font-size:13px;border-radius:6px;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);line-height:1.4;resize:vertical;"></textarea>
-              </div>
-
-              <!-- Options A, B, C, D Inputs & Correct Option Selector -->
-              <div style="margin-bottom:12px;">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-                  <span style="font-size:11.5px;font-weight:600;color:var(--text);">4 Lựa chọn trả lời: *</span>
-                  <div style="display:flex;align-items:center;gap:6px;">
-                    <label for="selQuizCorrectId" style="font-size:11.5px;font-weight:600;color:var(--accent);">Đáp án đúng: *</label>
-                    <select id="selQuizCorrectId" class="form-input" style="padding:3px 8px;font-size:12px;font-weight:700;border-radius:4px;background:var(--panel-alt);border:1px solid var(--line);color:var(--accent);">
-                      <option value="A">A</option>
-                      <option value="B">B</option>
-                      <option value="C">C</option>
-                      <option value="D">D</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-                  <div style="display:flex;align-items:center;gap:6px;">
-                    <span style="font-weight:700;font-size:12px;color:var(--text);width:16px;">A:</span>
-                    <input type="text" id="txtQuizOptA" class="form-input" placeholder="Lựa chọn A" style="flex:1;padding:6px 10px;font-size:12px;border-radius:6px;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);" />
-                  </div>
-                  <div style="display:flex;align-items:center;gap:6px;">
-                    <span style="font-weight:700;font-size:12px;color:var(--text);width:16px;">B:</span>
-                    <input type="text" id="txtQuizOptB" class="form-input" placeholder="Lựa chọn B" style="flex:1;padding:6px 10px;font-size:12px;border-radius:6px;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);" />
-                  </div>
-                  <div style="display:flex;align-items:center;gap:6px;">
-                    <span style="font-weight:700;font-size:12px;color:var(--text);width:16px;">C:</span>
-                    <input type="text" id="txtQuizOptC" class="form-input" placeholder="Lựa chọn C" style="flex:1;padding:6px 10px;font-size:12px;border-radius:6px;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);" />
-                  </div>
-                  <div style="display:flex;align-items:center;gap:6px;">
-                    <span style="font-weight:700;font-size:12px;color:var(--text);width:16px;">D:</span>
-                    <input type="text" id="txtQuizOptD" class="form-input" placeholder="Lựa chọn D" style="flex:1;padding:6px 10px;font-size:12px;border-radius:6px;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);" />
-                  </div>
-                </div>
-              </div>
-
-              <!-- Explanation Textarea -->
-              <div style="margin-bottom:12px;">
-                <label for="txtQuizExplanation" style="display:block;font-size:11.5px;font-weight:600;color:var(--text);margin-bottom:4px;">💡 Lời giải thích / Hướng dẫn giải:</label>
-                <textarea id="txtQuizExplanation" rows="2" class="form-input" placeholder="Giải thích chi tiết vì sao đáp án này đúng..." style="width:100%;padding:8px 10px;font-size:12px;border-radius:6px;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);line-height:1.4;resize:vertical;"></textarea>
-              </div>
-
-              <!-- Validation Feedback -->
-              <div id="quizValidationBanner" style="display:none;background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);border-radius:6px;padding:8px 12px;font-size:12px;color:#ef4444;margin-bottom:10px;"></div>
-
-              <!-- Save Notification Alert -->
-              <div id="quizSaveAlert" style="display:none;margin-bottom:10px;padding:8px 12px;border-radius:6px;font-size:12.5px;"></div>
-
-              <!-- Action Bar -->
-              <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-                <div style="font-size:11.5px;color:var(--dim);">
-                  Nguồn: <strong style="color:var(--accent);">AI Vision</strong> • Sẵn sàng đưa vào ngân hàng đề thi
-                </div>
-                <button type="button" class="btn-primary" id="btnSaveQuizQuestion" style="padding:8px 18px;font-size:13px;font-weight:700;display:inline-flex;align-items:center;gap:6px;">
-                  <span>💾</span>
-                  <span>Lưu vào Ngân Hàng Câu Hỏi</span>
-                </button>
-              </div>
-            </div>
-
           </div>
 
           <div class="modal-foot">
@@ -305,9 +185,6 @@ export class LogicSourceModal {
     this.modalEl = this.container.querySelector('#logicSourceModalBackdrop');
     this.btnClose = this.container.querySelector('#btnLogicModalClose');
     this.btnCancel = this.container.querySelector('#btnLogicModalCancel');
-
-    this.tabExpr = this.container.querySelector('#tabLogicModeExpr');
-    this.tabQuiz = this.container.querySelector('#tabLogicModeQuiz');
 
     this.dropzone = this.container.querySelector('#logicFileDropzone');
     this.fileInput = this.container.querySelector('#logicFileInput');
@@ -339,25 +216,6 @@ export class LogicSourceModal {
     this.badgeParserStatus = this.container.querySelector('#badgeParserStatus');
     this.parserErrorBanner = this.container.querySelector('#parserErrorBanner');
     this.btnApplyExpression = this.container.querySelector('#btnApplyLogicExpression');
-
-    // Quiz result elements
-    this.quizResultBox = this.container.querySelector('#logicQuizResultBox');
-    this.quizPreviewQuestion = this.container.querySelector('#quizPreviewQuestion');
-    this.quizPreviewOptions = this.container.querySelector('#quizPreviewOptions');
-    this.quizPreviewExplanation = this.container.querySelector('#quizPreviewExplanation');
-    this.quizStatusBadge = this.container.querySelector('#quizStatusBadge');
-    this.selQuizTopic = this.container.querySelector('#selQuizTopic');
-    this.selQuizDifficulty = this.container.querySelector('#selQuizDifficulty');
-    this.txtQuizQuestion = this.container.querySelector('#txtQuizQuestion');
-    this.selQuizCorrectId = this.container.querySelector('#selQuizCorrectId');
-    this.txtQuizOptA = this.container.querySelector('#txtQuizOptA');
-    this.txtQuizOptB = this.container.querySelector('#txtQuizOptB');
-    this.txtQuizOptC = this.container.querySelector('#txtQuizOptC');
-    this.txtQuizOptD = this.container.querySelector('#txtQuizOptD');
-    this.txtQuizExplanation = this.container.querySelector('#txtQuizExplanation');
-    this.quizValidationBanner = this.container.querySelector('#quizValidationBanner');
-    this.quizSaveAlert = this.container.querySelector('#quizSaveAlert');
-    this.btnSaveQuizQuestion = this.container.querySelector('#btnSaveQuizQuestion');
   }
 
   _bindEvents() {
@@ -378,10 +236,6 @@ export class LogicSourceModal {
         this.close();
       }
     });
-
-    // Mode tab switcher
-    this.tabExpr?.addEventListener('click', () => this.switchMode('expression'));
-    this.tabQuiz?.addEventListener('click', () => this.switchMode('quiz'));
 
     // File selection
     this.btnBrowse?.addEventListener('click', (e) => {
@@ -440,35 +294,15 @@ export class LogicSourceModal {
 
     // Apply button
     this.btnApplyExpression?.addEventListener('click', () => this._onApplyConfirmed());
-
-    // Live validation on quiz edit fields
-    const quizInputs = [
-      this.txtQuizQuestion,
-      this.txtQuizOptA,
-      this.txtQuizOptB,
-      this.txtQuizOptC,
-      this.txtQuizOptD,
-      this.selQuizCorrectId,
-      this.selQuizTopic,
-      this.selQuizDifficulty,
-      this.txtQuizExplanation,
-    ];
-    quizInputs.forEach(el => {
-      el?.addEventListener('input', () => this._onQuizInputChanged());
-      el?.addEventListener('change', () => this._onQuizInputChanged());
-    });
-
-    // Save quiz question button
-    this.btnSaveQuizQuestion?.addEventListener('click', () => this._onSaveQuizConfirmed());
   }
 
   /**
    * Opens the modal dialog.
-   * @param {'expression'|'quiz'} [initialMode='expression']
+   * @param {string} [initialMode='expression']
    */
   open(initialMode = 'expression') {
     this.isOpen = true;
-    this.switchMode(initialMode);
+    this.switchMode('expression');
     if (this.modalEl) {
       this.modalEl.style.display = 'flex';
       this.modalEl.focus();
@@ -487,31 +321,14 @@ export class LogicSourceModal {
   }
 
   /**
-   * Switches modal mode: 'expression' | 'quiz'.
-   * @param {'expression'|'quiz'} mode
+   * Sets modal mode.
+   * @param {string} [mode='expression']
    */
-  switchMode(mode) {
-    this.mode = mode === 'quiz' ? 'quiz' : 'expression';
-
-    this.tabExpr?.classList.toggle('active', this.mode === 'expression');
-    this.tabExpr?.setAttribute('aria-selected', this.mode === 'expression' ? 'true' : 'false');
-
-    this.tabQuiz?.classList.toggle('active', this.mode === 'quiz');
-    this.tabQuiz?.setAttribute('aria-selected', this.mode === 'quiz' ? 'true' : 'false');
-
+  switchMode(mode = 'expression') {
+    this.mode = 'expression';
     this._hideErrors();
-
-    // If result already extracted for this mode, display it
-    if (this.mode === 'expression') {
-      if (this.quizResultBox) this.quizResultBox.style.display = 'none';
-      if (this.extractedExpressionResult && this.exprResultBox) {
-        this.exprResultBox.style.display = 'block';
-      }
-    } else {
-      if (this.exprResultBox) this.exprResultBox.style.display = 'none';
-      if (this.extractedQuizResult && this.quizResultBox) {
-        this.quizResultBox.style.display = 'block';
-      }
+    if (this.extractedExpressionResult && this.exprResultBox) {
+      this.exprResultBox.style.display = 'block';
     }
   }
 
@@ -616,13 +433,12 @@ export class LogicSourceModal {
     if (this.loadingBox) this.loadingBox.style.display = 'block';
     if (this.btnStartAnalyze) this.btnStartAnalyze.disabled = true;
     if (this.exprResultBox) this.exprResultBox.style.display = 'none';
-    if (this.quizResultBox) this.quizResultBox.style.display = 'none';
 
     this.abortController = new AbortController();
 
     try {
       const result = await analyzeLogicFile(this.currentFile, {
-        mode: this.mode,
+        mode: 'expression',
         signal: this.abortController.signal,
       });
 
@@ -630,17 +446,8 @@ export class LogicSourceModal {
       if (this.loadingBox) this.loadingBox.style.display = 'none';
       if (this.btnStartAnalyze) this.btnStartAnalyze.disabled = false;
 
-      if (this.mode === 'quiz') {
-        this.extractedQuizResult = result;
-        this._renderQuizResult(result);
-        if (typeof this.onPreviewQuiz === 'function') {
-          this.onPreviewQuiz(result);
-        }
-      } else {
-        this.extractedExpressionResult = result;
-        this._renderExpressionResult(result);
-      }
-
+      this.extractedExpressionResult = result;
+      this._renderExpressionResult(result);
       this._renderWarnings(result.warnings);
     } catch (err) {
       // Ignore abort errors
@@ -780,268 +587,6 @@ export class LogicSourceModal {
     }
 
     this.close();
-  }
-
-  _getTopicName(topic) {
-    const map = {
-      logic: 'Cơ sở Logic & Suy luận',
-      boolean: 'Đại số Boole & Mạch Logic',
-      counting: 'Đại số Tổ hợp & Đếm',
-      relation: 'Quan hệ 2 ngôi & Thứ tự',
-      graph: 'Lý thuyết Đồ thị & Cây',
-    };
-    return map[topic] || 'Toán Rời Rạc';
-  }
-
-  _updateQuizPreviewCard(qText, opts, correctId, explanation) {
-    if (this.quizPreviewQuestion) {
-      this.quizPreviewQuestion.textContent = qText || '';
-    }
-    if (this.quizPreviewExplanation) {
-      this.quizPreviewExplanation.textContent = explanation || '';
-    }
-    if (this.quizPreviewOptions) {
-      this.quizPreviewOptions.innerHTML = '';
-      (opts || []).forEach((opt, idx) => {
-        const optDiv = document.createElement('div');
-        optDiv.style.cssText = 'padding:6px 10px;border-radius:6px;background:var(--panel);border:1px solid var(--line);font-size:12px;color:var(--text);display:flex;align-items:center;gap:6px;';
-        const optLetter = opt.id || ['A', 'B', 'C', 'D'][idx] || '';
-        const isCorrect = optLetter === correctId;
-        const badge = document.createElement('strong');
-        badge.style.color = isCorrect ? '#10b981' : 'var(--accent)';
-        badge.style.fontSize = '12px';
-        badge.textContent = `[${optLetter}]`;
-        const textSpan = document.createElement('span');
-        textSpan.textContent = opt.text || '';
-        optDiv.appendChild(badge);
-        optDiv.appendChild(textSpan);
-        this.quizPreviewOptions.appendChild(optDiv);
-      });
-    }
-  }
-
-  _renderQuizResult(result) {
-    if (!this.quizResultBox) return;
-    this.quizResultBox.style.display = 'block';
-
-    const questionText = result.question || '';
-    const explanationText = result.explanation || '';
-    const opts = Array.isArray(result.options) ? result.options : [];
-    const correctId = (result.correctId || 'A').toUpperCase();
-
-    // 1. Populate Preview Card
-    const optA = opts.find(o => o.id === 'A') || opts[0];
-    const optB = opts.find(o => o.id === 'B') || opts[1];
-    const optC = opts.find(o => o.id === 'C') || opts[2];
-    const optD = opts.find(o => o.id === 'D') || opts[3];
-
-    const normalizedOpts = [
-      { id: 'A', text: optA?.text || '' },
-      { id: 'B', text: optB?.text || '' },
-      { id: 'C', text: optC?.text || '' },
-      { id: 'D', text: optD?.text || '' },
-    ];
-    this._updateQuizPreviewCard(questionText, normalizedOpts, correctId, explanationText);
-
-    // 2. Populate Editable Form Fields
-    if (this.txtQuizQuestion) {
-      this.txtQuizQuestion.value = questionText;
-    }
-
-    if (this.txtQuizOptA) this.txtQuizOptA.value = optA?.text || '';
-    if (this.txtQuizOptB) this.txtQuizOptB.value = optB?.text || '';
-    if (this.txtQuizOptC) this.txtQuizOptC.value = optC?.text || '';
-    if (this.txtQuizOptD) this.txtQuizOptD.value = optD?.text || '';
-
-    if (this.selQuizCorrectId) {
-      this.selQuizCorrectId.value = ['A', 'B', 'C', 'D'].includes(correctId) ? correctId : 'A';
-    }
-
-    if (this.txtQuizExplanation) {
-      this.txtQuizExplanation.value = explanationText;
-    }
-
-    if (this.selQuizTopic && result.topic) {
-      this.selQuizTopic.value = result.topic;
-    }
-
-    if (this.selQuizDifficulty && result.difficulty) {
-      this.selQuizDifficulty.value = result.difficulty;
-    }
-
-    if (this.quizStatusBadge) {
-      const isApproved = result.status === 'approved';
-      this.quizStatusBadge.textContent = isApproved ? '✓ Đã duyệt' : '⏳ Chờ duyệt (Pending)';
-      this.quizStatusBadge.style.background = isApproved ? 'rgba(16,185,129,0.15)' : 'rgba(245,158,11,0.15)';
-      this.quizStatusBadge.style.color = isApproved ? '#10b981' : '#f59e0b';
-    }
-
-    if (this.quizSaveAlert) {
-      this.quizSaveAlert.style.display = 'none';
-    }
-
-    this._onQuizInputChanged();
-  }
-
-  _onQuizInputChanged() {
-    const qText = (this.txtQuizQuestion?.value || '').trim();
-    const optA = (this.txtQuizOptA?.value || '').trim();
-    const optB = (this.txtQuizOptB?.value || '').trim();
-    const optC = (this.txtQuizOptC?.value || '').trim();
-    const optD = (this.txtQuizOptD?.value || '').trim();
-    const correctId = (this.selQuizCorrectId?.value || 'A').trim().toUpperCase();
-    const explanation = (this.txtQuizExplanation?.value || '').trim();
-
-    // Sync preview card in real time
-    this._updateQuizPreviewCard(qText, [
-      { id: 'A', text: optA },
-      { id: 'B', text: optB },
-      { id: 'C', text: optC },
-      { id: 'D', text: optD },
-    ], correctId, explanation);
-
-    let error = '';
-    if (qText.length < 5) {
-      error = 'Nội dung câu hỏi phải có ít nhất 5 ký tự.';
-    } else if (!optA || !optB || !optC || !optD) {
-      error = 'Tất cả 4 lựa chọn (A, B, C, D) đều phải có nội dung.';
-    } else if (!['A', 'B', 'C', 'D'].includes(correctId)) {
-      error = 'Đáp án đúng phải là một trong các lựa chọn: A, B, C, D.';
-    }
-
-    if (error) {
-      this._showQuizValidation(error);
-      if (this.btnSaveQuizQuestion) this.btnSaveQuizQuestion.disabled = true;
-      if (this.quizStatusBadge) {
-        this.quizStatusBadge.textContent = '⚠️ Chưa hoàn tất';
-        this.quizStatusBadge.style.background = 'rgba(239,68,68,0.15)';
-        this.quizStatusBadge.style.color = '#ef4444';
-      }
-    } else {
-      this._hideQuizValidation();
-      if (this.btnSaveQuizQuestion) this.btnSaveQuizQuestion.disabled = false;
-      if (this.quizStatusBadge) {
-        const isApproved = this.extractedQuizResult?.status === 'approved';
-        this.quizStatusBadge.textContent = isApproved ? '✓ Đã duyệt' : '⏳ Chờ duyệt (Pending)';
-        this.quizStatusBadge.style.background = isApproved ? 'rgba(16,185,129,0.15)' : 'rgba(245,158,11,0.15)';
-        this.quizStatusBadge.style.color = isApproved ? '#10b981' : '#f59e0b';
-      }
-    }
-  }
-
-  _showQuizValidation(message) {
-    if (this.quizValidationBanner) {
-      this.quizValidationBanner.textContent = message;
-      this.quizValidationBanner.style.display = 'block';
-    }
-  }
-
-  _hideQuizValidation() {
-    if (this.quizValidationBanner) {
-      this.quizValidationBanner.style.display = 'none';
-      this.quizValidationBanner.textContent = '';
-    }
-  }
-
-  _showQuizSaveAlert(message, type = 'success') {
-    if (this.quizSaveAlert) {
-      this.quizSaveAlert.textContent = message;
-      this.quizSaveAlert.style.display = 'block';
-      if (type === 'success') {
-        this.quizSaveAlert.style.background = 'rgba(16,185,129,0.15)';
-        this.quizSaveAlert.style.color = '#10b981';
-        this.quizSaveAlert.style.border = '1px solid rgba(16,185,129,0.3)';
-      } else {
-        this.quizSaveAlert.style.background = 'rgba(239,68,68,0.15)';
-        this.quizSaveAlert.style.color = '#ef4444';
-        this.quizSaveAlert.style.border = '1px solid rgba(239,68,68,0.3)';
-      }
-    }
-  }
-
-  async _onSaveQuizConfirmed() {
-    const qText = (this.txtQuizQuestion?.value || '').trim();
-    const optA = (this.txtQuizOptA?.value || '').trim();
-    const optB = (this.txtQuizOptB?.value || '').trim();
-    const optC = (this.txtQuizOptC?.value || '').trim();
-    const optD = (this.txtQuizOptD?.value || '').trim();
-    const correctId = (this.selQuizCorrectId?.value || 'A').trim().toUpperCase();
-    const explanation = (this.txtQuizExplanation?.value || '').trim();
-    const topic = (this.selQuizTopic?.value || 'logic').trim();
-    const difficulty = (this.selQuizDifficulty?.value || 'medium').trim();
-
-    if (qText.length < 5 || !optA || !optB || !optC || !optD) {
-      this._onQuizInputChanged();
-      return;
-    }
-
-    const questionData = {
-      id: this.extractedQuizResult?.id || `custom_q_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-      topic,
-      topicName: this._getTopicName(topic),
-      difficulty,
-      question: qText,
-      options: [
-        { id: 'A', text: optA },
-        { id: 'B', text: optB },
-        { id: 'C', text: optC },
-        { id: 'D', text: optD },
-      ],
-      correctId,
-      explanation,
-      source: 'ai_vision',
-      status: 'approved',
-      createdAt: new Date().toISOString(),
-    };
-
-    if (typeof this.onSaveQuizQuestion === 'function') {
-      try {
-        if (this.btnSaveQuizQuestion) {
-          this.btnSaveQuizQuestion.disabled = true;
-          this.btnSaveQuizQuestion.innerHTML = `<span>⏳</span><span>Đang lưu...</span>`;
-        }
-        const res = await this.onSaveQuizQuestion(questionData);
-        if (res === false || (res && res.success === false)) {
-          this._showQuizValidation(res?.error || res?.message || 'Lỗi khi lưu câu hỏi.');
-          if (this.btnSaveQuizQuestion) {
-            this.btnSaveQuizQuestion.disabled = false;
-            this.btnSaveQuizQuestion.innerHTML = `<span>💾</span><span>Lưu vào Ngân Hàng Câu Hỏi</span>`;
-          }
-          return;
-        }
-
-        if (this.extractedQuizResult) {
-          this.extractedQuizResult.status = 'approved';
-        }
-        if (this.quizStatusBadge) {
-          this.quizStatusBadge.textContent = '✓ Đã duyệt';
-          this.quizStatusBadge.style.background = 'rgba(16,185,129,0.15)';
-          this.quizStatusBadge.style.color = '#10b981';
-        }
-
-        this._showQuizSaveAlert('✓ Đã lưu câu hỏi thành công vào Ngân hàng câu hỏi!', 'success');
-        setTimeout(() => {
-          this.close();
-        }, 1000);
-      } catch (err) {
-        this._showQuizValidation(err?.message || 'Lỗi khi lưu câu hỏi.');
-        if (this.btnSaveQuizQuestion) {
-          this.btnSaveQuizQuestion.disabled = false;
-          this.btnSaveQuizQuestion.innerHTML = `<span>💾</span><span>Lưu vào Ngân Hàng Câu Hỏi</span>`;
-        }
-      }
-    } else {
-      if (this.extractedQuizResult) {
-        this.extractedQuizResult.status = 'approved';
-      }
-      if (this.quizStatusBadge) {
-        this.quizStatusBadge.textContent = '✓ Đã duyệt';
-        this.quizStatusBadge.style.background = 'rgba(16,185,129,0.15)';
-        this.quizStatusBadge.style.color = '#10b981';
-      }
-      this._showQuizSaveAlert('✓ Câu hỏi đã được xác nhận!', 'success');
-      setTimeout(() => this.close(), 1000);
-    }
   }
 
   _renderWarnings(warnings) {

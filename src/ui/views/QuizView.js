@@ -42,7 +42,6 @@ import { authManager } from '../../core/auth/AuthManager.js';
 import { quizHistoryManager } from '../../core/quiz/QuizHistoryManager.js';
 import { cloudSyncManager } from '../../core/sync/CloudSyncManager.js';
 import { examManager } from '../../core/quiz/ExamManager.js';
-import { LogicSourceModal } from '../components/LogicSourceModal.js';
 import {
   parseExamText,
   parseExamCsv,
@@ -1292,18 +1291,6 @@ export class QuizView {
               <span>🚀 Phát Đề Cho Sinh Viên &amp; Xuất File Đáp Án</span>
             </button>
           </div>
-        </div>
-
-        <!-- Help text pointing to Quản Lý Đề Thi tab -->
-        <div style="background:var(--panel-alt);border:1px dashed var(--line);border-radius:10px;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-top:8px;">
-          <div style="font-size:13px;color:var(--dim);">
-            📊 Các đề thi sau khi phát được lưu trữ và theo dõi bài làm của sinh viên tại mục <strong>"Quản Lý Đề Thi"</strong>.
-          </div>
-          <button type="button" class="btn-secondary" id="btnGoToExamManagement" style="padding:6px 14px;font-size:12.5px;border-radius:6px;cursor:pointer;font-weight:600;">
-            👉 Chuyển Sang Tab [Quản Lý Đề Thi]
-          </button>
-        </div>
-
       </div>
 
       <!-- SECTION B: A4 PRINT & LATEX EXPORTER (PRESERVED) -->
@@ -2476,14 +2463,6 @@ export class QuizView {
     if (selAssignQuestionCount) {
       selAssignQuestionCount.addEventListener('change', (e) => {
         this.selectedAssignCount = e.target.value;
-      });
-    }
-
-    // Quick jump to exam management tab
-    const btnGoToExamManagement = this.container.querySelector('#btnGoToExamManagement');
-    if (btnGoToExamManagement) {
-      btnGoToExamManagement.addEventListener('click', () => {
-        this.setTab('myExams');
       });
     }
 

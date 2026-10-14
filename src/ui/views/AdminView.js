@@ -16,8 +16,6 @@ import { cloudSyncManager } from '../../core/sync/CloudSyncManager.js';
 import { quizHistoryManager } from '../../core/quiz/QuizHistoryManager.js';
 import { aiHistoryManager } from '../../core/ai/AiHistoryManager.js';
 import { examManager } from '../../core/quiz/ExamManager.js';
-import { getCustomQuestionBank } from '../../core/quiz/QuizBank.js';
-import { LogicSourceModal } from '../components/LogicSourceModal.js';
 
 export class AdminView {
   /**
@@ -65,7 +63,6 @@ export class AdminView {
       if (this.isServerConnected) {
         await cloudSyncManager.syncUsers(authManager);
         await cloudSyncManager.syncQuizLeaderboard(quizHistoryManager);
-        await cloudSyncManager.syncCustomQuestions();
       }
     } catch {
       this.isServerConnected = false;
@@ -73,7 +70,6 @@ export class AdminView {
 
     const allUsers = authManager.getUsers();
     const studentCount = allUsers.filter(u => u.username !== 'admin' && u.id !== 'user_admin').length;
-    const customQuestions = getCustomQuestionBank();
 
     this.container.innerHTML = `
       <div class="admin-dashboard-wrap" style="max-width:1200px;margin:0 auto;padding:24px 20px;font-family:inherit;">
@@ -88,15 +84,11 @@ export class AdminView {
               </span>
             </div>
             <p style="margin:0;font-size:13px;color:var(--dim);line-height:1.5;">
-              Bảng điều khiển quản lý tập trung tài khoản sinh viên, ngân hàng câu hỏi AI Vision, đồng bộ máy chủ và dữ liệu thi cử.
+              Bảng điều khiển quản lý tập trung tài khoản sinh viên, đồng bộ máy chủ và dữ liệu thi cử.
             </p>
           </div>
 
           <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-            <button type="button" class="btn-primary" id="btnAdminAddQuestionAi" style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;font-size:12.5px;font-weight:700;border-radius:8px;cursor:pointer;">
-              <span>📷</span>
-              <span>Thêm câu hỏi từ ảnh đề</span>
-            </button>
             <button type="button" class="btn-secondary" id="btnAdminManualSync" style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;font-size:12.5px;font-weight:600;border-radius:8px;cursor:pointer;">
               <span>🔄</span>
               <span>Đồng bộ Máy chủ</span>
@@ -126,16 +118,7 @@ export class AdminView {
             <div style="font-size:26px;font-weight:800;color:var(--text);">${studentCount}</div>
           </div>
 
-          <!-- Card 2: Custom AI Questions -->
-          <div style="background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 18px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-              <span style="font-size:12px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:0.5px;">Câu Hỏi AI Vision</span>
-              <span style="font-size:20px;">🤖</span>
-            </div>
-            <div style="font-size:26px;font-weight:800;color:#38bdf8;">${customQuestions.length}</div>
-          </div>
-
-          <!-- Card 3: Server Status -->
+          <!-- Card 2: Server Status -->
           <div style="background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 18px;">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
               <span style="font-size:12px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:0.5px;">Trạng Thái Máy Chủ</span>
@@ -146,7 +129,7 @@ export class AdminView {
             </div>
           </div>
 
-          <!-- Card 4: System Admin -->
+          <!-- Card 3: System Admin -->
           <div style="background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 18px;">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
               <span style="font-size:12px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:0.5px;">Quản Trị Hệ Thống</span>
@@ -155,43 +138,6 @@ export class AdminView {
             <div style="font-size:18px;font-weight:800;color:#f59e0b;">@admin</div>
           </div>
         </div>
-
-        <!-- AI Vision Question Bank Section -->
-        <section class="admin-ai-questions-section" style="background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px 22px;margin-bottom:24px;">
-          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:14px;">
-            <div>
-              <h3 style="margin:0 0 4px;font-size:16px;color:var(--text);font-weight:700;display:flex;align-items:center;gap:8px;">
-                <span>🤖</span>
-                <span>Ngân Hàng Câu Hỏi AI Vision (${customQuestions.length})</span>
-              </h3>
-              <p style="margin:0;font-size:12px;color:var(--dim);">
-                Câu hỏi trắc nghiệm được trích xuất từ ảnh đề bài qua AI Vision và đã được Quản trị viên duyệt. Tự động tích hợp vào luồng tạo đề thi.
-              </p>
-            </div>
-            <button type="button" class="btn-primary" id="btnAdminTriggerAddQuestionAi" style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;font-size:12.5px;font-weight:700;border-radius:8px;cursor:pointer;">
-              <span>📷</span>
-              <span>Thêm câu hỏi từ ảnh đề</span>
-            </button>
-          </div>
-
-          <!-- Table of custom questions -->
-          <div style="overflow-x:auto;border:1px solid var(--line);border-radius:8px;">
-            <table style="width:100%;border-collapse:collapse;font-size:13px;text-align:left;">
-              <thead style="background:var(--panel-alt);border-bottom:1px solid var(--line);">
-                <tr>
-                  <th style="padding:10px 14px;font-weight:700;color:var(--dim);font-size:12px;text-transform:uppercase;">Nội dung câu hỏi</th>
-                  <th style="padding:10px 14px;font-weight:700;color:var(--dim);font-size:12px;text-transform:uppercase;">Chuyên đề</th>
-                  <th style="padding:10px 14px;font-weight:700;color:var(--dim);font-size:12px;text-transform:uppercase;text-align:center;">Độ khó</th>
-                  <th style="padding:10px 14px;font-weight:700;color:var(--dim);font-size:12px;text-transform:uppercase;text-align:center;">Đáp án</th>
-                  <th style="padding:10px 14px;font-weight:700;color:var(--dim);font-size:12px;text-transform:uppercase;text-align:center;">Hành động</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${this._renderCustomQuestionsTableRows(customQuestions)}
-              </tbody>
-            </table>
-          </div>
-        </section>
 
         <!-- Add Student Form Section (Collapsible/Accordion) -->
         <section class="admin-create-user-section" style="background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px 22px;margin-bottom:24px;">
@@ -363,66 +309,6 @@ export class AdminView {
     }).join('');
   }
 
-  /**
-   * Renders rows for the AI custom questions table.
-   * @param {Array<Object>} questions
-   * @returns {string}
-   * @private
-   */
-  _renderCustomQuestionsTableRows(questions) {
-    if (!Array.isArray(questions) || questions.length === 0) {
-      return `
-        <tr>
-          <td colspan="5" style="text-align:center;padding:24px;color:var(--dim);font-style:italic;">
-            Chưa có câu hỏi AI Vision nào trong ngân hàng. Bấm "Thêm câu hỏi từ ảnh đề" để tải ảnh và trích xuất bằng AI!
-          </td>
-        </tr>
-      `;
-    }
-
-    return questions.map((q, idx) => {
-      const topicName = q.topicName || q.topic || 'Toán Rời Rạc';
-      const diffLabel = q.difficulty === 'easy' ? '🟢 Dễ' : (q.difficulty === 'hard' ? '🔴 Khó' : '🟡 TB');
-      const cleanQ = (q.question || '').replace(/<[^>]+>/g, '');
-      const opts = Array.isArray(q.options) ? q.options : [];
-      const correctOpt = opts.find(o => o.id === q.correctId);
-
-      return `
-        <tr style="border-bottom:1px solid var(--line);">
-          <td style="padding:10px 14px;max-width:420px;">
-            <div style="font-weight:600;color:var(--text);margin-bottom:4px;line-height:1.4;">
-              <span style="color:var(--accent);font-family:monospace;margin-right:4px;">#${idx + 1}</span>
-              ${this._escapeHtml(cleanQ)}
-            </div>
-            ${q.explanation ? `
-              <div style="font-size:11.5px;color:var(--dim);line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">
-                💡 <em>${this._escapeHtml(q.explanation)}</em>
-              </div>
-            ` : ''}
-          </td>
-          <td style="padding:10px 14px;white-space:nowrap;">
-            <span style="font-size:11px;padding:2px 8px;border-radius:4px;background:var(--panel-alt);border:1px solid var(--line);color:var(--accent);">
-              ${this._escapeHtml(topicName)}
-            </span>
-          </td>
-          <td style="padding:10px 14px;text-align:center;white-space:nowrap;font-size:12px;">
-            ${diffLabel}
-          </td>
-          <td style="padding:10px 14px;text-align:center;white-space:nowrap;">
-            <span style="font-weight:700;color:#10b981;background:rgba(16,185,129,0.12);padding:2px 8px;border-radius:4px;">
-              [ ${q.correctId} ] ${correctOpt ? this._escapeHtml(correctOpt.text) : ''}
-            </span>
-          </td>
-          <td style="padding:10px 14px;text-align:center;white-space:nowrap;">
-            <button type="button" class="btn-sm btn-delete-custom-q" data-q-id="${q.id}" data-q-title="${this._escapeHtml(cleanQ.slice(0, 30))}" style="padding:4px 10px;font-size:12px;font-weight:600;color:#ef4444;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.3);border-radius:6px;cursor:pointer;transition:all 0.15s;">
-              🗑️ Xóa
-            </button>
-          </td>
-        </tr>
-      `;
-    }).join('');
-  }
-
   _escapeHtml(str) {
     if (!str) return '';
     return String(str)
@@ -464,37 +350,6 @@ export class AdminView {
    * @private
    */
   _bindEvents() {
-    // 0. AI Vision Add Question Modal
-    const openAiModal = () => {
-      if (!this.logicModal) {
-        this.logicModal = new LogicSourceModal({
-          container: document.body,
-          adminMode: true,
-          onSaveQuizQuestion: async (questionData) => {
-            const currentUser = authManager.getCurrentUser();
-            const authHeaders = {
-              'x-user-id': currentUser?.id || 'user_admin',
-              'Authorization': `Bearer ${currentUser?.id || 'user_admin'}`,
-            };
-            questionData.createdBy = currentUser?.id || 'user_admin';
-            const res = await cloudSyncManager.saveCustomQuestion(questionData, authHeaders);
-            if (res && res.success) {
-              await this.render();
-              this._showAlert(`✓ Đã lưu câu hỏi AI Vision vào ngân hàng đề thi thành công!`, 'success');
-              return { success: true };
-            }
-            return { success: false, error: res?.error || 'Lỗi khi lưu câu hỏi.' };
-          },
-        });
-      }
-      this.logicModal.open('quiz');
-    };
-
-    const btnAddQHeader = this.container.querySelector('#btnAdminAddQuestionAi');
-    const btnAddQSection = this.container.querySelector('#btnAdminTriggerAddQuestionAi');
-    if (btnAddQHeader) btnAddQHeader.addEventListener('click', openAiModal);
-    if (btnAddQSection) btnAddQSection.addEventListener('click', openAiModal);
-
     // 1. Search box filtering
     const searchInput = this.container.querySelector('#adminUserSearchInput');
     if (searchInput) {
@@ -739,30 +594,6 @@ export class AdminView {
           this._showAlert(`✓ Đã xóa vĩnh viễn tài khoản "${targetName}".`, 'success');
         } else {
           this._showAlert(res.error || 'Lỗi khi xóa tài khoản.', 'error');
-        }
-      });
-    });
-
-    // Delete custom AI question buttons
-    this.container.querySelectorAll('.btn-delete-custom-q').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const qId = btn.getAttribute('data-q-id');
-        const qTitle = btn.getAttribute('data-q-title') || qId;
-        if (typeof window !== 'undefined' && window.confirm && !window.confirm(`Xác nhận xóa câu hỏi "${qTitle}..." khỏi ngân hàng?`)) {
-          return;
-        }
-
-        const currentUser = authManager.getCurrentUser();
-        const authHeaders = {
-          'x-user-id': currentUser?.id || 'user_admin',
-          'Authorization': `Bearer ${currentUser?.id || 'user_admin'}`,
-        };
-        const res = await cloudSyncManager.deleteCustomQuestion(qId, authHeaders);
-        if (res && res.success) {
-          await this.render();
-          this._showAlert(`✓ Đã xóa câu hỏi khỏi ngân hàng thành công!`, 'success');
-        } else {
-          this._showAlert(res?.error || 'Lỗi khi xóa câu hỏi.', 'error');
         }
       });
     });
