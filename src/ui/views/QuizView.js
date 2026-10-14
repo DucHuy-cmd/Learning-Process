@@ -107,11 +107,16 @@ export class QuizView {
     this.showTeacherSolutions = true;
 
     // Admin Exam Import & Answer Key State (Persisted in localStorage)
-    const saved = this._loadSavedWordQuestions();
+    const saved = this._loadSavedWordFiles();
+    this.importedFiles = saved.files;
     this.importedQuestions = saved.questions;
     this.importRawText = saved.rawText;
     this.importErrors = [];
     this.adminAnswerKeyExamId = null;
+    this.selectedAssignFileId = 'all'; // 'all' or specific file.id
+    this.selectedAssignCount = 'all'; // 'all' or string number e.g. '10', '20'
+    this.studioPrintSource = 'all_word'; // 'all_word', specific file.id, or 'builtin'
+    this.printExamCode = null;
 
     this._generateNewExam();
 
@@ -172,50 +177,199 @@ export class QuizView {
     return null;
   }
 
-  _loadSavedWordQuestions() {
+  _loadSavedWordFiles() {
     try {
       const storage = this._getStorage();
       if (storage) {
-        const stored = storage.getItem('toanrr_custom_imported_questions_v1');
+        const storedFiles = storage.getItem('toanrr_custom_imported_files_v1');
         const raw = storage.getItem('toanrr_custom_imported_raw_v1');
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            return { questions: parsed, rawText: raw || '' };
+        if (storedFiles) {
+          const parsedFiles = JSON.parse(storedFiles);
+          if (Array.isArray(parsedFiles) && parsedFiles.length > 0) {
+            const allQ = parsedFiles.flatMap(f => f.questions || []);
+            return { files: parsedFiles, questions: allQ, rawText: raw || '' };
+          }
+        }
+
+        // Backward compatibility: migrate from toanrr_custom_imported_questions_v1
+        const storedQ = storage.getItem('toanrr_custom_imported_questions_v1');
+        if (storedQ) {
+          const parsedQ = JSON.parse(storedQ);
+          if (Array.isArray(parsedQ) && parsedQ.length > 0) {
+            const legacyFile = {
+              id: 'file_legacy_default',
+              name: 'Đề thi đã tải lên trước đó.doc',
+              uploadedAt: new Date().toISOString(),
+              questionCount: parsedQ.length,
+              questions: parsedQ,
+            };
+            return { files: [legacyFile], questions: parsedQ, rawText: raw || '' };
           }
         }
       }
     } catch {}
-    return { questions: [], rawText: '' };
+    return { files: [], questions: [], rawText: '' };
   }
 
-  _saveWordQuestions(questions, rawText = null) {
-    this.importedQuestions = Array.isArray(questions) ? questions : [];
-    if (rawText !== null) {
-      this.importRawText = rawText;
-    }
+  _saveWordFiles(files) {
+    this.importedFiles = Array.isArray(files) ? files : [];
+    this.importedQuestions = this.importedFiles.flatMap(f => f.questions || []);
     try {
       const storage = this._getStorage();
       if (storage) {
+        storage.setItem('toanrr_custom_imported_files_v1', JSON.stringify(this.importedFiles));
         storage.setItem('toanrr_custom_imported_questions_v1', JSON.stringify(this.importedQuestions));
-        if (rawText !== null) {
-          storage.setItem('toanrr_custom_imported_raw_v1', this.importRawText);
-        }
       }
     } catch {}
   }
 
-  _clearAllWordQuestions() {
+  _deleteImportedFile(fileId) {
+    const file = this.importedFiles.find(f => f.id === fileId);
+    if (!file) return;
+
+    if (typeof window !== 'undefined' && window.confirm) {
+      const ok = window.confirm(`Bạn có chắc chắn muốn xóa dữ liệu từ file "${file.name}"?\n(${file.questionCount} câu hỏi sẽ bị gỡ khỏi hệ thống)`);
+      if (!ok) return;
+    }
+
+    const updated = this.importedFiles.filter(f => f.id !== fileId);
+    if (this.selectedAssignFileId === fileId) {
+      this.selectedAssignFileId = 'all';
+    }
+    if (this.studioPrintSource === fileId) {
+      this.studioPrintSource = 'all_word';
+    }
+    this._saveWordFiles(updated);
+    this._showAlert(`🗑️ Đã xóa dữ liệu file "${file.name}" thành công!`);
+    this.render();
+  }
+
+  _clearAllWordFiles() {
+    this.importedFiles = [];
     this.importedQuestions = [];
     this.importRawText = '';
     this.importErrors = [];
+    this.selectedAssignFileId = 'all';
+    this.selectedAssignCount = 'all';
+    this.studioPrintSource = 'all_word';
     try {
       const storage = this._getStorage();
       if (storage) {
+        storage.removeItem('toanrr_custom_imported_files_v1');
         storage.removeItem('toanrr_custom_imported_questions_v1');
         storage.removeItem('toanrr_custom_imported_raw_v1');
       }
     } catch {}
+  }
+
+  _saveWordQuestions(questions, rawText = null) {
+    const list = Array.isArray(questions) ? questions : [];
+    if (this.importedFiles && this.importedFiles.length > 0) {
+      if (this.importedFiles.length === 1) {
+        this.importedFiles[0].questions = list;
+        this.importedFiles[0].questionCount = list.length;
+      } else {
+        const synth = {
+          id: `file_${Date.now()}`,
+          name: 'Bộ câu hỏi tự soạn.doc',
+          uploadedAt: new Date().toISOString(),
+          questionCount: list.length,
+          questions: list,
+        };
+        this.importedFiles = [synth];
+      }
+    } else if (list.length > 0) {
+      this.importedFiles = [{
+        id: `file_${Date.now()}`,
+        name: 'Bộ câu hỏi tự soạn.doc',
+        uploadedAt: new Date().toISOString(),
+        questionCount: list.length,
+        questions: list,
+      }];
+    } else {
+      this.importedFiles = [];
+    }
+    this._saveWordFiles(this.importedFiles);
+    if (rawText !== null) {
+      this.importRawText = rawText;
+      try {
+        const storage = this._getStorage();
+        if (storage) storage.setItem('toanrr_custom_imported_raw_v1', this.importRawText);
+      } catch {}
+    }
+  }
+
+  _clearAllWordQuestions() {
+    this._clearAllWordFiles();
+  }
+
+  _loadSavedWordQuestions() {
+    const res = this._loadSavedWordFiles();
+    return { questions: res.questions, rawText: res.rawText };
+  }
+
+  _renderAssignCountOptions() {
+    let pool = this.importedQuestions;
+    if (this.selectedAssignFileId !== 'all') {
+      const file = this.importedFiles.find(f => f.id === this.selectedAssignFileId);
+      if (file && file.questions) {
+        pool = file.questions;
+      }
+    }
+    const poolSize = pool.length;
+    if (poolSize === 0) {
+      return `<option value="0">Chưa có câu hỏi nào</option>`;
+    }
+
+    const standardSteps = [5, 10, 15, 20, 25, 30, 40, 50];
+    let html = `<option value="all" ${this.selectedAssignCount === 'all' ? 'selected' : ''}>Tất cả (${poolSize} câu)</option>`;
+    standardSteps.forEach(cnt => {
+      if (poolSize >= cnt) {
+        let label = `Bốc ngẫu nhiên ${cnt} câu`;
+        if (cnt === 5) label += ' (15 phút)';
+        else if (cnt === 10) label += ' (45 phút)';
+        else if (cnt === 15) label += ' (Giữa kỳ)';
+        else if (cnt === 20) label += ' (Cuối kỳ)';
+        html += `<option value="${cnt}" ${this.selectedAssignCount === String(cnt) ? 'selected' : ''}>${label}</option>`;
+      }
+    });
+    return html;
+  }
+
+  _getStudioPrintExam() {
+    const source = this.studioPrintSource || (this.importedQuestions.length > 0 ? 'all_word' : 'builtin');
+    if (source !== 'builtin' && this.importedQuestions.length > 0) {
+      let pool = this.importedQuestions;
+      if (source !== 'all_word') {
+        const file = this.importedFiles.find(f => f.id === source);
+        if (file && file.questions && file.questions.length > 0) {
+          pool = file.questions;
+        }
+      }
+      const desiredCount = this.studioConfig.count || 20;
+      let selectedQuestions;
+      if (pool.length <= desiredCount) {
+        selectedQuestions = [...pool];
+      } else {
+        selectedQuestions = shuffle(pool).slice(0, desiredCount);
+      }
+      if (!this.printExamCode) {
+        this.printExamCode = `TRR-${Math.floor(100 + Math.random() * 900)}`;
+      }
+      return {
+        id: `print_exam_${Date.now()}`,
+        examCode: this.printExamCode,
+        title: 'ĐỀ THI MÔN: TOÁN RỜI RẠC',
+        totalQuestions: selectedQuestions.length,
+        questions: selectedQuestions,
+        createdAt: new Date().toISOString(),
+      };
+    }
+
+    if (!this.currentExam) {
+      this._generateNewExam();
+    }
+    return this.currentExam;
   }
 
   /**
@@ -444,9 +598,89 @@ export class QuizView {
         </div>
       </div>
 
+      <!-- Assigned Exams Table & Gradebook (Quản Lý Đề Thi Cho Admin) -->
+      ${isAdmin ? `
+        <div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:22px;margin-bottom:24px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
+            <h3 style="font-size:16px;font-weight:700;color:var(--text);margin:0;">
+              📑 Danh Sách Các Đề Thi Đã Phân Phối (${assignedExams.length})
+            </h3>
+            <button type="button" class="btn-danger" id="btnAdminClearAllExams" style="display:inline-flex;align-items:center;gap:6px;padding:7px 14px;font-size:12.5px;font-weight:700;border-radius:8px;cursor:pointer;background:#ef4444;color:#fff;border:none;">
+              <span>🗑️</span>
+              <span>Xóa Toàn Bộ Đề Thi &amp; Dữ Liệu Sinh Viên</span>
+            </button>
+          </div>
+
+          <div style="overflow-x:auto;">
+            <table class="leaderboard-table" style="font-size:13px;">
+              <thead>
+                <tr>
+                  <th>Tên đề thi</th>
+                  <th style="text-align:center;">Thời gian</th>
+                  <th style="text-align:center;">Số câu</th>
+                  <th style="text-align:center;">Đối tượng</th>
+                  <th style="text-align:center;">Đã nộp bài</th>
+                  <th style="text-align:center;">Ngày tạo</th>
+                  <th style="text-align:right;">Thao tác</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${assignedExams.length === 0 ? `
+                  <tr>
+                    <td colspan="7" style="text-align:center;padding:28px;color:var(--dim);font-style:italic;">
+                      Chưa có đề thi nào được tạo. Hãy chuyển sang tab "Soạn Đề Từ File Word" để nạp file và phát đề!
+                    </td>
+                  </tr>
+                ` : assignedExams.map(item => {
+                  const subs = examManager.getSubmissionsForExam(item.id);
+                  const isAll = Array.isArray(item.assignedTo) && item.assignedTo.includes('all');
+                  const targetLabel = isAll ? 'Toàn bộ sinh viên' : `${item.assignedTo.length} sinh viên`;
+
+                  return `
+                    <tr>
+                      <td style="font-weight:700;color:var(--text);">
+                        ${this._escapeHtml(item.title)}
+                        <div style="font-size:11px;color:var(--dim);font-weight:normal;">Mã: ${item.id}</div>
+                      </td>
+                      <td style="text-align:center;">${item.durationMinutes} phút</td>
+                      <td style="text-align:center;">${item.questionIds.length} câu</td>
+                      <td style="text-align:center;">
+                        <span class="pill-badge" style="background:rgba(56,189,248,0.12);color:#38bdf8;padding:2px 8px;border-radius:8px;font-size:11px;">
+                          ${targetLabel}
+                        </span>
+                      </td>
+                      <td style="text-align:center;font-weight:700;color:#10b981;">
+                        ${subs.length} bài
+                      </td>
+                      <td style="text-align:center;color:var(--dim);font-size:12px;">
+                        ${new Date(item.createdAt).toLocaleDateString('vi-VN')}
+                      </td>
+                      <td style="text-align:right;white-space:nowrap;">
+                        <button type="button" class="btn-sm btn-view-admin-key" data-exam-id="${item.id}" style="background:rgba(245,158,11,0.18);color:#f59e0b;border:1px solid rgba(245,158,11,0.4);margin-right:6px;font-weight:700;padding:4px 10px;border-radius:6px;cursor:pointer;">
+                          🔑 File Đáp Án
+                        </button>
+                        <button type="button" class="btn-sm btn-view-gradebook" data-exam-id="${item.id}" style="background:rgba(16,185,129,0.15);color:#10b981;border:1px solid rgba(16,185,129,0.3);margin-right:6px;font-weight:600;padding:4px 10px;border-radius:6px;cursor:pointer;">
+                          📊 Xem Sổ Điểm
+                        </button>
+                        <button type="button" class="btn-sm btn-export-exam-excel" data-exam-id="${item.id}" data-exam-title="${this._escapeHtml(item.title)}" style="background:rgba(59,130,246,0.15);color:#3b82f6;border:1px solid rgba(59,130,246,0.3);margin-right:6px;font-weight:600;padding:4px 10px;border-radius:6px;cursor:pointer;">
+                          📥 Xuất Excel
+                        </button>
+                        <button type="button" class="btn-sm btn-delete-assigned-exam" data-exam-id="${item.id}" data-exam-title="${this._escapeHtml(item.title)}" style="background:rgba(239,68,68,0.12);color:#ef4444;border:1px solid rgba(239,68,68,0.3);font-weight:600;padding:4px 10px;border-radius:6px;cursor:pointer;">
+                          🗑️ Xóa
+                        </button>
+                      </td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ` : ''}
+
       <!-- Assigned Exams Grid -->
       <div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:12px;display:flex;align-items:center;gap:8px;">
-        <span>📋 Danh Sách Đề Thi Trắc Nghiệm:</span>
+        <span>📋 ${isAdmin ? 'Phòng Thi Thử Nghiệm / Xem Trước Đề (Chế Độ Quản Trị Viên):' : 'Danh Sách Đề Thi Trắc Nghiệm:'}</span>
         <span style="font-size:12.5px;color:var(--dim);font-weight:normal;">(${assignedExams.length} đề thi sẵn sàng)</span>
       </div>
 
@@ -810,7 +1044,7 @@ export class QuizView {
   // =========================================================================
 
   _renderStudioView() {
-    const exam = this.currentExam;
+    const exam = this._getStudioPrintExam();
     if (!exam) return `<div>Đang tải đề thi...</div>`;
 
     const allStudents = authManager.getUsers().filter(u => u.role !== 'admin');
@@ -870,7 +1104,7 @@ export class QuizView {
                 Chọn hoặc kéo thả File Word đề thi (.docx, .doc, .txt)
               </div>
               <div style="font-size:12px;color:var(--dim);margin-bottom:12px;">
-                File mới tải lên sẽ được <strong>tự động lưu và giữ lại</strong> nối tiếp với các câu hỏi trước đó.
+                File mới tải lên sẽ được <strong>tự động lưu và giữ lại</strong> nối tiếp với các file trước đó. Không cho phép nạp trùng file.
               </div>
               <input type="file" id="fileImportWord" accept=".docx,.doc,.txt" style="font-size:12.5px;color:var(--text);cursor:pointer;" />
             </div>
@@ -895,7 +1129,54 @@ export class QuizView {
                   <span style="font-size:11px;background:#10b981;color:#fff;padding:2px 8px;border-radius:10px;font-weight:700;">Đã Có Đáp Án Đúng • Sẵn Sàng Phát Đề</span>
                 </div>
                 <div style="font-size:12px;color:var(--dim);">
-                  Dữ liệu câu hỏi được lưu giữ tự động trên hệ thống
+                  ${this.importedFiles.length} file đề thi đang lưu trữ trên hệ thống
+                </div>
+              </div>
+
+              <!-- TABLE OF IMPORTED FILES (Quản lý file đã nạp) -->
+              <div style="background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px;margin-top:14px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
+                  <h4 style="margin:0;font-size:13.5px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:6px;">
+                    <span>📂 Danh Sách Các File Đã Nạp (${this.importedFiles.length})</span>
+                  </h4>
+                  <span style="font-size:12px;color:#10b981;font-weight:600;">
+                    Tổng cộng: ${this.importedQuestions.length} câu hỏi tự soạn
+                  </span>
+                </div>
+
+                <div style="overflow-x:auto;">
+                  <table class="leaderboard-table" style="font-size:12.5px;margin:0;">
+                    <thead>
+                      <tr>
+                        <th style="text-align:left;">Tên file đề thi</th>
+                        <th style="text-align:center;">Số câu hỏi</th>
+                        <th style="text-align:center;">Thời điểm nạp</th>
+                        <th style="text-align:right;">Thao tác</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      ${this.importedFiles.map(f => `
+                        <tr>
+                          <td style="font-weight:600;color:var(--text);">
+                            📄 ${this._escapeHtml(f.name)}
+                          </td>
+                          <td style="text-align:center;">
+                            <span class="pill-badge" style="background:rgba(16,185,129,0.15);color:#10b981;padding:2px 8px;border-radius:6px;font-weight:700;">
+                              ${f.questionCount} câu
+                            </span>
+                          </td>
+                          <td style="text-align:center;color:var(--dim);font-size:11.5px;">
+                            ${new Date(f.uploadedAt).toLocaleString('vi-VN')}
+                          </td>
+                          <td style="text-align:right;">
+                            <button type="button" class="btn-sm btn-delete-imported-file" data-file-id="${f.id}" data-file-name="${this._escapeHtml(f.name)}" style="background:rgba(239,68,68,0.12);color:#ef4444;border:1px solid rgba(239,68,68,0.3);padding:3px 10px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;">
+                              🗑️ Xóa file này
+                            </button>
+                          </td>
+                        </tr>
+                      `).join('')}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             ` : `
@@ -910,13 +1191,45 @@ export class QuizView {
 
           </div>
 
+          <!-- SOURCE FILE & RANDOM QUESTION PICKER -->
+          <div style="background:var(--panel-alt);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:16px;">
+            <div style="font-size:13.5px;font-weight:700;color:var(--text);margin-bottom:12px;display:flex;align-items:center;gap:6px;">
+              <span>🎯 Lựa Chọn Nguồn Đề &amp; Bốc Câu Hỏi Phân Phối:</span>
+            </div>
+
+            <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));gap:14px;">
+              <div>
+                <label style="display:block;font-size:12px;color:var(--dim);margin-bottom:6px;font-weight:600;">
+                  1. Chọn file nguồn để phân đề:
+                </label>
+                <select id="selAssignFileSource" class="form-input" style="width:100%;padding:8px 12px;font-size:13px;border-radius:6px;background:var(--panel);border:1px solid var(--line);color:var(--text);font-weight:600;">
+                  <option value="all" ${this.selectedAssignFileId === 'all' ? 'selected' : ''}>
+                    📂 Tất cả các file đã nạp (${this.importedQuestions.length} câu)
+                  </option>
+                  ${this.importedFiles.map(f => `
+                    <option value="${f.id}" ${this.selectedAssignFileId === f.id ? 'selected' : ''}>
+                      📄 ${this._escapeHtml(f.name)} (${f.questionCount} câu)
+                    </option>
+                  `).join('')}
+                </select>
+              </div>
+
+              <div>
+                <label style="display:block;font-size:12px;color:var(--dim);margin-bottom:6px;font-weight:600;">
+                  2. Bốc ngẫu nhiên số câu từ file đã chọn:
+                </label>
+                <select id="selAssignQuestionCount" class="form-input" style="width:100%;padding:8px 12px;font-size:13px;border-radius:6px;background:var(--panel);border:1px solid var(--line);color:var(--text);font-weight:600;">
+                  ${this._renderAssignCountOptions()}
+                </select>
+              </div>
+            </div>
           </div>
 
           <!-- CONFIGURATION BAR -->
           <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(240px, 1fr));gap:16px;margin-bottom:16px;">
             <div>
               <label style="display:block;font-size:12.5px;font-weight:600;color:var(--text);margin-bottom:6px;">Tiêu đề đề thi: *</label>
-              <input type="text" id="txtAssignTitle" class="form-input" placeholder="Ví dụ: Kiểm tra 15 phút: Logic & Mệnh đề" value="${this.importedQuestions.length > 0 ? `Đề Kiểm Tra Toán Rời Rạc (${this.importedQuestions.length} câu)` : 'Đề Kiểm Tra Định Kỳ: Toán Rời Rạc'}" style="width:100%;padding:8px 12px;border-radius:6px;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);font-size:13px;" />
+              <input type="text" id="txtAssignTitle" class="form-input" placeholder="Ví dụ: Kiểm tra 15 phút: Logic & Mệnh đề" value="${this.importedQuestions.length > 0 ? (this.selectedAssignFileId !== 'all' ? `Đề Kiểm Tra: ${this._escapeHtml(this.importedFiles.find(f => f.id === this.selectedAssignFileId)?.name?.replace(/\.[^/.]+$/, '') || 'File Word')}` : `Đề Kiểm Tra Toán Rời Rạc (${this.importedQuestions.length} câu)`) : 'Đề Kiểm Tra Định Kỳ: Toán Rời Rạc'}" style="width:100%;padding:8px 12px;border-radius:6px;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);font-size:13px;" />
             </div>
 
             <div>
@@ -972,8 +1285,8 @@ export class QuizView {
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
             <div style="font-size:12.5px;color:var(--dim);">
               ${this.importedQuestions.length > 0
-                ? `<span style="color:#10b981;font-weight:700;">✅ Sẵn sàng phát đề với ${this.importedQuestions.length} câu hỏi tự soạn.</span>`
-                : '💡 Mẹo: Nhập đề ở khung trên và bấm "Phân Tích Đề Thi" để kiểm tra trước khi phát.'}
+                ? `<span style="color:#10b981;font-weight:700;">✅ Sẵn sàng phát đề với câu hỏi tự soạn đã chọn.</span>`
+                : '💡 Mẹo: Tải file Word ở khung trên trước khi tiến hành phát đề.'}
             </div>
             <button type="button" class="btn-primary" id="btnCreateAndAssignExam" style="padding:10px 24px;font-size:14px;font-weight:700;display:flex;align-items:center;gap:8px;">
               <span>🚀 Phát Đề Cho Sinh Viên &amp; Xuất File Đáp Án</span>
@@ -981,76 +1294,14 @@ export class QuizView {
           </div>
         </div>
 
-        <!-- Assigned Exams Table & Gradebook -->
-        <div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:22px;">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
-            <h3 style="font-size:16px;font-weight:700;color:var(--text);margin:0;">
-              📑 Danh Sách Các Đề Thi Đã Phân Phối (${assignedExamsList.length})
-            </h3>
-            <button type="button" class="btn-danger" id="btnAdminClearAllExams" style="display:inline-flex;align-items:center;gap:6px;padding:7px 14px;font-size:12.5px;font-weight:700;border-radius:8px;cursor:pointer;background:#ef4444;color:#fff;border:none;">
-              <span>🗑️</span>
-              <span>Xóa Toàn Bộ Đề Thi &amp; Dữ Liệu Sinh Viên</span>
-            </button>
+        <!-- Help text pointing to Quản Lý Đề Thi tab -->
+        <div style="background:var(--panel-alt);border:1px dashed var(--line);border-radius:10px;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-top:8px;">
+          <div style="font-size:13px;color:var(--dim);">
+            📊 Các đề thi sau khi phát được lưu trữ và theo dõi bài làm của sinh viên tại mục <strong>"Quản Lý Đề Thi"</strong>.
           </div>
-
-          <div style="overflow-x:auto;">
-            <table class="leaderboard-table" style="font-size:13px;">
-              <thead>
-                <tr>
-                  <th>Tên đề thi</th>
-                  <th style="text-align:center;">Thời gian</th>
-                  <th style="text-align:center;">Số câu</th>
-                  <th style="text-align:center;">Đối tượng</th>
-                  <th style="text-align:center;">Đã nộp bài</th>
-                  <th style="text-align:center;">Ngày tạo</th>
-                  <th style="text-align:right;">Thao tác</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${assignedExamsList.map(item => {
-                  const subs = examManager.getSubmissionsForExam(item.id);
-                  const isAll = Array.isArray(item.assignedTo) && item.assignedTo.includes('all');
-                  const targetLabel = isAll ? 'Toàn bộ sinh viên' : `${item.assignedTo.length} sinh viên`;
-
-                  return `
-                    <tr>
-                      <td style="font-weight:700;color:var(--text);">
-                        ${this._escapeHtml(item.title)}
-                        <div style="font-size:11px;color:var(--dim);font-weight:normal;">Mã: ${item.id}</div>
-                      </td>
-                      <td style="text-align:center;">${item.durationMinutes} phút</td>
-                      <td style="text-align:center;">${item.questionIds.length} câu</td>
-                      <td style="text-align:center;">
-                        <span class="pill-badge" style="background:rgba(56,189,248,0.12);color:#38bdf8;padding:2px 8px;border-radius:8px;font-size:11px;">
-                          ${targetLabel}
-                        </span>
-                      </td>
-                      <td style="text-align:center;font-weight:700;color:#10b981;">
-                        ${subs.length} bài
-                      </td>
-                      <td style="text-align:center;color:var(--dim);font-size:12px;">
-                        ${new Date(item.createdAt).toLocaleDateString('vi-VN')}
-                      </td>
-                      <td style="text-align:right;white-space:nowrap;">
-                        <button type="button" class="btn-sm btn-view-admin-key" data-exam-id="${item.id}" style="background:rgba(245,158,11,0.18);color:#f59e0b;border:1px solid rgba(245,158,11,0.4);margin-right:6px;font-weight:700;padding:4px 10px;border-radius:6px;cursor:pointer;">
-                          🔑 File Đáp Án
-                        </button>
-                        <button type="button" class="btn-sm btn-view-gradebook" data-exam-id="${item.id}" style="background:rgba(16,185,129,0.15);color:#10b981;border:1px solid rgba(16,185,129,0.3);margin-right:6px;font-weight:600;padding:4px 10px;border-radius:6px;cursor:pointer;">
-                          📊 Xem Sổ Điểm
-                        </button>
-                        <button type="button" class="btn-sm btn-export-exam-excel" data-exam-id="${item.id}" data-exam-title="${this._escapeHtml(item.title)}" style="background:rgba(59,130,246,0.15);color:#3b82f6;border:1px solid rgba(59,130,246,0.3);margin-right:6px;font-weight:600;padding:4px 10px;border-radius:6px;cursor:pointer;">
-                          📥 Xuất Excel
-                        </button>
-                        <button type="button" class="btn-sm btn-delete-assigned-exam" data-exam-id="${item.id}" data-exam-title="${this._escapeHtml(item.title)}" style="background:rgba(239,68,68,0.12);color:#ef4444;border:1px solid rgba(239,68,68,0.3);font-weight:600;padding:4px 10px;border-radius:6px;cursor:pointer;">
-                          🗑️ Xóa
-                        </button>
-                      </td>
-                    </tr>
-                  `;
-                }).join('')}
-              </tbody>
-            </table>
-          </div>
+          <button type="button" class="btn-secondary" id="btnGoToExamManagement" style="padding:6px 14px;font-size:12.5px;border-radius:6px;cursor:pointer;font-weight:600;">
+            👉 Chuyển Sang Tab [Quản Lý Đề Thi]
+          </button>
         </div>
 
       </div>
@@ -1089,6 +1340,27 @@ export class QuizView {
 
           <!-- Configuration Bar -->
           <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding-top:12px;border-top:1px solid var(--line);font-size:12.5px;">
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span style="color:var(--dim);">Nguồn đề:</span>
+              <select id="selStudioPrintSource" class="form-input" style="padding:4px 8px;font-size:12px;border-radius:4px;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);font-weight:600;">
+                ${this.importedQuestions.length > 0 ? `
+                  <option value="all_word" ${this.studioPrintSource === 'all_word' ? 'selected' : ''}>
+                    📂 Tất cả câu hỏi Word (${this.importedQuestions.length} câu)
+                  </option>
+                  ${this.importedFiles.map(f => `
+                    <option value="${f.id}" ${this.studioPrintSource === f.id ? 'selected' : ''}>
+                      📄 File: ${this._escapeHtml(f.name)} (${f.questionCount} câu)
+                    </option>
+                  `).join('')}
+                  <option value="builtin" ${this.studioPrintSource === 'builtin' ? 'selected' : ''}>
+                    🌟 Ngân hàng đề mẫu mặc định
+                  </option>
+                ` : `
+                  <option value="builtin" selected>🌟 Ngân hàng đề mẫu mặc định</option>
+                `}
+              </select>
+            </div>
+
             <div style="display:flex;align-items:center;gap:6px;">
               <span style="color:var(--dim);">Số lượng câu:</span>
               <select id="selStudioCount" class="form-input" style="padding:4px 8px;font-size:12px;border-radius:4px;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);">
@@ -2107,27 +2379,44 @@ export class QuizView {
     if (btnClearAllWordData) {
       btnClearAllWordData.addEventListener('click', () => {
         const confirmed = typeof window !== 'undefined' && window.confirm
-          ? window.confirm('Bạn có chắc chắn muốn xóa hết toàn bộ câu hỏi đề thi cũ (Word) đã lưu không?\n\nThao tác này sẽ dọn dẹp sạch danh sách câu hỏi để bạn tải lên đề thi mới.')
+          ? window.confirm('Bạn có chắc chắn muốn xóa hết toàn bộ các file đề thi Word cũ đã lưu không?\n\nThao tác này sẽ dọn dẹp sạch toàn bộ dữ liệu để bạn nạp file mới.')
           : true;
         if (!confirmed) return;
-        this._clearAllWordQuestions();
-        this.importRawText = '';
-        this.importErrors = [];
-        this._showAlert('🗑️ Đã xóa sạch toàn bộ dữ liệu câu hỏi Word cũ! Giờ bạn có thể tải lên đề thi mới.');
+        this._clearAllWordFiles();
+        this._showAlert('🗑️ Đã xóa sạch toàn bộ dữ liệu đề thi Word cũ! Giờ bạn có thể tải lên các file đề thi mới.');
         this.render();
       });
     }
 
-    // File Import Word (.docx, .doc, .txt)
+    // Delete single imported file
+    this.container.querySelectorAll('.btn-delete-imported-file').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const fileId = btn.getAttribute('data-file-id');
+        if (fileId) {
+          this._deleteImportedFile(fileId);
+        }
+      });
+    });
+
+    // File Import Word (.docx, .doc, .txt) with Duplicate Check
     const fileImportWord = this.container.querySelector('#fileImportWord');
     if (fileImportWord) {
       fileImportWord.addEventListener('change', async (e) => {
         const file = e.target.files && e.target.files[0];
         if (!file) return;
 
+        // Check duplicate file name
+        const fileNameLower = file.name.trim().toLowerCase();
+        const isDuplicate = this.importedFiles.some(f => f.name.trim().toLowerCase() === fileNameLower);
+        if (isDuplicate) {
+          this._showAlert(`⚠️ File "${file.name}" đã tồn tại trong danh sách đề thi!\nHệ thống không cho phép nạp trùng file. Vui lòng đổi tên file hoặc xóa file cũ trước khi nạp lại.`);
+          e.target.value = '';
+          return;
+        }
+
         try {
           let textContent = '';
-          const fileNameLower = file.name.toLowerCase();
 
           if (fileNameLower.endsWith('.docx')) {
             const arrayBuffer = await file.arrayBuffer();
@@ -2146,11 +2435,18 @@ export class QuizView {
           const res = parseExamText(textContent);
 
           if (res.questions && res.questions.length > 0) {
-            // MERGE & PERSIST: keep previous questions, merge new ones!
-            this.importedQuestions = mergeImportedQuestions(this.importedQuestions, res.questions);
-            this._saveWordQuestions(this.importedQuestions);
+            const newFileEntry = {
+              id: `file_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+              name: file.name,
+              uploadedAt: new Date().toISOString(),
+              questionCount: res.questions.length,
+              questions: res.questions,
+            };
+            this._saveWordFiles([...this.importedFiles, newFileEntry]);
+            this.selectedAssignFileId = newFileEntry.id;
+            this.selectedAssignCount = 'all';
             this.importErrors = res.errors || [];
-            this._showAlert(`✅ Đã nạp thành công ${res.questions.length} câu hỏi từ file "${file.name}"!\nTổng số câu hỏi hiện có trong hệ thống: ${this.importedQuestions.length} câu.`);
+            this._showAlert(`✅ Đã nạp thành công ${res.questions.length} câu hỏi từ file "${file.name}"!\nTổng số file hiện có: ${this.importedFiles.length} file (${this.importedQuestions.length} câu hỏi).`);
           } else {
             this.importErrors = res.errors && res.errors.length > 0
               ? res.errors
@@ -2162,6 +2458,32 @@ export class QuizView {
           console.error('[QuizView] Error reading Word file:', err);
           this._showAlert(`❌ Lỗi khi đọc file Word: ${err.message || err}`);
         }
+      });
+    }
+
+    // Select file source for assignment
+    const selAssignFileSource = this.container.querySelector('#selAssignFileSource');
+    if (selAssignFileSource) {
+      selAssignFileSource.addEventListener('change', (e) => {
+        this.selectedAssignFileId = e.target.value;
+        this.selectedAssignCount = 'all';
+        this.render();
+      });
+    }
+
+    // Select random question count
+    const selAssignQuestionCount = this.container.querySelector('#selAssignQuestionCount');
+    if (selAssignQuestionCount) {
+      selAssignQuestionCount.addEventListener('change', (e) => {
+        this.selectedAssignCount = e.target.value;
+      });
+    }
+
+    // Quick jump to exam management tab
+    const btnGoToExamManagement = this.container.querySelector('#btnGoToExamManagement');
+    if (btnGoToExamManagement) {
+      btnGoToExamManagement.addEventListener('click', () => {
+        this.setTab('myExams');
       });
     }
 
@@ -2186,7 +2508,7 @@ export class QuizView {
       });
     }
 
-    // Create & Assign Exam Button (Strict: Only from imported questions)
+    // Create & Assign Exam Button (From selected file with random question picking)
     const btnCreateAndAssign = this.container.querySelector('#btnCreateAndAssignExam');
     if (btnCreateAndAssign) {
       btnCreateAndAssign.addEventListener('click', () => {
@@ -2217,18 +2539,36 @@ export class QuizView {
           assignedTo = selectedStudents;
         }
 
-        // Strict validation: Only accept custom imported questions from Word
-        if (this.importedQuestions.length === 0) {
+        // Determine pool from selectedAssignFileId
+        let pool = this.importedQuestions;
+        let sourceLabel = 'Tất cả các file';
+        if (this.selectedAssignFileId !== 'all') {
+          const chosenFile = this.importedFiles.find(f => f.id === this.selectedAssignFileId);
+          if (chosenFile && chosenFile.questions && chosenFile.questions.length > 0) {
+            pool = chosenFile.questions;
+            sourceLabel = chosenFile.name;
+          }
+        }
+
+        if (pool.length === 0) {
           this._showAlert('⚠️ Vui lòng tải lên file Word đề thi (.doc / .docx) trước khi phát đề cho sinh viên! Hệ thống chỉ nhận phát đề từ câu hỏi tự soạn đã import.');
           return;
         }
 
-        const customQuestions = [...this.importedQuestions];
+        let questionsToAssign = pool;
+        if (this.selectedAssignCount && this.selectedAssignCount !== 'all') {
+          const countNum = parseInt(this.selectedAssignCount, 10);
+          if (!isNaN(countNum) && countNum > 0 && countNum < pool.length) {
+            questionsToAssign = shuffle(pool).slice(0, countNum);
+          }
+        }
+
+        const customQuestions = [...questionsToAssign];
         const questionIds = customQuestions.map(q => q.id);
 
         const result = examManager.createExam({
           title,
-          description: `Đề thi ${durationMinutes} phút (${questionIds.length} câu) môn Toán Rời Rạc.`,
+          description: `Đề thi ${durationMinutes} phút (${questionIds.length} câu) môn Toán Rời Rạc từ ${sourceLabel}.`,
           durationMinutes,
           questionIds,
           customQuestions,
@@ -2245,7 +2585,7 @@ export class QuizView {
           }
           // Automatically open dedicated Admin Answer Key modal immediately!
           this.adminAnswerKeyExamId = result.exam.id;
-          this._showAlert(`🎉 Tạo và phân phối đề thi thành công!\n\nĐề thi: "${title}" (Mã: ${result.exam.examCode})\nThời lượng: ${durationMinutes} phút\nSố câu: ${questionIds.length} câu\nĐối tượng: ${assignedTo.includes('all') ? 'Toàn bộ sinh viên' : assignedTo.length + ' sinh viên'}\n\nĐã tự động mở Hồ sơ Đáp án & Barem chấm dành cho Quản trị viên.`);
+          this._showAlert(`🎉 Tạo và phân phối đề thi thành công!\n\nĐề thi: "${title}" (Mã: ${result.exam.examCode})\nNguồn: ${sourceLabel}\nSố câu: ${questionIds.length} câu\nThời lượng: ${durationMinutes} phút\nĐối tượng: ${assignedTo.includes('all') ? 'Toàn bộ sinh viên' : assignedTo.length + ' sinh viên'}\n\nĐề thi đã được chuyển vào mục "Quản Lý Đề Thi". Hệ thống đang mở Hồ sơ Đáp án & Barem chấm dành riêng cho Quản trị viên.`);
           this.render();
         } else {
           this._showAlert(result.error || 'Có lỗi xảy ra khi tạo đề thi.');
@@ -2410,6 +2750,14 @@ export class QuizView {
     }
 
     // 5. Teacher's A4 & LaTeX Print Studio Events
+    const selPrintSource = this.container.querySelector('#selStudioPrintSource');
+    if (selPrintSource) {
+      selPrintSource.addEventListener('change', (e) => {
+        this.studioPrintSource = e.target.value;
+        this.render();
+      });
+    }
+
     const selCount = this.container.querySelector('#selStudioCount');
     if (selCount) {
       selCount.addEventListener('change', (e) => {
@@ -2440,6 +2788,7 @@ export class QuizView {
     const btnGenNewExam = this.container.querySelector('#btnGenNewExam');
     if (btnGenNewExam) {
       btnGenNewExam.addEventListener('click', () => {
+        this.printExamCode = `TRR-${Math.floor(100 + Math.random() * 900)}`;
         this._generateNewExam();
         this.render();
       });
@@ -2478,7 +2827,8 @@ export class QuizView {
     const btnCopyLatex = this.container.querySelector('#btnCopyLatex');
     if (btnCopyLatex) {
       btnCopyLatex.addEventListener('click', () => {
-        const latex = exportExamToLatex(this.currentExam);
+        const exam = this._getStudioPrintExam();
+        const latex = exportExamToLatex(exam);
         if (typeof navigator !== 'undefined' && navigator.clipboard) {
           navigator.clipboard.writeText(latex).then(() => {
             btnCopyLatex.textContent = '✓ Đã chép LaTeX!';

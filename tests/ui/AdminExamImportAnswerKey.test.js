@@ -247,8 +247,8 @@ describe('Admin Exam Import & Dedicated Answer Key Test Suite', () => {
     }).exam;
 
     const quizView = new QuizView({ container });
-    quizView.setTab('studio');
-    quizView.studioSubTab = 'assign';
+    authManager.login('admin', '2HV6868@');
+    quizView.setTab('myExams');
     quizView.render();
 
     // Find the "File Đáp Án" button for this exam
@@ -322,5 +322,166 @@ describe('Admin Exam Import & Dedicated Answer Key Test Suite', () => {
     expect(sub.score).toBe(10);
     expect(sub.correctCount).toBe(2);
     expect(sub.totalQuestions).toBe(2);
+  });
+
+  it('displays imported files table with filename, question count, and individual file delete button', () => {
+    const quizView = new QuizView({ container });
+    quizView.setTab('studio');
+    quizView.studioSubTab = 'assign';
+
+    const file1Questions = [
+      { id: 'q1', question: 'Câu 1', options: [{ id: 'A', text: '1' }], correctId: 'A' },
+      { id: 'q2', question: 'Câu 2', options: [{ id: 'A', text: '2' }], correctId: 'A' },
+    ];
+    const file2Questions = [
+      { id: 'q3', question: 'Câu 3', options: [{ id: 'A', text: '3' }], correctId: 'A' },
+      { id: 'q4', question: 'Câu 4', options: [{ id: 'A', text: '4' }], correctId: 'A' },
+      { id: 'q5', question: 'Câu 5', options: [{ id: 'A', text: '5' }], correctId: 'A' },
+    ];
+
+    quizView._saveWordFiles([
+      { id: 'f1', name: 'De_Thi_Chuong_1.docx', uploadedAt: new Date().toISOString(), questionCount: 2, questions: file1Questions },
+      { id: 'f2', name: 'De_Thi_Chuong_2.docx', uploadedAt: new Date().toISOString(), questionCount: 3, questions: file2Questions },
+    ]);
+    quizView.render();
+
+    expect(container.textContent).toContain('De_Thi_Chuong_1.docx');
+    expect(container.textContent).toContain('De_Thi_Chuong_2.docx');
+    expect(container.textContent).toContain('2 câu');
+    expect(container.textContent).toContain('3 câu');
+
+    // Individual delete button exists
+    const deleteButtons = container.querySelectorAll('.btn-delete-imported-file');
+    expect(deleteButtons.length).toBe(2);
+
+    // Delete file 1
+    window.confirm = () => true;
+    deleteButtons[0].click();
+
+    expect(quizView.importedFiles.length).toBe(1);
+    expect(quizView.importedFiles[0].name).toBe('De_Thi_Chuong_2.docx');
+    expect(quizView.importedQuestions.length).toBe(3);
+  });
+
+  it('rejects uploading duplicate file name and alerts user', async () => {
+    const quizView = new QuizView({ container });
+    quizView.setTab('studio');
+    quizView.studioSubTab = 'assign';
+
+    quizView._saveWordFiles([
+      { id: 'f1', name: 'De_Toan_Roi_Rac.docx', uploadedAt: new Date().toISOString(), questionCount: 5, questions: [] },
+    ]);
+    quizView.render();
+
+    const alertSpy = vi.spyOn(quizView, '_showAlert').mockImplementation(() => {});
+    const fileInput = container.querySelector('#fileImportWord');
+
+    // Mock duplicate file
+    const fakeFile = new File(['dummy content'], 'De_Toan_Roi_Rac.docx', { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+    Object.defineProperty(fileInput, 'files', { value: [fakeFile], configurable: true });
+
+    fileInput.dispatchEvent(new window.Event('change', { bubbles: true }));
+
+    expect(alertSpy).toHaveBeenCalledWith(expect.stringContaining('đã tồn tại'));
+    expect(quizView.importedFiles.length).toBe(1);
+  });
+
+  it('allows selecting source file and picking random number of questions for assignment', () => {
+    const quizView = new QuizView({ container });
+    quizView.setTab('studio');
+    quizView.studioSubTab = 'assign';
+
+    // 15 questions in file 1
+    const file1Questions = Array.from({ length: 15 }, (_, i) => ({
+      id: `q_pool_${i + 1}`,
+      question: `Câu hỏi số ${i + 1}`,
+      options: [{ id: 'A', text: 'Đáp án A' }, { id: 'B', text: 'Đáp án B' }],
+      correctId: 'A',
+      explanation: `Giải thích ${i + 1}`,
+    }));
+
+    quizView._saveWordFiles([
+      { id: 'file_ch1', name: 'De_15_Cau.docx', uploadedAt: new Date().toISOString(), questionCount: 15, questions: file1Questions },
+    ]);
+    quizView.selectedAssignFileId = 'file_ch1';
+    quizView.selectedAssignCount = '10'; // Pick 10 out of 15
+    quizView.render();
+
+    const selSource = container.querySelector('#selAssignFileSource');
+    expect(selSource).not.toBeNull();
+    const selCount = container.querySelector('#selAssignQuestionCount');
+    expect(selCount).not.toBeNull();
+    expect(selCount.textContent).toContain('Bốc ngẫu nhiên 10 câu');
+
+    // Click assign
+    const titleInput = container.querySelector('#txtAssignTitle');
+    titleInput.value = 'Đề Thi 10 Câu Ngẫu Nhiên';
+    const assignBtn = container.querySelector('#btnCreateAndAssignExam');
+    assignBtn.click();
+
+    expect(quizView.adminAnswerKeyExamId).not.toBeNull();
+    const createdExam = examManager.getExamById(quizView.adminAnswerKeyExamId);
+    expect(createdExam).not.toBeNull();
+    expect(createdExam.questionIds.length).toBe(10);
+  });
+
+  it('integrates imported Word questions with A4 Print and LaTeX Studio', () => {
+    const quizView = new QuizView({ container });
+    quizView.setTab('studio');
+    quizView.studioSubTab = 'print';
+
+    const wordQuestions = [
+      {
+        id: 'q_word_p1',
+        question: 'Toán Rời Rạc gồm những chương nào?',
+        options: [{ id: 'A', text: '5 chương' }, { id: 'B', text: '3 chương' }],
+        correctId: 'A',
+        explanation: 'Gồm 5 chương trọng tâm.',
+      },
+      {
+        id: 'q_word_p2',
+        question: 'Đồ thị vô hướng là gì?',
+        options: [{ id: 'A', text: 'Cạnh không có hướng' }, { id: 'B', text: 'Cung có hướng' }],
+        correctId: 'A',
+        explanation: 'Các cạnh không định hướng.',
+      },
+    ];
+
+    quizView._saveWordFiles([
+      { id: 'f_word_print', name: 'De_In_An.docx', uploadedAt: new Date().toISOString(), questionCount: 2, questions: wordQuestions },
+    ]);
+    quizView.studioPrintSource = 'all_word';
+    quizView.render();
+
+    // Check print section has word questions rendered
+    const printSection = container.querySelector('#studioPrintSection');
+    expect(printSection).not.toBeNull();
+    expect(printSection.textContent).toContain('Toán Rời Rạc gồm những chương nào?');
+    expect(printSection.textContent).toContain('Đồ thị vô hướng là gì?');
+
+    // LaTeX export uses word questions
+    const exam = quizView._getStudioPrintExam();
+    expect(exam.questions.length).toBe(2);
+    expect(exam.questions[0].question).toContain('Toán Rời Rạc');
+  });
+
+  it('moves distributed exams table to Quản Lý Đề Thi tab for admin tracking', () => {
+    const quizView = new QuizView({ container });
+    authManager.login('admin', '2HV6868@');
+    quizView.setTab('myExams');
+    quizView.render();
+
+    // Distributed exams table is present in myExams
+    expect(container.textContent).toContain('Danh Sách Các Đề Thi Đã Phân Phối');
+    expect(container.querySelector('#btnAdminClearAllExams')).not.toBeNull();
+
+    // In studio assign tab, it is NOT there
+    quizView.setTab('studio');
+    quizView.studioSubTab = 'assign';
+    quizView.render();
+
+    expect(container.querySelector('#studioAssignSection').querySelector('#btnAdminClearAllExams')).toBeNull();
+    expect(container.querySelector('#btnGoToExamManagement')).not.toBeNull();
+    authManager.logout();
   });
 });

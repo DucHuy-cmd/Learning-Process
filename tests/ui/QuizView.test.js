@@ -395,11 +395,10 @@ describe('QuizView UI Component', () => {
     authManager.logout();
   });
 
-  it('supports clearing all exams and student submissions from Studio', () => {
+  it('supports clearing all exams and student submissions from Exam Management', () => {
     const quizView = new QuizView({ container });
     authManager.login('admin', '2HV6868@');
-    quizView.setTab('studio');
-    quizView.studioSubTab = 'assign';
+    quizView.setTab('myExams');
     quizView.render();
 
     const btnClearAll = container.querySelector('#btnAdminClearAllExams');
