@@ -573,12 +573,21 @@ describe('Admin Exam Import & Dedicated Answer Key Test Suite', () => {
     expect(container.querySelector('#tabStudioPublish')).not.toBeNull();
     expect(container.querySelector('#tabStudioPrint')).not.toBeNull();
 
-    // Pick 10 from File A
+    // Verify Tab 1 is strictly for file upload and does NOT contain multi-file distribution
+    expect(container.querySelector('#studioDistributeSection').textContent).toContain('Nạp File Word Đề Thi');
+    expect(container.querySelector('#studioDistributeSection').querySelector('#sectionMultiFileDistribution')).toBeNull();
+
+    // Switch to Tab 2: Phân Phối & Phát Đề Thi
+    const tabPublish = container.querySelector('#tabStudioPublish');
+    tabPublish.click();
+    expect(quizView.studioSubTab).toBe('publish');
+
+    // Pick 10 from File A directly in Tab 2
     const inputA = container.querySelector('.input-distribute-file-count[data-file-id="f_bo_a"]');
     inputA.value = '10';
     inputA.dispatchEvent(new window.Event('change', { bubbles: true }));
 
-    // Pick 10 from File B
+    // Pick 10 from File B directly in Tab 2
     const inputB = container.querySelector('.input-distribute-file-count[data-file-id="f_bo_b"]');
     inputB.value = '10';
     inputB.dispatchEvent(new window.Event('change', { bubbles: true }));
@@ -588,13 +597,6 @@ describe('Admin Exam Import & Dedicated Answer Key Test Suite', () => {
 
     const distSummary = quizView._getDistributedSummary();
     expect(distSummary.totalSelected).toBe(20);
-
-    // Click button to proceed to Publish tab
-    const btnProceed = container.querySelector('#btnProceedToPublish');
-    expect(btnProceed).not.toBeNull();
-    btnProceed.click();
-
-    expect(quizView.studioSubTab).toBe('publish');
 
     // Verify Publish section has the questions and creates exam
     const titleInput = container.querySelector('#txtAssignTitle');

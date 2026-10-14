@@ -1159,10 +1159,10 @@ export class QuizView {
       <!-- Studio Subtab Navigation (3 Tabs) -->
       <div style="display:flex;gap:10px;margin-bottom:20px;border-bottom:1px solid var(--line);padding-bottom:10px;flex-wrap:wrap;">
         <button type="button" class="btn-tab ${(this.studioSubTab === 'distribute' || (this.studioSubTab !== 'publish' && this.studioSubTab !== 'print' && this.studioSubTab !== 'assign')) ? 'active' : ''}" id="tabStudioDistribute" style="padding:8px 18px;font-size:13.5px;font-weight:700;border-radius:6px;cursor:pointer;">
-          📋 1. Phân Phối Đề Thi Từ File Word
+          📁 1. Nạp File Word Đề Thi
         </button>
-        <button type="button" class="btn-tab ${this.studioSubTab === 'publish' ? 'active' : ''}" id="tabStudioPublish" style="padding:8px 18px;font-size:13.5px;font-weight:700;border-radius:6px;cursor:pointer;">
-          🚀 2. Phát Đề Thi Cho Sinh Viên
+        <button type="button" class="btn-tab ${(this.studioSubTab === 'publish' || this.studioSubTab === 'assign') ? 'active' : ''}" id="tabStudioPublish" style="padding:8px 18px;font-size:13.5px;font-weight:700;border-radius:6px;cursor:pointer;">
+          🚀 2. Phân Phối &amp; Phát Đề Thi
         </button>
         <button type="button" class="btn-tab ${this.studioSubTab === 'print' ? 'active' : ''}" id="tabStudioPrint" style="padding:8px 18px;font-size:13.5px;font-weight:700;border-radius:6px;cursor:pointer;">
           🖨️ 3. Soạn Đề In Ấn Chuẩn A4 &amp; Xuất LaTeX
@@ -1172,17 +1172,17 @@ export class QuizView {
       <!-- SECTION A: ASSIGN / DISTRIBUTE & PUBLISH WRAPPER -->
       <div id="studioAssignSection" style="display:${this.studioSubTab === 'print' ? 'none' : 'block'};">
         
-        <!-- SUB-TAB 1: PHÂN PHỐI ĐỀ THI TỪ FILE WORD -->
-        <div id="studioDistributeSection" style="display:${(this.studioSubTab === 'distribute' || this.studioSubTab === 'assign' || (this.studioSubTab !== 'publish' && this.studioSubTab !== 'print')) ? 'block' : 'none'};">
+        <!-- SUB-TAB 1: NẠP FILE WORD ĐỀ THI -->
+        <div id="studioDistributeSection" style="display:${(this.studioSubTab === 'distribute' || (this.studioSubTab !== 'publish' && this.studioSubTab !== 'print' && this.studioSubTab !== 'assign')) ? 'block' : 'none'};">
           <div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:22px;margin-bottom:24px;">
             <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:14px;">
               <div>
                 <div style="font-size:16px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:8px;">
-                  <span>📋 Phân Phối Đề Thi Từ File Word</span>
-                  <span class="pill-badge" style="background:rgba(16,185,129,0.15);color:#10b981;font-size:11.5px;padding:2px 8px;border-radius:10px;">Đa Nguồn • Lưu Trữ Đa File</span>
+                  <span>📁 Nạp File Word Đề Thi</span>
+                  <span class="pill-badge" style="background:rgba(16,185,129,0.15);color:#10b981;font-size:11.5px;padding:2px 8px;border-radius:10px;">Lưu Trữ Tự Động • Hỗ Trợ Đa File</span>
                 </div>
                 <p style="font-size:13px;color:var(--dim);margin:4px 0 0;">
-                  Hệ thống nhận nạp nhiều file Word (.doc / .docx), tự động lưu giữ câu hỏi và cho phép bạn tùy chỉnh chọn số lượng câu từ từng bộ file (ví dụ: bốc 10 câu ở bộ này, 10 câu ở bộ khác).
+                  Hệ thống nhận nạp nhiều file Word (.doc / .docx / .txt), tự động lưu giữ câu hỏi và đáp án để phân phối và phát đề thi.
                 </p>
               </div>
             </div>
@@ -1234,7 +1234,7 @@ export class QuizView {
                 <div style="padding:14px 18px;background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.3);border-radius:10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
                   <div style="font-weight:700;color:#10b981;font-size:14px;display:flex;align-items:center;gap:8px;">
                     <span>✅ Đã nạp thành công: ${this.importedQuestions.length} câu hỏi tự soạn!</span>
-                    <span style="font-size:11px;background:#10b981;color:#fff;padding:2px 8px;border-radius:10px;font-weight:700;">Đã Có Đáp Án Đúng • Sẵn Sàng Phát Đề &amp; Phân Phối</span>
+                    <span style="font-size:11px;background:#10b981;color:#fff;padding:2px 8px;border-radius:10px;font-weight:700;">Đã Có Đáp Án Đúng • Sẵn Sàng Phát Đề</span>
                   </div>
                   <div style="font-size:12px;color:var(--dim);">
                     ${this.importedFiles.length} file đề thi đang lưu trữ trên hệ thống
@@ -1298,8 +1298,27 @@ export class QuizView {
               `}
             </div>
 
+          </div>
+        </div>
+
+        <!-- SUB-TAB 2: PHÂN PHỐI & PHÁT ĐỀ THI CHO SINH VIÊN (DEDICATED PUBLISH TAB) -->
+        <div id="studioPublishSection" style="display:${(this.studioSubTab === 'publish' || this.studioSubTab === 'assign') ? 'block' : 'none'};">
+          <div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:22px;margin-bottom:24px;">
+            
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:16px;">
+              <div>
+                <div style="font-size:16px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:8px;">
+                  <span>🚀 Phân Phối &amp; Phát Đề Thi Cho Sinh Viên</span>
+                  <span class="pill-badge" style="background:rgba(16,185,129,0.15);color:#10b981;font-size:11.5px;padding:2px 8px;border-radius:10px;">Thang Điểm 10 • Tự Động Xuất File Đáp Án</span>
+                </div>
+                <p style="font-size:13px;color:var(--dim);margin:4px 0 0;">
+                  Tùy chỉnh chọn số lượng câu hỏi từ từng bộ file Word đã nạp (ví dụ: bốc 10 câu ở bộ này, 10 câu ở bộ khác), sau đó thiết lập thông số và phát đề trực tiếp cho sinh viên.
+                </p>
+              </div>
+            </div>
+
             <!-- DEDICATED SECTION: MULTI-FILE QUESTION DISTRIBUTION -->
-            <div id="sectionMultiFileDistribution" style="background:var(--panel-alt);border:1px solid var(--line);border-radius:10px;padding:18px;margin-bottom:16px;">
+            <div id="sectionMultiFileDistribution" style="background:var(--panel-alt);border:1px solid var(--line);border-radius:10px;padding:18px;margin-bottom:20px;">
               <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
                 <div>
                   <div style="font-size:14.5px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:8px;">
@@ -1314,7 +1333,7 @@ export class QuizView {
 
               ${this.importedFiles.length === 0 ? `
                 <div style="text-align:center;padding:24px;background:var(--panel);border:1px dashed var(--line);border-radius:8px;">
-                  <div style="font-size:13px;color:var(--dim);">Chưa có bộ file nào để phân phối. Hãy tải lên ít nhất 1 file Word ở trên!</div>
+                  <div style="font-size:13px;color:var(--dim);">Chưa có bộ file Word nào được nạp. Vui lòng chuyển sang <strong>Tab 1 (Nạp File Word Đề Thi)</strong> để tải lên ít nhất 1 file Word trước khi phân phối!</div>
                 </div>
               ` : `
                 <div style="overflow-x:auto;background:var(--panel);border:1px solid var(--line);border-radius:8px;margin-bottom:14px;">
@@ -1370,7 +1389,7 @@ export class QuizView {
                 </div>
 
                 <!-- Distribution Summary & Quick Actions -->
-                <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;padding:12px 14px;background:var(--panel);border:1px solid var(--line);border-radius:8px;margin-bottom:16px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;padding:12px 14px;background:var(--panel);border:1px solid var(--line);border-radius:8px;">
                   <div style="display:flex;gap:6px;flex-wrap:wrap;">
                     <button type="button" class="btn-sm" id="btnDistributeAll" style="font-size:12px;padding:5px 12px;cursor:pointer;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);border-radius:6px;font-weight:600;">
                       ⚡ Chọn tất cả câu hỏi
@@ -1387,71 +1406,27 @@ export class QuizView {
                     <span>🎯 Đã chọn: ${distSummary.totalSelected} / ${distSummary.totalAvailable} câu</span>
                   </div>
                 </div>
-
-                <!-- Prominent Navigation CTAs -->
-                <div style="display:flex;justify-content:flex-end;align-items:center;gap:10px;flex-wrap:wrap;">
-                  <button type="button" class="btn-sm" id="btnProceedToPrint" style="padding:9px 18px;font-size:13px;font-weight:700;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);border-radius:6px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
-                    <span>🖨️ Soạn Đề In Ấn A4 ➔</span>
-                  </button>
-                  <button type="button" class="btn-primary" id="btnProceedToPublish" style="padding:10px 22px;font-size:13.5px;font-weight:700;display:inline-flex;align-items:center;gap:8px;cursor:pointer;">
-                    <span>🚀 Sang Tab Phát Đề Thi Cho Sinh Viên (${distSummary.totalSelected} câu) ➔</span>
-                  </button>
-                </div>
               `}
             </div>
 
-          </div>
-        </div>
-
-        <!-- SUB-TAB 2: PHÁT ĐỀ THI CHO SINH VIÊN (DEDICATED PUBLISH TAB) -->
-        <div id="studioPublishSection" style="display:${(this.studioSubTab === 'publish' || this.studioSubTab === 'assign') ? 'block' : 'none'};">
-          <div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:22px;margin-bottom:24px;">
-            
-            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:16px;">
-              <div>
-                <div style="font-size:16px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:8px;">
-                  <span>🚀 Phát Đề Thi Cho Sinh Viên</span>
-                  <span class="pill-badge" style="background:rgba(16,185,129,0.15);color:#10b981;font-size:11.5px;padding:2px 8px;border-radius:10px;">Thang Điểm 10 • Tự Động Xuất File Đáp Án</span>
-                </div>
-                <p style="font-size:13px;color:var(--dim);margin:4px 0 0;">
-                  Thiết lập thông số đề thi và phát trực tiếp cho sinh viên làm bài kiểm tra trực tuyến.
-                </p>
-              </div>
-
-              <div>
-                <button type="button" class="btn-sm" id="btnBackToDistribute" style="font-size:12.5px;padding:6px 14px;border-radius:6px;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
-                  <span>⬅️</span>
-                  <span>Quay lại Tab Phân Phối Đề</span>
-                </button>
-              </div>
-            </div>
-
-            <!-- Distribution Info Banner -->
+            <!-- Distribution Info Banner (No jump-back buttons) -->
             ${distSummary.totalSelected === 0 ? `
-              <div style="padding:18px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:8px;margin-bottom:18px;text-align:center;">
-                <div style="font-size:14px;font-weight:700;color:#ef4444;margin-bottom:6px;">⚠️ Chưa có câu hỏi nào được chọn phân phối!</div>
-                <div style="font-size:12.5px;color:var(--dim);margin-bottom:12px;">Vui lòng quay lại Tab Phân Phối Đề để chọn số lượng câu hỏi từ các bộ file Word trước khi phát đề.</div>
-                <button type="button" class="btn-primary" id="btnBackToDistributeEmpty" style="font-size:12.5px;padding:7px 16px;cursor:pointer;">
-                  📋 Quay Lại Tab Phân Phối Đề Để Chọn Câu Hỏi
-                </button>
+              <div style="padding:14px 18px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:8px;margin-bottom:18px;text-align:center;">
+                <div style="font-size:13.5px;font-weight:700;color:#ef4444;margin-bottom:4px;">⚠️ Chưa có câu hỏi nào được chọn để phát đề!</div>
+                <div style="font-size:12.5px;color:var(--dim);">Vui lòng nhập số câu hoặc bấm các nút chọn nhanh (ví dụ: 10 câu, Tất cả) ở bảng phân phối ngay phía trên.</div>
               </div>
             ` : `
-              <div style="padding:14px 18px;background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.3);border-radius:8px;margin-bottom:18px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
-                <div>
-                  <div style="font-weight:700;color:#2563eb;font-size:13.5px;margin-bottom:4px;">
-                    🎯 Đang phát đề gồm ${distSummary.totalSelected} câu hỏi tổng hợp từ ${distSummary.breakdown.length} bộ đề:
-                  </div>
-                  <div style="display:flex;gap:6px;flex-wrap:wrap;">
-                    ${distSummary.breakdown.map(b => `
-                      <span class="pill-badge" style="background:var(--panel);border:1px solid var(--line);color:var(--text);font-size:11.5px;padding:3px 8px;border-radius:6px;font-weight:600;">
-                        📄 ${this._escapeHtml(b.fileName)}: <strong style="color:#2563eb;">${b.selectedCount}</strong> câu
-                      </span>
-                    `).join('')}
-                  </div>
+              <div style="padding:14px 18px;background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.3);border-radius:8px;margin-bottom:18px;">
+                <div style="font-weight:700;color:#2563eb;font-size:13.5px;margin-bottom:6px;">
+                  🎯 Đang cấu hình phát đề gồm ${distSummary.totalSelected} câu hỏi tổng hợp từ ${distSummary.breakdown.length} bộ đề:
                 </div>
-                <button type="button" class="btn-sm" id="btnModifyDistFromPublish" style="font-size:12px;padding:5px 12px;border-radius:6px;background:var(--panel);border:1px solid var(--line);color:var(--text);cursor:pointer;font-weight:600;">
-                  ✏️ Thay đổi số câu
-                </button>
+                <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                  ${distSummary.breakdown.map(b => `
+                    <span class="pill-badge" style="background:var(--panel);border:1px solid var(--line);color:var(--text);font-size:11.5px;padding:3px 8px;border-radius:6px;font-weight:600;">
+                      📄 ${this._escapeHtml(b.fileName)}: <strong style="color:#2563eb;">${b.selectedCount}</strong> câu
+                    </span>
+                  `).join('')}
+                </div>
               </div>
             `}
 
