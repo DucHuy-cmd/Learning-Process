@@ -484,4 +484,129 @@ describe('Admin Exam Import & Dedicated Answer Key Test Suite', () => {
     expect(container.querySelector('#btnGoToExamManagement')).toBeNull();
     authManager.logout();
   });
+
+  it('allows teacher to type custom question count and picks that exact number of questions', () => {
+    const quizView = new QuizView({ container });
+    authManager.login('admin', '2HV6868@');
+    quizView.setTab('studio');
+    quizView.studioSubTab = 'assign';
+
+    const pool = Array.from({ length: 25 }, (_, i) => ({
+      id: `q_custom_${i + 1}`,
+      question: `Câu hỏi số ${i + 1}`,
+      options: [{ id: 'A', text: 'Đáp án A' }, { id: 'B', text: 'Đáp án B' }],
+      correctId: 'A',
+      explanation: `Giải thích ${i + 1}`,
+    }));
+
+    quizView._saveWordFiles([
+      { id: 'f_custom_pool', name: 'De_25_Cau.docx', uploadedAt: new Date().toISOString(), questionCount: 25, questions: pool },
+    ]);
+    quizView.render();
+
+    const numInput = container.querySelector('#numAssignQuestionCount');
+    expect(numInput).not.toBeNull();
+
+    // Teacher types 12 questions
+    numInput.value = '12';
+    numInput.dispatchEvent(new window.Event('input', { bubbles: true }));
+
+    expect(quizView.selectedAssignCount).toBe('12');
+
+    // Title and submit
+    const titleInput = container.querySelector('#txtAssignTitle');
+    titleInput.value = 'Đề Thi Điền Số Câu 12';
+    const assignBtn = container.querySelector('#btnCreateAndAssignExam');
+    assignBtn.click();
+
+    expect(quizView.adminAnswerKeyExamId).not.toBeNull();
+    const createdExam = examManager.getExamById(quizView.adminAnswerKeyExamId);
+    expect(createdExam).not.toBeNull();
+    expect(createdExam.questionIds.length).toBe(12);
+
+    authManager.logout();
+  });
+
+  it('correctly opens Admin Answer Key and Gradebook modals from the distributed exams table', () => {
+    const quizView = new QuizView({ container });
+    authManager.login('admin', '2HV6868@');
+
+    // Create an exam first
+    const createRes = examManager.createExam({
+      title: 'Đề Thi Kiểm Tra Modals',
+      durationMinutes: 20,
+      questionIds: ['q_mod_1', 'q_mod_2'],
+      customQuestions: [
+        { id: 'q_mod_1', question: 'Câu 1?', options: [{ id: 'A', text: '1' }, { id: 'B', text: '2' }], correctId: 'A' },
+        { id: 'q_mod_2', question: 'Câu 2?', options: [{ id: 'A', text: '1' }, { id: 'B', text: '2' }], correctId: 'B' },
+      ],
+      examCode: 'TRR-TEST',
+    });
+    expect(createRes.success).toBe(true);
+
+    quizView.setTab('myExams');
+    quizView.render();
+
+    // Find action buttons in table
+    const btnKey = container.querySelector(`.btn-view-admin-key[data-exam-id="${createRes.exam.id}"]`);
+    expect(btnKey).not.toBeNull();
+    btnKey.click();
+
+    // Admin answer key modal is open
+    expect(quizView.adminAnswerKeyExamId).toBe(createRes.exam.id);
+    const keyBackdrop = container.querySelector('#adminAnswerKeyBackdrop');
+    expect(keyBackdrop).not.toBeNull();
+    expect(keyBackdrop.textContent).toContain('HỒ SƠ ĐÁP ÁN & BAREM CHẤM DÀNH CHO ADMIN');
+    expect(keyBackdrop.textContent).toContain('TRR-TEST');
+
+    // Close modal
+    const btnCloseKey = container.querySelector('#btnCloseAdminAnswerKey');
+    expect(btnCloseKey).not.toBeNull();
+    btnCloseKey.click();
+    expect(quizView.adminAnswerKeyExamId).toBeNull();
+    expect(container.querySelector('#adminAnswerKeyBackdrop')).toBeNull();
+
+    // Now open gradebook modal
+    const btnGrade = container.querySelector(`.btn-view-gradebook[data-exam-id="${createRes.exam.id}"]`);
+    expect(btnGrade).not.toBeNull();
+    btnGrade.click();
+
+    expect(quizView.gradebookExamId).toBe(createRes.exam.id);
+    const gradeBackdrop = container.querySelector('#gradebookModalBackdrop');
+    expect(gradeBackdrop).not.toBeNull();
+    expect(gradeBackdrop.textContent).toContain('Sổ Điểm Điện Tử & Danh Sách Nộp Bài');
+
+    // Close gradebook modal
+    const btnCloseGrade = container.querySelector('#btnCloseGradebook');
+    expect(btnCloseGrade).not.toBeNull();
+    btnCloseGrade.click();
+    expect(quizView.gradebookExamId).toBeNull();
+    expect(container.querySelector('#gradebookModalBackdrop')).toBeNull();
+
+    authManager.logout();
+  });
+
+  it('guarantees A4 Print section is outside studioAssignSection and visible when studioSubTab is print', () => {
+    const quizView = new QuizView({ container });
+    authManager.login('admin', '2HV6868@');
+    quizView.setTab('studio');
+    quizView.studioSubTab = 'print';
+    quizView.render();
+
+    const assignSection = container.querySelector('#studioAssignSection');
+    const printSection = container.querySelector('#studioPrintSection');
+
+    expect(assignSection).not.toBeNull();
+    expect(printSection).not.toBeNull();
+
+    // Verify studioPrintSection is NOT a descendant of studioAssignSection
+    expect(assignSection.contains(printSection)).toBe(false);
+
+    // Verify visibility styles
+    expect(assignSection.style.display).toBe('none');
+    expect(printSection.style.display).toBe('block');
+
+    authManager.logout();
+  });
 });
+

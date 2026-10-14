@@ -874,9 +874,16 @@ export async function handleRequest(req, res) {
       const title = (data.title || '').trim();
       const questionIds = Array.isArray(data.questionIds) ? data.questionIds : [];
       const durationMinutes = Number(data.durationMinutes);
+      const customQuestions = Array.isArray(data.customQuestions) ? data.customQuestions : [];
+      customQuestions.forEach(cq => {
+        if (cq && cq.id && !serverCustomQuestions.some(scq => scq.id === cq.id)) {
+          serverCustomQuestions.push(cq);
+        }
+      });
       const validQuestionIds = new Set([
         ...STATIC_QUESTION_BANK.map(question => question.id),
         ...serverCustomQuestions.map(question => question.id),
+        ...customQuestions.map(question => question.id),
       ]);
       const assignedTo = Array.isArray(data.assignedTo) ? data.assignedTo : ['all'];
       if (
@@ -906,6 +913,8 @@ export async function handleRequest(req, res) {
         description: typeof data.description === 'string' ? data.description.trim() : '',
         durationMinutes,
         questionIds,
+        customQuestions,
+        examCode: typeof data.examCode === 'string' && data.examCode.trim() ? data.examCode.trim() : null,
         assignedTo,
         createdAt: new Date().toISOString(),
         createdBy: data.createdBy || 'user_admin',

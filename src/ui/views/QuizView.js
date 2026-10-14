@@ -321,7 +321,9 @@ export class QuizView {
     }
 
     const standardSteps = [5, 10, 15, 20, 25, 30, 40, 50];
-    let html = `<option value="all" ${this.selectedAssignCount === 'all' ? 'selected' : ''}>Tất cả (${poolSize} câu)</option>`;
+    let html = `<option value="all" ${this.selectedAssignCount === 'all' || !this.selectedAssignCount ? 'selected' : ''}>Tất cả (${poolSize} câu)</option>`;
+    let hasMatched = this.selectedAssignCount === 'all' || !this.selectedAssignCount;
+
     standardSteps.forEach(cnt => {
       if (poolSize >= cnt) {
         let label = `Bốc ngẫu nhiên ${cnt} câu`;
@@ -329,9 +331,15 @@ export class QuizView {
         else if (cnt === 10) label += ' (45 phút)';
         else if (cnt === 15) label += ' (Giữa kỳ)';
         else if (cnt === 20) label += ' (Cuối kỳ)';
-        html += `<option value="${cnt}" ${this.selectedAssignCount === String(cnt) ? 'selected' : ''}>${label}</option>`;
+        const isSel = this.selectedAssignCount === String(cnt);
+        if (isSel) hasMatched = true;
+        html += `<option value="${cnt}" ${isSel ? 'selected' : ''}>${label}</option>`;
       }
     });
+
+    if (!hasMatched && this.selectedAssignCount && this.selectedAssignCount !== 'all' && !isNaN(parseInt(this.selectedAssignCount, 10))) {
+      html += `<option value="${this.selectedAssignCount}" selected>Tuỳ chỉnh: ${this.selectedAssignCount} câu</option>`;
+    }
     return html;
   }
 
@@ -1049,6 +1057,18 @@ export class QuizView {
     const allStudents = authManager.getUsers().filter(u => u.role !== 'admin');
     const assignedExamsList = examManager.getExams();
 
+    let currentPool = this.importedQuestions;
+    if (this.selectedAssignFileId !== 'all') {
+      const file = this.importedFiles.find(f => f.id === this.selectedAssignFileId);
+      if (file && file.questions) {
+        currentPool = file.questions;
+      }
+    }
+    const currentPoolSize = currentPool.length;
+    const currentCountDisplay = (this.selectedAssignCount === 'all' || !this.selectedAssignCount || isNaN(parseInt(this.selectedAssignCount, 10)))
+      ? (currentPoolSize > 0 ? currentPoolSize : 0)
+      : Math.min(parseInt(this.selectedAssignCount, 10), currentPoolSize);
+
     return `
       <!-- Studio Subtab Navigation -->
       <div style="display:flex;gap:10px;margin-bottom:20px;border-bottom:1px solid var(--line);padding-bottom:10px;">
@@ -1217,9 +1237,20 @@ export class QuizView {
                 <label style="display:block;font-size:12px;color:var(--dim);margin-bottom:6px;font-weight:600;">
                   2. Bốc ngẫu nhiên số câu từ file đã chọn:
                 </label>
-                <select id="selAssignQuestionCount" class="form-input" style="width:100%;padding:8px 12px;font-size:13px;border-radius:6px;background:var(--panel);border:1px solid var(--line);color:var(--text);font-weight:600;">
-                  ${this._renderAssignCountOptions()}
-                </select>
+                <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                  <div style="display:flex;align-items:center;gap:6px;">
+                    <input type="number" id="numAssignQuestionCount" class="form-input" min="1" max="${currentPoolSize || 1}"
+                      value="${currentPoolSize > 0 ? currentCountDisplay : 0}"
+                      placeholder="Số câu (VD: 10, 20...)"
+                      style="width:90px;padding:8px 8px;font-size:13.5px;border-radius:6px;background:var(--panel);border:1px solid var(--line);color:var(--text);font-weight:700;text-align:center;" />
+                    <span style="font-size:12px;color:var(--dim);font-weight:600;white-space:nowrap;">/ ${currentPoolSize} câu</span>
+                  </div>
+                  <div style="flex:1;min-width:180px;">
+                    <select id="selAssignQuestionCount" class="form-input" style="width:100%;padding:8px 10px;font-size:12.5px;border-radius:6px;background:var(--panel);border:1px solid var(--line);color:var(--text);font-weight:600;">
+                      ${this._renderAssignCountOptions()}
+                    </select>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -1291,6 +1322,7 @@ export class QuizView {
               <span>🚀 Phát Đề Cho Sinh Viên &amp; Xuất File Đáp Án</span>
             </button>
           </div>
+        </div>
       </div>
 
       <!-- SECTION B: A4 PRINT & LATEX EXPORTER (PRESERVED) -->
@@ -1523,7 +1555,17 @@ export class QuizView {
 
   _renderGradebookModal() {
     const exam = examManager.getExamById(this.gradebookExamId);
-    if (!exam) return '';
+    if (!exam) {
+      return `
+        <div class="gradebook-modal-backdrop" id="gradebookModalBackdrop" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px;">
+          <div class="gradebook-modal-card" style="background:var(--panel);border:1px solid var(--line);border-radius:12px;width:100%;max-width:500px;padding:24px;text-align:center;">
+            <h3 style="font-size:16px;font-weight:700;color:var(--text);margin:0 0 8px;">⚠️ Không tìm thấy đề thi</h3>
+            <p style="color:var(--dim);font-size:13px;margin:0 0 20px;">Đề thi này không tồn tại hoặc đã bị xóa khỏi hệ thống.</p>
+            <button type="button" class="btn-primary" id="btnCloseGradebook" style="padding:8px 20px;font-size:13px;font-weight:700;border-radius:6px;cursor:pointer;">✕ Đóng</button>
+          </div>
+        </div>
+      `;
+    }
 
     const submissions = examManager.getSubmissionsForExam(this.gradebookExamId);
     const avgScore = submissions.length > 0 
@@ -1531,8 +1573,8 @@ export class QuizView {
       : 0;
 
     return `
-      <div class="gradebook-modal-backdrop" id="gradebookModalBackdrop">
-        <div class="gradebook-modal-card">
+      <div class="gradebook-modal-backdrop" id="gradebookModalBackdrop" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px;">
+        <div class="gradebook-modal-card" style="background:var(--panel);border:1px solid var(--line);border-radius:12px;width:100%;max-width:960px;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 20px 40px rgba(0,0,0,0.4);overflow:hidden;">
           <div style="padding:18px 24px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;">
             <div>
               <div style="font-size:12px;color:var(--accent);font-weight:700;text-transform:uppercase;">
@@ -1624,12 +1666,29 @@ export class QuizView {
 
   _renderAdminAnswerKeyModal() {
     const exam = examManager.getExamById(this.adminAnswerKeyExamId);
-    if (!exam) return '';
+    if (!exam) {
+      return `
+        <div class="gradebook-modal-backdrop" id="adminAnswerKeyBackdrop" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px;">
+          <div class="gradebook-modal-card" style="background:var(--panel);border:1px solid var(--line);border-radius:12px;width:100%;max-width:500px;padding:24px;text-align:center;">
+            <h3 style="font-size:16px;font-weight:700;color:var(--text);margin:0 0 8px;">⚠️ Không tìm thấy đề thi</h3>
+            <p style="color:var(--dim);font-size:13px;margin:0 0 20px;">Đề thi này không tồn tại hoặc đã bị xóa khỏi hệ thống.</p>
+            <button type="button" class="btn-primary" id="btnCloseAdminAnswerKey" style="padding:8px 20px;font-size:13px;font-weight:700;border-radius:6px;cursor:pointer;">✕ Đóng</button>
+          </div>
+        </div>
+      `;
+    }
 
-    const questions = examManager.getExamQuestions(exam);
+    let questions = examManager.getExamQuestions(exam);
+    if (questions.length === 0 && this.importedQuestions && this.importedQuestions.length > 0) {
+      const importedMap = new Map(this.importedQuestions.map(q => [q.id, q]));
+      const resolved = (exam.questionIds || []).map(id => importedMap.get(id)).filter(Boolean);
+      if (resolved.length > 0) {
+        questions = resolved;
+      }
+    }
 
     return `
-      <div class="gradebook-modal-backdrop" id="adminAnswerKeyBackdrop" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;">
+      <div class="gradebook-modal-backdrop" id="adminAnswerKeyBackdrop" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px;">
         <div class="gradebook-modal-card" style="background:var(--panel);border:1px solid var(--line);border-radius:12px;width:100%;max-width:960px;max-height:92vh;display:flex;flex-direction:column;box-shadow:0 20px 40px rgba(0,0,0,0.4);overflow:hidden;">
           
           <!-- Modal Header -->
@@ -2458,11 +2517,51 @@ export class QuizView {
       });
     }
 
-    // Select random question count
+    // Select random question count (both input and dropdown sync)
+    const numAssignQuestionCount = this.container.querySelector('#numAssignQuestionCount');
     const selAssignQuestionCount = this.container.querySelector('#selAssignQuestionCount');
+
+    if (numAssignQuestionCount) {
+      numAssignQuestionCount.addEventListener('input', (e) => {
+        const val = e.target.value.trim();
+        if (val === '') {
+          this.selectedAssignCount = 'all';
+          if (selAssignQuestionCount) selAssignQuestionCount.value = 'all';
+        } else {
+          const parsed = parseInt(val, 10);
+          if (!isNaN(parsed) && parsed > 0) {
+            this.selectedAssignCount = String(parsed);
+            if (selAssignQuestionCount) {
+              const opt = selAssignQuestionCount.querySelector(`option[value="${parsed}"]`);
+              if (opt) {
+                selAssignQuestionCount.value = String(parsed);
+              } else {
+                let customOpt = selAssignQuestionCount.querySelector('option[data-custom="true"]');
+                if (!customOpt) {
+                  customOpt = document.createElement('option');
+                  customOpt.setAttribute('data-custom', 'true');
+                  selAssignQuestionCount.appendChild(customOpt);
+                }
+                customOpt.value = String(parsed);
+                customOpt.textContent = `Tuỳ chỉnh: ${parsed} câu`;
+                selAssignQuestionCount.value = String(parsed);
+              }
+            }
+          }
+        }
+      });
+    }
+
     if (selAssignQuestionCount) {
       selAssignQuestionCount.addEventListener('change', (e) => {
         this.selectedAssignCount = e.target.value;
+        if (numAssignQuestionCount) {
+          if (e.target.value === 'all') {
+            numAssignQuestionCount.value = '';
+          } else {
+            numAssignQuestionCount.value = e.target.value;
+          }
+        }
       });
     }
 
@@ -2534,11 +2633,21 @@ export class QuizView {
           return;
         }
 
+        // Read count from number input if present, fallback to this.selectedAssignCount
+        const numInput = this.container.querySelector('#numAssignQuestionCount');
+        const rawCount = (numInput && numInput.value.trim() !== '') ? numInput.value.trim() : this.selectedAssignCount;
+
         let questionsToAssign = pool;
-        if (this.selectedAssignCount && this.selectedAssignCount !== 'all') {
-          const countNum = parseInt(this.selectedAssignCount, 10);
-          if (!isNaN(countNum) && countNum > 0 && countNum < pool.length) {
-            questionsToAssign = shuffle(pool).slice(0, countNum);
+        if (rawCount && rawCount !== 'all') {
+          const countNum = parseInt(rawCount, 10);
+          if (!isNaN(countNum) && countNum > 0) {
+            if (countNum > pool.length) {
+              this._showAlert(`Số lượng câu cần bốc (${countNum}) vượt quá số câu có sẵn trong file (${pool.length} câu)!`);
+              return;
+            }
+            if (countNum < pool.length) {
+              questionsToAssign = shuffle(pool).slice(0, countNum);
+            }
           }
         }
 
@@ -2563,6 +2672,7 @@ export class QuizView {
             cloudSyncManager.serverCreateExam(result.exam).catch(() => {});
           }
           // Automatically open dedicated Admin Answer Key modal immediately!
+          this.gradebookExamId = null;
           this.adminAnswerKeyExamId = result.exam.id;
           this._showAlert(`🎉 Tạo và phân phối đề thi thành công!\n\nĐề thi: "${title}" (Mã: ${result.exam.examCode})\nNguồn: ${sourceLabel}\nSố câu: ${questionIds.length} câu\nThời lượng: ${durationMinutes} phút\nĐối tượng: ${assignedTo.includes('all') ? 'Toàn bộ sinh viên' : assignedTo.length + ' sinh viên'}\n\nĐề thi đã được chuyển vào mục "Quản Lý Đề Thi". Hệ thống đang mở Hồ sơ Đáp án & Barem chấm dành riêng cho Quản trị viên.`);
           this.render();
@@ -2574,8 +2684,11 @@ export class QuizView {
 
     // Admin Answer Key Modal & Row Events
     this.container.querySelectorAll('.btn-view-admin-key').forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
         const examId = btn.getAttribute('data-exam-id');
+        this.gradebookExamId = null;
         this.adminAnswerKeyExamId = examId;
         this.render();
       });
@@ -2583,7 +2696,9 @@ export class QuizView {
 
     const btnCloseAnswerKey = this.container.querySelector('#btnCloseAdminAnswerKey');
     if (btnCloseAnswerKey) {
-      btnCloseAnswerKey.addEventListener('click', () => {
+      btnCloseAnswerKey.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
         this.adminAnswerKeyExamId = null;
         this.render();
       });
@@ -2640,8 +2755,11 @@ export class QuizView {
 
     // View Gradebook for Exam
     this.container.querySelectorAll('.btn-view-gradebook').forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
         const examId = btn.getAttribute('data-exam-id');
+        this.adminAnswerKeyExamId = null;
         this.gradebookExamId = examId;
         this.render();
       });
@@ -2649,7 +2767,9 @@ export class QuizView {
 
     const btnCloseGradebook = this.container.querySelector('#btnCloseGradebook');
     if (btnCloseGradebook) {
-      btnCloseGradebook.addEventListener('click', () => {
+      btnCloseGradebook.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
         this.gradebookExamId = null;
         this.render();
       });
