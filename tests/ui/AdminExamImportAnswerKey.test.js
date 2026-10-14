@@ -835,8 +835,36 @@ describe('Admin Exam Import & Dedicated Answer Key Test Suite', () => {
     expect(card.textContent).toContain('Đề 2');
     expect(container.textContent).toContain('Đề 1');
 
+    // 7. Verify Admin does NOT see the redundant dashboard stats header card
+    expect(container.textContent).not.toContain('ĐIỂM TB (THANG 10)');
+    expect(container.textContent).not.toContain('Cổng Khảo Thí & Kiểm Tra Định Kỳ');
+    expect(container.textContent).toContain('Danh Sách Các Đề Thi Đã Phân Phối');
+
+    authManager.logout();
+  });
+
+  it('renders clear descriptive labels for question shuffle vs option shuffle', () => {
+    authManager.login('admin', '2HV6868@');
+    const quizView = new QuizView({ container });
+    quizView.setTab('studio');
+    quizView.studioSubTab = 'publish';
+    quizView.render();
+
+    const chkQ = container.querySelector('#chkShuffleQuestions');
+    const chkOpt = container.querySelector('#chkShuffleOptions');
+    expect(chkQ).not.toBeNull();
+    expect(chkOpt).not.toBeNull();
+
+    const parentQ = chkQ.closest('label');
+    const parentOpt = chkOpt.closest('label');
+    expect(parentQ.textContent).toContain('Xáo trộn thứ tự CÂU HỎI');
+    expect(parentQ.textContent).toContain('Mỗi sinh viên sẽ nhận các câu hỏi theo thứ tự ngẫu nhiên');
+    expect(parentOpt.textContent).toContain('Xáo trộn thứ tự ĐÁP ÁN (A, B, C, D)');
+    expect(parentOpt.textContent).toContain('Đáp án đúng sẽ nằm ngẫu nhiên ở vị trí A, B, C hoặc D');
+
     authManager.logout();
   });
 });
+
 
 

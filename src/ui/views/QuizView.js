@@ -667,19 +667,18 @@ export class QuizView {
       : 0;
 
     return `
-      <!-- Student Exam Dashboard Header -->
+      <!-- Student Exam Dashboard Header (Only shown for Students) -->
+      ${!isAdmin ? `
       <div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px 24px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px;">
         <div>
           <div style="font-size:12px;color:var(--accent);font-weight:700;text-transform:uppercase;margin-bottom:4px;">
-            ${isAdmin ? '🛠️ Quản Lý Đề Thi &amp; Khảo Thí' : '🎓 Cổng Khảo Thí &amp; Kiểm Tra Định Kỳ'}
+            🎓 Cổng Khảo Thí &amp; Kiểm Tra Định Kỳ
           </div>
           <h2 style="font-size:20px;font-weight:700;color:var(--text);margin:0;">
-            ${isAdmin ? 'Quản Lý Danh Sách Đề Thi' : `Xin chào, ${this._escapeHtml(currentUser.fullName)}`} ${isAdmin ? '<span class="pill-badge" style="background:rgba(245,158,11,0.2);color:var(--accent);font-size:11px;padding:2px 8px;border-radius:8px;vertical-align:middle;">Quản Trị Viên</span>' : ''}
+            Xin chào, ${this._escapeHtml(currentUser.fullName)}
           </h2>
           <p style="font-size:13px;color:var(--dim);margin:4px 0 0;">
-            ${isAdmin 
-              ? 'Xem tất cả các đề thi được tạo trong hệ thống, theo dõi tiến độ thi của sinh viên hoặc làm bài thi thử.' 
-              : 'Quy chế thi trực tuyến: Mỗi thí sinh chỉ có duy nhất 1 lượt làm. Màn hình sẽ tự động khóa khi vào thi, <strong style="color:#ef4444;">VI PHẠM</strong> 3 lần sẽ bị 0đ.'}
+            Quy chế thi trực tuyến: Mỗi thí sinh chỉ có duy nhất 1 lượt làm. Màn hình sẽ tự động khóa khi vào thi, <strong style="color:#ef4444;">VI PHẠM</strong> 3 lần sẽ bị 0đ.
           </p>
         </div>
 
@@ -699,6 +698,7 @@ export class QuizView {
           </div>
         </div>
       </div>
+      ` : ''}
 
       <!-- Assigned Exams Table & Gradebook (Quản Lý Đề Thi Cho Admin) -->
       ${isAdmin ? `
@@ -1450,9 +1450,31 @@ export class QuizView {
               </div>
             </div>
 
-            <div style="display:flex;gap:18px;flex-wrap:margin-bottom:18px;font-size:13px;color:var(--text);">
-              <label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" id="chkShuffleQuestions" checked /> Xáo trộn thứ tự câu hỏi khi thi</label>
-              <label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" id="chkShuffleOptions" checked /> Xáo trộn thứ tự đáp án A, B, C, D</label>
+            <!-- SHUFFLE CONFIGURATION -->
+            <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));gap:12px;margin-bottom:18px;">
+              <label style="display:flex;align-items:flex-start;gap:10px;padding:12px 14px;border-radius:8px;background:var(--panel-alt);border:1px solid var(--line);cursor:pointer;">
+                <input type="checkbox" id="chkShuffleQuestions" checked style="margin-top:3px;cursor:pointer;" />
+                <div>
+                  <div style="font-size:13px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:6px;">
+                    <span>🔀 Xáo trộn thứ tự CÂU HỎI</span>
+                  </div>
+                  <div style="font-size:11.5px;color:var(--dim);margin-top:2px;line-height:1.4;">
+                    Đổi vị trí thứ tự câu (Câu 1, 2, 3...) — Mỗi sinh viên sẽ nhận các câu hỏi theo thứ tự ngẫu nhiên khác nhau.
+                  </div>
+                </div>
+              </label>
+
+              <label style="display:flex;align-items:flex-start;gap:10px;padding:12px 14px;border-radius:8px;background:var(--panel-alt);border:1px solid var(--line);cursor:pointer;">
+                <input type="checkbox" id="chkShuffleOptions" checked style="margin-top:3px;cursor:pointer;" />
+                <div>
+                  <div style="font-size:13px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:6px;">
+                    <span>🔀 Xáo trộn thứ tự ĐÁP ÁN (A, B, C, D)</span>
+                  </div>
+                  <div style="font-size:11.5px;color:var(--dim);margin-top:2px;line-height:1.4;">
+                    Đổi vị trí 4 phương án trong từng câu — Đáp án đúng sẽ nằm ngẫu nhiên ở vị trí A, B, C hoặc D.
+                  </div>
+                </div>
+              </label>
             </div>
 
             <!-- Assignment Target Selection -->
