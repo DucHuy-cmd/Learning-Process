@@ -43,7 +43,7 @@ describe('Admin Exam Import & Dedicated Answer Key Test Suite', () => {
     delete global.document;
   });
 
-  it('renders Word exam import section in Studio tab with action toolbar', () => {
+  it('renders Word exam import section in Studio tab with clean toolbar', () => {
     const quizView = new QuizView({ container });
     quizView.setTab('studio');
     quizView.studioSubTab = 'assign';
@@ -51,28 +51,40 @@ describe('Admin Exam Import & Dedicated Answer Key Test Suite', () => {
 
     expect(container.querySelector('#importExamBox')).not.toBeNull();
     expect(container.querySelector('#btnDownloadSampleWord')).not.toBeNull();
-    expect(container.querySelector('#btnStudioAddQuestionAi')).not.toBeNull();
     expect(container.querySelector('#btnClearAllWordData')).not.toBeNull();
-    expect(container.querySelector('#btnFillSampleText')).not.toBeNull();
     expect(container.querySelector('#fileImportWord')).not.toBeNull();
-    expect(container.querySelector('#txtImportRaw')).not.toBeNull();
-    expect(container.querySelector('#btnParseImportText')).not.toBeNull();
+
+    // Verify removed buttons and raw text input are gone
+    expect(container.querySelector('#btnStudioAddQuestionAi')).toBeNull();
+    expect(container.querySelector('#btnFillSampleText')).toBeNull();
+    expect(container.querySelector('#txtImportRaw')).toBeNull();
+    expect(container.querySelector('#btnParseImportText')).toBeNull();
   });
 
-  it('fills sample exam text, parses 5 questions, saves to localStorage, and displays live preview', () => {
+  it('saves imported questions to localStorage and displays compact count badge without full question dump', () => {
     const quizView = new QuizView({ container });
     quizView.setTab('studio');
     quizView.studioSubTab = 'assign';
+
+    // Set 5 sample questions
+    const sampleQuestions = [
+      { id: 'q1', question: 'Mệnh đề 1', options: [{ id: 'A', text: 'Opt A' }, { id: 'B', text: 'Opt B' }], correctId: 'A' },
+      { id: 'q2', question: 'Mệnh đề 2', options: [{ id: 'A', text: 'Opt A' }, { id: 'B', text: 'Opt B' }], correctId: 'B' },
+      { id: 'q3', question: 'Mệnh đề 3', options: [{ id: 'A', text: 'Opt A' }, { id: 'B', text: 'Opt B' }], correctId: 'A' },
+      { id: 'q4', question: 'Mệnh đề 4', options: [{ id: 'A', text: 'Opt A' }, { id: 'B', text: 'Opt B' }], correctId: 'A' },
+      { id: 'q5', question: 'Mệnh đề 5', options: [{ id: 'A', text: 'Opt A' }, { id: 'B', text: 'Opt B' }], correctId: 'B' },
+    ];
+    quizView.importedQuestions = sampleQuestions;
+    quizView._saveWordQuestions(quizView.importedQuestions);
     quizView.render();
 
-    const btnFill = container.querySelector('#btnFillSampleText');
-    expect(btnFill).not.toBeNull();
-    btnFill.click();
-
     expect(quizView.importedQuestions.length).toBe(5);
-    expect(quizView.importErrors.length).toBe(0);
     expect(container.textContent).toContain('Đã nạp thành công: 5 câu hỏi tự soạn');
-    expect(container.textContent).toContain('Lưu Vĩnh Viễn');
+    expect(container.textContent).toContain('Sẵn Sàng Phát Đề');
+
+    // Verify full question dump list is NOT rendered in import exam box
+    expect(container.querySelector('#importExamBox').querySelector('.exam-question-item')).toBeNull();
+    expect(container.querySelector('#importExamBox').textContent).not.toContain('Mệnh đề 1');
 
     // Verify persisted in localStorage
     const saved = localStorage.getItem('toanrr_custom_imported_questions_v1');
@@ -103,13 +115,15 @@ describe('Admin Exam Import & Dedicated Answer Key Test Suite', () => {
     const quizView = new QuizView({ container });
     quizView.setTab('studio');
     quizView.studioSubTab = 'assign';
-    quizView.render();
 
-    // First upload 5 questions
-    container.querySelector('#btnFillSampleText').click();
+    // First load 5 questions
+    const q1to5 = [1, 2, 3, 4, 5].map(i => ({ id: `q${i}`, question: `Câu ${i}`, options: [{ id: 'A', text: 'A' }], correctId: 'A' }));
+    quizView.importedQuestions = q1to5;
+    quizView._saveWordQuestions(quizView.importedQuestions);
+    quizView.render();
     expect(quizView.importedQuestions.length).toBe(5);
 
-    // Simulate appending new questions from another file
+    // Simulate appending 2 new questions
     const newQuestions = [
       { id: 'q_extra_1', question: 'Câu hỏi mới 1?', options: [{ id: 'A', text: 'Đúng' }], correctId: 'A' },
       { id: 'q_extra_2', question: 'Câu hỏi mới 2?', options: [{ id: 'A', text: 'Đúng' }], correctId: 'A' },
@@ -131,10 +145,13 @@ describe('Admin Exam Import & Dedicated Answer Key Test Suite', () => {
     const quizView = new QuizView({ container });
     quizView.setTab('studio');
     quizView.studioSubTab = 'assign';
-    quizView.render();
 
-    container.querySelector('#btnFillSampleText').click();
-    expect(quizView.importedQuestions.length).toBe(5);
+    quizView.importedQuestions = [
+      { id: 'q1', question: 'Câu 1', options: [{ id: 'A', text: 'A' }], correctId: 'A' },
+    ];
+    quizView._saveWordQuestions(quizView.importedQuestions);
+    quizView.render();
+    expect(quizView.importedQuestions.length).toBe(1);
 
     const btnClear = container.querySelector('#btnClearAllWordData');
     expect(btnClear).not.toBeNull();
@@ -149,10 +166,17 @@ describe('Admin Exam Import & Dedicated Answer Key Test Suite', () => {
     const quizView = new QuizView({ container });
     quizView.setTab('studio');
     quizView.studioSubTab = 'assign';
-    quizView.render();
 
-    // Fill sample questions
-    container.querySelector('#btnFillSampleText').click();
+    // Provide 5 questions
+    quizView.importedQuestions = [1, 2, 3, 4, 5].map(i => ({
+      id: `q_sample_${i}`,
+      question: `Câu hỏi mẫu số ${i}?`,
+      options: [{ id: 'A', text: 'Đáp án A' }, { id: 'B', text: 'Đáp án B' }],
+      correctId: 'A',
+      explanation: `Giải thích chi tiết cho câu ${i}.`,
+    }));
+    quizView._saveWordQuestions(quizView.importedQuestions);
+    quizView.render();
     expect(quizView.importedQuestions.length).toBe(5);
 
     // Set custom title and exam code

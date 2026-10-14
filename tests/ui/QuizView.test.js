@@ -356,11 +356,13 @@ describe('QuizView UI Component', () => {
     const quizView = new QuizView({ container });
     quizView.setTab('studio');
 
-    // Fill sample Word questions first
-    const btnFill = container.querySelector('#btnFillSampleText');
-    expect(btnFill).not.toBeNull();
-    btnFill.click();
-    expect(quizView.importedQuestions.length).toBe(5);
+    // Load Word questions first
+    quizView.importedQuestions = [
+      { id: 'q_unit_1', question: 'Câu hỏi unit test?', options: [{ id: 'A', text: 'Đúng' }, { id: 'B', text: 'Sai' }], correctId: 'A' },
+    ];
+    quizView._saveWordQuestions(quizView.importedQuestions);
+    quizView.render();
+    expect(quizView.importedQuestions.length).toBe(1);
 
     // Fill title
     const txtTitle = container.querySelector('#txtAssignTitle');
@@ -432,18 +434,23 @@ describe('QuizView UI Component', () => {
     const quizView1 = new QuizView({ container });
     quizView1.setTab('studio');
 
-    // Fill sample questions
-    container.querySelector('#btnFillSampleText').click();
-    expect(quizView1.importedQuestions.length).toBe(5);
+    // Load sample questions
+    quizView1.importedQuestions = [
+      { id: 'q1', question: 'C1', options: [{ id: 'A', text: 'A' }], correctId: 'A' },
+      { id: 'q2', question: 'C2', options: [{ id: 'A', text: 'A' }], correctId: 'A' },
+    ];
+    quizView1._saveWordQuestions(quizView1.importedQuestions);
+    quizView1.render();
+    expect(quizView1.importedQuestions.length).toBe(2);
 
     // Verify localStorage has questions
     const saved = JSON.parse(localStorage.getItem('toanrr_custom_imported_questions_v1') || '[]');
-    expect(saved.length).toBe(5);
+    expect(saved.length).toBe(2);
 
     // Instantiate fresh QuizView
     const quizView2 = new QuizView({ container });
     quizView2.setTab('studio');
-    expect(quizView2.importedQuestions.length).toBe(5);
+    expect(quizView2.importedQuestions.length).toBe(2);
 
     // Clear questions via button
     const btnClear = container.querySelector('#btnClearAllWordData');

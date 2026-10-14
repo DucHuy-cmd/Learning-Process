@@ -839,24 +839,17 @@ export class QuizView {
                 <span class="pill-badge" style="background:rgba(16,185,129,0.15);color:#10b981;font-size:11.5px;padding:2px 8px;border-radius:10px;">Thang Điểm 10 • Tự Động Xuất File Đáp Án</span>
               </div>
               <p style="font-size:13px;color:var(--dim);margin:4px 0 0;">
-                Hệ thống nhận phát đề từ file Word (.doc / .docx), tự động lưu giữ câu hỏi qua các lần tải lên, hỗ trợ trích xuất câu hỏi từ ảnh đề bằng AI, và tự động tạo File Đáp Án bảo mật cho Quản trị viên.
+                Hệ thống nhận phát đề từ file Word (.doc / .docx), tự động lưu giữ câu hỏi qua các lần tải lên và tự động tạo File Đáp Án bảo mật cho Quản trị viên.
               </p>
             </div>
           </div>
 
-          <!-- Action Toolbar: Download Sample, AI OCR, Clear Data -->
+          <!-- Action Toolbar: Download Sample & Clear Data -->
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;background:var(--panel-alt);border:1px solid var(--line);border-radius:8px;padding:12px 16px;">
-            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <div>
               <button type="button" class="btn-primary" id="btnDownloadSampleWord" style="font-size:12.5px;padding:7px 16px;border-radius:6px;background:#2563eb;border-color:#2563eb;color:#fff;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
                 <span>📥</span>
                 <span>Tải File Mẫu Word Chuẩn (.doc)</span>
-              </button>
-              <button type="button" class="btn-primary" id="btnStudioAddQuestionAi" style="font-size:12.5px;padding:7px 16px;border-radius:6px;background:#8b5cf6;border-color:#7c3aed;color:#fff;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
-                <span>📷</span>
-                <span>Thêm câu hỏi từ ảnh đề (AI)</span>
-              </button>
-              <button type="button" class="btn-secondary" id="btnFillSampleText" style="font-size:12px;padding:6px 12px;border-radius:6px;cursor:pointer;">
-                📋 Dán đề mẫu nhanh
               </button>
             </div>
 
@@ -882,19 +875,6 @@ export class QuizView {
               <input type="file" id="fileImportWord" accept=".docx,.doc,.txt" style="font-size:12.5px;color:var(--text);cursor:pointer;" />
             </div>
 
-            <!-- Optional Collapsible Text Area Review -->
-            <div id="importTextSection" style="margin-bottom:14px;">
-              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-                <label style="font-size:12px;font-weight:600;color:var(--dim);">
-                  Nội dung văn bản câu hỏi (Xem trước / chỉnh sửa trực tiếp):
-                </label>
-                <button type="button" class="btn-primary" id="btnParseImportText" style="padding:4px 12px;font-size:11.5px;font-weight:700;border-radius:4px;cursor:pointer;">
-                  🔍 Cập Nhật Lại Dữ Liệu Từ Văn Bản
-                </button>
-              </div>
-              <textarea id="txtImportRaw" class="form-input" rows="4" placeholder="Nội dung file Word sau khi tải lên sẽ hiển thị tại đây..." style="width:100%;padding:10px;font-family:monospace;font-size:12px;line-height:1.45;background:var(--panel);border:1px solid var(--line);border-radius:6px;color:var(--text);box-sizing:border-box;resize:vertical;">${this._escapeHtml(this.importRawText)}</textarea>
-            </div>
-
             <!-- VALIDATION ERRORS -->
             ${this.importErrors.length > 0 ? `
               <div style="margin-bottom:14px;padding:12px 16px;background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);border-radius:8px;">
@@ -907,51 +887,28 @@ export class QuizView {
               </div>
             ` : ''}
 
-            <!-- PREVIEW QUESTION LIST -->
+            <!-- COMPACT IMPORT STATUS BADGE -->
             ${this.importedQuestions.length > 0 ? `
-              <div style="padding:14px 18px;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);border-radius:10px;">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
-                  <div style="font-weight:700;color:#10b981;font-size:14px;display:flex;align-items:center;gap:8px;">
-                    <span>✅ Đã nạp thành công: ${this.importedQuestions.length} câu hỏi tự soạn!</span>
-                    <span style="font-size:11px;background:#10b981;color:#fff;padding:2px 8px;border-radius:10px;font-weight:700;">100% Đã Có Đáp Án Đúng • Lưu Vĩnh Viễn</span>
-                  </div>
-                  <span style="font-size:12px;color:var(--dim);">Tất cả câu hỏi này sẽ được nạp vào đề thi ↓</span>
+              <div style="padding:14px 18px;background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.3);border-radius:10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+                <div style="font-weight:700;color:#10b981;font-size:14px;display:flex;align-items:center;gap:8px;">
+                  <span>✅ Đã nạp thành công: ${this.importedQuestions.length} câu hỏi tự soạn!</span>
+                  <span style="font-size:11px;background:#10b981;color:#fff;padding:2px 8px;border-radius:10px;font-weight:700;">Đã Có Đáp Án Đúng • Sẵn Sàng Phát Đề</span>
                 </div>
-
-                <div style="max-height:240px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding-right:4px;">
-                  ${this.importedQuestions.map((q, idx) => `
-                    <div style="background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px 12px;font-size:12px;">
-                      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:4px;">
-                        <strong style="color:var(--text);font-size:12.5px;">Câu ${idx + 1}: ${this._escapeHtml(q.question)}</strong>
-                        <span style="background:rgba(16,185,129,0.2);color:#10b981;font-weight:700;padding:2px 8px;border-radius:4px;white-space:nowrap;font-size:12px;">
-                          Đ/A: [ ${q.correctId} ]
-                        </span>
-                      </div>
-                      <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:4px;color:var(--dim);font-size:11.5px;">
-                        ${(q.options || []).map(opt => `
-                          <div style="${opt.id === q.correctId ? 'color:#10b981;font-weight:700;' : ''}">
-                            ${opt.id}. ${this._escapeHtml(opt.text)} ${opt.id === q.correctId ? '✓' : ''}
-                          </div>
-                        `).join('')}
-                      </div>
-                      ${q.explanation ? `
-                        <div style="margin-top:4px;font-size:11px;color:var(--dim);font-style:italic;">
-                          💡 Lời giải: ${this._escapeHtml(q.explanation)}
-                        </div>
-                      ` : ''}
-                    </div>
-                  `).join('')}
+                <div style="font-size:12px;color:var(--dim);">
+                  Dữ liệu câu hỏi được lưu giữ tự động trên hệ thống
                 </div>
               </div>
             ` : `
-              <div style="text-align:center;padding:24px 20px;background:var(--panel);border:1px dashed var(--line);border-radius:8px;">
+              <div style="text-align:center;padding:20px 16px;background:var(--panel);border:1px dashed var(--line);border-radius:8px;">
                 <div style="font-size:24px;margin-bottom:4px;">📂</div>
-                <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:4px;">Chưa có câu hỏi tự soạn nào</div>
-                <div style="font-size:12px;color:var(--dim);max-width:500px;margin:0 auto;">
-                  Vui lòng bấm nút <strong>"Tải File Mẫu Word Chuẩn"</strong> bên trên để soạn đề, sau đó tải file Word lên (hoặc bấm <strong>"Thêm câu hỏi từ ảnh đề"</strong>) để bắt đầu phát đề cho sinh viên.
+                <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:2px;">Chưa có câu hỏi tự soạn nào</div>
+                <div style="font-size:12px;color:var(--dim);">
+                  Vui lòng tải file mẫu Word về soạn câu hỏi, sau đó tải file lên để phát đề cho sinh viên.
                 </div>
               </div>
             `}
+
+          </div>
 
           </div>
 
@@ -2145,43 +2102,6 @@ export class QuizView {
       });
     }
 
-    // AI Vision / Photo Question OCR
-    const btnStudioAddQuestionAi = this.container.querySelector('#btnStudioAddQuestionAi');
-    if (btnStudioAddQuestionAi) {
-      btnStudioAddQuestionAi.addEventListener('click', () => {
-        if (!this.logicModal) {
-          this.logicModal = new LogicSourceModal({
-            container: document.body,
-            adminMode: true,
-            onSaveQuizQuestion: async (questionData) => {
-              const currentUser = authManager.getCurrentUser();
-              const authHeaders = {
-                'x-user-id': currentUser?.id || 'user_admin',
-                'Authorization': `Bearer ${currentUser?.id || 'user_admin'}`,
-              };
-              questionData.createdBy = currentUser?.id || 'user_admin';
-              const res = await cloudSyncManager.saveCustomQuestion(questionData, authHeaders);
-
-              const newQuestion = {
-                id: questionData.id || `ai_q_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-                question: questionData.question || '',
-                options: questionData.options || [],
-                correctId: questionData.correctId || 'A',
-                explanation: questionData.explanation || '',
-                topic: questionData.topic || 'all',
-                difficulty: questionData.difficulty || 'medium',
-              };
-              this.importedQuestions = mergeImportedQuestions(this.importedQuestions, [newQuestion]);
-              this._saveWordQuestions(this.importedQuestions);
-              this.render();
-              return { success: true };
-            },
-          });
-        }
-        this.logicModal.open('quiz');
-      });
-    }
-
     // Clear All Old Word Questions
     const btnClearAllWordData = this.container.querySelector('#btnClearAllWordData');
     if (btnClearAllWordData) {
@@ -2230,7 +2150,7 @@ export class QuizView {
             this.importedQuestions = mergeImportedQuestions(this.importedQuestions, res.questions);
             this._saveWordQuestions(this.importedQuestions);
             this.importErrors = res.errors || [];
-            this._showAlert(`✅ Đã nạp thành công ${res.questions.length} câu hỏi từ file "${file.name}"!\nTổng số câu hỏi hiện có trong hệ thống: ${this.importedQuestions.length} câu.\n(Dữ liệu đã được lưu trữ vĩnh viễn)`);
+            this._showAlert(`✅ Đã nạp thành công ${res.questions.length} câu hỏi từ file "${file.name}"!\nTổng số câu hỏi hiện có trong hệ thống: ${this.importedQuestions.length} câu.`);
           } else {
             this.importErrors = res.errors && res.errors.length > 0
               ? res.errors
@@ -2242,41 +2162,6 @@ export class QuizView {
           console.error('[QuizView] Error reading Word file:', err);
           this._showAlert(`❌ Lỗi khi đọc file Word: ${err.message || err}`);
         }
-      });
-    }
-
-    // Fill Sample Text
-    const btnFillSampleText = this.container.querySelector('#btnFillSampleText');
-    if (btnFillSampleText) {
-      btnFillSampleText.addEventListener('click', () => {
-        this.importRawText = generateSampleExamText();
-        const res = parseExamText(this.importRawText);
-        this.importedQuestions = mergeImportedQuestions(this.importedQuestions, res.questions);
-        this._saveWordQuestions(this.importedQuestions);
-        this.importErrors = res.errors;
-        this._showAlert(`✅ Đã thêm ${res.questions.length} câu hỏi mẫu vào danh sách! Tổng hiện có: ${this.importedQuestions.length} câu.`);
-        this.render();
-      });
-    }
-
-    // Parse / Refresh Raw Textarea
-    const btnParseImportText = this.container.querySelector('#btnParseImportText');
-    if (btnParseImportText) {
-      btnParseImportText.addEventListener('click', () => {
-        const txt = this.container.querySelector('#txtImportRaw')?.value || '';
-        this.importRawText = txt;
-        const res = parseExamText(txt);
-        if (res.questions && res.questions.length > 0) {
-          this.importedQuestions = mergeImportedQuestions(this.importedQuestions, res.questions);
-          this._saveWordQuestions(this.importedQuestions);
-        }
-        this.importErrors = res.errors;
-        if (res.success) {
-          this._showAlert(`✅ Cập nhật thành công ${res.totalCount} câu hỏi! Tổng hiện có: ${this.importedQuestions.length} câu.`);
-        } else {
-          this._showAlert(`⚠️ Nhận diện được ${res.totalCount} câu hỏi, có ${res.errors.length} lỗi cần lưu ý.`);
-        }
-        this.render();
       });
     }
 
@@ -2301,7 +2186,7 @@ export class QuizView {
       });
     }
 
-    // Create & Assign Exam Button (Strict: Only from imported/custom questions)
+    // Create & Assign Exam Button (Strict: Only from imported questions)
     const btnCreateAndAssign = this.container.querySelector('#btnCreateAndAssignExam');
     if (btnCreateAndAssign) {
       btnCreateAndAssign.addEventListener('click', () => {
@@ -2332,21 +2217,9 @@ export class QuizView {
           assignedTo = selectedStudents;
         }
 
-        // Strict validation: Only accept custom imported questions (from Word or AI)
+        // Strict validation: Only accept custom imported questions from Word
         if (this.importedQuestions.length === 0) {
-          const rawText = this.container.querySelector('#txtImportRaw')?.value?.trim();
-          if (rawText) {
-            const res = parseExamText(rawText);
-            if (res.questions && res.questions.length > 0) {
-              this.importedQuestions = mergeImportedQuestions(this.importedQuestions, res.questions);
-              this._saveWordQuestions(this.importedQuestions);
-              this.importErrors = res.errors;
-            }
-          }
-        }
-
-        if (this.importedQuestions.length === 0) {
-          this._showAlert('⚠️ Vui lòng tải lên file Word đề thi (.doc / .docx) hoặc thêm câu hỏi từ ảnh đề trước khi phát đề cho sinh viên! Hệ thống chỉ nhận phát đề từ câu hỏi tự soạn đã import.');
+          this._showAlert('⚠️ Vui lòng tải lên file Word đề thi (.doc / .docx) trước khi phát đề cho sinh viên! Hệ thống chỉ nhận phát đề từ câu hỏi tự soạn đã import.');
           return;
         }
 
