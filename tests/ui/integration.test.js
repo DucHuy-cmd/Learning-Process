@@ -715,7 +715,9 @@ describe('Phase 4: New UI & Application Integration Suite (Day 1, Day 2, Day 2.5
 
       // Check academic suite
       expect(container.querySelector('.academic-suite')).not.toBeNull();
-      expect(container.querySelector('#btnHomeQuizArena')).not.toBeNull();
+      expect(container.querySelector('#btnHomeMyExams')).not.toBeNull();
+      expect(container.querySelector('#btnHomeQuizStudio')).not.toBeNull();
+      expect(container.querySelector('#btnHomeQuizArena')).toBeNull();
 
       // Check footer and author pills
       const footer = container.querySelector('#homeFooter');
@@ -728,7 +730,7 @@ describe('Phase 4: New UI & Application Integration Suite (Day 1, Day 2, Day 2.5
       expect(footer.textContent).toContain('© 2026 Toán Rời Rạc Platform');
     });
 
-    it('clicking Studio and Arena buttons on HomeView triggers onNavigate with quiz and specific subtab', () => {
+    it('clicking Studio and MyExams buttons on HomeView triggers onNavigate with quiz and specific subtab', () => {
       const container = document.getElementById('homeView');
       const onNavigate = vi.fn();
       new HomeView({ container, onNavigate });
@@ -738,10 +740,10 @@ describe('Phase 4: New UI & Application Integration Suite (Day 1, Day 2, Day 2.5
       btnStudio.click();
       expect(onNavigate).toHaveBeenCalledWith('quiz', 'studio');
 
-      const btnArena = container.querySelector('#btnHomeQuizArena');
-      expect(btnArena).not.toBeNull();
-      btnArena.click();
-      expect(onNavigate).toHaveBeenCalledWith('quiz', 'practice');
+      const btnExams = container.querySelector('#btnHomeMyExams');
+      expect(btnExams).not.toBeNull();
+      btnExams.click();
+      expect(onNavigate).toHaveBeenCalledWith('quiz', 'myExams');
 
       const btnTheoryBar = container.querySelector('#btnHomeTheoryBar');
       expect(btnTheoryBar).not.toBeNull();

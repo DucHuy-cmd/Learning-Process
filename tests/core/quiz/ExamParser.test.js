@@ -113,4 +113,38 @@ A. Chỉ có một phương án
     expect(result.totalCount).toBe(5);
     expect(result.errors.length).toBe(0);
   });
+
+  it('generates standard Word document template (.doc) with sample questions', async () => {
+    const { generateSampleWordDocument, stripHtmlToExamText } = await import('../../../src/core/quiz/ExamParser.js');
+    const docHtml = generateSampleWordDocument();
+    expect(docHtml).toContain('ĐỀ THI TRẮC NGHIỆM MÔN TOÁN RỜI RẠC');
+    expect(docHtml).toContain('Câu 1:');
+    expect(docHtml).toContain('Đáp án:');
+
+    // Stripping HTML should produce parseable exam text
+    const text = stripHtmlToExamText(docHtml);
+    expect(text).toContain('Câu 1:');
+    const parsed = parseExamText(text);
+    expect(parsed.success).toBe(true);
+    expect(parsed.questions.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('merges new imported questions without duplicating existing ones', async () => {
+    const { mergeImportedQuestions } = await import('../../../src/core/quiz/ExamParser.js');
+    const listA = [
+      { id: 'q1', question: 'Mệnh đề là gì?', options: [{ id: 'A', text: 'Khẳng định đúng hoặc sai' }], correctId: 'A' },
+      { id: 'q2', question: 'Tập hợp rỗng ký hiệu là?', options: [{ id: 'A', text: '∅' }], correctId: 'A' },
+    ];
+    const listB = [
+      { id: 'q2_dup', question: 'Tập hợp rỗng ký hiệu là?', options: [{ id: 'A', text: '∅' }], correctId: 'A' },
+      { id: 'q3', question: 'Đồ thị Euler có chu trình Euler khi nào?', options: [{ id: 'A', text: 'Mọi đỉnh có bậc chẵn' }], correctId: 'A' },
+    ];
+
+    const merged = mergeImportedQuestions(listA, listB);
+    expect(merged.length).toBe(3);
+    expect(merged[0].id).toBe('q1');
+    expect(merged[1].id).toBe('q2');
+    expect(merged[2].id).toBe('q3');
+  });
 });
+

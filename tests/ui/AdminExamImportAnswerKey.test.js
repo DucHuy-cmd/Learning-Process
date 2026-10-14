@@ -29,6 +29,7 @@ describe('Admin Exam Import & Dedicated Answer Key Test Suite', () => {
     global.document = document;
 
     container = document.getElementById('quizContainer');
+    global.localStorage = window.localStorage;
     authManager.login('admin', '2HV6868@');
     examManager.clearAllData();
   });
@@ -37,25 +38,28 @@ describe('Admin Exam Import & Dedicated Answer Key Test Suite', () => {
     vi.useRealTimers();
     authManager.logout();
     vi.restoreAllMocks();
+    delete global.localStorage;
     delete global.window;
     delete global.document;
   });
 
-  it('renders exam import section in Studio tab with text and csv modes', () => {
+  it('renders Word exam import section in Studio tab with action toolbar', () => {
     const quizView = new QuizView({ container });
     quizView.setTab('studio');
     quizView.studioSubTab = 'assign';
     quizView.render();
 
     expect(container.querySelector('#importExamBox')).not.toBeNull();
-    expect(container.querySelector('#tabImportModeText')).not.toBeNull();
-    expect(container.querySelector('#tabImportModeCsv')).not.toBeNull();
+    expect(container.querySelector('#btnDownloadSampleWord')).not.toBeNull();
+    expect(container.querySelector('#btnStudioAddQuestionAi')).not.toBeNull();
+    expect(container.querySelector('#btnClearAllWordData')).not.toBeNull();
+    expect(container.querySelector('#btnFillSampleText')).not.toBeNull();
+    expect(container.querySelector('#fileImportWord')).not.toBeNull();
     expect(container.querySelector('#txtImportRaw')).not.toBeNull();
     expect(container.querySelector('#btnParseImportText')).not.toBeNull();
-    expect(container.querySelector('#btnFillSampleText')).not.toBeNull();
   });
 
-  it('fills sample exam text, parses 5 questions, and displays live preview', () => {
+  it('fills sample exam text, parses 5 questions, saves to localStorage, and displays live preview', () => {
     const quizView = new QuizView({ container });
     quizView.setTab('studio');
     quizView.studioSubTab = 'assign';
@@ -67,30 +71,78 @@ describe('Admin Exam Import & Dedicated Answer Key Test Suite', () => {
 
     expect(quizView.importedQuestions.length).toBe(5);
     expect(quizView.importErrors.length).toBe(0);
-    expect(container.textContent).toContain('Đã nhận diện thành công: 5 câu hỏi tự soạn');
-    expect(container.textContent).toContain('100% Đã Có Đáp Án Đúng');
+    expect(container.textContent).toContain('Đã nạp thành công: 5 câu hỏi tự soạn');
+    expect(container.textContent).toContain('Lưu Vĩnh Viễn');
+
+    // Verify persisted in localStorage
+    const saved = localStorage.getItem('toanrr_custom_imported_questions_v1');
+    expect(saved).not.toBeNull();
+    const parsedSaved = JSON.parse(saved);
+    expect(parsedSaved.length).toBe(5);
   });
 
-  it('switches to CSV import mode and allows downloading sample CSV', () => {
+  it('downloads standard Word template (.doc) when clicking "Tải File Mẫu Word Chuẩn"', () => {
     const quizView = new QuizView({ container });
     quizView.setTab('studio');
     quizView.studioSubTab = 'assign';
     quizView.render();
 
-    const tabCsv = container.querySelector('#tabImportModeCsv');
-    tabCsv.click();
-
-    expect(quizView.importMode).toBe('csv');
-    const downloadBtn = container.querySelector('#btnDownloadSampleCsv');
+    const downloadBtn = container.querySelector('#btnDownloadSampleWord');
     expect(downloadBtn).not.toBeNull();
 
     const downloadSpy = vi.spyOn(quizView, '_downloadFile').mockImplementation(() => {});
     downloadBtn.click();
     expect(downloadSpy).toHaveBeenCalledWith(
-      expect.stringContaining('Câu hỏi'),
-      'Mau_De_Thi_Toan_Roi_Rac.csv',
-      'text/csv;charset=utf-8;'
+      expect.stringContaining('ĐỀ THI TRẮC NGHIỆM MÔN TOÁN RỜI RẠC'),
+      'Mau_De_Thi_Toan_Roi_Rac.doc',
+      'application/msword;charset=utf-8;'
     );
+  });
+
+  it('preserves previously imported questions across new uploads and appends them', () => {
+    const quizView = new QuizView({ container });
+    quizView.setTab('studio');
+    quizView.studioSubTab = 'assign';
+    quizView.render();
+
+    // First upload 5 questions
+    container.querySelector('#btnFillSampleText').click();
+    expect(quizView.importedQuestions.length).toBe(5);
+
+    // Simulate appending new questions from another file
+    const newQuestions = [
+      { id: 'q_extra_1', question: 'Câu hỏi mới 1?', options: [{ id: 'A', text: 'Đúng' }], correctId: 'A' },
+      { id: 'q_extra_2', question: 'Câu hỏi mới 2?', options: [{ id: 'A', text: 'Đúng' }], correctId: 'A' },
+    ];
+    quizView.importedQuestions = quizView.importedQuestions.concat(newQuestions);
+    quizView._saveWordQuestions(quizView.importedQuestions);
+    quizView.render();
+
+    expect(quizView.importedQuestions.length).toBe(7);
+
+    // Instantiate a new QuizView to simulate reload - data must persist!
+    const reloadedView = new QuizView({ container });
+    reloadedView.setTab('studio');
+    reloadedView.render();
+    expect(reloadedView.importedQuestions.length).toBe(7);
+  });
+
+  it('clears all old Word data when clicking "Xóa Hết Dữ Liệu Đề Thi Cũ (Word)"', () => {
+    const quizView = new QuizView({ container });
+    quizView.setTab('studio');
+    quizView.studioSubTab = 'assign';
+    quizView.render();
+
+    container.querySelector('#btnFillSampleText').click();
+    expect(quizView.importedQuestions.length).toBe(5);
+
+    const btnClear = container.querySelector('#btnClearAllWordData');
+    expect(btnClear).not.toBeNull();
+    btnClear.click();
+
+    expect(quizView.importedQuestions.length).toBe(0);
+    expect(localStorage.getItem('toanrr_custom_imported_questions_v1')).toBeNull();
+    expect(container.textContent).toContain('Chưa có câu hỏi tự soạn nào');
   });
 
   it('creates an exam from imported custom questions and automatically opens Admin Answer Key modal', () => {

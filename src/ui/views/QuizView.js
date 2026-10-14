@@ -48,6 +48,10 @@ import {
   parseExamCsv,
   generateSampleExamText,
   generateSampleExamCsv,
+  generateSampleWordDocument,
+  extractTextFromDocx,
+  mergeImportedQuestions,
+  stripHtmlToExamText,
 } from '../../core/quiz/ExamParser.js';
 
 function shuffle(items) {
@@ -84,21 +88,8 @@ export class QuizView {
     this.onOpenRelation = onOpenRelation || (() => {});
     this.onOpenAuth = onOpenAuth || null;
 
-    // Active primary tab: 'practice' (admin only) | 'myExams' | 'studio' (admin only)
-    this.activeTab = authManager.isAdmin() ? 'practice' : 'myExams';
-
-    // Interactive Practice Mode State
-    this.practiceFilter = {
-      topic: 'all',
-      difficulty: 'all',
-    };
-    this.practiceQuestions = [];
-    this.currentIndex = 0;
-    this.userAnswers = {}; // { [questionId]: selectedOptionId }
-    this.score = 0;
-    this.streak = 0;
-    this.maxStreak = 0;
-    this.answeredCount = 0;
+    // Active primary tab: 'myExams' (for all) | 'studio' (admin only)
+    this.activeTab = 'myExams';
 
     // Timed Exam Taking Session State
     this.activeExamSession = null; // { exam, questions, answers, currentQIndex, timeRemaining, timerId, startedAt }
@@ -115,14 +106,13 @@ export class QuizView {
     this.currentExam = null;
     this.showTeacherSolutions = true;
 
-    // Admin Exam Import & Answer Key State
-    this.importedQuestions = [];
+    // Admin Exam Import & Answer Key State (Persisted in localStorage)
+    const saved = this._loadSavedWordQuestions();
+    this.importedQuestions = saved.questions;
+    this.importRawText = saved.rawText;
     this.importErrors = [];
-    this.importMode = 'text'; // 'text' | 'csv'
-    this.importRawText = '';
     this.adminAnswerKeyExamId = null;
 
-    this._initPracticeQuestions();
     this._generateNewExam();
 
     if (authManager && typeof authManager.subscribe === 'function') {
@@ -170,18 +160,76 @@ export class QuizView {
     }
   }
 
+  _getStorage() {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        return window.localStorage;
+      }
+      if (typeof localStorage !== 'undefined') {
+        return localStorage;
+      }
+    } catch {}
+    return null;
+  }
+
+  _loadSavedWordQuestions() {
+    try {
+      const storage = this._getStorage();
+      if (storage) {
+        const stored = storage.getItem('toanrr_custom_imported_questions_v1');
+        const raw = storage.getItem('toanrr_custom_imported_raw_v1');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            return { questions: parsed, rawText: raw || '' };
+          }
+        }
+      }
+    } catch {}
+    return { questions: [], rawText: '' };
+  }
+
+  _saveWordQuestions(questions, rawText = null) {
+    this.importedQuestions = Array.isArray(questions) ? questions : [];
+    if (rawText !== null) {
+      this.importRawText = rawText;
+    }
+    try {
+      const storage = this._getStorage();
+      if (storage) {
+        storage.setItem('toanrr_custom_imported_questions_v1', JSON.stringify(this.importedQuestions));
+        if (rawText !== null) {
+          storage.setItem('toanrr_custom_imported_raw_v1', this.importRawText);
+        }
+      }
+    } catch {}
+  }
+
+  _clearAllWordQuestions() {
+    this.importedQuestions = [];
+    this.importRawText = '';
+    this.importErrors = [];
+    try {
+      const storage = this._getStorage();
+      if (storage) {
+        storage.removeItem('toanrr_custom_imported_questions_v1');
+        storage.removeItem('toanrr_custom_imported_raw_v1');
+      }
+    } catch {}
+  }
+
   /**
-   * Sets active subtab: 'practice' | 'myExams' | 'studio'
-   * @param {'practice' | 'myExams' | 'studio'} tabName
+   * Sets active subtab: 'myExams' | 'studio'
+   * @param {'myExams' | 'studio'} tabName
    */
   setTab(tabName) {
-    if (tabName === 'leaderboard') {
-      tabName = authManager.isAdmin() ? 'practice' : 'myExams';
-    }
-    if ((tabName === 'studio' || tabName === 'practice') && !authManager.isAdmin()) {
+    if (tabName === 'leaderboard' || tabName === 'practice') {
       tabName = 'myExams';
     }
-    const validTabs = authManager.isAdmin() ? ['practice', 'myExams', 'studio'] : ['myExams'];
+    if (tabName === 'studio' && !authManager.isAdmin()) {
+      tabName = 'myExams';
+    }
+    const validTabs = authManager.isAdmin() ? ['myExams', 'studio'] : ['myExams'];
     if (validTabs.includes(tabName)) {
       if (this.activeExamSession && tabName !== 'myExams') {
         const confirmLeave = typeof window !== 'undefined' && window.confirm 
@@ -218,31 +266,12 @@ export class QuizView {
       } else if (['dijkstra', 'mst', 'euler_hamilton'].includes(topic)) {
         normalizedTopic = 'graph';
       }
-      this.practiceFilter.topic = normalizedTopic;
       this.studioConfig.topic = normalizedTopic;
-      this._initPracticeQuestions();
       this._generateNewExam();
       if (this.container) {
         this.render();
       }
     }
-  }
-
-  _initPracticeQuestions() {
-    let pool = [...STATIC_QUESTION_BANK];
-    if (this.practiceFilter.topic !== 'all') {
-      pool = pool.filter(q => q.topic === this.practiceFilter.topic);
-    }
-    if (this.practiceFilter.difficulty !== 'all') {
-      pool = pool.filter(q => q.difficulty === this.practiceFilter.difficulty);
-    }
-    this.practiceQuestions = pool.sort(() => Math.random() - 0.5);
-    this.currentIndex = 0;
-    this.userAnswers = {};
-    this.score = 0;
-    this.streak = 0;
-    this.maxStreak = 0;
-    this.answeredCount = 0;
   }
 
   _generateNewExam() {
@@ -266,10 +295,11 @@ export class QuizView {
     const isAdmin = authManager.isAdmin();
     const currentUser = authManager.getCurrentUser();
 
-    if (!isAdmin && (this.activeTab === 'practice' || this.activeTab === 'studio' || this.activeTab === 'leaderboard')) {
+    if (!isAdmin && this.activeTab === 'studio') {
       this.activeTab = 'myExams';
-    } else if (this.activeTab === 'leaderboard' || (this.activeTab === 'studio' && !isAdmin)) {
-      this.activeTab = isAdmin ? 'practice' : 'myExams';
+    }
+    if (this.activeTab === 'practice' || this.activeTab === 'leaderboard') {
+      this.activeTab = 'myExams';
     }
 
     // Check my exams count
@@ -293,39 +323,31 @@ export class QuizView {
               </span>
               <span style="font-size:12px;color:var(--dim);">Toán Rời Rạc &amp; Cấu Trúc Dữ Liệu</span>
             </div>
-            <h1 style="font-size:24px;font-weight:700;color:var(--text);margin:0;">${isAdmin ? 'Luyện Tập &amp; Thi Trắc Nghiệm Toán Rời Rạc' : 'Cổng Khảo Thí &amp; Kiểm Tra Định Kỳ'}</h1>
+            <h1 style="font-size:24px;font-weight:700;color:var(--text);margin:0;">${isAdmin ? 'Quản Trị Khảo Thí &amp; Soạn Đề Từ File Word' : 'Cổng Khảo Thí &amp; Kiểm Tra Định Kỳ'}</h1>
           </div>
 
           <!-- Main Nav Tabs -->
           <div class="quiz-main-tabs" style="display:flex;gap:6px;align-items:center;background:var(--panel);padding:4px;border-radius:8px;border:1px solid var(--line);flex-wrap:wrap;">
-            <button type="button" class="btn-tab ${this.activeTab === 'practice' ? 'active' : ''}" id="tabBtnPractice" style="${isAdmin ? '' : 'display:none;'}padding:8px 14px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;">
-              🎮 Đấu Trường Luyện Tập
-            </button>
-            <button type="button" class="btn-tab ${this.activeTab === 'myExams' ? 'active' : ''}" id="tabBtnMyExams" style="padding:8px 14px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;position:relative;">
+            <button type="button" class="btn-tab ${this.activeTab === 'myExams' ? 'active' : ''}" id="tabBtnMyExams" style="padding:8px 16px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;position:relative;">
               📝 ${isAdmin ? 'Quản Lý Đề Thi' : 'Đề Thi Của Tôi'} ${myPendingCount > 0 ? `<span style="background:#ef4444;color:#fff;font-size:10px;padding:1px 6px;border-radius:10px;margin-left:4px;font-weight:700;">${myPendingCount}</span>` : ''}
             </button>
-            <button type="button" class="btn-tab ${this.activeTab === 'studio' ? 'active' : ''}" id="tabBtnStudio" style="${isAdmin ? '' : 'display:none;'}padding:8px 14px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;">
-              👩‍🏫 Quản Trị &amp; Soạn Đề
+            <button type="button" class="btn-tab ${this.activeTab === 'studio' ? 'active' : ''}" id="tabBtnStudio" style="${isAdmin ? '' : 'display:none;'}padding:8px 16px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;">
+              👩‍🏫 Soạn Đề Từ File Word
             </button>
           </div>
         </div>
 
-        <!-- TAB 1: PRACTICE ARENA (ADMIN ONLY) -->
-        ${isAdmin ? `
-        <div id="panePractice" style="display:${this.activeTab === 'practice' ? 'block' : 'none'};">
-          ${this._renderPracticeView()}
-        </div>
-        ` : ''}
-
-        <!-- TAB 2: MY EXAMS (TIMED ASSIGNED EXAMS) -->
+        <!-- TAB 1: MY EXAMS (TIMED ASSIGNED EXAMS) -->
         <div id="paneMyExams" style="display:${this.activeTab === 'myExams' ? 'block' : 'none'};">
           ${this._renderMyExamsView()}
         </div>
 
-        <!-- TAB 3: TEACHER'S EXAM STUDIO -->
+        <!-- TAB 2: TEACHER'S EXAM STUDIO -->
+        ${isAdmin ? `
         <div id="paneStudio" style="display:${this.activeTab === 'studio' ? 'block' : 'none'};">
           ${this._renderStudioView()}
         </div>
+        ` : ''}
 
         <!-- MODAL: GRADEBOOK (WHEN ADMIN VIEWS AN EXAM'S SUBMISSIONS) -->
         ${this.gradebookExamId ? this._renderGradebookModal() : ''}
@@ -339,199 +361,11 @@ export class QuizView {
     this._bindEvents();
   }
 
-  // =========================================================================
-  // SUB-VIEW 1: INTERACTIVE PRACTICE ARENA (150 QUESTIONS, RISK-FREE)
-  // =========================================================================
-
   _renderPracticeView() {
-    if (!authManager.isAdmin()) {
-      return `
-        <div style="text-align:center;padding:48px 20px;background:var(--panel);border:1px solid var(--line);border-radius:12px;">
-          <div style="font-size:48px;margin-bottom:12px;">🔒</div>
-          <h3 style="font-size:18px;font-weight:700;color:var(--text);margin:0 0 8px 0;">Chế độ Đấu trường Luyện tập bị giới hạn</h3>
-          <p style="font-size:13.5px;color:var(--dim);margin:0 auto 20px auto;max-width:440px;line-height:1.5;">
-            Chế độ tự luyện tập chỉ dành riêng cho Quản trị viên hệ thống để kiểm duyệt ngân hàng câu hỏi. Sinh viên vui lòng vào tab <strong>"📝 Đề Thi Của Tôi"</strong> để làm bài thi được giao.
-          </p>
-          <button type="button" class="btn-primary" id="btnSwitchToMyExamsFromLockedPractice" style="padding:10px 22px;font-size:13.5px;font-weight:700;border-radius:8px;cursor:pointer;">
-            Chuyển sang Đề Thi Của Tôi →
-          </button>
-        </div>
-      `;
-    }
-
-    const q = this.practiceQuestions[this.currentIndex];
-    const total = this.practiceQuestions.length;
-    const answered = Boolean(q && this.userAnswers[q.id]);
-    const selectedOptId = q ? this.userAnswers[q.id] : null;
-
-    return `
-      <!-- Notice Banner for Practice Mode -->
-      <div style="background:rgba(56,189,248,0.08);border:1px solid rgba(56,189,248,0.25);border-radius:10px;padding:12px 18px;margin-bottom:16px;display:flex;align-items:center;gap:12px;">
-        <span style="font-size:22px;">💡</span>
-        <div style="font-size:13px;color:var(--text);line-height:1.5;">
-          <strong>Chế độ Tự Luyện Tập:</strong> Bạn có thể thoải mái làm bài và thử sai để củng cố kiến thức theo 5 chuyên đề. Điểm tự luyện tập <em>không tính vào Bảng Xếp Hạng chính thức</em>. Để làm bài thi theo Thang Điểm 10, hãy chuyển sang tab <strong>"📝 Đề Thi Của Tôi"</strong>.
-        </div>
-      </div>
-
-      <!-- Practice Controls & Scoreboard -->
-      <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:16px;margin-bottom:20px;">
-        
-        <!-- Filter Controls Card -->
-        <div style="background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;">
-          <div style="font-size:12px;color:var(--dim);font-weight:600;text-transform:uppercase;margin-bottom:10px;">Lọc Chuyên Đề &amp; Độ Khó</div>
-          <div style="display:flex;gap:10px;flex-wrap:wrap;">
-            <select id="selPracticeTopic" class="form-input" style="flex:1;min-width:140px;padding:6px 10px;font-size:12.5px;border-radius:6px;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);">
-              <option value="all" ${this.practiceFilter.topic === 'all' ? 'selected' : ''}>🌟 Tất cả các chương (150 câu)</option>
-              <option value="logic" ${this.practiceFilter.topic === 'logic' ? 'selected' : ''}>⚡ Chương 1: Cơ sở Logic &amp; Suy luận (30 câu)</option>
-              <option value="boolean" ${this.practiceFilter.topic === 'boolean' ? 'selected' : ''}>🔌 Chương 2: Đại số Boole &amp; Mạch Logic (30 câu)</option>
-              <option value="counting" ${this.practiceFilter.topic === 'counting' ? 'selected' : ''}>🎲 Chương 3: Đại số Tổ hợp &amp; Đếm (30 câu)</option>
-              <option value="relation" ${this.practiceFilter.topic === 'relation' ? 'selected' : ''}>🔗 Chương 4: Quan hệ 2 ngôi &amp; Thứ tự (30 câu)</option>
-              <option value="graph" ${this.practiceFilter.topic === 'graph' ? 'selected' : ''}>🌐 Chương 5: Lý thuyết Đồ thị &amp; Cây (30 câu)</option>
-            </select>
-            <select id="selPracticeDiff" class="form-input" style="flex:1;min-width:130px;padding:6px 10px;font-size:12.5px;border-radius:6px;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);">
-              <option value="all" ${this.practiceFilter.difficulty === 'all' ? 'selected' : ''}>Tất cả độ khó</option>
-              <option value="easy" ${this.practiceFilter.difficulty === 'easy' ? 'selected' : ''}>Dễ (Cơ bản)</option>
-              <option value="medium" ${this.practiceFilter.difficulty === 'medium' ? 'selected' : ''}>Trung bình</option>
-              <option value="hard" ${this.practiceFilter.difficulty === 'hard' ? 'selected' : ''}>Nâng cao</option>
-            </select>
-            <button type="button" class="btn-sm" id="btnResetPractice" style="padding:6px 12px;font-size:12px;" title="Xáo trộn lại câu hỏi">
-              🔄 Làm mới
-            </button>
-          </div>
-        </div>
-
-        <!-- Realtime Scoreboard Card -->
-        <div style="background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;display:flex;align-items:center;justify-content:space-around;">
-          <div style="text-align:center;">
-            <div style="font-size:11px;color:var(--dim);font-weight:600;text-transform:uppercase;">Điểm Số</div>
-            <div style="font-size:24px;font-weight:800;color:var(--accent);">${this.score} <span style="font-size:13px;font-weight:normal;color:var(--dim);">/ ${this.answeredCount * 10 || 0}</span></div>
-          </div>
-          <div style="height:36px;width:1px;background:var(--line);"></div>
-          <div style="text-align:center;">
-            <div style="font-size:11px;color:var(--dim);font-weight:600;text-transform:uppercase;">Tỷ Lệ Đúng</div>
-            <div style="font-size:24px;font-weight:800;color:#10b981;">
-              ${this.answeredCount > 0 ? Math.round((this.score / (this.answeredCount * 10)) * 100) : 0}%
-            </div>
-          </div>
-          <div style="height:36px;width:1px;background:var(--line);"></div>
-          <div style="text-align:center;">
-            <div style="font-size:11px;color:var(--dim);font-weight:600;text-transform:uppercase;">Chuỗi Thắng</div>
-            <div style="font-size:24px;font-weight:800;color:#f43f5e;">
-              🔥 ${this.streak} <span style="font-size:11.5px;color:var(--dim);font-weight:normal;">(Kỷ lục: ${this.maxStreak})</span>
-            </div>
-          </div>
-        </div>
-
-      </div>
-
-
-
-      <!-- Question Card -->
-      ${total === 0 ? `
-        <div style="text-align:center;padding:60px 20px;background:var(--panel);border:1px dashed var(--line);border-radius:10px;">
-          <div style="font-size:36px;margin-bottom:12px;">🔍</div>
-          <h3 style="color:var(--text);margin:0 0 8px;">Không tìm thấy câu hỏi phù hợp bộ lọc</h3>
-          <p style="color:var(--dim);font-size:13px;margin:0 0 16px;">Vui lòng chọn bộ lọc khác để tiếp tục luyện tập.</p>
-          <button type="button" class="btn-primary" id="btnResetFilters">Xóa bộ lọc</button>
-        </div>
-      ` : `
-        <div class="practice-question-card" style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:24px;box-shadow:0 8px 24px rgba(0,0,0,0.15);margin-bottom:20px;">
-          
-          <!-- Question Meta Header -->
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px;">
-            <div style="display:flex;align-items:center;gap:8px;">
-              <span style="font-size:12.5px;font-weight:700;background:var(--panel-alt);border:1px solid var(--line);padding:3px 10px;border-radius:6px;color:var(--text);">
-                Câu ${this.currentIndex + 1} / ${total}
-              </span>
-              <span class="pill-badge" style="background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">
-                ${q.topicName || q.topic}
-              </span>
-              <span class="pill-badge" style="background:rgba(245,158,11,0.15);color:#f59e0b;border:1px solid rgba(245,158,11,0.3);padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">
-                ${q.difficulty === 'easy' ? 'Độ khó: Dễ' : q.difficulty === 'medium' ? 'Độ khó: Trung bình' : 'Độ khó: Nâng cao'}
-              </span>
-            </div>
-
-            <!-- Jump Navigation -->
-            <div style="display:flex;align-items:center;gap:6px;">
-              <button type="button" class="btn-sm" id="btnPracticePrev" ${this.currentIndex === 0 ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : ''}>
-                ❮ Câu trước
-              </button>
-              <button type="button" class="btn-sm" id="btnPracticeNext" ${this.currentIndex === total - 1 ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : ''}>
-                Câu tiếp ❯
-              </button>
-            </div>
-          </div>
-
-          <!-- Question Content -->
-          <div style="font-size:16px;font-weight:600;color:var(--text);line-height:1.6;margin-bottom:24px;padding:12px 16px;background:var(--panel-alt);border-radius:8px;border-left:4px solid var(--accent);">
-            ${q.question}
-          </div>
-
-          <!-- Options List (Hàng dọc A B C D) -->
-          <div class="quiz-options-list" style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px;width:100%;">
-            ${q.options.map((opt) => {
-              let btnStyle = `display:flex;align-items:flex-start;gap:12px;padding:12px 16px;border-radius:8px;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);font-size:14px;text-align:left;cursor:pointer;transition:all 0.15s ease;width:100%;white-space:normal !important;word-break:break-word !important;overflow-wrap:anywhere !important;line-height:1.5;box-sizing:border-box;`;
-              let badgeColor = `background:var(--line);color:var(--text);`;
-
-              if (answered) {
-                if (opt.id === q.correctId) {
-                  btnStyle = `display:flex;align-items:flex-start;gap:12px;padding:12px 16px;border-radius:8px;background:rgba(16,185,129,0.15);border:2px solid #10b981;color:var(--text);font-size:14px;text-align:left;width:100%;white-space:normal !important;word-break:break-word !important;overflow-wrap:anywhere !important;line-height:1.5;box-sizing:border-box;`;
-                  badgeColor = `background:#10b981;color:#ffffff;font-weight:bold;`;
-                } else if (opt.id === selectedOptId) {
-                  btnStyle = `display:flex;align-items:flex-start;gap:12px;padding:12px 16px;border-radius:8px;background:rgba(244,63,94,0.15);border:2px solid #f43f5e;color:var(--text);font-size:14px;text-align:left;width:100%;white-space:normal !important;word-break:break-word !important;overflow-wrap:anywhere !important;line-height:1.5;box-sizing:border-box;`;
-                  badgeColor = `background:#f43f5e;color:#ffffff;font-weight:bold;`;
-                } else {
-                  btnStyle += `opacity:0.6;cursor:default;`;
-                }
-              }
-
-              return `
-                <button type="button" class="btn-quiz-option" data-opt-id="${opt.id}" ${answered ? 'disabled' : ''} style="${btnStyle}">
-                  <span style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;font-size:13px;font-weight:700;flex-shrink:0;margin-top:2px;${badgeColor}">
-                    ${opt.id}
-                  </span>
-                  <span style="flex:1;min-width:0;font-weight:500;white-space:normal !important;word-break:break-word !important;overflow-wrap:anywhere !important;line-height:1.5;">${opt.text}</span>
-                  ${answered && opt.id === q.correctId ? '<span style="color:#10b981;font-weight:bold;padding-left:10px;white-space:nowrap;flex-shrink:0;margin-top:2px;">✓ Đúng</span>' : ''}
-                  ${answered && opt.id === selectedOptId && opt.id !== q.correctId ? '<span style="color:#f43f5e;font-weight:bold;padding-left:10px;white-space:nowrap;flex-shrink:0;margin-top:2px;">✗ Sai</span>' : ''}
-                </button>
-              `;
-            }).join('')}
-          </div>
-
-          <!-- Explanation & Action Link Box (revealed upon answering) -->
-          ${answered ? `
-            <div class="quiz-explanation-box" style="margin-top:20px;padding:16px;border-radius:8px;background:rgba(56,189,248,0.06);border:1px solid rgba(56,189,248,0.25);">
-              <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-                <span style="font-size:16px;">💡</span>
-                <span style="font-size:13px;font-weight:700;color:#38bdf8;text-transform:uppercase;">
-                  Hướng Dẫn Lời Giải &amp; Bản Chất Toán Học:
-                </span>
-              </div>
-              <p style="font-size:13.5px;color:var(--text);line-height:1.6;margin:0 0 12px;">
-                ${q.explanation}
-              </p>
-
-              <!-- Action Link to open in Lab -->
-              ${q.actionLink ? `
-                <div style="display:flex;align-items:center;justify-content:flex-end;padding-top:10px;border-top:1px dashed rgba(56,189,248,0.2);">
-                  <button type="button" class="btn-sm btn-open-lab" data-action-view="${q.actionLink.view}" data-action-val="${q.actionLink.tab || q.actionLink.expression || q.actionLink.algoKey || ''}" style="background:rgba(245,158,11,0.15);color:var(--accent);border:1px solid rgba(245,158,11,0.3);padding:6px 14px;border-radius:6px;font-weight:600;font-size:12.5px;">
-                    ${q.actionLink.view === 'logic' ? '⚖️ Mở thử nghiệm biểu thức trong Logic Lab ❯' :
-                      q.actionLink.view === 'counting' ? '🎲 Mở thực nghiệm trong Counting Lab ❯' :
-                      q.actionLink.view === 'relation' ? '🔗 Mở thực nghiệm trong Relation Lab ❯' :
-                      '🔬 Mở trực quan hóa trong Algorithm Lab ❯'}
-                  </button>
-                </div>
-              ` : ''}
-            </div>
-          ` : ''}
-
-        </div>
-      `}
-    `;
+    return '';
   }
-
   // =========================================================================
-  // SUB-VIEW 2: MY EXAMS (TIMED ASSIGNED EXAMS - 1 ATTEMPT, SCALE 10)
+  // SUB-VIEW 1: MY EXAMS (TIMED ASSIGNED EXAMS - 1 ATTEMPT, SCALE 10)
   // =========================================================================
 
   _renderMyExamsView() {
@@ -996,99 +830,74 @@ export class QuizView {
       <!-- SECTION A: ASSIGN EXAMS & GRADEBOOK -->
       <div id="studioAssignSection" style="display:${this.studioSubTab === 'assign' ? 'block' : 'none'};">
         
-        <!-- Create & Assign Exam Card with Word/Excel Import -->
+        <!-- Create & Assign Exam Card with Word Import & Persistence -->
         <div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:22px;margin-bottom:24px;">
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:14px;">
             <div>
               <div style="font-size:16px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:8px;">
-                <span>🚀 Soạn &amp; Phát Đề Thi Tự Soạn (Import Word / Excel)</span>
+                <span>🚀 Soạn &amp; Phát Đề Thi Từ File Word</span>
                 <span class="pill-badge" style="background:rgba(16,185,129,0.15);color:#10b981;font-size:11.5px;padding:2px 8px;border-radius:10px;">Thang Điểm 10 • Tự Động Xuất File Đáp Án</span>
               </div>
               <p style="font-size:13px;color:var(--dim);margin:4px 0 0;">
-                Hệ thống nhận phát đề từ file đề tự soạn (từ Word hoặc Excel/CSV), tự động bóc tách câu hỏi, đáp án đúng và sinh ngay File Đáp Án dành riêng cho Quản trị viên.
+                Hệ thống nhận phát đề từ file Word (.doc / .docx), tự động lưu giữ câu hỏi qua các lần tải lên, hỗ trợ trích xuất câu hỏi từ ảnh đề bằng AI, và tự động tạo File Đáp Án bảo mật cho Quản trị viên.
               </p>
-            </div>
-
-            <div style="display:flex;align-items:center;gap:8px;">
-              <span style="font-size:12px;color:var(--dim);">Nguồn đề:</span>
-              <select id="selAssignSelectionMode" class="form-input" style="padding:6px 12px;font-size:12.5px;border-radius:6px;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);font-weight:700;">
-                <option value="import" selected>📥 Nhập từ Word / Excel tự soạn (Khuyên dùng)</option>
-                <option value="manual">📚 Chọn thủ công từ ngân hàng câu hỏi</option>
-                <option value="random">🎲 Bốc ngẫu nhiên theo chuyên đề</option>
-              </select>
             </div>
           </div>
 
-          <!-- IMPORT SECTION (PRIMARY) -->
+          <!-- Action Toolbar: Download Sample, AI OCR, Clear Data -->
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;background:var(--panel-alt);border:1px solid var(--line);border-radius:8px;padding:12px 16px;">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <button type="button" class="btn-primary" id="btnDownloadSampleWord" style="font-size:12.5px;padding:7px 16px;border-radius:6px;background:#2563eb;border-color:#2563eb;color:#fff;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
+                <span>📥</span>
+                <span>Tải File Mẫu Word Chuẩn (.doc)</span>
+              </button>
+              <button type="button" class="btn-primary" id="btnStudioAddQuestionAi" style="font-size:12.5px;padding:7px 16px;border-radius:6px;background:#8b5cf6;border-color:#7c3aed;color:#fff;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
+                <span>📷</span>
+                <span>Thêm câu hỏi từ ảnh đề (AI)</span>
+              </button>
+              <button type="button" class="btn-secondary" id="btnFillSampleText" style="font-size:12px;padding:6px 12px;border-radius:6px;cursor:pointer;">
+                📋 Dán đề mẫu nhanh
+              </button>
+            </div>
+
+            <div>
+              <button type="button" class="btn-sm" id="btnClearAllWordData" style="font-size:12px;padding:6px 14px;border-radius:6px;background:rgba(239,68,68,0.15);color:#ef4444;border:1px solid rgba(239,68,68,0.3);font-weight:700;cursor:pointer;" title="Xóa toàn bộ câu hỏi Word đã lưu để bắt đầu đề mới">
+                🗑️ Xóa Hết Dữ Liệu Đề Thi Cũ (Word)
+              </button>
+            </div>
+          </div>
+
+          <!-- WORD IMPORT BOX -->
           <div id="importExamBox" style="background:var(--panel-alt);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:18px;">
             
-            <!-- Mode Switch Tabs -->
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:10px;">
-              <div style="display:flex;gap:6px;">
-                <button type="button" class="btn-tab ${this.importMode === 'text' ? 'active' : ''}" id="tabImportModeText" style="padding:6px 14px;font-size:12.5px;border-radius:6px;cursor:pointer;">
-                  📝 Dán Đề Từ Word / Text
-                </button>
-                <button type="button" class="btn-tab ${this.importMode === 'csv' ? 'active' : ''}" id="tabImportModeCsv" style="padding:6px 14px;font-size:12.5px;border-radius:6px;cursor:pointer;">
-                  📊 Tải File Excel / CSV (.csv)
-                </button>
+            <!-- File Upload Zone -->
+            <div style="border:2px dashed var(--line);border-radius:8px;padding:22px;text-align:center;background:var(--panel);margin-bottom:14px;">
+              <div style="font-size:32px;margin-bottom:6px;">📄</div>
+              <div style="font-weight:700;font-size:13.5px;color:var(--text);margin-bottom:4px;">
+                Chọn hoặc kéo thả File Word đề thi (.docx, .doc, .txt)
               </div>
-
-              <!-- Quick Helper Buttons -->
-              <div style="display:flex;align-items:center;gap:8px;">
-                ${this.importMode === 'text' ? `
-                  <button type="button" class="btn-secondary" id="btnFillSampleText" style="font-size:12px;padding:5px 12px;border-radius:6px;cursor:pointer;">
-                    📋 Dán Đề Mẫu (5 Câu)
-                  </button>
-                  <button type="button" class="btn-secondary" id="btnClearImportText" style="font-size:12px;padding:5px 10px;border-radius:6px;cursor:pointer;">
-                    🗑️ Xóa Khung
-                  </button>
-                ` : `
-                  <button type="button" class="btn-primary" id="btnDownloadSampleCsv" style="font-size:12px;padding:5px 14px;border-radius:6px;background:#10b981;border-color:#10b981;cursor:pointer;display:flex;align-items:center;gap:6px;">
-                    📥 Tải File Mẫu Excel (.csv)
-                  </button>
-                `}
+              <div style="font-size:12px;color:var(--dim);margin-bottom:12px;">
+                File mới tải lên sẽ được <strong>tự động lưu và giữ lại</strong> nối tiếp với các câu hỏi trước đó.
               </div>
+              <input type="file" id="fileImportWord" accept=".docx,.doc,.txt" style="font-size:12.5px;color:var(--text);cursor:pointer;" />
             </div>
 
-            <!-- TAB 1: TEXT AREA -->
-            <div id="importTextSection" style="display:${this.importMode === 'text' ? 'block' : 'none'};">
-              <textarea id="txtImportRaw" class="form-input" rows="7" placeholder="Dán nội dung đề thi từ Word vào đây...
-Ví dụ:
-Câu 1: Cho mệnh đề P: 'Hôm nay trời mưa'. Mệnh đề phủ định là gì?
-A. Hôm nay trời không mưa
-B. Hôm nay trời mưa to
-C. Hôm nay trời nắng ráo
-D. Hôm nay trời nhiều mây
-Đáp án: A
-Giải thích: Mệnh đề phủ định của P là không P.
-" style="width:100%;padding:10px 14px;font-family:monospace;font-size:12.5px;line-height:1.5;background:var(--panel);border:1px solid var(--line);border-radius:6px;color:var(--text);box-sizing:border-box;resize:vertical;">${this._escapeHtml(this.importRawText)}</textarea>
-              <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;flex-wrap:wrap;gap:10px;">
-                <div style="font-size:11.5px;color:var(--dim);">
-                  💡 Hỗ trợ: <code>Câu 1:</code>, <code>A.</code>, <code>B.</code>, <code>C.</code>, <code>D.</code>, <code>Đáp án: A</code>, <code>Giải thích: ...</code>
-                </div>
-                <button type="button" class="btn-primary" id="btnParseImportText" style="padding:6px 18px;font-size:13px;font-weight:700;border-radius:6px;cursor:pointer;">
-                  🔍 Phân Tích &amp; Nhận Diện Đề Thi
+            <!-- Optional Collapsible Text Area Review -->
+            <div id="importTextSection" style="margin-bottom:14px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                <label style="font-size:12px;font-weight:600;color:var(--dim);">
+                  Nội dung văn bản câu hỏi (Xem trước / chỉnh sửa trực tiếp):
+                </label>
+                <button type="button" class="btn-primary" id="btnParseImportText" style="padding:4px 12px;font-size:11.5px;font-weight:700;border-radius:4px;cursor:pointer;">
+                  🔍 Cập Nhật Lại Dữ Liệu Từ Văn Bản
                 </button>
               </div>
-            </div>
-
-            <!-- TAB 2: FILE UPLOAD -->
-            <div id="importCsvSection" style="display:${this.importMode === 'csv' ? 'block' : 'none'};">
-              <div style="border:2px dashed var(--line);border-radius:8px;padding:22px;text-align:center;background:var(--panel);">
-                <div style="font-size:28px;margin-bottom:6px;">📊</div>
-                <div style="font-weight:700;font-size:13.5px;color:var(--text);margin-bottom:4px;">
-                  Chọn File Excel / CSV đề thi tự soạn
-                </div>
-                <div style="font-size:12px;color:var(--dim);margin-bottom:12px;">
-                  Hỗ trợ định dạng <code>.csv</code>, <code>.txt</code> (Bấm nút "Tải File Mẫu Excel" góc trên nếu chưa có mẫu)
-                </div>
-                <input type="file" id="fileImportCsv" accept=".csv,.txt,.json" style="font-size:12.5px;color:var(--text);" />
-              </div>
+              <textarea id="txtImportRaw" class="form-input" rows="4" placeholder="Nội dung file Word sau khi tải lên sẽ hiển thị tại đây..." style="width:100%;padding:10px;font-family:monospace;font-size:12px;line-height:1.45;background:var(--panel);border:1px solid var(--line);border-radius:6px;color:var(--text);box-sizing:border-box;resize:vertical;">${this._escapeHtml(this.importRawText)}</textarea>
             </div>
 
             <!-- VALIDATION ERRORS -->
             ${this.importErrors.length > 0 ? `
-              <div style="margin-top:14px;padding:12px 16px;background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);border-radius:8px;">
+              <div style="margin-bottom:14px;padding:12px 16px;background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);border-radius:8px;">
                 <div style="font-weight:700;color:#ef4444;font-size:13px;margin-bottom:6px;">
                   ⚠️ Phát hiện ${this.importErrors.length} lỗi cú pháp cần điều chỉnh:
                 </div>
@@ -1100,26 +909,26 @@ Giải thích: Mệnh đề phủ định của P là không P.
 
             <!-- PREVIEW QUESTION LIST -->
             ${this.importedQuestions.length > 0 ? `
-              <div style="margin-top:14px;padding:12px 16px;background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.3);border-radius:8px;">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
-                  <div style="font-weight:700;color:#10b981;font-size:13.5px;display:flex;align-items:center;gap:6px;">
-                    <span>✅ Đã nhận diện thành công: ${this.importedQuestions.length} câu hỏi tự soạn!</span>
-                    <span style="font-size:11px;background:#10b981;color:#fff;padding:1px 8px;border-radius:10px;font-weight:700;">100% Đã Có Đáp Án Đúng</span>
+              <div style="padding:14px 18px;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);border-radius:10px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+                  <div style="font-weight:700;color:#10b981;font-size:14px;display:flex;align-items:center;gap:8px;">
+                    <span>✅ Đã nạp thành công: ${this.importedQuestions.length} câu hỏi tự soạn!</span>
+                    <span style="font-size:11px;background:#10b981;color:#fff;padding:2px 8px;border-radius:10px;font-weight:700;">100% Đã Có Đáp Án Đúng • Lưu Vĩnh Viễn</span>
                   </div>
-                  <span style="font-size:11.5px;color:var(--dim);">Xem trước các câu hỏi bên dưới ↓</span>
+                  <span style="font-size:12px;color:var(--dim);">Tất cả câu hỏi này sẽ được nạp vào đề thi ↓</span>
                 </div>
 
-                <div style="max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding-right:4px;">
+                <div style="max-height:240px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding-right:4px;">
                   ${this.importedQuestions.map((q, idx) => `
-                    <div style="background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:8px 12px;font-size:12px;">
+                    <div style="background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px 12px;font-size:12px;">
                       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:4px;">
-                        <strong style="color:var(--text);">Câu ${idx + 1}: ${this._escapeHtml(q.question)}</strong>
-                        <span style="background:rgba(16,185,129,0.2);color:#10b981;font-weight:700;padding:1px 8px;border-radius:4px;white-space:nowrap;">
+                        <strong style="color:var(--text);font-size:12.5px;">Câu ${idx + 1}: ${this._escapeHtml(q.question)}</strong>
+                        <span style="background:rgba(16,185,129,0.2);color:#10b981;font-weight:700;padding:2px 8px;border-radius:4px;white-space:nowrap;font-size:12px;">
                           Đ/A: [ ${q.correctId} ]
                         </span>
                       </div>
                       <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:4px;color:var(--dim);font-size:11.5px;">
-                        ${q.options.map(opt => `
+                        ${(q.options || []).map(opt => `
                           <div style="${opt.id === q.correctId ? 'color:#10b981;font-weight:700;' : ''}">
                             ${opt.id}. ${this._escapeHtml(opt.text)} ${opt.id === q.correctId ? '✓' : ''}
                           </div>
@@ -1134,88 +943,16 @@ Giải thích: Mệnh đề phủ định của P là không P.
                   `).join('')}
                 </div>
               </div>
-            ` : ''}
-
-          </div>
-
-          <!-- RANDOM CONTROLS (COMPATIBILITY) -->
-          <div id="randomQuestionControls" style="display:none;background:var(--panel-alt);border:1px solid var(--line);border-radius:8px;padding:14px;margin-bottom:16px;">
-            <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));gap:14px;">
-              <div>
-                <label style="display:block;font-size:12.5px;font-weight:600;color:var(--text);margin-bottom:6px;">Số lượng câu hỏi: *</label>
-                <select id="selAssignQCount" class="form-input" style="width:100%;padding:8px 12px;border-radius:6px;background:var(--panel);border:1px solid var(--line);color:var(--text);font-size:13px;">
-                  <option value="5">5 câu (Kiểm tra nhanh)</option>
-                  <option value="10" selected>10 câu (Chuẩn 15 phút)</option>
-                  <option value="15">15 câu (Đề kiểm tra giữa kỳ)</option>
-                  <option value="20">20 câu (Khảo sát toàn diện)</option>
-                </select>
+            ` : `
+              <div style="text-align:center;padding:24px 20px;background:var(--panel);border:1px dashed var(--line);border-radius:8px;">
+                <div style="font-size:24px;margin-bottom:4px;">📂</div>
+                <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:4px;">Chưa có câu hỏi tự soạn nào</div>
+                <div style="font-size:12px;color:var(--dim);max-width:500px;margin:0 auto;">
+                  Vui lòng bấm nút <strong>"Tải File Mẫu Word Chuẩn"</strong> bên trên để soạn đề, sau đó tải file Word lên (hoặc bấm <strong>"Thêm câu hỏi từ ảnh đề"</strong>) để bắt đầu phát đề cho sinh viên.
+                </div>
               </div>
+            `}
 
-              <div>
-                <label style="display:block;font-size:12.5px;font-weight:600;color:var(--text);margin-bottom:6px;">Chuyên đề lấy câu hỏi:</label>
-                <select id="selAssignTopic" class="form-input" style="width:100%;padding:8px 12px;border-radius:6px;background:var(--panel);border:1px solid var(--line);color:var(--text);font-size:13px;">
-                  <option value="all">🌟 Tổng hợp cả 5 chuyên đề</option>
-                  <option value="logic">⚡ Chương 1: Cơ sở Logic &amp; Suy luận</option>
-                  <option value="boolean">🔌 Chương 2: Đại số Boole &amp; Mạch Logic</option>
-                  <option value="counting">🎲 Chương 3: Đại số Tổ hợp &amp; Đếm</option>
-                  <option value="relation">🔗 Chương 4: Quan hệ 2 ngôi &amp; Thứ tự</option>
-                  <option value="graph">🌐 Chương 5: Lý thuyết Đồ thị &amp; Cây</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          <!-- MANUAL QUESTION LIST (COMPATIBILITY) -->
-          <div id="manualQuestionList" style="display:none;background:var(--panel-alt);border:1px solid var(--line);border-radius:8px;padding:14px;margin-bottom:16px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:10px;flex-wrap:wrap;">
-              <div style="display:flex;align-items:center;gap:8px;">
-                <label for="selManualChapterFilter" style="font-size:12.5px;font-weight:700;color:var(--text);">Lọc theo chương:</label>
-                <select id="selManualChapterFilter" class="form-input" style="padding:6px 12px;font-size:12.5px;border-radius:6px;background:var(--panel);border:1px solid var(--line);color:var(--text);">
-                  <option value="all">📚 Tất cả các chương (150 câu)</option>
-                  <option value="logic">⚡ Chương 1: Cơ sở Logic &amp; Suy luận (30 câu)</option>
-                  <option value="boolean">🔌 Chương 2: Đại số Boole &amp; Mạch Logic (30 câu)</option>
-                  <option value="counting">🎲 Chương 3: Đại số Tổ hợp &amp; Đếm (30 câu)</option>
-                  <option value="relation">🔗 Chương 4: Quan hệ 2 ngôi &amp; Thứ tự (30 câu)</option>
-                  <option value="graph">🌐 Chương 5: Lý thuyết Đồ thị &amp; Cây (30 câu)</option>
-                </select>
-              </div>
-
-              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-                <button type="button" class="btn-primary" id="btnStudioAddQuestionAi" style="font-size:11.5px;padding:5px 12px;display:inline-flex;align-items:center;gap:4px;cursor:pointer;">
-                  <span>📷</span>
-                  <span>Thêm câu hỏi từ ảnh đề (AI)</span>
-                </button>
-                <button type="button" class="btn-secondary" id="btnManualSelectVisible" style="font-size:11.5px;padding:5px 10px;">
-                  Chọn tất cả chương này
-                </button>
-                <button type="button" class="btn-secondary" id="btnManualDeselectAll" style="font-size:11.5px;padding:5px 10px;">
-                  Bỏ chọn tất cả
-                </button>
-                <span id="manualSelectedCounter" style="font-size:11.5px;font-weight:700;background:var(--accent);color:#000;padding:3px 9px;border-radius:12px;">
-                  Đã chọn: 0 câu
-                </span>
-              </div>
-            </div>
-
-            <div id="manualQuestionsContainer" style="max-height:260px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;padding-right:4px;">
-              ${getAllQuestions().map((question, index) => {
-                const cleanQText = question.question.replace(/<br><svg[\s\S]*?<\/svg>/gi, ' [Sơ đồ mạch logic]').replace(/<[^>]+>/g, '');
-                return `
-                  <label class="manual-q-row" data-topic="${question.topic}" style="display:flex;align-items:flex-start;gap:10px;padding:8px 12px;background:var(--panel);border:1px solid var(--line);border-radius:6px;font-size:12px;cursor:pointer;transition:background 0.15s ease;">
-                    <input type="checkbox" class="chk-assign-question" value="${question.id}" style="margin-top:2px;cursor:pointer;" />
-                    <div style="flex:1;">
-                      <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;flex-wrap:wrap;">
-                        <span style="font-weight:700;color:var(--text);">Câu ${index + 1} [${question.id}]</span>
-                        ${question.source === 'ai_vision' ? `<span style="font-size:10px;padding:1px 6px;border-radius:4px;background:rgba(59,130,246,0.18);color:#38bdf8;font-weight:700;">🤖 AI Vision</span>` : ''}
-                        <span style="font-size:10.5px;padding:1px 6px;border-radius:4px;background:var(--panel-alt);border:1px solid var(--line);color:var(--accent);">${this._escapeHtml(question.topicName || question.topic)}</span>
-                        <span style="font-size:10.5px;color:var(--dim);">${question.difficulty === 'easy' ? '🟢 Dễ' : question.difficulty === 'medium' ? '🟡 Trung bình' : '🔴 Nâng cao'}</span>
-                      </div>
-                      <div style="color:var(--text);line-height:1.4;">${this._escapeHtml(cleanQText)}</div>
-                    </div>
-                  </label>
-                `;
-              }).join('')}
-            </div>
           </div>
 
           <!-- CONFIGURATION BAR -->
@@ -2263,104 +2000,6 @@ Giải thích: Mệnh đề phủ định của P là không P.
       });
     }
 
-    // 2. Practice Arena Events
-    const selTopic = this.container.querySelector('#selPracticeTopic');
-    if (selTopic) {
-      selTopic.addEventListener('change', (e) => {
-        this.practiceFilter.topic = e.target.value;
-        this._initPracticeQuestions();
-        this.render();
-      });
-    }
-
-    const selDiff = this.container.querySelector('#selPracticeDiff');
-    if (selDiff) {
-      selDiff.addEventListener('change', (e) => {
-        this.practiceFilter.difficulty = e.target.value;
-        this._initPracticeQuestions();
-        this.render();
-      });
-    }
-
-    const btnResetPractice = this.container.querySelector('#btnResetPractice');
-    if (btnResetPractice) {
-      btnResetPractice.addEventListener('click', () => {
-        this._initPracticeQuestions();
-        this.render();
-      });
-    }
-
-    const btnResetFilters = this.container.querySelector('#btnResetFilters');
-    if (btnResetFilters) {
-      btnResetFilters.addEventListener('click', () => {
-        this.practiceFilter.topic = 'all';
-        this.practiceFilter.difficulty = 'all';
-        this._initPracticeQuestions();
-        this.render();
-      });
-    }
-
-    const btnPrev = this.container.querySelector('#btnPracticePrev');
-    if (btnPrev) {
-      btnPrev.addEventListener('click', () => {
-        if (this.currentIndex > 0) {
-          this.currentIndex--;
-          this.render();
-        }
-      });
-    }
-
-    const btnNext = this.container.querySelector('#btnPracticeNext');
-    if (btnNext) {
-      btnNext.addEventListener('click', () => {
-        if (this.currentIndex < this.practiceQuestions.length - 1) {
-          this.currentIndex++;
-          this.render();
-        }
-      });
-    }
-
-    // Practice Option Buttons Click
-    this.container.querySelectorAll('.btn-quiz-option').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const q = this.practiceQuestions[this.currentIndex];
-        if (!q || this.userAnswers[q.id]) return;
-
-        const optId = btn.getAttribute('data-opt-id');
-        this.userAnswers[q.id] = optId;
-        this.answeredCount++;
-
-        const isCorrect = optId === q.correctId;
-        if (isCorrect) {
-          this.score += 10;
-          this.streak++;
-          if (this.streak > this.maxStreak) {
-            this.maxStreak = this.streak;
-          }
-        } else {
-          this.streak = 0;
-        }
-
-        this.render();
-      });
-    });
-
-    // Action links to open in Labs
-    this.container.querySelectorAll('.btn-open-lab').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const view = btn.getAttribute('data-action-view');
-        const val = btn.getAttribute('data-action-val');
-        if (view === 'logic') {
-          this.onOpenLogicWithExpr(val);
-        } else if (view === 'lab') {
-          this.onOpenLabWithAlgo(val);
-        } else if (view === 'counting') {
-          this.onOpenCounting(val);
-        } else if (view === 'relation') {
-          this.onOpenRelation(val);
-        }
-      });
-    });
 
     // 3. My Exams & Timed Exam Events
     this.container.querySelectorAll('.btn-start-exam').forEach(btn => {
@@ -2497,193 +2136,147 @@ Giải thích: Mệnh đề phủ định của P là không P.
       });
     }
 
-    const selectionMode = this.container.querySelector('#selAssignSelectionMode');
-    const randomQuestionControls = this.container.querySelector('#randomQuestionControls');
-    const manualQuestionList = this.container.querySelector('#manualQuestionList');
-    const importExamBox = this.container.querySelector('#importExamBox');
-
-    if (selectionMode) {
-      selectionMode.addEventListener('change', () => {
-        const modeVal = selectionMode.value;
-        if (importExamBox) importExamBox.style.display = modeVal === 'import' ? 'block' : 'none';
-        if (randomQuestionControls) randomQuestionControls.style.display = modeVal === 'random' ? 'contents' : 'none';
-        if (manualQuestionList) manualQuestionList.style.display = modeVal === 'manual' ? 'block' : 'none';
+    // Download Sample Word Document (.doc)
+    const btnDownloadSampleWord = this.container.querySelector('#btnDownloadSampleWord');
+    if (btnDownloadSampleWord) {
+      btnDownloadSampleWord.addEventListener('click', () => {
+        const sampleDoc = generateSampleWordDocument();
+        this._downloadFile(sampleDoc, 'Mau_De_Thi_Toan_Roi_Rac.doc', 'application/msword;charset=utf-8;');
       });
+    }
 
-      const selManualChapterFilter = this.container.querySelector('#selManualChapterFilter');
-      const manualRows = Array.from(this.container.querySelectorAll('.manual-q-row'));
-      const counterEl = this.container.querySelector('#manualSelectedCounter');
+    // AI Vision / Photo Question OCR
+    const btnStudioAddQuestionAi = this.container.querySelector('#btnStudioAddQuestionAi');
+    if (btnStudioAddQuestionAi) {
+      btnStudioAddQuestionAi.addEventListener('click', () => {
+        if (!this.logicModal) {
+          this.logicModal = new LogicSourceModal({
+            container: document.body,
+            adminMode: true,
+            onSaveQuizQuestion: async (questionData) => {
+              const currentUser = authManager.getCurrentUser();
+              const authHeaders = {
+                'x-user-id': currentUser?.id || 'user_admin',
+                'Authorization': `Bearer ${currentUser?.id || 'user_admin'}`,
+              };
+              questionData.createdBy = currentUser?.id || 'user_admin';
+              const res = await cloudSyncManager.saveCustomQuestion(questionData, authHeaders);
 
-      const updateSelectedCounter = () => {
-        if (!counterEl) return;
-        const checkedCount = this.container.querySelectorAll('.chk-assign-question:checked').length;
-        counterEl.textContent = `Đã chọn: ${checkedCount} câu`;
-      };
-
-      if (selManualChapterFilter) {
-        selManualChapterFilter.addEventListener('change', () => {
-          const filterVal = selManualChapterFilter.value;
-          manualRows.forEach(row => {
-            const topic = row.getAttribute('data-topic');
-            if (filterVal === 'all' || topic === filterVal) {
-              row.style.display = 'flex';
-            } else {
-              row.style.display = 'none';
-            }
+              const newQuestion = {
+                id: questionData.id || `ai_q_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+                question: questionData.question || '',
+                options: questionData.options || [],
+                correctId: questionData.correctId || 'A',
+                explanation: questionData.explanation || '',
+                topic: questionData.topic || 'all',
+                difficulty: questionData.difficulty || 'medium',
+              };
+              this.importedQuestions = mergeImportedQuestions(this.importedQuestions, [newQuestion]);
+              this._saveWordQuestions(this.importedQuestions);
+              this.render();
+              return { success: true };
+            },
           });
-        });
-      }
-
-      const btnManualSelectVisible = this.container.querySelector('#btnManualSelectVisible');
-      if (btnManualSelectVisible) {
-        btnManualSelectVisible.addEventListener('click', () => {
-          manualRows.forEach(row => {
-            if (row.style.display !== 'none') {
-              const chk = row.querySelector('.chk-assign-question');
-              if (chk) chk.checked = true;
-            }
-          });
-          updateSelectedCounter();
-        });
-      }
-
-      const btnManualDeselectAll = this.container.querySelector('#btnManualDeselectAll');
-      if (btnManualDeselectAll) {
-        btnManualDeselectAll.addEventListener('click', () => {
-          this.container.querySelectorAll('.chk-assign-question').forEach(chk => {
-            chk.checked = false;
-          });
-          updateSelectedCounter();
-        });
-      }
-
-      this.container.querySelectorAll('.chk-assign-question').forEach(chk => {
-        chk.addEventListener('change', updateSelectedCounter);
+        }
+        this.logicModal.open('quiz');
       });
-      updateSelectedCounter();
+    }
 
-      const btnStudioAddQuestionAi = this.container.querySelector('#btnStudioAddQuestionAi');
-      if (btnStudioAddQuestionAi) {
-        btnStudioAddQuestionAi.addEventListener('click', () => {
-          if (!this.logicModal) {
-            this.logicModal = new LogicSourceModal({
-              container: document.body,
-              adminMode: true,
-              onSaveQuizQuestion: async (questionData) => {
-                const currentUser = authManager.getCurrentUser();
-                const authHeaders = {
-                  'x-user-id': currentUser?.id || 'user_admin',
-                  'Authorization': `Bearer ${currentUser?.id || 'user_admin'}`,
-                };
-                questionData.createdBy = currentUser?.id || 'user_admin';
-                const res = await cloudSyncManager.saveCustomQuestion(questionData, authHeaders);
-                if (res && res.success) {
-                  this.render();
-                  return { success: true };
-                }
-                return { success: false, error: res?.error || 'Lỗi khi lưu câu hỏi.' };
-              },
-            });
+    // Clear All Old Word Questions
+    const btnClearAllWordData = this.container.querySelector('#btnClearAllWordData');
+    if (btnClearAllWordData) {
+      btnClearAllWordData.addEventListener('click', () => {
+        const confirmed = typeof window !== 'undefined' && window.confirm
+          ? window.confirm('Bạn có chắc chắn muốn xóa hết toàn bộ câu hỏi đề thi cũ (Word) đã lưu không?\n\nThao tác này sẽ dọn dẹp sạch danh sách câu hỏi để bạn tải lên đề thi mới.')
+          : true;
+        if (!confirmed) return;
+        this._clearAllWordQuestions();
+        this.importRawText = '';
+        this.importErrors = [];
+        this._showAlert('🗑️ Đã xóa sạch toàn bộ dữ liệu câu hỏi Word cũ! Giờ bạn có thể tải lên đề thi mới.');
+        this.render();
+      });
+    }
+
+    // File Import Word (.docx, .doc, .txt)
+    const fileImportWord = this.container.querySelector('#fileImportWord');
+    if (fileImportWord) {
+      fileImportWord.addEventListener('change', async (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+
+        try {
+          let textContent = '';
+          const fileNameLower = file.name.toLowerCase();
+
+          if (fileNameLower.endsWith('.docx')) {
+            const arrayBuffer = await file.arrayBuffer();
+            textContent = await extractTextFromDocx(arrayBuffer);
+          } else {
+            const raw = await file.text();
+            textContent = stripHtmlToExamText(raw);
           }
-          this.logicModal.open('quiz');
-        });
-      }
-    }
 
-    // Import Mode Tabs & Action Buttons
-    const tabImportModeText = this.container.querySelector('#tabImportModeText');
-    if (tabImportModeText) {
-      tabImportModeText.addEventListener('click', () => {
-        this.importMode = 'text';
-        this.render();
+          if (!textContent || !textContent.trim()) {
+            this._showAlert('⚠️ Không đọc được nội dung văn bản trong file Word này. Vui lòng kiểm tra lại định dạng file hoặc dùng file mẫu.');
+            return;
+          }
+
+          this.importRawText = textContent;
+          const res = parseExamText(textContent);
+
+          if (res.questions && res.questions.length > 0) {
+            // MERGE & PERSIST: keep previous questions, merge new ones!
+            this.importedQuestions = mergeImportedQuestions(this.importedQuestions, res.questions);
+            this._saveWordQuestions(this.importedQuestions);
+            this.importErrors = res.errors || [];
+            this._showAlert(`✅ Đã nạp thành công ${res.questions.length} câu hỏi từ file "${file.name}"!\nTổng số câu hỏi hiện có trong hệ thống: ${this.importedQuestions.length} câu.\n(Dữ liệu đã được lưu trữ vĩnh viễn)`);
+          } else {
+            this.importErrors = res.errors && res.errors.length > 0
+              ? res.errors
+              : ['Không tìm thấy câu hỏi hợp lệ trong file. Vui lòng tải file mẫu chuẩn để xem định dạng.'];
+            this._showAlert('⚠️ Không nhận diện được câu hỏi nào từ file.\nVui lòng xem danh sách lỗi bên dưới hoặc tải file mẫu chuẩn.');
+          }
+          this.render();
+        } catch (err) {
+          console.error('[QuizView] Error reading Word file:', err);
+          this._showAlert(`❌ Lỗi khi đọc file Word: ${err.message || err}`);
+        }
       });
     }
 
-    const tabImportModeCsv = this.container.querySelector('#tabImportModeCsv');
-    if (tabImportModeCsv) {
-      tabImportModeCsv.addEventListener('click', () => {
-        this.importMode = 'csv';
-        this.render();
-      });
-    }
-
+    // Fill Sample Text
     const btnFillSampleText = this.container.querySelector('#btnFillSampleText');
     if (btnFillSampleText) {
       btnFillSampleText.addEventListener('click', () => {
         this.importRawText = generateSampleExamText();
         const res = parseExamText(this.importRawText);
-        this.importedQuestions = res.questions;
+        this.importedQuestions = mergeImportedQuestions(this.importedQuestions, res.questions);
+        this._saveWordQuestions(this.importedQuestions);
         this.importErrors = res.errors;
+        this._showAlert(`✅ Đã thêm ${res.questions.length} câu hỏi mẫu vào danh sách! Tổng hiện có: ${this.importedQuestions.length} câu.`);
         this.render();
       });
     }
 
-    const btnClearImportText = this.container.querySelector('#btnClearImportText');
-    if (btnClearImportText) {
-      btnClearImportText.addEventListener('click', () => {
-        this.importRawText = '';
-        this.importedQuestions = [];
-        this.importErrors = [];
-        this.render();
-      });
-    }
-
+    // Parse / Refresh Raw Textarea
     const btnParseImportText = this.container.querySelector('#btnParseImportText');
     if (btnParseImportText) {
       btnParseImportText.addEventListener('click', () => {
         const txt = this.container.querySelector('#txtImportRaw')?.value || '';
         this.importRawText = txt;
         const res = parseExamText(txt);
-        this.importedQuestions = res.questions;
+        if (res.questions && res.questions.length > 0) {
+          this.importedQuestions = mergeImportedQuestions(this.importedQuestions, res.questions);
+          this._saveWordQuestions(this.importedQuestions);
+        }
         this.importErrors = res.errors;
         if (res.success) {
-          this._showAlert(`✅ Phân tích thành công ${res.totalCount} câu hỏi! Bạn có thể xem trước và bấm "Phát Đề" ngay.`);
+          this._showAlert(`✅ Cập nhật thành công ${res.totalCount} câu hỏi! Tổng hiện có: ${this.importedQuestions.length} câu.`);
         } else {
-          this._showAlert(`⚠️ Nhận diện được ${res.totalCount} câu hỏi, nhưng có ${res.errors.length} lỗi cần điều chỉnh trước khi phát đề.`);
+          this._showAlert(`⚠️ Nhận diện được ${res.totalCount} câu hỏi, có ${res.errors.length} lỗi cần lưu ý.`);
         }
         this.render();
-      });
-    }
-
-    const btnDownloadSampleCsv = this.container.querySelector('#btnDownloadSampleCsv');
-    if (btnDownloadSampleCsv) {
-      btnDownloadSampleCsv.addEventListener('click', () => {
-        this._downloadFile(generateSampleExamCsv(), 'Mau_De_Thi_Toan_Roi_Rac.csv', 'text/csv;charset=utf-8;');
-      });
-    }
-
-    const fileImportCsv = this.container.querySelector('#fileImportCsv');
-    if (fileImportCsv) {
-      fileImportCsv.addEventListener('change', (e) => {
-        const file = e.target.files && e.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          const content = event.target?.result;
-          if (typeof content === 'string') {
-            let res;
-            if (file.name.endsWith('.json')) {
-              try {
-                const data = JSON.parse(content);
-                const qList = Array.isArray(data) ? data : (data.questions || []);
-                res = { success: qList.length > 0, questions: qList, errors: qList.length > 0 ? [] : ['File JSON không có câu hỏi.'], totalCount: qList.length };
-              } catch (err) {
-                res = { success: false, questions: [], errors: [`Lỗi cú pháp JSON: ${err.message}`], totalCount: 0 };
-              }
-            } else {
-              res = parseExamCsv(content);
-            }
-            this.importedQuestions = res.questions;
-            this.importErrors = res.errors;
-            if (res.success) {
-              this._showAlert(`✅ Đọc file thành công! Đã nhận diện ${res.totalCount} câu hỏi.`);
-            } else {
-              this._showAlert(`⚠️ Phát hiện lỗi khi đọc file: ${res.errors.join('; ')}`);
-            }
-            this.render();
-          }
-        };
-        reader.readAsText(file, 'utf-8');
       });
     }
 
@@ -2708,22 +2301,17 @@ Giải thích: Mệnh đề phủ định của P là không P.
       });
     }
 
-    // Create & Assign Exam Button
+    // Create & Assign Exam Button (Strict: Only from imported/custom questions)
     const btnCreateAndAssign = this.container.querySelector('#btnCreateAndAssignExam');
     if (btnCreateAndAssign) {
       btnCreateAndAssign.addEventListener('click', () => {
         const titleInput = this.container.querySelector('#txtAssignTitle');
         const durationInput = this.container.querySelector('#numAssignDuration');
         const examCodeInput = this.container.querySelector('#txtAssignExamCode');
-        const countSelect = this.container.querySelector('#selAssignQCount');
-        const topicSelect = this.container.querySelector('#selAssignTopic');
 
         const title = titleInput ? titleInput.value.trim() : '';
         const durationMinutes = durationInput ? parseInt(durationInput.value, 10) : 15;
         const examCode = examCodeInput ? examCodeInput.value.trim() : null;
-        const count = countSelect ? parseInt(countSelect.value, 10) : 10;
-        const topic = topicSelect ? topicSelect.value : 'all';
-        const selectionModeVal = this.container.querySelector('#selAssignSelectionMode')?.value || 'import';
 
         if (!title) {
           this._showAlert('Vui lòng nhập tiêu đề đề thi!');
@@ -2744,56 +2332,26 @@ Giải thích: Mệnh đề phủ định của P là không P.
           assignedTo = selectedStudents;
         }
 
-        let questionIds = [];
-        let customQuestions = [];
-
-        if (selectionModeVal === 'manual') {
-          questionIds = Array.from(this.container.querySelectorAll('.chk-assign-question:checked'))
-            .map(input => input.value);
-          if (questionIds.length === 0) {
-            this._showAlert('Vui lòng chọn ít nhất 1 câu hỏi cho đề thi!');
-            return;
-          }
-        } else if (selectionModeVal === 'random') {
-          let pool = getAllQuestions();
-          if (topic !== 'all') {
-            pool = pool.filter(q => q.topic === topic);
-          }
-          const targetHardCount = Math.max(0, Math.round(count * 0.1));
-          const hardPool = pool.filter(q => q.difficulty === 'hard');
-          const standardPool = pool.filter(q => q.difficulty !== 'hard');
-          const shuffledHard = shuffle(hardPool);
-          const shuffledStandard = shuffle(standardPool);
-          const actualHardCount = Math.min(targetHardCount, shuffledHard.length);
-          const standardCount = Math.min(count - actualHardCount, shuffledStandard.length);
-          const selectedQuestions = shuffle([
-            ...shuffledStandard.slice(0, standardCount),
-            ...shuffledHard.slice(0, actualHardCount),
-          ]);
-          questionIds = selectedQuestions.map(q => q.id);
-        } else {
-          // 'import' mode: primary workflow
-          if (this.importedQuestions.length === 0) {
-            const rawText = this.container.querySelector('#txtImportRaw')?.value?.trim();
-            if (rawText) {
-              const res = parseExamText(rawText);
-              if (res.success && res.questions.length > 0) {
-                this.importedQuestions = res.questions;
-                this.importErrors = res.errors;
-              }
+        // Strict validation: Only accept custom imported questions (from Word or AI)
+        if (this.importedQuestions.length === 0) {
+          const rawText = this.container.querySelector('#txtImportRaw')?.value?.trim();
+          if (rawText) {
+            const res = parseExamText(rawText);
+            if (res.questions && res.questions.length > 0) {
+              this.importedQuestions = mergeImportedQuestions(this.importedQuestions, res.questions);
+              this._saveWordQuestions(this.importedQuestions);
+              this.importErrors = res.errors;
             }
           }
-
-          if (this.importedQuestions.length === 0) {
-            // If still empty (e.g. legacy test without typed text), fallback to standard pool
-            const pool = getAllQuestions();
-            const fallbackQuestions = shuffle(pool).slice(0, 10);
-            questionIds = fallbackQuestions.map(q => q.id);
-          } else {
-            customQuestions = [...this.importedQuestions];
-            questionIds = customQuestions.map(q => q.id);
-          }
         }
+
+        if (this.importedQuestions.length === 0) {
+          this._showAlert('⚠️ Vui lòng tải lên file Word đề thi (.doc / .docx) hoặc thêm câu hỏi từ ảnh đề trước khi phát đề cho sinh viên! Hệ thống chỉ nhận phát đề từ câu hỏi tự soạn đã import.');
+          return;
+        }
+
+        const customQuestions = [...this.importedQuestions];
+        const questionIds = customQuestions.map(q => q.id);
 
         const result = examManager.createExam({
           title,
@@ -2814,9 +2372,6 @@ Giải thích: Mệnh đề phủ định của P là không P.
           }
           // Automatically open dedicated Admin Answer Key modal immediately!
           this.adminAnswerKeyExamId = result.exam.id;
-          this.importedQuestions = [];
-          this.importRawText = '';
-          this.importErrors = [];
           this._showAlert(`🎉 Tạo và phân phối đề thi thành công!\n\nĐề thi: "${title}" (Mã: ${result.exam.examCode})\nThời lượng: ${durationMinutes} phút\nSố câu: ${questionIds.length} câu\nĐối tượng: ${assignedTo.includes('all') ? 'Toàn bộ sinh viên' : assignedTo.length + ' sinh viên'}\n\nĐã tự động mở Hồ sơ Đáp án & Barem chấm dành cho Quản trị viên.`);
           this.render();
         } else {
@@ -3120,71 +2675,7 @@ Giải thích: Mệnh đề phủ định của P là không P.
         return;
       }
 
-      // Context 1: Practice Arena Mode
-      if (this.activeTab === 'practice' && this.practiceQuestions && this.practiceQuestions.length > 0) {
-        const q = this.practiceQuestions[this.currentIndex];
-
-        // Arrow Right: Next question
-        if (e.key === 'ArrowRight') {
-          if (this.currentIndex < this.practiceQuestions.length - 1) {
-            e.preventDefault();
-            this.currentIndex++;
-            this.render();
-          }
-          return;
-        }
-
-        // Arrow Left: Previous question
-        if (e.key === 'ArrowLeft') {
-          if (this.currentIndex > 0) {
-            e.preventDefault();
-            this.currentIndex--;
-            this.render();
-          }
-          return;
-        }
-
-        // Enter or Space: Advance to next question if answered
-        if ((e.key === 'Enter' || e.key === ' ') && q && this.userAnswers[q.id]) {
-          if (this.currentIndex < this.practiceQuestions.length - 1) {
-            e.preventDefault();
-            this.currentIndex++;
-            this.render();
-          }
-          return;
-        }
-
-        // Option selection keys: A, B, C, D or 1, 2, 3, 4
-        const keyMap = {
-          'a': 'A', 'A': 'A', '1': 'A',
-          'b': 'B', 'B': 'B', '2': 'B',
-          'c': 'C', 'C': 'C', '3': 'C',
-          'd': 'D', 'D': 'D', '4': 'D',
-        };
-        const optId = keyMap[e.key];
-        if (optId && q && !this.userAnswers[q.id]) {
-          const optExists = q.options && q.options.some(opt => opt.id === optId);
-          if (optExists) {
-            e.preventDefault();
-            this.userAnswers[q.id] = optId;
-            this.answeredCount++;
-            const isCorrect = optId === q.correctId;
-            if (isCorrect) {
-              this.score += 10;
-              this.streak++;
-              if (this.streak > this.maxStreak) {
-                this.maxStreak = this.streak;
-              }
-            } else {
-              this.streak = 0;
-            }
-            this.render();
-          }
-          return;
-        }
-      }
-
-      // Context 2: Active Timed Exam Session
+      // Context: Active Timed Exam Session
       if (this.activeTab === 'myExams' && this.activeExamSession && this.activeExamSession.questions) {
         const session = this.activeExamSession;
         const currentQ = session.questions[session.currentQIndex];

@@ -173,25 +173,14 @@ export class HomeView {
 
         </section>
 
-        <!-- 3. Academic & Teaching Suite Highlight (Giữ lại thanh ngang đấu trường trắc nghiệm) -->
+        <!-- 3. Academic & Teaching Suite Highlight -->
         <section class="academic-suite" style="margin-top:28px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:24px;display:grid;grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));gap:20px;">
-          <div style="display:${authManager.isAdmin() ? 'flex' : 'none'};gap:14px;align-items:flex-start;">
-            <div style="font-size:28px;">🎮</div>
-            <div>
-              <h4 style="font-size:15px;font-weight:700;color:var(--text);margin:0 0 4px 0;">Đấu trường Trắc nghiệm</h4>
-              <p style="font-size:12.5px;color:var(--dim);margin:0 0 10px 0;line-height:1.4;">
-                Hàng trăm câu hỏi trắc nghiệm rèn luyện phản xạ tính toán, chấm điểm tức thì và giải thích chi tiết từng bước.
-              </p>
-              <button type="button" class="btn-sm" id="btnHomeQuizArena" style="font-size:12px;padding:5px 14px;cursor:pointer;">Vào luyện tập →</button>
-            </div>
-          </div>
-
           <div style="display:${authManager.isAdmin() ? 'flex' : 'none'};gap:14px;align-items:flex-start;">
             <div style="font-size:28px;">👩‍🏫</div>
             <div>
-              <h4 style="font-size:15px;font-weight:700;color:var(--text);margin:0 0 4px 0;">Studio Soạn đề & In ấn A4</h4>
+              <h4 style="font-size:15px;font-weight:700;color:var(--text);margin:0 0 4px 0;">Soạn Đề Từ File Word &amp; In Ấn A4</h4>
               <p style="font-size:12.5px;color:var(--dim);margin:0 0 10px 0;line-height:1.4;">
-                Công cụ hỗ trợ Quản trị viên xuất đề thi chuẩn giấy in A4, phiếu tô trắc nghiệm chuẩn máy chấm và bảng đáp án.
+                Công cụ hỗ trợ Quản trị viên nhập đề tự soạn từ file Word, lưu trữ đề và xuất đề thi chuẩn giấy in A4 kèm Barem đáp án.
               </p>
               <button type="button" class="btn-sm" id="btnHomeQuizStudio" style="font-size:12px;padding:5px 14px;cursor:pointer;">Vào Studio soạn đề →</button>
             </div>
@@ -299,9 +288,6 @@ export class HomeView {
     });
 
     // 5. Academic suite buttons
-    const btnHomeQuizArena = this.container.querySelector('#btnHomeQuizArena');
-    if (btnHomeQuizArena) btnHomeQuizArena.addEventListener('click', () => this.onNavigate('quiz', 'practice'));
-
     const btnHomeQuizStudio = this.container.querySelector('#btnHomeQuizStudio');
     if (btnHomeQuizStudio) btnHomeQuizStudio.addEventListener('click', () => this.onNavigate('quiz', 'studio'));
 

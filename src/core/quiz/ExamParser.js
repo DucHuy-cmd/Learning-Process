@@ -426,3 +426,223 @@ export function generateSampleExamCsv() {
 "Cho hai tập hợp A = {1, 2, 3} và B = {2, 3, 4}. Giao của hai tập hợp A ∩ B là:","{1, 2, 3, 4}","{2, 3}","{1, 4}","Tập rỗng","B","Giao A ∩ B là {2, 3}."
 "Trong logic mệnh đề, phép toán nào có giá trị SAI khi và chỉ khi cả hai mệnh đề đều sai?","Phép hội (AND)","Phép tuyển (OR)","Phép kéo theo (->)","Phép tương đương (<->)","B","Phép tuyển P ∨ Q chỉ sai khi cả hai cùng sai."`;
 }
+
+/**
+ * Generates sample Word document (.doc) in Microsoft Word XML/HTML format.
+ * Can be opened natively in MS Word, WPS Office, and Google Docs.
+ * @returns {string}
+ */
+export function generateSampleWordDocument() {
+  const sampleText = generateSampleExamText();
+  const parsed = parseExamText(sampleText);
+  const questions = parsed.questions;
+
+  return `<!DOCTYPE html>
+<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+<head>
+<meta charset='utf-8'>
+<title>Mau_De_Thi_Toan_Roi_Rac</title>
+<!--[if gte mso 9]>
+<xml>
+  <w:WordDocument>
+    <w:View>Print</w:View>
+    <w:Zoom>100</w:Zoom>
+    <w:DoNotOptimizeForBrowser/>
+  </w:WordDocument>
+</xml>
+<![endif]-->
+<style>
+  body { font-family: 'Times New Roman', Times, serif; font-size: 13pt; line-height: 1.5; color: #000; margin: 40px; }
+  h1 { text-align: center; font-size: 16pt; font-weight: bold; text-transform: uppercase; margin-bottom: 4px; }
+  .subtitle { text-align: center; font-size: 12pt; font-style: italic; margin-bottom: 24px; }
+  .instruction { background-color: #f3f4f6; border-left: 4px solid #2563eb; padding: 12px 16px; margin-bottom: 24px; font-size: 11pt; }
+  .q-block { margin-bottom: 18px; page-break-inside: avoid; }
+  .q-title { font-weight: bold; margin-bottom: 6px; }
+  .opt { margin-left: 24px; margin-bottom: 3px; }
+  .key { font-weight: bold; color: #15803d; margin-top: 4px; margin-left: 24px; }
+  .exp { font-style: italic; color: #4b5563; margin-top: 2px; margin-left: 24px; }
+</style>
+</head>
+<body>
+  <h1>ĐỀ THI TRẮC NGHIỆM MÔN TOÁN RỜI RẠC</h1>
+  <div class="subtitle">(Tài liệu mẫu chuẩn dùng để nhập đề tự soạn vào phần mềm)</div>
+
+  <div class="instruction">
+    <strong>HƯỚNG DẪN SOẠN ĐỀ:</strong><br/>
+    1. Mỗi câu hỏi bắt đầu bằng <strong>Câu 1:</strong>, <strong>Câu 2:</strong>, ... hoặc <strong>1.</strong>, <strong>2.</strong><br/>
+    2. Các phương án bắt đầu bằng <strong>A.</strong>, <strong>B.</strong>, <strong>C.</strong>, <strong>D.</strong><br/>
+    3. Ghi rõ đáp án đúng ở dòng <strong>Đáp án: A</strong> (hoặc B, C, D)<br/>
+    4. Thêm dòng <strong>Giải thích: ...</strong> nếu có lời giải chi tiết cho sinh viên.
+  </div>
+
+  <div class="content">
+${questions.map((q, idx) => `
+    <div class="q-block">
+      <div class="q-title">Câu ${idx + 1}: ${q.question}</div>
+      ${q.options.map(o => `<div class="opt">${o.id}. ${o.text}</div>`).join('\n      ')}
+      <div class="key">Đáp án: ${q.correctId}</div>
+      <div class="exp">Giải thích: ${q.explanation || ''}</div>
+    </div>
+`).join('\n')}
+  </div>
+</body>
+</html>`;
+}
+
+/**
+ * Extracts plain text from a docx file (ArrayBuffer) or HTML-based Word file.
+ * @param {ArrayBuffer} arrayBuffer
+ * @returns {Promise<string>}
+ */
+export async function extractTextFromDocx(arrayBuffer) {
+  if (!arrayBuffer || arrayBuffer.byteLength < 30) {
+    return '';
+  }
+
+  const uint8 = new Uint8Array(arrayBuffer);
+  // Check ZIP signature PK\x03\x04
+  if (uint8[0] !== 0x50 || uint8[1] !== 0x4b || uint8[2] !== 0x03 || uint8[3] !== 0x04) {
+    // Not a ZIP file, try reading as raw UTF-8 text (e.g. .doc HTML or plain text)
+    const decoder = new TextDecoder('utf-8');
+    const raw = decoder.decode(uint8);
+    if (raw.includes('<html') || raw.includes('<?xml')) {
+      return stripHtmlToExamText(raw);
+    }
+    return raw;
+  }
+
+  // It's a ZIP archive (.docx). Scan local file headers.
+  const view = new DataView(arrayBuffer);
+  let pos = 0;
+  const maxPos = uint8.length - 30;
+
+  while (pos < maxPos) {
+    if (view.getUint32(pos, true) === 0x04034b50) {
+      const method = view.getUint16(pos + 8, true);
+      const cSize = view.getUint32(pos + 18, true);
+      const fnLen = view.getUint16(pos + 26, true);
+      const exLen = view.getUint16(pos + 28, true);
+      const fnStart = pos + 30;
+      const fnEnd = fnStart + fnLen;
+
+      let filename = '';
+      for (let i = fnStart; i < fnEnd; i++) {
+        filename += String.fromCharCode(uint8[i]);
+      }
+
+      const dataStart = fnEnd + exLen;
+      const dataEnd = dataStart + cSize;
+
+      if (filename === 'word/document.xml') {
+        const compressedData = uint8.subarray(dataStart, dataEnd);
+        let xmlStr = '';
+
+        if (method === 0) {
+          xmlStr = new TextDecoder('utf-8').decode(compressedData);
+        } else if (method === 8) {
+          if (typeof DecompressionStream !== 'undefined') {
+            const ds = new DecompressionStream('deflate-raw');
+            const writer = ds.writable.getWriter();
+            writer.write(compressedData);
+            writer.close();
+            xmlStr = await new Response(ds.readable).text();
+          } else {
+            throw new Error('Trình duyệt không hỗ trợ DecompressionStream để giải nén file .docx.');
+          }
+        }
+
+        return parseDocxXmlToText(xmlStr);
+      }
+
+      pos = dataEnd > pos ? dataEnd : pos + 1;
+    } else {
+      pos++;
+    }
+  }
+
+  return '';
+}
+
+/**
+ * Parses Word XML document string into plain exam text lines.
+ * @param {string} xmlStr
+ * @returns {string}
+ */
+export function parseDocxXmlToText(xmlStr) {
+  if (!xmlStr) return '';
+  const pRegex = /<w:p(?: [^>]*)?>([\s\S]*?)<\/w:p>/g;
+  const tRegex = /<w:t(?: [^>]*)?>([^<]*)<\/w:t>/g;
+  const lines = [];
+  let pMatch;
+
+  while ((pMatch = pRegex.exec(xmlStr)) !== null) {
+    let line = '';
+    let tMatch;
+    while ((tMatch = tRegex.exec(pMatch[1])) !== null) {
+      line += tMatch[1];
+    }
+    const cleanLine = line.trim();
+    if (cleanLine) {
+      lines.push(cleanLine);
+    }
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * Strips HTML formatting from Word HTML document into clean plain text for parseExamText.
+ * @param {string} htmlStr
+ * @returns {string}
+ */
+export function stripHtmlToExamText(htmlStr) {
+  if (!htmlStr) return '';
+  const withoutHead = htmlStr
+    .replace(/<head[\s\S]*?<\/head>/gi, '')
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/<div class="instruction"[\s\S]*?<\/div>/gi, '')
+    .replace(/<div class="subtitle"[\s\S]*?<\/div>/gi, '');
+
+  const withNewlines = withoutHead
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/(p|div|tr|li|h[1-6])>/gi, '\n')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&amp;/gi, '&');
+
+  return withNewlines
+    .split('\n')
+    .map(line => line.trim())
+    .filter(Boolean)
+    .join('\n');
+}
+
+/**
+ * Merges newly imported questions with existing imported questions without duplicates.
+ * @param {Array<Object>} existingQuestions
+ * @param {Array<Object>} newQuestions
+ * @returns {Array<Object>}
+ */
+export function mergeImportedQuestions(existingQuestions = [], newQuestions = []) {
+  const result = [...(Array.isArray(existingQuestions) ? existingQuestions : [])];
+  const existingSet = new Set(result.map(q => (q.question || '').trim().toLowerCase()));
+
+  (Array.isArray(newQuestions) ? newQuestions : []).forEach(newQ => {
+    if (!newQ || !newQ.question) return;
+    const normalizedKey = newQ.question.trim().toLowerCase();
+    if (!existingSet.has(normalizedKey)) {
+      existingSet.add(normalizedKey);
+      result.push({
+        ...newQ,
+        id: newQ.id || `q_word_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      });
+    }
+  });
+
+  return result;
+}
+
