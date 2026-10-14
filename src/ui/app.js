@@ -298,6 +298,9 @@ export class App {
         if (this.currentView === 'admin' && !authManager.isAdmin()) {
           this.navigate('home');
         }
+        if (this.views.home && typeof this.views.home.render === 'function') {
+          this.views.home.render();
+        }
         if (this.views.quiz && typeof this.views.quiz.render === 'function') {
           this.views.quiz.render();
         }
@@ -620,9 +623,12 @@ export class App {
       if (authManager.isAdmin()) {
         this.openQuizWithTab('studio');
       } else {
-        this.openQuizWithTab('practice');
+        this.openQuizWithTab('myExams');
       }
     } else {
+      if (viewName === 'quiz' && (subtab === 'practice' || !subtab) && !authManager.isAdmin()) {
+        subtab = 'myExams';
+      }
       this.navigate(viewName || rawHash, false, subtab);
     }
   }
@@ -633,10 +639,10 @@ export class App {
     }
     if (viewName === 'studio') {
       viewName = 'quiz';
-      subtab = 'studio';
+      subtab = authManager.isAdmin() ? 'studio' : 'myExams';
     }
-    if (subtab === 'studio' && !authManager.isAdmin()) {
-      subtab = 'practice';
+    if ((subtab === 'studio' || subtab === 'practice') && !authManager.isAdmin()) {
+      subtab = 'myExams';
     }
     if (!this.views[viewName]) viewName = 'home';
     if (updateHash && typeof window !== 'undefined') {
@@ -780,9 +786,9 @@ export class App {
     }
   }
 
-  openQuizWithTab(subtab = 'practice', topic = null) {
-    if (subtab === 'studio' && !authManager.isAdmin()) {
-      subtab = 'practice';
+  openQuizWithTab(subtab = 'myExams', topic = null) {
+    if ((subtab === 'studio' || subtab === 'practice') && !authManager.isAdmin()) {
+      subtab = 'myExams';
     }
     this.navigate('quiz', true, subtab);
     if (this.views.quiz) {

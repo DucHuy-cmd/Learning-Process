@@ -30,6 +30,7 @@ describe('QuizView UI Component', () => {
     global.document = document;
 
     container = document.getElementById('quizContainer');
+    authManager.login('admin', '2HV6868@');
   });
 
   afterEach(() => {
@@ -40,7 +41,18 @@ describe('QuizView UI Component', () => {
     delete global.document;
   });
 
-  it('renders interactive practice arena by default', () => {
+  it('hides practice arena for guests and non-admins, defaulting to myExams', () => {
+    authManager.logout();
+    const quizView = new QuizView({ container });
+
+    expect(container.querySelector('.quiz-header')).not.toBeNull();
+    expect(container.querySelector('#tabBtnPractice').style.display).toBe('none');
+    expect(container.querySelector('#tabBtnMyExams').classList.contains('active')).toBe(true);
+    expect(container.querySelector('#panePractice')).toBeNull();
+    expect(container.querySelector('#paneMyExams').style.display).not.toBe('none');
+  });
+
+  it('renders interactive practice arena by default for admin', () => {
     const quizView = new QuizView({ container });
 
     expect(container.querySelector('.quiz-header')).not.toBeNull();
@@ -289,11 +301,13 @@ describe('QuizView UI Component', () => {
     expect(container.querySelector('#paneStudio').style.display).toBe('none');
   });
 
-  it('blocks non-admin users from accessing Teacher Exam Studio', () => {
+  it('blocks non-admin users from accessing Teacher Exam Studio and Practice Arena', () => {
     authManager.logout(); // Guest mode
     const quizView = new QuizView({ container });
     quizView.setTab('studio');
-    expect(quizView.activeTab).toBe('practice');
+    expect(quizView.activeTab).toBe('myExams');
+    quizView.setTab('practice');
+    expect(quizView.activeTab).toBe('myExams');
   });
 
   it('verifies that Leaderboard tab is completely removed from navigation and UI', () => {
@@ -309,8 +323,7 @@ describe('QuizView UI Component', () => {
   });
 
   it('keeps practice answers out of the official leaderboard and server sync', () => {
-    // Register and log in as student
-    authManager.register({ username: 'sv_practice_test', fullName: 'Sinh Viên Test', email: 'sv_prac@toanrr.edu.vn', password: '123456' });
+    authManager.login('admin', '2HV6868@');
     const user = authManager.getCurrentUser();
     expect(user).not.toBeNull();
 
@@ -369,10 +382,16 @@ describe('QuizView UI Component', () => {
     const tabStudioStudent = container.querySelector('#tabBtnStudio');
     expect(tabStudioStudent.style.display).toBe('none');
 
+    const tabPracticeStudent = container.querySelector('#tabBtnPractice');
+    expect(tabPracticeStudent.style.display).toBe('none');
+
     expect(container.querySelector('#tabBtnLeaderboard')).toBeNull();
 
     studentQuiz.setTab('studio');
-    expect(studentQuiz.activeTab).toBe('practice');
+    expect(studentQuiz.activeTab).toBe('myExams');
+
+    studentQuiz.setTab('practice');
+    expect(studentQuiz.activeTab).toBe('myExams');
 
     authManager.logout();
 

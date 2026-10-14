@@ -175,7 +175,7 @@ export class HomeView {
 
         <!-- 3. Academic & Teaching Suite Highlight (Giữ lại thanh ngang đấu trường trắc nghiệm) -->
         <section class="academic-suite" style="margin-top:28px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:24px;display:grid;grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));gap:20px;">
-          <div style="display:flex;gap:14px;align-items:flex-start;">
+          <div style="display:${authManager.isAdmin() ? 'flex' : 'none'};gap:14px;align-items:flex-start;">
             <div style="font-size:28px;">🎮</div>
             <div>
               <h4 style="font-size:15px;font-weight:700;color:var(--text);margin:0 0 4px 0;">Đấu trường Trắc nghiệm</h4>

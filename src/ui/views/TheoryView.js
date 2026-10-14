@@ -17,6 +17,7 @@
  */
 
 import { THEORY_CHAPTERS, THEORY_TOPICS } from '../../core/theory/theoryData.js';
+import { authManager } from '../../core/auth/AuthManager.js';
 
 export class TheoryView {
   /**
@@ -331,7 +332,7 @@ export class TheoryView {
                 </button>
 
                 <button type="button" class="btn-sm" id="btnLaunchQuizFromModal" 
-                        style="padding:10px 16px;font-size:13px;font-weight:600;border-radius:8px;cursor:pointer;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);" title="Luyện tập trắc nghiệm câu hỏi về chủ đề này">
+                        style="${authManager.isAdmin() ? 'display:inline-block;' : 'display:none;'}padding:10px 16px;font-size:13px;font-weight:600;border-radius:8px;cursor:pointer;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);" title="Luyện tập trắc nghiệm câu hỏi về chủ đề này">
                   🎯 Luyện trắc nghiệm
                 </button>
               </div>

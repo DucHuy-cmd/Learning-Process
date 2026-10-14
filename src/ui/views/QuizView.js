@@ -78,8 +78,8 @@ export class QuizView {
     this.onOpenRelation = onOpenRelation || (() => {});
     this.onOpenAuth = onOpenAuth || null;
 
-    // Active primary tab: 'practice' | 'myExams' | 'leaderboard' | 'studio'
-    this.activeTab = 'practice';
+    // Active primary tab: 'practice' (admin only) | 'myExams' | 'studio' (admin only)
+    this.activeTab = authManager.isAdmin() ? 'practice' : 'myExams';
 
     // Interactive Practice Mode State
     this.practiceFilter = {
@@ -163,12 +163,12 @@ export class QuizView {
    */
   setTab(tabName) {
     if (tabName === 'leaderboard') {
-      tabName = 'practice';
+      tabName = authManager.isAdmin() ? 'practice' : 'myExams';
     }
-    if (tabName === 'studio' && !authManager.isAdmin()) {
-      tabName = 'practice';
+    if ((tabName === 'studio' || tabName === 'practice') && !authManager.isAdmin()) {
+      tabName = 'myExams';
     }
-    const validTabs = ['practice', 'myExams', 'studio'];
+    const validTabs = authManager.isAdmin() ? ['practice', 'myExams', 'studio'] : ['myExams'];
     if (validTabs.includes(tabName)) {
       if (this.activeExamSession && tabName !== 'myExams') {
         const confirmLeave = typeof window !== 'undefined' && window.confirm 
@@ -250,12 +250,14 @@ export class QuizView {
     }
     if (!this.container) return;
 
-    if (this.activeTab === 'leaderboard' || (this.activeTab === 'studio' && !authManager.isAdmin())) {
-      this.activeTab = 'practice';
-    }
-
     const isAdmin = authManager.isAdmin();
     const currentUser = authManager.getCurrentUser();
+
+    if (!isAdmin && (this.activeTab === 'practice' || this.activeTab === 'studio' || this.activeTab === 'leaderboard')) {
+      this.activeTab = 'myExams';
+    } else if (this.activeTab === 'leaderboard' || (this.activeTab === 'studio' && !isAdmin)) {
+      this.activeTab = isAdmin ? 'practice' : 'myExams';
+    }
 
     // Check my exams count
     const myExams = currentUser ? examManager.getExamsForUser(currentUser.id) : [];
@@ -278,12 +280,12 @@ export class QuizView {
               </span>
               <span style="font-size:12px;color:var(--dim);">Toán Rời Rạc &amp; Cấu Trúc Dữ Liệu</span>
             </div>
-            <h1 style="font-size:24px;font-weight:700;color:var(--text);margin:0;">Luyện Tập &amp; Thi Trắc Nghiệm Toán Rời Rạc</h1>
+            <h1 style="font-size:24px;font-weight:700;color:var(--text);margin:0;">${isAdmin ? 'Luyện Tập &amp; Thi Trắc Nghiệm Toán Rời Rạc' : 'Cổng Khảo Thí &amp; Kiểm Tra Định Kỳ'}</h1>
           </div>
 
           <!-- Main Nav Tabs -->
           <div class="quiz-main-tabs" style="display:flex;gap:6px;align-items:center;background:var(--panel);padding:4px;border-radius:8px;border:1px solid var(--line);flex-wrap:wrap;">
-            <button type="button" class="btn-tab ${this.activeTab === 'practice' ? 'active' : ''}" id="tabBtnPractice" style="padding:8px 14px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;">
+            <button type="button" class="btn-tab ${this.activeTab === 'practice' ? 'active' : ''}" id="tabBtnPractice" style="${isAdmin ? '' : 'display:none;'}padding:8px 14px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;">
               🎮 Đấu Trường Luyện Tập
             </button>
             <button type="button" class="btn-tab ${this.activeTab === 'myExams' ? 'active' : ''}" id="tabBtnMyExams" style="padding:8px 14px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;position:relative;">
@@ -295,10 +297,12 @@ export class QuizView {
           </div>
         </div>
 
-        <!-- TAB 1: PRACTICE ARENA -->
+        <!-- TAB 1: PRACTICE ARENA (ADMIN ONLY) -->
+        ${isAdmin ? `
         <div id="panePractice" style="display:${this.activeTab === 'practice' ? 'block' : 'none'};">
           ${this._renderPracticeView()}
         </div>
+        ` : ''}
 
         <!-- TAB 2: MY EXAMS (TIMED ASSIGNED EXAMS) -->
         <div id="paneMyExams" style="display:${this.activeTab === 'myExams' ? 'block' : 'none'};">
@@ -324,6 +328,21 @@ export class QuizView {
   // =========================================================================
 
   _renderPracticeView() {
+    if (!authManager.isAdmin()) {
+      return `
+        <div style="text-align:center;padding:48px 20px;background:var(--panel);border:1px solid var(--line);border-radius:12px;">
+          <div style="font-size:48px;margin-bottom:12px;">🔒</div>
+          <h3 style="font-size:18px;font-weight:700;color:var(--text);margin:0 0 8px 0;">Chế độ Đấu trường Luyện tập bị giới hạn</h3>
+          <p style="font-size:13.5px;color:var(--dim);margin:0 auto 20px auto;max-width:440px;line-height:1.5;">
+            Chế độ tự luyện tập chỉ dành riêng cho Quản trị viên hệ thống để kiểm duyệt ngân hàng câu hỏi. Sinh viên vui lòng vào tab <strong>"📝 Đề Thi Của Tôi"</strong> để làm bài thi được giao.
+          </p>
+          <button type="button" class="btn-primary" id="btnSwitchToMyExamsFromLockedPractice" style="padding:10px 22px;font-size:13.5px;font-weight:700;border-radius:8px;cursor:pointer;">
+            Chuyển sang Đề Thi Của Tôi →
+          </button>
+        </div>
+      `;
+    }
+
     const q = this.practiceQuestions[this.currentIndex];
     const total = this.practiceQuestions.length;
     const answered = Boolean(q && this.userAnswers[q.id]);
@@ -1860,6 +1879,13 @@ export class QuizView {
 
     if (tabMyExams) {
       tabMyExams.addEventListener('click', () => {
+        this.setTab('myExams');
+      });
+    }
+
+    const btnSwitchLocked = this.container.querySelector('#btnSwitchToMyExamsFromLockedPractice');
+    if (btnSwitchLocked) {
+      btnSwitchLocked.addEventListener('click', () => {
         this.setTab('myExams');
       });
     }
