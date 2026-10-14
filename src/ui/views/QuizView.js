@@ -117,6 +117,7 @@ export class QuizView {
     this.selectedAssignCount = 'all'; // 'all' or string number e.g. '10', '20'
     this.studioPrintSource = 'all_word'; // 'all_word', specific file.id, or 'builtin'
     this.printExamCode = null;
+    this.studioAssignTitle = null;
 
     this._generateNewExam();
 
@@ -367,6 +368,28 @@ export class QuizView {
     });
 
     return { totalSelected, totalAvailable, breakdown };
+  }
+
+  /**
+   * Computes sequential exam title: "Đề 1", "Đề 2", "Đề 3", ...
+   * If an exam already exists with number N, continues to N + 1.
+   */
+  _getNextExamTitle() {
+    const existingExams = (examManager && typeof examManager.getExams === 'function')
+      ? examManager.getExams()
+      : [];
+    let maxNum = 0;
+    (existingExams || []).forEach(ex => {
+      if (!ex || !ex.title) return;
+      const match = ex.title.trim().match(/^Đề\s*(\d+)/i) || ex.title.trim().match(/Đề\s*(\d+)/i);
+      if (match) {
+        const n = parseInt(match[1], 10);
+        if (!isNaN(n) && n > maxNum) {
+          maxNum = n;
+        }
+      }
+    });
+    return `Đề ${maxNum + 1}`;
   }
 
   _getSelectedDistributedQuestions() {
@@ -1154,6 +1177,9 @@ export class QuizView {
       : printPoolSize;
 
     const distSummary = this._getDistributedSummary();
+    const defaultExamTitle = (this.studioAssignTitle !== null && this.studioAssignTitle !== undefined)
+      ? this.studioAssignTitle
+      : this._getNextExamTitle();
 
     return `
       <!-- Studio Subtab Navigation (3 Tabs) -->
@@ -1175,17 +1201,6 @@ export class QuizView {
         <!-- SUB-TAB 1: NẠP FILE WORD ĐỀ THI -->
         <div id="studioDistributeSection" style="display:${(this.studioSubTab === 'distribute' || (this.studioSubTab !== 'publish' && this.studioSubTab !== 'print' && this.studioSubTab !== 'assign')) ? 'block' : 'none'};">
           <div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:22px;margin-bottom:24px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:14px;">
-              <div>
-                <div style="font-size:16px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:8px;">
-                  <span>📁 Nạp File Word Đề Thi</span>
-                  <span class="pill-badge" style="background:rgba(16,185,129,0.15);color:#10b981;font-size:11.5px;padding:2px 8px;border-radius:10px;">Lưu Trữ Tự Động • Hỗ Trợ Đa File</span>
-                </div>
-                <p style="font-size:13px;color:var(--dim);margin:4px 0 0;">
-                  Hệ thống nhận nạp nhiều file Word (.doc / .docx / .txt), tự động lưu giữ câu hỏi và đáp án để phân phối và phát đề thi.
-                </p>
-              </div>
-            </div>
 
             <!-- Action Toolbar: Download Sample & Clear Data -->
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;background:var(--panel-alt);border:1px solid var(--line);border-radius:8px;padding:12px 16px;">
@@ -1304,18 +1319,6 @@ export class QuizView {
         <!-- SUB-TAB 2: PHÂN PHỐI & PHÁT ĐỀ THI CHO SINH VIÊN (DEDICATED PUBLISH TAB) -->
         <div id="studioPublishSection" style="display:${(this.studioSubTab === 'publish' || this.studioSubTab === 'assign') ? 'block' : 'none'};">
           <div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:22px;margin-bottom:24px;">
-            
-            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:16px;">
-              <div>
-                <div style="font-size:16px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:8px;">
-                  <span>🚀 Phân Phối &amp; Phát Đề Thi Cho Sinh Viên</span>
-                  <span class="pill-badge" style="background:rgba(16,185,129,0.15);color:#10b981;font-size:11.5px;padding:2px 8px;border-radius:10px;">Thang Điểm 10 • Tự Động Xuất File Đáp Án</span>
-                </div>
-                <p style="font-size:13px;color:var(--dim);margin:4px 0 0;">
-                  Tùy chỉnh chọn số lượng câu hỏi từ từng bộ file Word đã nạp (ví dụ: bốc 10 câu ở bộ này, 10 câu ở bộ khác), sau đó thiết lập thông số và phát đề trực tiếp cho sinh viên.
-                </p>
-              </div>
-            </div>
 
             <!-- DEDICATED SECTION: MULTI-FILE QUESTION DISTRIBUTION -->
             <div id="sectionMultiFileDistribution" style="background:var(--panel-alt);border:1px solid var(--line);border-radius:10px;padding:18px;margin-bottom:20px;">
@@ -1434,7 +1437,7 @@ export class QuizView {
             <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(240px, 1fr));gap:16px;margin-bottom:16px;">
               <div>
                 <label style="display:block;font-size:12.5px;font-weight:600;color:var(--text);margin-bottom:6px;">Tiêu đề đề thi: *</label>
-                <input type="text" id="txtAssignTitle" class="form-input" placeholder="Ví dụ: Kiểm tra 15 phút: Logic & Mệnh đề" value="${distSummary.breakdown.length > 0 ? (distSummary.breakdown.length === 1 ? `Đề Kiểm Tra: ${this._escapeHtml(distSummary.breakdown[0].fileName.replace(/\.[^/.]+$/, ''))} (${distSummary.totalSelected} câu)` : `Đề Kiểm Tra Tổng Hợp: ${distSummary.breakdown.map(b => this._escapeHtml(b.fileName.replace(/\.[^/.]+$/, ''))).join(' + ')} (${distSummary.totalSelected} câu)`) : 'Đề Kiểm Tra Định Kỳ: Toán Rời Rạc'}" style="width:100%;padding:8px 12px;border-radius:6px;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);font-size:13px;" />
+                <input type="text" id="txtAssignTitle" class="form-input" placeholder="Ví dụ: Đề 1, Đề 2, ..." value="${this._escapeHtml(defaultExamTitle)}" style="width:100%;padding:8px 12px;border-radius:6px;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);font-size:13px;font-weight:600;" />
               </div>
 
               <div>
@@ -2844,6 +2847,14 @@ export class QuizView {
       });
     }
 
+    // Track custom exam title input
+    const txtAssignTitle = this.container.querySelector('#txtAssignTitle');
+    if (txtAssignTitle) {
+      txtAssignTitle.addEventListener('input', (e) => {
+        this.studioAssignTitle = e.target.value;
+      });
+    }
+
     // Create & Assign Exam Button (From multi-file distribution)
     const btnCreateAndAssign = this.container.querySelector('#btnCreateAndAssignExam');
     if (btnCreateAndAssign) {
@@ -2913,6 +2924,7 @@ export class QuizView {
           this.gradebookExamId = null;
           this.adminAnswerKeyExamId = result.exam.id;
           this._showAlert(`🎉 Tạo và phát đề thi thành công!\n\nĐề thi: "${title}" (Mã: ${result.exam.examCode})\nNguồn: ${sourceLabel}\nSố câu: ${questionIds.length} câu\nThời lượng: ${durationMinutes} phút\nĐối tượng: ${assignedTo.includes('all') ? 'Toàn bộ sinh viên' : assignedTo.length + ' sinh viên'}\n\nĐề thi đã được chuyển vào mục "Quản Lý Đề Thi". Hệ thống đã chuẩn bị sẵn File Đáp Án dành riêng cho Quản trị viên.`);
+          this.studioAssignTitle = null;
           this.render();
         } else {
           this._showAlert(result.error || result.message || 'Có lỗi xảy ra khi tạo đề thi.');
@@ -3082,6 +3094,7 @@ export class QuizView {
         }
 
         this._showAlert('✅ Đã xóa toàn bộ đề thi và làm sạch dữ liệu bài làm của sinh viên thành công!');
+        this.studioAssignTitle = null;
         this.render();
       });
     }

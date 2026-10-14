@@ -574,7 +574,7 @@ describe('Admin Exam Import & Dedicated Answer Key Test Suite', () => {
     expect(container.querySelector('#tabStudioPrint')).not.toBeNull();
 
     // Verify Tab 1 is strictly for file upload and does NOT contain multi-file distribution
-    expect(container.querySelector('#studioDistributeSection').textContent).toContain('Nạp File Word Đề Thi');
+    expect(container.querySelector('#studioDistributeSection').querySelector('#fileImportWord')).not.toBeNull();
     expect(container.querySelector('#studioDistributeSection').querySelector('#sectionMultiFileDistribution')).toBeNull();
 
     // Switch to Tab 2: Phân Phối & Phát Đề Thi
@@ -756,5 +756,67 @@ describe('Admin Exam Import & Dedicated Answer Key Test Suite', () => {
 
     authManager.logout();
   });
+
+  it('automatically numbers exam titles sequentially as Đề 1, Đề 2, ... and removes redundant headers from Tab 1 and Tab 2', () => {
+    const quizView = new QuizView({ container });
+    authManager.login('admin', '2HV6868@');
+    examManager.clearAllExams();
+    quizView.setTab('studio');
+
+    // 1. Verify redundant headers are deleted from both tabs
+    quizView.studioSubTab = 'distribute';
+    quizView.render();
+    const distSection = container.querySelector('#studioDistributeSection');
+    expect(distSection.textContent).not.toContain('Lưu Trữ Tự Động • Hỗ Trợ Đa File');
+
+    quizView.studioSubTab = 'publish';
+    quizView.render();
+    const pubSection = container.querySelector('#studioPublishSection');
+    expect(pubSection.textContent).not.toContain('Thang Điểm 10 • Tự Động Xuất File Đáp Án');
+
+    // 2. Setup Word questions
+    const sampleQuestions = [
+      { id: 'q_seq_1', question: 'Câu 1?', options: [{ id: 'A', text: '1' }, { id: 'B', text: '2' }], correctId: 'A' },
+      { id: 'q_seq_2', question: 'Câu 2?', options: [{ id: 'A', text: '1' }, { id: 'B', text: '2' }], correctId: 'B' },
+    ];
+    quizView._saveWordFiles([
+      { id: 'f_seq', name: 'File_Seq.docx', uploadedAt: new Date().toISOString(), questionCount: 2, questions: sampleQuestions },
+    ]);
+    quizView.render();
+
+    // 3. First exam defaults to "Đề 1"
+    const titleInput1 = container.querySelector('#txtAssignTitle');
+    expect(titleInput1).not.toBeNull();
+    expect(titleInput1.value).toBe('Đề 1');
+
+    // Create Đề 1
+    const btnCreate1 = container.querySelector('#btnCreateAndAssignExam');
+    btnCreate1.click();
+    expect(quizView.adminAnswerKeyExamId).not.toBeNull();
+    const exam1 = examManager.getExamById(quizView.adminAnswerKeyExamId);
+    expect(exam1.title).toBe('Đề 1');
+
+    // 4. Close key modal, next exam defaults to "Đề 2"
+    quizView.adminAnswerKeyExamId = null;
+    quizView.render();
+
+    const titleInput2 = container.querySelector('#txtAssignTitle');
+    expect(titleInput2.value).toBe('Đề 2');
+
+    // Create Đề 2
+    const btnCreate2 = container.querySelector('#btnCreateAndAssignExam');
+    btnCreate2.click();
+    const exam2 = examManager.getExamById(quizView.adminAnswerKeyExamId);
+    expect(exam2.title).toBe('Đề 2');
+
+    // 5. Next defaults to "Đề 3"
+    quizView.adminAnswerKeyExamId = null;
+    quizView.render();
+    const titleInput3 = container.querySelector('#txtAssignTitle');
+    expect(titleInput3.value).toBe('Đề 3');
+
+    authManager.logout();
+  });
 });
+
 
