@@ -403,15 +403,22 @@ describe('Admin Exam Import & Dedicated Answer Key Test Suite', () => {
     quizView._saveWordFiles([
       { id: 'file_ch1', name: 'De_15_Cau.docx', uploadedAt: new Date().toISOString(), questionCount: 15, questions: file1Questions },
     ]);
-    quizView.selectedAssignFileId = 'file_ch1';
-    quizView.selectedAssignCount = '10'; // Pick 10 out of 15
     quizView.render();
 
-    const selSource = container.querySelector('#selAssignFileSource');
-    expect(selSource).not.toBeNull();
-    const selCount = container.querySelector('#selAssignQuestionCount');
-    expect(selCount).not.toBeNull();
-    expect(selCount.textContent).toContain('Bốc ngẫu nhiên 10 câu');
+    // Verify old dropdown is deleted as requested
+    expect(container.querySelector('#selAssignQuestionCount')).toBeNull();
+
+    // In multi-file distribution table, set 10 questions for file_ch1
+    const countInput = container.querySelector('.input-distribute-file-count[data-file-id="file_ch1"]');
+    expect(countInput).not.toBeNull();
+    countInput.value = '10';
+    countInput.dispatchEvent(new window.Event('change', { bubbles: true }));
+
+    expect(quizView.fileDistributions['file_ch1']).toBe(10);
+
+    // Switch to dedicated Publish tab
+    quizView.studioSubTab = 'publish';
+    quizView.render();
 
     // Click assign
     const titleInput = container.querySelector('#txtAssignTitle');
@@ -504,14 +511,18 @@ describe('Admin Exam Import & Dedicated Answer Key Test Suite', () => {
     ]);
     quizView.render();
 
-    const numInput = container.querySelector('#numAssignQuestionCount');
-    expect(numInput).not.toBeNull();
+    const countInput = container.querySelector('.input-distribute-file-count[data-file-id="f_custom_pool"]');
+    expect(countInput).not.toBeNull();
 
     // Teacher types 12 questions
-    numInput.value = '12';
-    numInput.dispatchEvent(new window.Event('input', { bubbles: true }));
+    countInput.value = '12';
+    countInput.dispatchEvent(new window.Event('change', { bubbles: true }));
 
-    expect(quizView.selectedAssignCount).toBe('12');
+    expect(quizView.fileDistributions['f_custom_pool']).toBe(12);
+
+    // Switch to Publish tab
+    quizView.studioSubTab = 'publish';
+    quizView.render();
 
     // Title and submit
     const titleInput = container.querySelector('#txtAssignTitle');
@@ -523,6 +534,85 @@ describe('Admin Exam Import & Dedicated Answer Key Test Suite', () => {
     const createdExam = examManager.getExamById(quizView.adminAnswerKeyExamId);
     expect(createdExam).not.toBeNull();
     expect(createdExam.questionIds.length).toBe(12);
+
+    authManager.logout();
+  });
+
+  it('allows picking 10 questions from file A and 10 questions from file B to create a combined 20-question exam across 3 tabs', () => {
+    const quizView = new QuizView({ container });
+    authManager.login('admin', '2HV6868@');
+    quizView.setTab('studio');
+    quizView.studioSubTab = 'distribute';
+
+    // File A: 30 questions
+    const fileAQuestions = Array.from({ length: 30 }, (_, i) => ({
+      id: `q_fileA_${i + 1}`,
+      question: `Câu hỏi Bộ A số ${i + 1}`,
+      options: [{ id: 'A', text: 'Đáp án A' }, { id: 'B', text: 'Đáp án B' }],
+      correctId: 'A',
+      explanation: `Giải thích A ${i + 1}`,
+    }));
+
+    // File B: 25 questions
+    const fileBQuestions = Array.from({ length: 25 }, (_, i) => ({
+      id: `q_fileB_${i + 1}`,
+      question: `Câu hỏi Bộ B số ${i + 1}`,
+      options: [{ id: 'A', text: 'Đáp án A' }, { id: 'B', text: 'Đáp án B' }],
+      correctId: 'A',
+      explanation: `Giải thích B ${i + 1}`,
+    }));
+
+    quizView._saveWordFiles([
+      { id: 'f_bo_a', name: 'De_Bo_A_Logic.docx', uploadedAt: new Date().toISOString(), questionCount: 30, questions: fileAQuestions },
+      { id: 'f_bo_b', name: 'De_Bo_B_DoThi.docx', uploadedAt: new Date().toISOString(), questionCount: 25, questions: fileBQuestions },
+    ]);
+    quizView.render();
+
+    // Verify 3 sub-tabs exist
+    expect(container.querySelector('#tabStudioDistribute')).not.toBeNull();
+    expect(container.querySelector('#tabStudioPublish')).not.toBeNull();
+    expect(container.querySelector('#tabStudioPrint')).not.toBeNull();
+
+    // Pick 10 from File A
+    const inputA = container.querySelector('.input-distribute-file-count[data-file-id="f_bo_a"]');
+    inputA.value = '10';
+    inputA.dispatchEvent(new window.Event('change', { bubbles: true }));
+
+    // Pick 10 from File B
+    const inputB = container.querySelector('.input-distribute-file-count[data-file-id="f_bo_b"]');
+    inputB.value = '10';
+    inputB.dispatchEvent(new window.Event('change', { bubbles: true }));
+
+    expect(quizView.fileDistributions['f_bo_a']).toBe(10);
+    expect(quizView.fileDistributions['f_bo_b']).toBe(10);
+
+    const distSummary = quizView._getDistributedSummary();
+    expect(distSummary.totalSelected).toBe(20);
+
+    // Click button to proceed to Publish tab
+    const btnProceed = container.querySelector('#btnProceedToPublish');
+    expect(btnProceed).not.toBeNull();
+    btnProceed.click();
+
+    expect(quizView.studioSubTab).toBe('publish');
+
+    // Verify Publish section has the questions and creates exam
+    const titleInput = container.querySelector('#txtAssignTitle');
+    titleInput.value = 'Đề Thi Kết Hợp Bộ A (10 câu) và Bộ B (10 câu)';
+
+    const btnAssign = container.querySelector('#btnCreateAndAssignExam');
+    btnAssign.click();
+
+    expect(quizView.adminAnswerKeyExamId).not.toBeNull();
+    const combinedExam = examManager.getExamById(quizView.adminAnswerKeyExamId);
+    expect(combinedExam).not.toBeNull();
+    expect(combinedExam.questionIds.length).toBe(20);
+
+    // Verify exactly 10 questions from File A and 10 questions from File B
+    const countA = combinedExam.customQuestions.filter(q => q.id.startsWith('q_fileA_')).length;
+    const countB = combinedExam.customQuestions.filter(q => q.id.startsWith('q_fileB_')).length;
+    expect(countA).toBe(10);
+    expect(countB).toBe(10);
 
     authManager.logout();
   });
