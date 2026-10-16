@@ -2239,14 +2239,26 @@ export class QuizView {
     if (typeof document === 'undefined' || this._examLockdownHandlers) return;
     const isMobile = typeof navigator !== 'undefined' && (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (typeof window !== 'undefined' && window.innerWidth < 768));
 
+    // Grace period ngẫu nhiên 3–5 giây, chỉ tính tối đa 1 vi phạm mỗi lần ẩn tab
+    const GRACE_MIN_MS = 3000;
+    const GRACE_MAX_MS = 5000;
+    const _randomGrace = () => Math.floor(Math.random() * (GRACE_MAX_MS - GRACE_MIN_MS + 1)) + GRACE_MIN_MS;
+
     this._examLockdownHandlers = {
       fullscreenchange: () => {
+        // Trên mobile không dùng fullscreen API
         if (isMobile) return;
         const session = this.activeExamSession;
         if (!session) return;
         const isFullscreen = document.fullscreenElement === document.documentElement;
         if (isFullscreen) {
           session.fullscreenActive = true;
+          // Hủy grace timer nếu người dùng quay lại kịp
+          if (this._desktopGraceTimer) {
+            clearTimeout(this._desktopGraceTimer);
+            this._desktopGraceTimer = null;
+          }
+          session._graceViolationIssued = false; // Reset để lần sau có thể tính
           if (session.lockdownPending) {
             this._cancelExamLockdownCountdown(session);
             session.lockdownPending = false;
@@ -2255,24 +2267,51 @@ export class QuizView {
           }
         } else if (session.fullscreenActive) {
           session.fullscreenActive = false;
-          this._recordExamLockdownViolation();
+          // Desktop grace period 3-5 giây trước khi phạt, chỉ 1 lần/phiên
+          if (this._desktopGraceTimer) clearTimeout(this._desktopGraceTimer);
+          if (!session._graceViolationIssued) {
+            this._desktopGraceTimer = setTimeout(() => {
+              this._desktopGraceTimer = null;
+              if (document.fullscreenElement !== document.documentElement && !session._graceViolationIssued) {
+                session._graceViolationIssued = true;
+                this._recordExamLockdownViolation();
+              }
+            }, _randomGrace());
+          }
         }
       },
       visibilitychange: () => {
         if (document.visibilityState === 'hidden') {
           if (isMobile) {
+            // Mobile: grace period 3-5 giây, chỉ 1 vi phạm mỗi phiên ẩn tab
             if (this._mobileVisibilityTimer) clearTimeout(this._mobileVisibilityTimer);
+            if (this._mobileViolationIssued) return;
             this._mobileVisibilityTimer = setTimeout(() => {
-              if (document.visibilityState === 'hidden') {
+              this._mobileVisibilityTimer = null;
+              if (document.visibilityState === 'hidden' && !this._mobileViolationIssued) {
+                this._mobileViolationIssued = true;
                 this._recordExamLockdownViolation();
               }
-            }, 3500);
-          } else {
-            this._recordExamLockdownViolation();
+            }, _randomGrace());
           }
-        } else if (document.visibilityState === 'visible' && isMobile && this._mobileVisibilityTimer) {
-          clearTimeout(this._mobileVisibilityTimer);
-          this._mobileVisibilityTimer = null;
+          // Desktop: không phạt qua visibilitychange (đã xử lý qua fullscreenchange)
+        } else if (document.visibilityState === 'visible') {
+          // Người dùng quay lại → reset tất cả grace timer và cờ vi phạm phiên nền
+          if (isMobile) {
+            if (this._mobileVisibilityTimer) {
+              clearTimeout(this._mobileVisibilityTimer);
+              this._mobileVisibilityTimer = null;
+            }
+            this._mobileViolationIssued = false;
+          } else {
+            if (this._desktopGraceTimer) {
+              clearTimeout(this._desktopGraceTimer);
+              this._desktopGraceTimer = null;
+            }
+            if (this.activeExamSession) {
+              this.activeExamSession._graceViolationIssued = false;
+            }
+          }
         }
       },
     };
@@ -2284,6 +2323,14 @@ export class QuizView {
     if (this._mobileVisibilityTimer) {
       clearTimeout(this._mobileVisibilityTimer);
       this._mobileVisibilityTimer = null;
+    }
+    if (this._desktopGraceTimer) {
+      clearTimeout(this._desktopGraceTimer);
+      this._desktopGraceTimer = null;
+    }
+    this._mobileViolationIssued = false;
+    if (this.activeExamSession) {
+      this.activeExamSession._graceViolationIssued = false;
     }
     if (typeof document !== 'undefined' && this._examLockdownHandlers) {
       document.removeEventListener('fullscreenchange', this._examLockdownHandlers.fullscreenchange);
@@ -2352,7 +2399,7 @@ export class QuizView {
 
   _startExamLockdownCountdown(session) {
     this._cancelExamLockdownCountdown(session);
-    session.lockdownCountdown = 10;
+    session.lockdownCountdown = 35; // Tăng lên 35 giây để thí sinh kịp quay lại
     session.lockdownTimerId = setInterval(() => {
       if (this.activeExamSession !== session || !session.lockdownPending || session.timeRemaining <= 0) {
         this._cancelExamLockdownCountdown(session);
