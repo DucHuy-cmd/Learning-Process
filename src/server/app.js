@@ -17,7 +17,7 @@ import { isAIConfigured, analyzeGraphFileBackend, analyzeLogicFileBackend, execu
 import { validateGraphSpecification, MAX_FILE_SIZE_BYTES } from '../app/ai/GraphVisionAdapter.js';
 import { extractDocx } from '../app/ai/DocxExtractor.js';
 
-import { serverUsers, serverAiSessions, serverQuizStats, serverExams, serverExamSubmissions, serverCustomQuestions, saveDatabase, isKVConfigured, fetchFromKV } from './auth/ServerDataStore.js';
+import { serverUsers, serverAiSessions, serverQuizStats, serverExams, serverExamSubmissions, serverCustomQuestions, saveDatabase, isKVConfigured, fetchFromKV, writeToKV } from './auth/ServerDataStore.js';
 import { DEFAULT_EXAMS } from '../core/quiz/ExamManager.js';
 import { STATIC_QUESTION_BANK } from '../core/quiz/QuizBank.js';
 import { DEMO_USERS } from '../core/auth/AuthManager.js';
@@ -77,6 +77,7 @@ export function validateBackendFile(file) {
  * @param {Object} data
  */
 export function sendJson(res, statusCode, data) {
+  if (res.headersSent || res.writableEnded) return;
   res.writeHead(statusCode, {
     'Content-Type': 'application/json; charset=utf-8',
     'Access-Control-Allow-Origin': '*',
@@ -457,6 +458,7 @@ export async function handleRequest(req, res) {
     for (const k of Object.keys(serverQuizStats)) delete serverQuizStats[k];
     for (const k of Object.keys(serverAiSessions)) delete serverAiSessions[k];
     serverExams.length = 0;
+    serverExams.push(...DEFAULT_EXAMS);
     serverExamSubmissions.length = 0;
     serverCustomQuestions.length = 0;
     saveDatabase();
@@ -561,11 +563,16 @@ export async function handleRequest(req, res) {
       if (u.username) activeUserMap.set(u.username.toLowerCase(), u);
     }
     // Clean out obsolete user stats if user is no longer in serverUsers or is admin
+    let cleanedStats = false;
     for (const k of Object.keys(serverQuizStats)) {
       const isObs = !activeUserMap.has(k) && !activeUserMap.has(k.toLowerCase());
       if (isObs || k === 'user_admin' || serverQuizStats[k].username === 'admin') {
         delete serverQuizStats[k];
+        cleanedStats = true;
       }
+    }
+    if (cleanedStats) {
+      saveDatabase();
     }
     const list = Object.values(serverQuizStats).filter(u => 
       u.userId !== 'guest' && 

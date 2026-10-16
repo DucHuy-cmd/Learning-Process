@@ -46,6 +46,7 @@ export class App {
     this._initHelpGuide();
     this._initAuthModal();
     this._initUserDropdown();
+    this._initMobileNav();
     this._initCloudSync();
     this._bindNavigation();
     this._handleInitialRoute();
@@ -72,6 +73,15 @@ export class App {
         if (themeBtn) {
           themeBtn.textContent = theme === 'light' ? '🌙 Tối' : '☀️ Sáng';
         }
+      }
+
+      const mIcon = document.getElementById('mobileNavThemeIcon');
+      const mTitle = document.getElementById('mobileNavThemeTitle');
+      const mSub = document.getElementById('mobileNavThemeSub');
+      if (mIcon && mTitle && mSub) {
+        mIcon.textContent = theme === 'light' ? '🌙' : '☀️';
+        mTitle.textContent = theme === 'light' ? 'Chế độ Tối' : 'Chế độ Sáng';
+        mSub.textContent = theme === 'light' ? 'Đang bật chế độ Sáng' : 'Đang bật chế độ Tối';
       }
     }
 
@@ -389,6 +399,94 @@ export class App {
     }
   }
 
+  _initMobileNav() {
+    if (typeof document === 'undefined') return;
+    try {
+      const btnToggle = document.getElementById('btnMobileMenuToggle');
+      const drawer = document.getElementById('mobileNavDrawer');
+      const backdrop = document.getElementById('mobileNavBackdrop');
+      const btnClose = document.getElementById('btnMobileNavClose');
+      const btnTheme = document.getElementById('btnMobileNavTheme');
+      const btnHelp = document.getElementById('btnMobileNavHelp');
+      const btnAuthAction = document.getElementById('btnMobileNavAuthAction');
+
+      if (!btnToggle || !drawer) return;
+
+      const openDrawer = () => {
+        drawer.classList.add('open');
+        drawer.setAttribute('aria-hidden', 'false');
+        btnToggle.setAttribute('aria-expanded', 'true');
+        btnToggle.classList.add('active');
+        document.body.classList.add('mobile-nav-locked');
+      };
+
+      const closeDrawer = () => {
+        drawer.classList.remove('open');
+        drawer.setAttribute('aria-hidden', 'true');
+        btnToggle.setAttribute('aria-expanded', 'false');
+        btnToggle.classList.remove('active');
+        document.body.classList.remove('mobile-nav-locked');
+      };
+
+      this.closeMobileDrawer = closeDrawer;
+
+      btnToggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (drawer.classList.contains('open')) {
+          closeDrawer();
+        } else {
+          openDrawer();
+        }
+      });
+
+      if (btnClose) btnClose.addEventListener('click', closeDrawer);
+      if (backdrop) backdrop.addEventListener('click', closeDrawer);
+
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && drawer.classList.contains('open')) {
+          closeDrawer();
+        }
+      });
+
+      // Mobile nav items navigation
+      drawer.querySelectorAll('.mobile-nav-item[data-view]').forEach(item => {
+        item.addEventListener('click', () => {
+          const view = item.getAttribute('data-view');
+          this.navigate(view);
+          closeDrawer();
+        });
+      });
+
+      if (btnTheme) {
+        btnTheme.addEventListener('click', () => {
+          this.toggleTheme();
+        });
+      }
+
+      if (btnHelp) {
+        btnHelp.addEventListener('click', () => {
+          closeDrawer();
+          if (this.helpModal) {
+            this.helpModal.open();
+          }
+        });
+      }
+
+      if (btnAuthAction) {
+        btnAuthAction.addEventListener('click', () => {
+          closeDrawer();
+          if (authManager.isLoggedIn()) {
+            this.openAuthModal('profile');
+          } else {
+            this.openAuthModal('login');
+          }
+        });
+      }
+    } catch (err) {
+      console.warn('Mobile nav initialization deferred or failed:', err);
+    }
+  }
+
   _initCloudSync() {
     if (typeof window === 'undefined') return;
     try {
@@ -463,6 +561,28 @@ export class App {
       if (ddProfileLbl) ddProfileLbl.textContent = 'Đăng nhập / Đăng ký';
       if (ddLogoutDivider) ddLogoutDivider.style.display = 'none';
       if (ddLogoutBtn) ddLogoutBtn.style.display = 'none';
+    }
+
+    // Sync state to Mobile Nav Drawer
+    const mAvatar = document.getElementById('mobileNavAvatar');
+    const mName = document.getElementById('mobileNavUserName');
+    const mRole = document.getElementById('mobileNavUserRole');
+    const mAction = document.getElementById('btnMobileNavAuthAction');
+    const mAdminBtn = document.getElementById('mobileNavBtnAdmin');
+    if (mAdminBtn) {
+      mAdminBtn.style.display = isAdmin ? 'flex' : 'none';
+    }
+    if (currentUser) {
+      const displayName = (currentUser.fullName || currentUser.username || 'Người dùng').trim();
+      if (mAvatar) mAvatar.textContent = currentUser.avatar || (isAdmin ? '👑' : '👨‍🎓');
+      if (mName) mName.textContent = displayName;
+      if (mRole) mRole.textContent = isAdmin ? '👑 Quản trị viên' : (currentUser.className || 'Sinh viên');
+      if (mAction) mAction.textContent = 'Hồ sơ';
+    } else {
+      if (mAvatar) mAvatar.textContent = '👤';
+      if (mName) mName.textContent = 'Khách (Guest)';
+      if (mRole) mRole.textContent = 'Chưa đăng nhập';
+      if (mAction) mAction.textContent = 'Đăng nhập';
     }
   }
 
@@ -703,6 +823,11 @@ export class App {
 
     // Toggle active nav button
     document.querySelectorAll('.nav-btn[data-view]').forEach(btn => {
+      btn.classList.toggle('active', btn.getAttribute('data-view') === viewName);
+    });
+
+    // Toggle active mobile nav item
+    document.querySelectorAll('.mobile-nav-item[data-view]').forEach(btn => {
       btn.classList.toggle('active', btn.getAttribute('data-view') === viewName);
     });
 

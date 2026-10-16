@@ -48,9 +48,9 @@ export class HomeView {
         
         <!-- 1. Hero Section -->
         <section class="hero-section" style="text-align:center;padding:36px 16px 28px;">
-          <div class="hero-pill-badge" style="display:inline-flex;align-items:center;gap:8px;padding:6px 18px;border-radius:30px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.28);margin-bottom:16px;">
-            <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#10b981;box-shadow:0 0 8px #10b981;"></span>
-            <span style="font-size:12.5px;font-weight:700;color:var(--text);letter-spacing:0.3px;">
+          <div class="hero-pill-badge" style="display:inline-flex;align-items:center;gap:8px;padding:6px 16px;border-radius:30px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.28);margin-bottom:16px;max-width:100%;box-sizing:border-box;">
+            <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#10b981;box-shadow:0 0 8px #10b981;flex-shrink:0;"></span>
+            <span style="font-size:12.5px;font-weight:700;color:var(--text);letter-spacing:0.3px;line-height:1.4;">
               ✨ Không Gian Học Tập &amp; Thực Nghiệm Toán Rời Rạc Tương Tác
             </span>
           </div>
@@ -62,11 +62,11 @@ export class HomeView {
           </p>
 
           <!-- Horizontal Theory Navigation Tab Bar -->
-          <div style="display:flex;justify-content:center;margin-top:20px;">
+          <div class="home-theory-bar-wrap" style="display:flex;justify-content:center;margin-top:20px;width:100%;max-width:100%;box-sizing:border-box;">
             <button type="button" class="btn-primary home-theory-bar-btn" id="btnHomeTheoryBar" 
                     title="Chuyển đến trang Tổng hợp Lý thuyết Toán Rời Rạc">
               <span class="home-theory-icon">📚</span>
-              <span>Lý Thuyết Tổng Hợp &amp; Giáo Trình Chi Tiết</span>
+              <span class="home-theory-text">Lý Thuyết Tổng Hợp &amp; Giáo Trình Chi Tiết</span>
               <span class="home-theory-arrow">→</span>
             </button>
           </div>

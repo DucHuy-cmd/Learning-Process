@@ -5189,6 +5189,8 @@ body.theme-light .footer-author-pill:hover {
   align-items: center;
   gap: 12px;
   padding: 12px 28px;
+  max-width: 100%;
+  box-sizing: border-box;
   background: var(--panel-alt);
   border: 1.5px solid rgba(56, 189, 248, 0.4);
   border-radius: 30px;
@@ -7009,6 +7011,104 @@ body.theme-light .btn-close-modal:hover {
   gap: 10px;
 }
 
+/* Nhiệm vụ 3: Auto-save status indicator badge */
+.exam-autosave-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  padding: 2px 8px;
+  border-radius: 12px;
+  user-select: none;
+}
+
+.exam-autosave-badge .autosave-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 6px #10b981;
+  animation: autosavePulse 2s infinite ease-in-out;
+}
+
+@keyframes autosavePulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+    box-shadow: 0 0 6px #10b981;
+  }
+  50% {
+    opacity: 0.45;
+    transform: scale(0.85);
+    box-shadow: 0 0 2px #10b981;
+  }
+}
+
+/* Nhiệm vụ 1: Chống tràn chữ, công thức toán và hình ảnh cho câu hỏi & đáp án */
+.exam-question-card,
+.active-exam-question-card,
+.quiz-question-card,
+.quiz-question-box,
+.exam-question-text,
+.exam-q-text,
+.question-content,
+.btn-active-exam-opt,
+.btn-quiz-option,
+.opt-text,
+.quiz-option-text,
+.exam-opt-text {
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  box-sizing: border-box;
+  max-width: 100%;
+}
+
+.exam-question-card img,
+.active-exam-room img,
+.btn-active-exam-opt img,
+.opt-text img,
+.quiz-question-card img,
+.quiz-question-box img {
+  max-width: 100%;
+  height: auto;
+  box-sizing: border-box;
+  border-radius: 6px;
+}
+
+/* Công thức toán KaTeX (.katex-display) và bảng mạch logic cuộn ngang mượt mà */
+.katex-display,
+.katex-html,
+.katex,
+.logic-circuit,
+.circuit-canvas-wrap,
+.circuit-board,
+.truth-table-scroll,
+.exam-circuit-preview,
+.table-scroll,
+.table-responsive {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
+  scrollbar-width: thin;
+}
+
+.katex-display::-webkit-scrollbar,
+.logic-circuit::-webkit-scrollbar,
+.truth-table-scroll::-webkit-scrollbar {
+  height: 4px;
+}
+
+.katex-display::-webkit-scrollbar-thumb,
+.logic-circuit::-webkit-scrollbar-thumb,
+.truth-table-scroll::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 4px;
+}
+
 /* Modal Overlay for Gradebook */
 .gradebook-modal-backdrop {
   position: fixed;
@@ -7037,90 +7137,378 @@ body.theme-light .btn-close-modal:hover {
   overflow: hidden;
 }
 
+/* Teacher's Studio Exam Assignment Button */
+.btn-studio-assign {
+  padding: 10px 24px;
+  font-size: 14px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-studio-assign:hover {
+  transform: translateY(-1.5px);
+  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.35);
+}
+
+/* =====================================================================
+   MOBILE NAVIGATION TOGGLE & DRAWER (DESKTOP DEFAULT: HIDDEN)
+   ===================================================================== */
+.btn-mobile-menu-toggle {
+  display: none !important;
+}
+
+.mobile-nav-drawer {
+  display: none !important;
+}
+
 /* =====================================================================
    MOBILE RESPONSIVENESS (< 768px & < 480px)
    ===================================================================== */
 @media (max-width: 768px) {
-  /* 1. Header & Global Navigation */
+  /* 1. Header & Mobile Navigation */
   .app-header {
-    height: 52px;
-    padding: 0 10px;
-    gap: 8px;
+    height: 56px !important;
+    padding: 0 12px !important;
+    gap: 10px !important;
+    justify-content: space-between !important;
+  }
+
+  .header-left {
+    gap: 8px !important;
+    max-width: none !important;
+    overflow: visible !important;
+    flex: 1 !important;
+    min-width: 0 !important;
   }
 
   .brand-wrap {
-    gap: 6px;
+    gap: 8px !important;
   }
 
   .brand-icon {
-    font-size: 18px;
+    font-size: 20px !important;
   }
 
   .brand-name {
-    font-size: 13.5px;
-    max-width: 130px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    font-size: 15px !important;
+    max-width: 170px !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    font-weight: 700 !important;
   }
 
   .brand-badge {
     display: none !important;
   }
 
-  .header-left {
-    gap: 8px !important;
-    max-width: calc(100% - 120px);
-    overflow: hidden;
-  }
-
+  /* Hide Desktop Horizontal Navigation on Mobile as requested */
   .nav-links {
-    overflow-x: auto;
-    flex-wrap: nowrap !important;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-    padding-bottom: 1px;
-    gap: 4px;
-    max-width: 100%;
-  }
-
-  .nav-links::-webkit-scrollbar {
-    display: none;
-  }
-
-  .nav-btn {
-    padding: 5px 8px !important;
-    font-size: 12px !important;
-    gap: 4px !important;
-    flex-shrink: 0;
-  }
-
-  .header-right {
-    gap: 4px !important;
-    flex-shrink: 0;
-  }
-
-  .btn-icon {
-    padding: 5px 8px !important;
-    font-size: 11.5px !important;
-  }
-
-  #userHeaderBadge {
-    padding: 4px 8px !important;
-  }
-
-  #lblUserHeaderName {
     display: none !important;
   }
 
-  /* 2. Home View */
+  .header-actions {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    flex-shrink: 0 !important;
+  }
+
+  .btn-auth-user {
+    padding: 6px 10px !important;
+    font-size: 13px !important;
+    gap: 6px !important;
+    border-radius: 8px !important;
+  }
+
+  .btn-auth-user .auth-btn-caret {
+    display: none !important;
+  }
+
+  /* Hamburger Menu Toggle Button (Góc trái trên mobile) */
+  .btn-mobile-menu-toggle {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 38px !important;
+    height: 38px !important;
+    border-radius: 8px !important;
+    background: var(--panel-alt) !important;
+    border: 1px solid var(--line) !important;
+    color: var(--text) !important;
+    cursor: pointer !important;
+    padding: 0 !important;
+    transition: all 0.2s ease !important;
+    flex-shrink: 0 !important;
+  }
+
+  .btn-mobile-menu-toggle:hover {
+    background: rgba(56, 189, 248, 0.12) !important;
+    border-color: var(--accent) !important;
+    color: var(--accent) !important;
+  }
+
+  .btn-mobile-menu-toggle svg {
+    display: block !important;
+    flex-shrink: 0 !important;
+  }
+
+  .btn-mobile-menu-toggle .hamburger-icon-open {
+    display: block !important;
+  }
+
+  .btn-mobile-menu-toggle .hamburger-icon-close {
+    display: none !important;
+  }
+
+  .btn-mobile-menu-toggle.active .hamburger-icon-open {
+    display: none !important;
+  }
+
+  .btn-mobile-menu-toggle.active .hamburger-icon-close {
+    display: block !important;
+    color: #ef4444 !important;
+  }
+
+  /* Mobile Navigation Drawer (Trượt ra từ bên trái) */
+  .mobile-nav-drawer {
+    display: block !important;
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 99999 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+    transition: visibility 0.25s ease !important;
+  }
+
+  .mobile-nav-drawer.open {
+    visibility: visible !important;
+    pointer-events: auto !important;
+  }
+
+  .mobile-nav-backdrop {
+    position: fixed !important;
+    inset: 0 !important;
+    background: rgba(0, 0, 0, 0.65) !important;
+    backdrop-filter: blur(4px) !important;
+    -webkit-backdrop-filter: blur(4px) !important;
+    opacity: 0 !important;
+    transition: opacity 0.25s ease !important;
+  }
+
+  .mobile-nav-drawer.open .mobile-nav-backdrop {
+    opacity: 1 !important;
+  }
+
+  .mobile-nav-panel {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    bottom: 0 !important;
+    width: 310px !important;
+    max-width: 86vw !important;
+    background: var(--panel) !important;
+    border-right: 1px solid var(--line) !important;
+    border-left: none !important;
+    display: flex !important;
+    flex-direction: column !important;
+    transform: translateX(-100%) !important;
+    transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    box-shadow: 8px 0 32px rgba(0, 0, 0, 0.5) !important;
+    z-index: 100000 !important;
+    overflow: hidden !important;
+  }
+
+  body.theme-light .mobile-nav-panel {
+    background: #ffffff !important;
+    box-shadow: 8px 0 28px rgba(0, 0, 0, 0.15) !important;
+  }
+
+  .mobile-nav-drawer.open .mobile-nav-panel {
+    transform: translateX(0) !important;
+  }
+
+  .mobile-nav-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--line);
+    flex-shrink: 0;
+  }
+
+  .mobile-nav-brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .mobile-brand-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  .btn-mobile-nav-close {
+    width: 34px;
+    height: 34px;
+    border-radius: 8px;
+    border: 1px solid var(--line);
+    background: var(--panel-alt);
+    color: var(--text);
+    font-size: 15px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .btn-mobile-nav-close:hover {
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+    border-color: rgba(239, 68, 68, 0.3);
+  }
+
+  .mobile-nav-user-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: var(--panel-alt);
+    border-bottom: 1px solid var(--line);
+    flex-shrink: 0;
+  }
+
+  .mobile-user-avatar {
+    font-size: 24px;
+  }
+
+  .mobile-user-details {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .mobile-user-name {
+    font-size: 13.5px;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-weight: 700;
+  }
+
+  .mobile-user-role {
+    font-size: 11px;
+    color: var(--dim);
+  }
+
+  .mobile-nav-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px 10px 40px;
+    -webkit-overflow-scrolling: touch;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .mobile-nav-section-title {
+    font-size: 10.5px;
+    font-weight: 700;
+    color: var(--dim);
+    letter-spacing: 0.05em;
+    padding: 10px 10px 4px;
+    text-transform: uppercase;
+  }
+
+  .mobile-nav-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 9px 12px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--text);
+    font-size: 13.5px;
+    text-align: left;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .mobile-nav-item:hover {
+    background: rgba(56, 189, 248, 0.1);
+    color: var(--blue-light);
+  }
+
+  .mobile-nav-item.active {
+    background: rgba(56, 189, 248, 0.14) !important;
+    color: var(--blue-light) !important;
+    border-color: rgba(56, 189, 248, 0.35) !important;
+    font-weight: 700;
+  }
+
+  .mobile-nav-icon {
+    font-size: 17px;
+    width: 22px;
+    text-align: center;
+    flex-shrink: 0;
+  }
+
+  .mobile-nav-label {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .mobile-nav-title {
+    font-size: 13.5px;
+    font-weight: 600;
+  }
+
+  .mobile-nav-sub {
+    font-size: 11px;
+    color: var(--dim);
+    font-weight: 400;
+  }
+
+  body.mobile-nav-locked {
+    overflow: hidden !important;
+  }
+
+  /* 2. Home View Mobile */
   .home-container {
     padding: 16px 12px 60px !important;
   }
 
   .hero-section {
-    padding: 24px 14px 28px !important;
+    padding: 24px 12px 28px !important;
     margin-bottom: 24px !important;
+    overflow: hidden !important;
+  }
+
+  .hero-pill-badge {
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    white-space: normal !important;
+    line-height: 1.4 !important;
+    text-align: center !important;
+    padding: 6px 12px !important;
+    font-size: 11.5px !important;
+  }
+
+  .hero-pill-badge span:last-child {
+    font-size: 11.5px !important;
+    word-break: break-word !important;
   }
 
   .hero-section h1 {
@@ -7128,9 +7516,69 @@ body.theme-light .btn-close-modal:hover {
     line-height: 1.35 !important;
   }
 
-  .pillar-cards-grid {
+  /* Home Theory Navigation Bar Button (Full container width & no overflow) */
+  .home-theory-bar-wrap {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    padding: 0 !important;
+  }
+
+  .home-theory-bar-btn {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    padding: 11px 14px !important;
+    font-size: 13px !important;
+    gap: 8px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    border-radius: 12px !important;
+    margin: 0 auto !important;
+    text-align: left !important;
+  }
+
+  .home-theory-bar-btn .home-theory-icon {
+    font-size: 18px !important;
+    flex-shrink: 0 !important;
+  }
+
+  .home-theory-bar-btn .home-theory-text,
+  .home-theory-bar-btn span:nth-child(2) {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    white-space: normal !important;
+    line-height: 1.35 !important;
+    word-break: break-word !important;
+    font-size: 12.5px !important;
+  }
+
+  .home-theory-bar-btn .home-theory-arrow {
+    width: 24px !important;
+    height: 24px !important;
+    font-size: 12px !important;
+    flex-shrink: 0 !important;
+  }
+
+  .pillar-cards-grid,
+  .four-pillars-grid {
     grid-template-columns: 1fr !important;
     gap: 16px !important;
+  }
+
+  .pillar-card {
+    padding: 18px 16px !important;
+  }
+
+  .pillar-card > div:last-child {
+    width: 100% !important;
+  }
+
+  .pillar-card button {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
   }
 
   .academic-suite {
@@ -7139,7 +7587,22 @@ body.theme-light .btn-close-modal:hover {
     gap: 16px !important;
   }
 
-  /* 3. Quiz & Exam System */
+  .home-footer {
+    padding: 20px 14px !important;
+    margin-top: 36px !important;
+  }
+
+  .footer-brand-wrap {
+    flex-wrap: wrap !important;
+    justify-content: center !important;
+    gap: 6px !important;
+  }
+
+  .footer-brand-title {
+    font-size: 14px !important;
+  }
+
+  /* 3. Quiz & Exam System Mobile Optimization */
   .quiz-view-container {
     padding: 12px 10px 50px !important;
   }
@@ -7171,28 +7634,42 @@ body.theme-light .btn-close-modal:hover {
 
   .quiz-main-tabs .btn-tab {
     flex-shrink: 0;
-    padding: 6px 10px !important;
+    padding: 6px 12px !important;
     font-size: 12px !important;
   }
 
-  .exam-cards-grid {
-    grid-template-columns: 1fr !important;
-    gap: 14px !important;
-  }
-
-  .exam-card {
-    padding: 16px !important;
-  }
-
+  /* Active Exam Room */
   .active-exam-room {
-    padding: 14px 12px !important;
+    padding: 14px 12px 60px !important;
     border-radius: 10px !important;
+    position: relative;
+  }
+
+  /* Nhiệm vụ 2 — Ghim cố định thanh trạng thái (Sticky Header): top: 0; z-index: 50; */
+  body.in-active-exam .app-header,
+  body:has(.active-exam-room) .app-header {
+    display: none !important;
   }
 
   .active-exam-topbar {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 50 !important;
+    background: rgba(15, 23, 42, 0.96) !important;
+    backdrop-filter: blur(14px) !important;
+    -webkit-backdrop-filter: blur(14px) !important;
     flex-direction: column !important;
     align-items: stretch !important;
     gap: 12px !important;
+    padding: 12px 14px 14px !important;
+    margin: -14px -12px 16px -12px !important;
+    border-bottom: 1px solid var(--line) !important;
+    box-shadow: 0 6px 22px rgba(0, 0, 0, 0.45) !important;
+  }
+
+  body.theme-light .active-exam-topbar {
+    background: rgba(255, 255, 255, 0.97) !important;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08) !important;
   }
 
   .active-exam-actions-wrap {
@@ -7206,28 +7683,33 @@ body.theme-light .btn-close-modal:hover {
     font-size: 17px !important;
     padding: 8px 12px !important;
     flex: 1 !important;
+    min-height: 46px !important;
     box-sizing: border-box !important;
   }
 
   #btnSubmitActiveExam {
     flex: 1.2 !important;
     padding: 8px 14px !important;
-    font-size: 13px !important;
+    font-size: 13.5px !important;
     box-sizing: border-box !important;
     justify-content: center !important;
+    min-height: 46px !important;
+    touch-action: manipulation;
   }
 
   .exam-q-jump-hint {
     display: block !important;
   }
 
+  /* Nhiệm vụ 3 — Thanh mục lục câu hỏi: Hỗ trợ vuốt trượt ngang mượt mà */
   .exam-q-jump-grid {
     display: flex !important;
     flex-wrap: nowrap !important;
     overflow-x: auto !important;
-    -webkit-overflow-scrolling: touch;
-    gap: 7px !important;
-    padding: 10px 8px !important;
+    -webkit-overflow-scrolling: touch !important;
+    scroll-behavior: smooth !important;
+    gap: 8px !important;
+    padding: 8px 4px 12px !important;
     margin-bottom: 16px !important;
     scrollbar-width: thin;
   }
@@ -7241,26 +7723,60 @@ body.theme-light .btn-close-modal:hover {
     border-radius: 4px;
   }
 
+  /* Nhiệm vụ 3 — Nút số câu: Chiều cao & rộng tối thiểu 44px – 48px chuẩn ngón tay bấm */
   .exam-q-jump-btn {
     flex-shrink: 0 !important;
-    width: 36px !important;
-    height: 36px !important;
-    min-width: 36px !important;
-    min-height: 36px !important;
-    font-size: 13px !important;
+    width: 44px !important;
+    height: 44px !important;
+    min-width: 44px !important;
+    min-height: 44px !important;
+    font-size: 14px !important;
+    font-weight: 700 !important;
+    border-radius: 10px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    touch-action: manipulation !important;
   }
 
+  /* Nhiệm vụ 1 — Thẻ câu hỏi & điều khiển: Chống tràn chữ & hình ảnh */
   .exam-question-card {
     padding: 16px 14px !important;
     margin-bottom: 16px !important;
     border-radius: 10px !important;
+    word-break: break-word !important;
+    overflow-wrap: anywhere !important;
+    box-sizing: border-box !important;
+    max-width: 100% !important;
   }
 
+  .exam-question-card img {
+    max-width: 100% !important;
+    height: auto !important;
+    box-sizing: border-box !important;
+    border-radius: 6px !important;
+  }
+
+  .exam-q-top-nav .btn-sm {
+    min-height: 34px !important;
+    padding: 4px 10px !important;
+    font-size: 12px !important;
+    font-weight: 700 !important;
+    border-radius: 6px !important;
+    touch-action: manipulation;
+  }
+
+  /* Nhiệm vụ 1 & 3 — Nút chọn đáp án: Chiều cao tối thiểu 48px & Chống tràn */
   .btn-active-exam-opt {
     padding: 12px 14px !important;
-    font-size: 13.5px !important;
+    font-size: 14px !important;
     gap: 10px !important;
     min-height: 48px !important;
+    touch-action: manipulation;
+    word-break: break-word !important;
+    overflow-wrap: anywhere !important;
+    box-sizing: border-box !important;
+    max-width: 100% !important;
   }
 
   .btn-active-exam-opt .opt-badge {
@@ -7276,16 +7792,217 @@ body.theme-light .btn-close-modal:hover {
     font-size: 13.5px !important;
   }
 
+  /* Bottom Question Navigation Bar — STICKY DOCKED TO SCREEN BOTTOM */
   .exam-navigation-bar {
+    position: sticky !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    background: rgba(15, 23, 42, 0.96) !important;
+    backdrop-filter: blur(14px) !important;
+    -webkit-backdrop-filter: blur(14px) !important;
+    border-top: 1px solid var(--line) !important;
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px)) !important;
+    margin: 16px -12px -14px -12px !important;
+    z-index: 95 !important;
+    box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.45) !important;
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
     gap: 8px !important;
   }
 
-  .exam-navigation-bar button {
-    padding: 10px 14px !important;
-    font-size: 13.5px !important;
+  body.theme-light .exam-navigation-bar {
+    background: rgba(255, 255, 255, 0.97) !important;
+    box-shadow: 0 -6px 20px rgba(0, 0, 0, 0.08) !important;
   }
 
-  /* 4. Admin Database View */
+  .exam-navigation-bar button {
+    min-height: 48px !important;
+    padding: 8px 14px !important;
+    font-size: 14px !important;
+    font-weight: 700 !important;
+    flex: 1 1 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border-radius: 8px !important;
+    touch-action: manipulation;
+  }
+
+  .exam-navigation-bar .exam-progress-counter {
+    font-size: 11.5px !important;
+    flex: 1.2 1 auto !important;
+    min-width: 85px !important;
+    text-align: center !important;
+    line-height: 1.35 !important;
+  }
+
+  /* Student Exam Cards Grid */
+  .exam-cards-grid {
+    grid-template-columns: 1fr !important;
+    gap: 14px !important;
+  }
+
+  .exam-card {
+    padding: 16px !important;
+  }
+
+  .exam-card > div:last-child {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 10px !important;
+  }
+
+  .exam-card .btn-start-exam,
+  .exam-card .btn-review-exam {
+    width: 100% !important;
+    min-height: 44px !important;
+    justify-content: center !important;
+    font-size: 14px !important;
+  }
+
+  .exam-status-badge {
+    white-space: normal !important;
+    word-break: break-word !important;
+    line-height: 1.35 !important;
+    font-size: 11px !important;
+  }
+
+  /* Teacher's Exam Studio Mobile Optimization & Button Fix */
+  .studio-card {
+    padding: 16px 14px !important;
+  }
+
+  .studio-inner-card {
+    padding: 14px 12px !important;
+  }
+
+  .studio-toolbar-actions {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 10px !important;
+  }
+
+  .studio-toolbar-actions > div,
+  .studio-toolbar-actions button,
+  #btnDownloadSampleWord,
+  #btnClearAllWordData {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    justify-content: center !important;
+    white-space: normal !important;
+    word-break: break-word !important;
+    text-align: center !important;
+  }
+
+  .studio-dist-quick-bar {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 10px !important;
+  }
+
+  .studio-dist-quick-bar > div:first-child {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 6px !important;
+    width: 100% !important;
+  }
+
+  .studio-dist-quick-bar button {
+    width: 100% !important;
+    justify-content: center !important;
+  }
+
+  .studio-dist-quick-bar > div:last-child {
+    justify-content: center !important;
+    text-align: center !important;
+  }
+
+  .studio-print-actions {
+    width: 100% !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 8px !important;
+  }
+
+  .studio-print-actions button,
+  #btnSwitchToAssignTabFromPrint {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    justify-content: center !important;
+    white-space: normal !important;
+  }
+
+  /* Critical Fix: Fix overflowing & misaligned "Phát Đề Cho Sinh Viên & Xuất File Đáp Án" button */
+  .studio-assign-action-bar {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 12px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .studio-assign-action-hint {
+    width: 100% !important;
+    text-align: center !important;
+    font-size: 12.5px !important;
+    line-height: 1.4 !important;
+  }
+
+  #btnCreateAndAssignExam,
+  .btn-studio-assign {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 12px 14px !important;
+    font-size: 13.5px !important;
+    white-space: normal !important;
+    word-break: break-word !important;
+    border-radius: 8px !important;
+    text-align: center !important;
+    gap: 8px !important;
+    margin: 0 !important;
+  }
+
+  #btnCreateAndAssignExam span,
+  .btn-studio-assign span,
+  .btn-studio-assign-text,
+  .btn-assign-text {
+    white-space: normal !important;
+    word-break: break-word !important;
+    line-height: 1.35 !important;
+    text-align: center !important;
+  }
+
+  /* 4. Horizontal Scrollable Tabs across all Labs & Views */
+  .theory-filter-tabs,
+  .logic-sub-tabs,
+  .counting-sub-tabs,
+  .relation-sub-tabs,
+  .lab-controls-bar {
+    overflow-x: auto !important;
+    flex-wrap: nowrap !important;
+    -webkit-overflow-scrolling: touch !important;
+    scrollbar-width: none !important;
+    gap: 6px !important;
+    padding-bottom: 4px !important;
+  }
+
+  .theory-filter-tabs::-webkit-scrollbar,
+  .logic-sub-tabs::-webkit-scrollbar,
+  .counting-sub-tabs::-webkit-scrollbar,
+  .relation-sub-tabs::-webkit-scrollbar,
+  .lab-controls-bar::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  /* 5. Admin Database View */
   .admin-dashboard-wrap {
     padding: 12px 10px 40px !important;
   }
@@ -7318,7 +8035,7 @@ body.theme-light .btn-close-modal:hover {
     padding: 14px !important;
   }
 
-  /* 5. Auth Modal */
+  /* 6. Auth Modal */
   .auth-modal-dialog {
     max-width: 95vw !important;
     margin: 10px auto;
@@ -7345,12 +8062,53 @@ body.theme-light .btn-close-modal:hover {
   }
 
   .brand-name {
-    max-width: 100px;
-    font-size: 13px;
+    max-width: 120px !important;
+    font-size: 13px !important;
+  }
+
+  .btn-auth-user #lblUserAuthName {
+    display: none !important;
+  }
+
+  .btn-auth-user {
+    padding: 6px 8px !important;
   }
 
   .auth-tab-btn {
     padding: 8px 10px !important;
     font-size: 12px !important;
+  }
+
+  .exam-q-top-nav .btn-sm {
+    padding: 3px 6px !important;
+    font-size: 11px !important;
+  }
+
+  .exam-navigation-bar button {
+    font-size: 13px !important;
+    padding: 8px 6px !important;
+    min-height: 48px !important;
+  }
+
+  .exam-q-jump-btn {
+    width: 44px !important;
+    height: 44px !important;
+    min-width: 44px !important;
+    min-height: 44px !important;
+  }
+
+  .home-theory-bar-btn {
+    padding: 9px 10px !important;
+  }
+
+  .home-theory-bar-btn .home-theory-text,
+  .home-theory-bar-btn span:nth-child(2) {
+    font-size: 12px !important;
+  }
+
+  #btnCreateAndAssignExam,
+  .btn-studio-assign {
+    padding: 10px 10px !important;
+    font-size: 12.5px !important;
   }
 }

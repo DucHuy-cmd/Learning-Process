@@ -40,7 +40,7 @@ export function readRequestBody(req, maxBytes = 16 * 1024 * 1024) {
     req.on('data', (chunk) => {
       totalBytes += chunk.length;
       if (totalBytes > maxBytes) {
-        req.destroy();
+        req.pause();
         reject(new Error(`Kích thước yêu cầu vượt quá giới hạn tối đa (${(maxBytes / (1024 * 1024)).toFixed(0)}MB).`));
         return;
       }

@@ -13,7 +13,20 @@
 
   <!-- Global Application Header -->
   <header class="app-header">
-    <div class="header-left" style="display:flex;align-items:center;gap:16px;">
+    <div class="header-left" style="display:flex;align-items:center;gap:12px;">
+      <!-- Mobile Menu Hamburger Toggle Button (Góc trái trên mobile) -->
+      <button type="button" class="btn-mobile-menu-toggle" id="btnMobileMenuToggle" aria-label="Mở menu điều hướng" aria-expanded="false" title="Menu điều hướng">
+        <svg class="hamburger-icon-open" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="3" y1="6" x2="21" y2="6"></line>
+          <line x1="3" y1="12" x2="21" y2="12"></line>
+          <line x1="3" y1="18" x2="21" y2="18"></line>
+        </svg>
+        <svg class="hamburger-icon-close" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+
       <a href="#home" class="brand-wrap" id="brandLogo">
         <span class="brand-icon">⚡</span>
         <span class="brand-name">Toán Rời Rạc Platform</span>
@@ -158,6 +171,119 @@
       </div>
     </div>
   </header>
+
+  <!-- Mobile Navigation Drawer (Mobile only) -->
+  <div class="mobile-nav-drawer" id="mobileNavDrawer" aria-hidden="true">
+    <div class="mobile-nav-backdrop" id="mobileNavBackdrop"></div>
+    <div class="mobile-nav-panel">
+      <!-- Drawer Header -->
+      <div class="mobile-nav-header">
+        <div class="mobile-nav-brand">
+          <span class="brand-icon">⚡</span>
+          <span class="mobile-brand-title">Toán Rời Rạc</span>
+        </div>
+        <button type="button" class="btn-mobile-nav-close" id="btnMobileNavClose" aria-label="Đóng menu">✕</button>
+      </div>
+
+      <!-- User Mini Card in Drawer -->
+      <div class="mobile-nav-user-card" id="mobileNavUserCard">
+        <span class="mobile-user-avatar" id="mobileNavAvatar">👤</span>
+        <div class="mobile-user-details">
+          <strong class="mobile-user-name" id="mobileNavUserName">Khách</strong>
+          <span class="mobile-user-role" id="mobileNavUserRole">Chưa đăng nhập</span>
+        </div>
+        <button type="button" class="btn-sm" id="btnMobileNavAuthAction" style="margin-left:auto;font-size:12px;padding:5px 12px;border-radius:6px;font-weight:700;">Đăng nhập</button>
+      </div>
+
+      <!-- Drawer Scrollable Body -->
+      <div class="mobile-nav-body">
+        <div class="mobile-nav-section-title">CHUYÊN MỤC CHÍNH</div>
+        <button type="button" class="mobile-nav-item active" data-view="home">
+          <span class="mobile-nav-icon">🏠</span>
+          <div class="mobile-nav-label">
+            <span class="mobile-nav-title">Trang chủ</span>
+            <span class="mobile-nav-sub">Tổng quan hệ thống</span>
+          </div>
+        </button>
+        <button type="button" class="mobile-nav-item" data-view="theory">
+          <span class="mobile-nav-icon">📚</span>
+          <div class="mobile-nav-label">
+            <span class="mobile-nav-title">Lý thuyết</span>
+            <span class="mobile-nav-sub">20 chuyên đề giáo trình</span>
+          </div>
+        </button>
+        <button type="button" class="mobile-nav-item" data-view="quiz">
+          <span class="mobile-nav-icon">🎯</span>
+          <div class="mobile-nav-label">
+            <span class="mobile-nav-title">Luyện tập &amp; Đề thi</span>
+            <span class="mobile-nav-sub">Khảo thí định kỳ thang 10</span>
+          </div>
+        </button>
+        <button type="button" class="mobile-nav-item" data-view="ai">
+          <span class="mobile-nav-icon">🤖</span>
+          <div class="mobile-nav-label">
+            <span class="mobile-nav-title">Trợ lý AI</span>
+            <span class="mobile-nav-sub">Nhận diện ảnh &amp; giải đáp</span>
+          </div>
+        </button>
+
+        <div class="mobile-nav-section-title" style="margin-top:16px;">PHÒNG THỰC NGHIỆM (LABS)</div>
+        <button type="button" class="mobile-nav-item" data-view="logic">
+          <span class="mobile-nav-icon" style="color:#f59e0b;">⚡</span>
+          <div class="mobile-nav-label">
+            <span class="mobile-nav-title">Logic Lab</span>
+            <span class="mobile-nav-sub">Bảng chân trị, K-Map, Mạch số</span>
+          </div>
+        </button>
+        <button type="button" class="mobile-nav-item" data-view="counting">
+          <span class="mobile-nav-icon" style="color:#10b981;">🎲</span>
+          <div class="mobile-nav-label">
+            <span class="mobile-nav-title">Counting Lab</span>
+            <span class="mobile-nav-sub">Ánh xạ, Dirichlet, Tổ hợp, Truy hồi</span>
+          </div>
+        </button>
+        <button type="button" class="mobile-nav-item" data-view="relation">
+          <span class="mobile-nav-icon" style="color:#8b5cf6;">🔗</span>
+          <div class="mobile-nav-label">
+            <span class="mobile-nav-title">Relation Lab</span>
+            <span class="mobile-nav-sub">Ma trận quan hệ, Warshall, POSET</span>
+          </div>
+        </button>
+        <button type="button" class="mobile-nav-item" data-view="lab">
+          <span class="mobile-nav-icon" style="color:#3b82f6;">🌐</span>
+          <div class="mobile-nav-label">
+            <span class="mobile-nav-title">Graph Lab</span>
+            <span class="mobile-nav-sub">7 Thuật toán đồ thị kinh điển</span>
+          </div>
+        </button>
+
+        <!-- Admin View (Only if Admin) -->
+        <button type="button" class="mobile-nav-item" data-view="admin" id="mobileNavBtnAdmin" style="display:none;">
+          <span class="mobile-nav-icon">🗄️</span>
+          <div class="mobile-nav-label">
+            <span class="mobile-nav-title">Quản trị Database</span>
+            <span class="mobile-nav-sub">Quản lý CSDL &amp; sinh viên</span>
+          </div>
+        </button>
+
+        <div class="mobile-nav-section-title" style="margin-top:16px;">CÀI ĐẶT &amp; TIỆN ÍCH</div>
+        <button type="button" class="mobile-nav-item" id="btnMobileNavTheme">
+          <span class="mobile-nav-icon" id="mobileNavThemeIcon">☀️</span>
+          <div class="mobile-nav-label">
+            <span class="mobile-nav-title" id="mobileNavThemeTitle">Chế độ Sáng / Tối</span>
+            <span class="mobile-nav-sub" id="mobileNavThemeSub">Đổi tông màu giao diện</span>
+          </div>
+        </button>
+        <button type="button" class="mobile-nav-item" id="btnMobileNavHelp">
+          <span class="mobile-nav-icon">❓</span>
+          <div class="mobile-nav-label">
+            <span class="mobile-nav-title">Hướng dẫn sử dụng</span>
+            <span class="mobile-nav-sub">Phím tắt &amp; tài liệu hướng dẫn</span>
+          </div>
+        </button>
+      </div>
+    </div>
+  </div>
 
   <!-- Main Views Container -->
   <main id="app" class="app-main">

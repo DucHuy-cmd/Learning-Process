@@ -561,6 +561,14 @@ export class QuizView {
       this.activeTab = 'myExams';
     }
 
+    if (typeof document !== 'undefined' && document.body) {
+      if (this.activeExamSession) {
+        document.body.classList.add('in-active-exam');
+      } else {
+        document.body.classList.remove('in-active-exam');
+      }
+    }
+
     // Check my exams count
     const myExams = currentUser ? examManager.getExamsForUser(currentUser.id) : [];
     const myPendingCount = currentUser 
@@ -906,11 +914,18 @@ export class QuizView {
         
         <!-- Top bar: Title, Timer, Submitting -->
         <div class="active-exam-topbar">
-          <div>
-            <div style="font-size:12px;color:var(--accent);font-weight:700;text-transform:uppercase;">
-              Phòng Thi Trực Tuyến • Đang Chấm Giờ
+          <div class="active-exam-header-left">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:3px;">
+              <span style="font-size:11.5px;color:var(--accent);font-weight:700;text-transform:uppercase;">
+                Phòng Thi Trực Tuyến • Đang Chấm Giờ
+              </span>
+              <!-- Auto-save status indicator (Nhiệm vụ 3) -->
+              <span class="exam-autosave-badge" id="examAutosaveBadge" title="Hệ thống tự động ghi nhận bài làm từng giây">
+                <span class="autosave-dot"></span>
+                <span>🟢 Đã tự động lưu bài</span>
+              </span>
             </div>
-            <h2 style="font-size:20px;font-weight:700;color:var(--text);margin:2px 0 0;line-height:1.3;word-break:break-word;">
+            <h2 style="font-size:19px;font-weight:700;color:var(--text);margin:0;line-height:1.3;word-break:break-word;">
               ${this._escapeHtml(exam.title)}
             </h2>
           </div>
@@ -921,8 +936,8 @@ export class QuizView {
               ⏱️ ${timeFormatted}
             </div>
 
-            <!-- Submit Button -->
-            <button type="button" class="btn-primary" id="btnSubmitActiveExam" style="background:#10b981;border-color:#10b981;font-weight:700;font-size:14px;padding:10px 22px;min-height:42px;display:flex;align-items:center;justify-content:center;touch-action:manipulation;">
+            <!-- Submit Button (Min height 44px-48px) -->
+            <button type="button" class="btn-primary" id="btnSubmitActiveExam" style="background:#10b981;border-color:#10b981;font-weight:700;font-size:14px;padding:10px 20px;min-height:46px;display:flex;align-items:center;justify-content:center;touch-action:manipulation;">
               📤 Nộp Bài Thi (${answeredCount}/${totalQ})
             </button>
           </div>
@@ -952,11 +967,22 @@ export class QuizView {
         <!-- Current Question Display -->
         <div class="exam-question-card" style="background:var(--panel-alt);border:1px solid var(--line);border-radius:10px;padding:24px;margin-bottom:20px;box-sizing:border-box;">
           
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-            <span style="font-size:13px;font-weight:700;background:var(--panel);border:1px solid var(--line);padding:3px 12px;border-radius:6px;color:var(--text);">
-              Câu ${session.currentQIndex + 1} / ${totalQ}
-            </span>
-            <span class="pill-badge" style="background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;gap:8px;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="font-size:13px;font-weight:700;background:var(--panel);border:1px solid var(--line);padding:4px 12px;border-radius:6px;color:var(--text);white-space:nowrap;">
+                Câu ${session.currentQIndex + 1} / ${totalQ}
+              </span>
+              <!-- Quick Top Prev & Next Buttons for mobile & desktop convenience -->
+              <div class="exam-q-top-nav" style="display:flex;gap:4px;">
+                <button type="button" class="btn-sm btn-exam-prev-top" ${session.currentQIndex === 0 ? 'disabled style="opacity:0.35;cursor:not-allowed;"' : 'style="cursor:pointer;"'} title="Câu trước (❮)">
+                  ❮ Trước
+                </button>
+                <button type="button" class="btn-sm btn-exam-next-top" ${session.currentQIndex === totalQ - 1 ? 'disabled style="opacity:0.35;cursor:not-allowed;"' : 'style="cursor:pointer;"'} title="Câu sau (❯)">
+                  Sau ❯
+                </button>
+              </div>
+            </div>
+            <span class="pill-badge" style="background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;white-space:nowrap;">
               ${currentQ.topicName || currentQ.topic}
             </span>
           </div>
@@ -970,11 +996,11 @@ export class QuizView {
             ${displayedOptions.map((opt, optionIndex) => {
               const isSelected = selectedOpt === opt.id;
               const displayLabel = String.fromCharCode(65 + optionIndex);
-              let style = `display:flex;align-items:flex-start;gap:12px;padding:12px 16px;border-radius:8px;background:var(--panel);border:1px solid var(--line);color:var(--text);font-size:14px;text-align:left;cursor:pointer;transition:all 0.15s ease;width:100%;line-height:1.5;box-sizing:border-box;white-space:normal !important;word-break:break-word !important;overflow-wrap:anywhere !important;`;
+              let style = `display:flex;align-items:flex-start;gap:12px;padding:12px 16px;border-radius:8px;background:var(--panel);border:1px solid var(--line);color:var(--text);font-size:14px;text-align:left;cursor:pointer;transition:all 0.15s ease;width:100%;min-height:48px;line-height:1.5;box-sizing:border-box;white-space:normal !important;word-break:break-word !important;overflow-wrap:anywhere !important;`;
               let badgeStyle = `background:var(--line);color:var(--text);`;
 
               if (isSelected) {
-                style = `display:flex;align-items:flex-start;gap:12px;padding:12px 16px;border-radius:8px;background:rgba(56,189,248,0.15);border:2px solid var(--accent);color:var(--text);font-size:14px;text-align:left;cursor:pointer;width:100%;line-height:1.5;box-sizing:border-box;white-space:normal !important;word-break:break-word !important;overflow-wrap:anywhere !important;`;
+                style = `display:flex;align-items:flex-start;gap:12px;padding:12px 16px;border-radius:8px;background:rgba(56,189,248,0.15);border:2px solid var(--accent);color:var(--text);font-size:14px;text-align:left;cursor:pointer;width:100%;min-height:48px;line-height:1.5;box-sizing:border-box;white-space:normal !important;word-break:break-word !important;overflow-wrap:anywhere !important;`;
                 badgeStyle = `background:var(--accent);color:#000;font-weight:bold;`;
               }
 
@@ -993,18 +1019,24 @@ export class QuizView {
         </div>
 
         <!-- Question Navigation Bottom Bar -->
-        <div class="exam-navigation-bar" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
-          <button type="button" class="btn-secondary" id="btnExamPrevQ" ${session.currentQIndex === 0 ? 'disabled style="opacity:0.5;cursor:not-allowed;min-height:42px;"' : 'style="min-height:42px;"'}>
+        <div class="exam-navigation-bar">
+          <button type="button" class="btn-secondary" id="btnExamPrevQ" ${session.currentQIndex === 0 ? 'disabled style="opacity:0.35;cursor:not-allowed;"' : ''}>
             ❮ Câu trước
           </button>
           
-          <div class="exam-progress-counter" style="font-size:13.5px;color:var(--dim);text-align:center;">
-            Đã làm: <strong>${answeredCount}</strong> / ${totalQ} câu
+          <div class="exam-progress-counter" style="font-size:13px;color:var(--dim);text-align:center;">
+            Câu <strong>${session.currentQIndex + 1}</strong>/${totalQ} • Đã làm: <strong>${answeredCount}</strong>/${totalQ}
           </div>
 
-          <button type="button" class="btn-secondary" id="btnExamNextQ" ${session.currentQIndex === totalQ - 1 ? 'disabled style="opacity:0.5;cursor:not-allowed;min-height:42px;"' : 'style="min-height:42px;"'}>
-            Câu tiếp ❯
-          </button>
+          ${session.currentQIndex === totalQ - 1 ? `
+            <button type="button" class="btn-primary" id="btnExamNextQSubmit" style="background:#10b981;border-color:#10b981;font-weight:700;box-shadow:0 2px 10px rgba(16,185,129,0.3);">
+              Nộp bài 📤
+            </button>
+          ` : `
+            <button type="button" class="btn-secondary btn-exam-next-primary" id="btnExamNextQ">
+              Câu tiếp ❯
+            </button>
+          `}
         </div>
 
       </div>
@@ -1202,10 +1234,10 @@ export class QuizView {
         
         <!-- SUB-TAB 1: NẠP FILE WORD ĐỀ THI -->
         <div id="studioDistributeSection" style="display:${(this.studioSubTab === 'distribute' || (this.studioSubTab !== 'publish' && this.studioSubTab !== 'print' && this.studioSubTab !== 'assign')) ? 'block' : 'none'};">
-          <div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:22px;margin-bottom:24px;">
+          <div class="studio-card" style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:22px;margin-bottom:24px;">
 
             <!-- Action Toolbar: Download Sample & Clear Data -->
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;background:var(--panel-alt);border:1px solid var(--line);border-radius:8px;padding:12px 16px;">
+            <div class="studio-toolbar-actions" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;background:var(--panel-alt);border:1px solid var(--line);border-radius:8px;padding:12px 16px;">
               <div>
                 <button type="button" class="btn-primary" id="btnDownloadSampleWord" style="font-size:12.5px;padding:7px 16px;border-radius:6px;background:#2563eb;border-color:#2563eb;color:#fff;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
                   <span>📥</span>
@@ -1320,10 +1352,10 @@ export class QuizView {
 
         <!-- SUB-TAB 2: PHÂN PHỐI & PHÁT ĐỀ THI CHO SINH VIÊN (DEDICATED PUBLISH TAB) -->
         <div id="studioPublishSection" style="display:${(this.studioSubTab === 'publish' || this.studioSubTab === 'assign') ? 'block' : 'none'};">
-          <div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:22px;margin-bottom:24px;">
+          <div class="studio-card" style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:22px;margin-bottom:24px;">
 
             <!-- DEDICATED SECTION: MULTI-FILE QUESTION DISTRIBUTION -->
-            <div id="sectionMultiFileDistribution" style="background:var(--panel-alt);border:1px solid var(--line);border-radius:10px;padding:18px;margin-bottom:20px;">
+            <div id="sectionMultiFileDistribution" class="studio-inner-card" style="background:var(--panel-alt);border:1px solid var(--line);border-radius:10px;padding:18px;margin-bottom:20px;">
               <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
                 <div>
                   <div style="font-size:14.5px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:8px;">
@@ -1394,7 +1426,7 @@ export class QuizView {
                 </div>
 
                 <!-- Distribution Summary & Quick Actions -->
-                <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;padding:12px 14px;background:var(--panel);border:1px solid var(--line);border-radius:8px;">
+                <div class="studio-dist-quick-bar" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;padding:12px 14px;background:var(--panel);border:1px solid var(--line);border-radius:8px;">
                   <div style="display:flex;gap:6px;flex-wrap:wrap;">
                     <button type="button" class="btn-sm" id="btnDistributeAll" style="font-size:12px;padding:5px 12px;cursor:pointer;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);border-radius:6px;font-weight:600;">
                       ⚡ Chọn tất cả câu hỏi
@@ -1532,14 +1564,15 @@ export class QuizView {
               </details>
             ` : ''}
 
-            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
-              <div style="font-size:12.5px;color:var(--dim);">
+            <div class="studio-assign-action-bar" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+              <div class="studio-assign-action-hint" style="font-size:12.5px;color:var(--dim);">
                 ${distSummary.totalSelected > 0
                   ? `<span style="color:#10b981;font-weight:700;">✅ Sẵn sàng phát đề với ${distSummary.totalSelected} câu hỏi tự soạn đã phân phối.</span>`
                   : '⚠️ Vui lòng phân phối câu hỏi ở tab Phân Phối Đề trước khi phát.'}
               </div>
-              <button type="button" class="btn-primary" id="btnCreateAndAssignExam" style="padding:10px 24px;font-size:14px;font-weight:700;display:flex;align-items:center;gap:8px;cursor:pointer;">
-                <span>🚀 Phát Đề Cho Sinh Viên &amp; Xuất File Đáp Án</span>
+              <button type="button" class="btn-primary btn-studio-assign" id="btnCreateAndAssignExam" style="cursor:pointer;">
+                <span class="btn-assign-icon">🚀</span>
+                <span class="btn-assign-text">Phát Đề Cho Sinh Viên &amp; Xuất File Đáp Án</span>
               </button>
             </div>
           </div>
@@ -1563,7 +1596,7 @@ export class QuizView {
           </div>
         ` : `
           <!-- Teacher's Studio Controls Bar (No Print) -->
-          <div class="exam-studio-controls no-print" style="background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:24px;">
+          <div class="exam-studio-controls studio-card no-print" style="background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:24px;">
             <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:12px;">
               <div>
                 <div style="font-size:14px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:6px;">
@@ -1578,7 +1611,7 @@ export class QuizView {
               </div>
 
               <!-- Quick Action Buttons -->
-              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <div class="studio-print-actions" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
                 <button type="button" class="btn-primary" id="btnPrintExam" style="padding:8px 16px;font-size:13px;font-weight:600;">
                   🖨️ In Đề / Xuất PDF (A4)
                 </button>
@@ -2741,25 +2774,44 @@ export class QuizView {
         });
       });
 
-      // Prev / Next Question in Exam
+      // Prev / Next Question in Exam (Both top and bottom bars)
+      const handlePrevQ = () => {
+        if (this.activeExamSession && this.activeExamSession.currentQIndex > 0) {
+          this.activeExamSession.currentQIndex--;
+          this.render();
+        }
+      };
+      const handleNextQ = () => {
+        if (this.activeExamSession && this.activeExamSession.currentQIndex < this.activeExamSession.questions.length - 1) {
+          this.activeExamSession.currentQIndex++;
+          this.render();
+        }
+      };
+
       const btnExamPrevQ = this.container.querySelector('#btnExamPrevQ');
-      if (btnExamPrevQ) {
-        btnExamPrevQ.addEventListener('click', () => {
-          if (this.activeExamSession.currentQIndex > 0) {
-            this.activeExamSession.currentQIndex--;
-            this.render();
-          }
+      if (btnExamPrevQ) btnExamPrevQ.addEventListener('click', handlePrevQ);
+      const btnExamPrevTop = this.container.querySelector('.btn-exam-prev-top');
+      if (btnExamPrevTop) btnExamPrevTop.addEventListener('click', handlePrevQ);
+
+      const btnExamNextQ = this.container.querySelector('#btnExamNextQ');
+      if (btnExamNextQ) btnExamNextQ.addEventListener('click', handleNextQ);
+      const btnExamNextTop = this.container.querySelector('.btn-exam-next-top');
+      if (btnExamNextTop) btnExamNextTop.addEventListener('click', handleNextQ);
+
+      const btnExamNextQSubmit = this.container.querySelector('#btnExamNextQSubmit');
+      if (btnExamNextQSubmit) {
+        btnExamNextQSubmit.addEventListener('click', () => {
+          const btnSubmit = this.container.querySelector('#btnSubmitActiveExam');
+          if (btnSubmit) btnSubmit.click();
         });
       }
 
-      const btnExamNextQ = this.container.querySelector('#btnExamNextQ');
-      if (btnExamNextQ) {
-        btnExamNextQ.addEventListener('click', () => {
-          if (this.activeExamSession.currentQIndex < this.activeExamSession.questions.length - 1) {
-            this.activeExamSession.currentQIndex++;
-            this.render();
-          }
-        });
+      // Auto-scroll current question in horizontal jump bar so student always sees their progress
+      const activeJumpBtn = this.container.querySelector('.exam-q-jump-btn.current');
+      if (activeJumpBtn && typeof activeJumpBtn.scrollIntoView === 'function') {
+        try {
+          activeJumpBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+        } catch {}
       }
 
       // Choose Option

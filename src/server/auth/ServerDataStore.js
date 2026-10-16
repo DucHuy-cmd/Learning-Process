@@ -7,7 +7,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DEMO_USERS } from '../../core/auth/AuthManager.js';
-import { INITIAL_LEADERBOARD } from '../../core/quiz/QuizHistoryManager.js';
 import { DEFAULT_EXAMS } from '../../core/quiz/ExamManager.js';
 
 const __filename = fileURLToPath(import.meta.url);
