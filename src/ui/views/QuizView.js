@@ -161,6 +161,9 @@ export class QuizView {
 
     this._initKeyboardNavigation();
 
+    // ── Zero Data Loss: Start offline queue flush listener ────────────────────
+    this._initOfflineQueueListener();
+
     if (this.container) {
       this.render();
     }
@@ -2170,6 +2173,77 @@ export class QuizView {
       return;
     }
 
+    // ── Zero Data Loss: Check for a saved draft and offer to resume ───────────
+    const existingDraft = examManager.loadDraft(examId, currentUser.id);
+    if (existingDraft) {
+      const timeLeftMin = Math.ceil((existingDraft.timeRemaining || 0) / 60);
+      const wantResume = typeof window !== 'undefined' && window.confirm
+        ? window.confirm(
+            `📂 Phát hiện bài làm chưa hoàn thành của đề thi "${exam.title}"!\n\n` +
+            `• Số câu đã trả lời: ${Object.keys(existingDraft.answers || {}).length} / ${exam.questionIds.length}\n` +
+            `• Thời gian còn lại: ~${timeLeftMin} phút\n\n` +
+            `Bấm OK để tiếp tục làm từ chỗ đã dừng.\n` +
+            `Bấm Hủy để bỏ bản nháp và bắt đầu lại từ đầu (Lưu ý: thời gian vẫn tính từ lúc bắt đầu đầu tiên).`
+          )
+        : true;
+
+      if (wantResume) {
+        // Restore questions in the saved order (no re-shuffle)
+        const allQuestions = getAllQuestions();
+        const customQuestions = Array.isArray(exam.customQuestions) ? exam.customQuestions : [];
+        const questionPool = [...allQuestions, ...customQuestions];
+
+        const savedIds = Array.isArray(existingDraft.questionIds) && existingDraft.questionIds.length > 0
+          ? existingDraft.questionIds
+          : exam.questionIds;
+
+        let restoredQuestions = savedIds.map(id => questionPool.find(q => q.id === id)).filter(Boolean);
+        // Fallback: if the saved order is empty, use original exam order
+        if (restoredQuestions.length === 0) {
+          restoredQuestions = exam.questionIds.map(id => questionPool.find(q => q.id === id)).filter(Boolean);
+        }
+
+        const restoredOptionOrder = (existingDraft.optionOrder && Object.keys(existingDraft.optionOrder).length > 0)
+          ? existingDraft.optionOrder
+          : Object.fromEntries(restoredQuestions.map(question => {
+              const optionIds = question.options.map(option => option.id);
+              return [question.id, optionIds];
+            }));
+
+        const restoredIdx = Math.min(
+          Math.max(0, existingDraft.currentQIndex || 0),
+          Math.max(0, restoredQuestions.length - 1)
+        );
+
+        this.activeExamSession = {
+          exam,
+          questions:      restoredQuestions,
+          optionOrder:    restoredOptionOrder,
+          answers:        { ...(existingDraft.answers || {}) },
+          currentQIndex:  restoredIdx,
+          timeRemaining:  Math.max(0, existingDraft.timeRemaining || 0),
+          timerId:        null,
+          startedAt:      existingDraft.startedAt || Date.now(),
+          violationCount: violationRecord.count || 0,
+          lockdownPending:   false,
+          lockdownCountdown: null,
+          lockdownTimerId:   null,
+          lockdownWarning:   false,
+          fullscreenActive:  false,
+        };
+
+        this.render();
+        this._attachExamLockdownListeners();
+        this._requestExamFullscreen();
+        this._startExamTimer();
+        return; // Resume path complete — skip the normal start flow below
+      }
+
+      // User chose NOT to resume → discard draft and start fresh
+      examManager.clearDraft(examId, currentUser.id);
+    }
+    // ── End Zero Data Loss ────────────────────────────────────────────────────
+
     const confirmStart = typeof window !== 'undefined' && window.confirm
       ? window.confirm(`Bắt đầu làm đề thi: "${exam.title}"?\n\nLưu ý quan trọng:\n- Mỗi thí sinh chỉ có duy nhất 1 lượt làm.\n- Màn hình sẽ tự động khóa khi vào thi, VI PHẠM 3 lần sẽ bị 0đ (thoát toàn màn hình hoặc rời cửa sổ thi sẽ tính là VI PHẠM).\n- Thời gian làm bài: ${exam.durationMinutes} phút.\n- Đồng hồ đếm ngược sẽ bắt đầu ngay bây giờ!\n\nBạn đã sẵn sàng chưa?`)
       : true;
@@ -2465,17 +2539,47 @@ export class QuizView {
     }
 
     const currentUser = authManager.getCurrentUser();
-    const timeSpentSeconds = Math.round((Date.now() - this.activeExamSession.startedAt) / 1000);
+    const session = this.activeExamSession;
+    const timeSpentSeconds = Math.round((Date.now() - session.startedAt) / 1000);
 
-    const result = examManager.submitExam({
-      examId: this.activeExamSession.exam.id,
+    // ── Zero Data Loss: Offline Submission Queue ──────────────────────────────
+    // Build the submission payload once so we can either submit or enqueue it
+    const submissionPayload = {
+      examId: session.exam.id,
       userId: currentUser ? currentUser.id : 'guest',
       userInfo: currentUser || {},
-      answers: this.activeExamSession.answers,
+      answers: session.answers,
       timeSpentSeconds,
-      optionOrder: this.activeExamSession.optionOrder,
+      optionOrder: session.optionOrder,
       integrityBan,
-    });
+    };
+
+    // Detect offline state
+    const isOffline = typeof navigator !== 'undefined' && typeof navigator.onLine === 'boolean' && !navigator.onLine;
+
+    if (isOffline) {
+      // Save to offline queue — the student's work is safe
+      examManager.enqueueOfflineSubmission(submissionPayload);
+      // Keep the draft alive until the submission is confirmed on the server
+      // (don't clearDraft here so the session data survives another reload)
+      this.activeExamSession = null;
+      this._showAlert(
+        '📡 Bài làm của bạn đã được lưu an toàn trên máy!\n\n' +
+        'Đang nộp bài... Nếu mất mạng, bài làm của bạn đã được lưu an toàn trên máy và sẽ tự động gửi lại khi có kết nối.\n\n' +
+        '→ Vui lòng kiểm tra kết nối mạng và mở lại trang để hệ thống tự động nộp bài.'
+      );
+      this.render();
+      return;
+    }
+    // ── End Offline Queue ─────────────────────────────────────────────────────
+
+    const result = examManager.submitExam(submissionPayload);
+
+    // ── Clear draft on successful submission ──────────────────────────────────
+    if (result.success && currentUser) {
+      examManager.clearDraft(session.exam.id, currentUser.id);
+    }
+    // ─────────────────────────────────────────────────────────────────────────
 
     if (result.success && cloudSyncManager && cloudSyncManager.isConnected) {
       cloudSyncManager.serverSubmitExam(result.submission).catch(() => {});
@@ -2489,12 +2593,47 @@ export class QuizView {
         : `🎉 Bạn đã nộp bài thi thành công!\n\nĐiểm số: ${result.submission.score} / 10 điểm\nSố câu đúng: ${result.submission.correctCount} / ${result.submission.totalQuestions}\n\nKết quả đã được ghi nhận vào Bảng Xếp Hạng chính thức!`);
       this.reviewSubmission = result.submission;
     } else {
+      // Primary submit failed (e.g. network hiccup) → enqueue for retry
+      examManager.enqueueOfflineSubmission(submissionPayload);
       this._showAlert(integrityBan
         ? `Bạn đã bị xử lý 0 điểm và cấm thi lại đề này do VI PHẠM quy chế 3 lần. ${result.error || ''}`
-        : (result.error || 'Có lỗi xảy ra khi nộp bài thi.'));
+        : `⚠️ ${result.error || 'Có lỗi xảy ra khi nộp bài thi.'}\n\nBài làm của bạn đã được lưu an toàn trên máy và sẽ tự động gửi lại khi có kết nối mạng.`);
     }
 
     this.render();
+  }
+
+  // ── Zero Data Loss: Offline Queue Processor ───────────────────────────────
+
+  /**
+   * Attempts to flush any queued offline submissions and wires up the
+   * browser's 'online' event to retry automatically when connectivity returns.
+   * Called once from the constructor.
+   */
+  _initOfflineQueueListener() {
+    if (typeof window === 'undefined') return;
+
+    const tryFlush = () => {
+      examManager.flushOfflineQueue(submission => {
+        // Notify the user that their queued submission went through
+        try {
+          if (typeof window.alert === 'function') {
+            window.alert(
+              `✅ Bài thi "${submission.examTitle}" đã được nộp thành công!\n` +
+              `Điểm số: ${submission.score} / 10 điểm`
+            );
+          }
+        } catch {}
+        // Re-render to reflect the new submission in the UI
+        if (this.container) this.render();
+      });
+    };
+
+    // Flush on initial load (handles drafts left from previous sessions)
+    tryFlush();
+
+    // Flush whenever the browser comes back online
+    window.addEventListener('online', tryFlush);
   }
 
   // =========================================================================
@@ -2630,6 +2769,23 @@ export class QuizView {
           const currentQ = this.activeExamSession.questions[this.activeExamSession.currentQIndex];
           if (currentQ) {
             this.activeExamSession.answers[currentQ.id] = optId;
+
+            // ── Zero Data Loss: Auto-save draft on every answer click ──────
+            const session = this.activeExamSession;
+            const currentUser = authManager.getCurrentUser();
+            if (currentUser && session) {
+              examManager.saveDraft(session.exam.id, currentUser.id, {
+                examId:        session.exam.id,
+                answers:       session.answers,
+                startedAt:     session.startedAt,
+                timeRemaining: session.timeRemaining,
+                currentQIndex: session.currentQIndex,
+                questionIds:   session.questions.map(q => q.id),
+                optionOrder:   session.optionOrder,
+              });
+            }
+            // ── End Auto-save ─────────────────────────────────────────────
+
             this.render();
           }
         });
