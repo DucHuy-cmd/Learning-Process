@@ -17,6 +17,11 @@ export const STORAGE_KEY_EXAMS = 'trr_assigned_exams_v1';
 export const STORAGE_KEY_SUBMISSIONS = 'trr_exam_submissions_v1';
 export const STORAGE_KEY_EXAM_VIOLATIONS = 'trr_exam_violations_v1';
 
+// ── Zero Data Loss ────────────────────────────────────────────────────────────
+// Active exam draft key pattern : trr_active_exam_${examId}_${userId}
+// Offline submission queue key  : trr_offline_submission_queue_v1
+export const STORAGE_KEY_OFFLINE_QUEUE = 'trr_offline_submission_queue_v1';
+
 export const DEFAULT_EXAMS = [
   {
     id: 'exam_intro_eval_2026',
@@ -631,6 +636,168 @@ export class ExamManager {
       this.memoryExamViolations = [];
     }
     this._notifyListeners('data_reset', {});
+  }
+
+  // ── Zero Data Loss: Draft Management ────────────────────────────────────────
+
+  /**
+   * Builds the localStorage key for an active exam draft.
+   * @param {string} examId
+   * @param {string} userId
+   * @returns {string}
+   */
+  _draftKey(examId, userId) {
+    return `trr_active_exam_${examId}_${userId}`;
+  }
+
+  /**
+   * Saves the current exam session state as a draft into localStorage.
+   * Called after every answer selection so no progress is ever lost.
+   *
+   * @param {string} examId
+   * @param {string} userId
+   * @param {Object} draftData - { examId, answers, startedAt, timeRemaining, currentQIndex, questionIds, optionOrder }
+   */
+  saveDraft(examId, userId, draftData) {
+    if (!this.storage || !examId || !userId) return;
+    try {
+      const payload = {
+        examId,
+        answers:       draftData.answers       || {},
+        startedAt:     draftData.startedAt     || Date.now(),
+        timeRemaining: draftData.timeRemaining != null ? draftData.timeRemaining : 0,
+        currentQIndex: draftData.currentQIndex != null ? draftData.currentQIndex : 0,
+        questionIds:   draftData.questionIds   || [],
+        optionOrder:   draftData.optionOrder   || {},
+      };
+      this.storage.setItem(this._draftKey(examId, userId), JSON.stringify(payload));
+    } catch {
+      // localStorage may be full or unavailable — silently ignore to never crash the exam
+    }
+  }
+
+  /**
+   * Loads a valid (non-expired) draft for the given exam and user.
+   * A draft is considered valid when: Date.now() - startedAt < durationMinutes * 60 * 1000
+   *
+   * @param {string} examId
+   * @param {string} userId
+   * @returns {Object|null} Draft data or null if absent / expired / corrupt
+   */
+  loadDraft(examId, userId) {
+    if (!this.storage || !examId || !userId) return null;
+    try {
+      const raw = this.storage.getItem(this._draftKey(examId, userId));
+      if (!raw) return null;
+      const draft = JSON.parse(raw);
+      if (!draft || typeof draft !== 'object') return null;
+
+      // Validate required fields
+      if (!draft.examId || !draft.startedAt) return null;
+
+      // Check expiry against the exam's durationMinutes
+      const exam = this.getExamById(examId);
+      if (!exam) return null;
+      const durationMs = (exam.durationMinutes || 15) * 60 * 1000;
+      if (Date.now() - draft.startedAt >= durationMs) {
+        // Draft has expired — clean it up
+        this.clearDraft(examId, userId);
+        return null;
+      }
+
+      return draft;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Removes the active exam draft from localStorage.
+   * Called after a successful submission or when a session is cleanly ended.
+   *
+   * @param {string} examId
+   * @param {string} userId
+   */
+  clearDraft(examId, userId) {
+    if (!this.storage || !examId || !userId) return;
+    try {
+      this.storage.removeItem(this._draftKey(examId, userId));
+    } catch {}
+  }
+
+  // ── Zero Data Loss: Offline Submission Queue ─────────────────────────────────
+
+  /**
+   * Reads all pending offline submissions from the queue.
+   * @returns {Array<Object>}
+   */
+  getOfflineQueue() {
+    if (!this.storage) return [];
+    try {
+      const raw = this.storage.getItem(STORAGE_KEY_OFFLINE_QUEUE);
+      const queue = raw ? JSON.parse(raw) : [];
+      return Array.isArray(queue) ? queue : [];
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Adds a submission payload to the offline queue so it can be retried
+   * automatically when the network recovers.
+   *
+   * @param {Object} submissionPayload - Same shape as submitExam() params
+   */
+  enqueueOfflineSubmission(submissionPayload) {
+    if (!this.storage || !submissionPayload) return;
+    try {
+      const queue = this.getOfflineQueue();
+      // Avoid duplicate entries for the same exam+user
+      const isDuplicate = queue.some(
+        item => item.examId === submissionPayload.examId && item.userId === submissionPayload.userId
+      );
+      if (!isDuplicate) {
+        queue.push({ ...submissionPayload, enqueuedAt: Date.now() });
+        this.storage.setItem(STORAGE_KEY_OFFLINE_QUEUE, JSON.stringify(queue));
+      }
+    } catch {}
+  }
+
+  /**
+   * Attempts to flush all queued offline submissions to the live system.
+   * Each item that succeeds is removed from the queue.
+   * Safe to call at any time — silently skips already-submitted entries.
+   *
+   * @param {Function} [onFlushed] - Optional callback(submission) called per successful flush
+   */
+  flushOfflineQueue(onFlushed) {
+    const queue = this.getOfflineQueue();
+    if (queue.length === 0) return;
+
+    const remaining = [];
+    queue.forEach(item => {
+      // Skip if already submitted (idempotency guard)
+      if (this.getSubmission(item.examId, item.userId)) return;
+
+      const result = this.submitExam(item);
+      if (result.success) {
+        this.clearDraft(item.examId, item.userId);
+        if (typeof onFlushed === 'function') {
+          try { onFlushed(result.submission); } catch {}
+        }
+      } else {
+        // Keep in queue only if the failure is NOT a duplicate (already submitted)
+        if (!result.submission) {
+          remaining.push(item);
+        }
+      }
+    });
+
+    try {
+      if (this.storage) {
+        this.storage.setItem(STORAGE_KEY_OFFLINE_QUEUE, JSON.stringify(remaining));
+      }
+    } catch {}
   }
 }
 
