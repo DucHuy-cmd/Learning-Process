@@ -1039,6 +1039,53 @@ export class QuizView {
           `}
         </div>
 
+        <!-- ── Submit Confirm Modal (in-DOM, keeps fullscreen) ─────────────── -->
+        ${session._showSubmitConfirm ? `
+          <div id="examSubmitConfirmOverlay" role="dialog" aria-modal="true" aria-labelledby="examSubmitConfirmTitle"
+            style="position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;
+                   background:rgba(0,0,0,0.72);backdrop-filter:blur(3px);padding:16px;box-sizing:border-box;">
+            <div style="background:var(--panel,#1e2130);border:1px solid var(--line,#2a2f45);border-radius:14px;
+                        padding:32px 28px;max-width:420px;width:100%;box-shadow:0 8px 40px rgba(0,0,0,0.6);
+                        display:flex;flex-direction:column;gap:18px;text-align:center;">
+              <div style="font-size:42px;line-height:1;">📤</div>
+              <h3 id="examSubmitConfirmTitle"
+                  style="margin:0;font-size:18px;font-weight:700;color:var(--text,#e2e8f0);line-height:1.4;">
+                Xác nhận nộp bài thi
+              </h3>
+              ${(totalQ - answeredCount) > 0 ? `
+                <div style="background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.35);
+                            border-radius:8px;padding:12px 16px;color:#f87171;font-size:14px;font-weight:600;">
+                  ⚠️ Bạn vẫn còn <strong>${totalQ - answeredCount} câu</strong> chưa chọn đáp án!
+                </div>
+              ` : `
+                <div style="background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.3);
+                            border-radius:8px;padding:12px 16px;color:#34d399;font-size:14px;font-weight:600;">
+                  ✅ Bạn đã hoàn thành tất cả ${totalQ} câu hỏi.
+                </div>
+              `}
+              <p style="margin:0;font-size:14px;color:var(--dim,#94a3b8);line-height:1.6;">
+                Bạn có chắc chắn muốn nộp bài thi ngay bây giờ?<br>
+                <span style="color:#f87171;font-weight:600;">Hành động này không thể hoàn tác.</span>
+              </p>
+              <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">
+                <button type="button" id="btnExamConfirmCancel"
+                  style="flex:1;min-width:140px;padding:12px 20px;border-radius:8px;border:1px solid var(--line,#2a2f45);
+                         background:var(--panel-alt,#252b3b);color:var(--text,#e2e8f0);font-size:14px;font-weight:600;
+                         cursor:pointer;transition:background 0.15s;">
+                  ❮ Tiếp tục làm bài
+                </button>
+                <button type="button" id="btnExamConfirmSubmit"
+                  style="flex:1;min-width:140px;padding:12px 20px;border-radius:8px;border:1px solid #10b981;
+                         background:#10b981;color:#fff;font-size:14px;font-weight:700;
+                         cursor:pointer;transition:background 0.15s;">
+                  Nộp bài 📤
+                </button>
+              </div>
+            </div>
+          </div>
+        ` : ''}
+        <!-- ── End Submit Confirm Modal ───────────────────────────────────── -->
+
       </div>
     `;
   }
@@ -2263,6 +2310,7 @@ export class QuizView {
           lockdownTimerId:   null,
           lockdownWarning:   false,
           fullscreenActive:  false,
+          _showSubmitConfirm: false,
         };
 
         this.render();
@@ -2312,6 +2360,7 @@ export class QuizView {
       lockdownTimerId: null,
       lockdownWarning: false,
       fullscreenActive: false,
+      _showSubmitConfirm: false,
     };
 
     this.render();
@@ -2843,24 +2892,50 @@ export class QuizView {
         });
       });
 
-      // Submit Active Exam
+      // Submit Active Exam — opens in-DOM confirm modal (no window.confirm → no fullscreen exit)
       const btnSubmitActiveExam = this.container.querySelector('#btnSubmitActiveExam');
       if (btnSubmitActiveExam) {
         btnSubmitActiveExam.addEventListener('click', () => {
-          const answeredCount = Object.keys(this.activeExamSession.answers).length;
-          const totalQ = this.activeExamSession.questions.length;
-          const remaining = totalQ - answeredCount;
+          if (!this.activeExamSession) return;
+          // Show the custom in-DOM confirmation modal (keeps fullscreen intact)
+          this.activeExamSession._showSubmitConfirm = true;
+          this.render();
+        });
+      }
 
-          let confirmMsg = 'Bạn có chắc chắn muốn nộp bài thi ngay bây giờ?';
-          if (remaining > 0) {
-            confirmMsg = `Bạn vẫn còn ${remaining} câu chưa chọn đáp án!\n\nBạn có chắc chắn muốn nộp bài thi ngay bây giờ?`;
+      // In-DOM Confirm Modal: "Tiếp tục làm bài" (cancel)
+      const btnExamConfirmCancel = this.container.querySelector('#btnExamConfirmCancel');
+      if (btnExamConfirmCancel) {
+        btnExamConfirmCancel.addEventListener('click', () => {
+          if (this.activeExamSession) {
+            this.activeExamSession._showSubmitConfirm = false;
           }
+          this.render();
+        });
+      }
 
-          if (typeof window !== 'undefined' && window.confirm && !window.confirm(confirmMsg)) {
-            return;
+      // In-DOM Confirm Modal: "Nộp bài" (confirm submit)
+      const btnExamConfirmSubmit = this.container.querySelector('#btnExamConfirmSubmit');
+      if (btnExamConfirmSubmit) {
+        btnExamConfirmSubmit.addEventListener('click', () => {
+          if (this.activeExamSession) {
+            this.activeExamSession._showSubmitConfirm = false;
           }
-
           this._submitActiveExam();
+        });
+      }
+
+      // Backdrop click on the confirm overlay also closes it (cancel)
+      const examSubmitConfirmOverlay = this.container.querySelector('#examSubmitConfirmOverlay');
+      if (examSubmitConfirmOverlay) {
+        examSubmitConfirmOverlay.addEventListener('click', (e) => {
+          // Only close if the click was on the dim backdrop itself, not the dialog box
+          if (e.target === examSubmitConfirmOverlay) {
+            if (this.activeExamSession) {
+              this.activeExamSession._showSubmitConfirm = false;
+            }
+            this.render();
+          }
         });
       }
     }
