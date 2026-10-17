@@ -355,14 +355,16 @@ Tôi là gia sư AI học thuật được tích hợp trực tiếp vào hệ t
 
     this.container.innerHTML = `
       <div class="ai-assistant-layout">
+        <div class="ai-sidebar-backdrop" id="aiSidebarBackdrop"></div>
         <!-- 1. LEFT SIDEBAR: Controls & Prompts -->
-        <aside class="ai-sidebar">
+        <aside class="ai-sidebar" id="aiSidebarDrawer">
           <div class="ai-sidebar-head">
             <span class="ai-sidebar-icon">🤖</span>
-            <div>
+            <div style="flex:1;min-width:0;">
               <h3 class="ai-sidebar-title">Trợ Lý AI Toán Rời Rạc</h3>
               <span class="ai-sidebar-sub">Công nghệ AI Bridge 4 Phòng Lab</span>
             </div>
+            <button type="button" class="btn-ai-sidebar-close" id="btnCloseAiSidebarMobile" title="Đóng danh mục">✕</button>
           </div>
 
           <!-- New Chat Button -->
@@ -449,13 +451,22 @@ Tôi là gia sư AI học thuật được tích hợp trực tiếp vào hệ t
           <!-- Chat Canvas Header -->
           <div class="ai-canvas-header">
             <div class="canvas-title-wrap">
+              <button type="button" class="btn-ai-sidebar-mobile-toggle" id="btnToggleAiSidebarMobile" title="Mở danh mục gợi ý, lịch sử và cài đặt">
+                <span class="toggle-icon">☰</span>
+                <span class="toggle-text">Gợi ý &amp; Lịch sử</span>
+              </button>
               <div class="ai-avatar-badge">🤖</div>
               <div>
                 <h2 class="ai-title">AI Assistant</h2>
                 <div class="ai-sub-info">
-                  <span class="ai-sub-text">Trợ lý Thực nghiệm Toán Rời Rạc &amp; Phân tích graph từ image/document</span>
+                  <span class="ai-sub-text">Trợ lý Thực nghiệm Toán Rời Rạc</span>
                 </div>
               </div>
+            </div>
+            <div class="ai-canvas-header-actions">
+              <button type="button" class="btn-ai-header-new-chat" id="btnAiHeaderNewChat" title="Bắt đầu cuộc trò chuyện mới">
+                <span>＋ Mới</span>
+              </button>
             </div>
           </div>
 
@@ -1032,11 +1043,20 @@ Tôi là gia sư AI học thuật được tích hợp trực tiếp vào hệ t
     this._bindPromptChips();
   }
 
+  _closeMobileDrawer() {
+    if (!this.container) return;
+    const drawer = this.container.querySelector('#aiSidebarDrawer');
+    const backdrop = this.container.querySelector('#aiSidebarBackdrop');
+    if (drawer) drawer.classList.remove('open');
+    if (backdrop) backdrop.classList.remove('open');
+  }
+
   _bindPromptChips() {
     if (!this.container) return;
     this.container.querySelectorAll('[data-prompt]').forEach(btn => {
       btn.onclick = () => {
         const prompt = btn.getAttribute('data-prompt');
+        this._closeMobileDrawer();
         this._handleUserPrompt(prompt);
       };
     });
@@ -1060,6 +1080,36 @@ Tôi là gia sư AI học thuật được tích hợp trực tiếp vào hệ t
 
   _bindEvents() {
     if (!this.container) return;
+
+    // 0. Mobile Drawer Toggle & Controls
+    const btnToggleSidebarMobile = this.container.querySelector('#btnToggleAiSidebarMobile');
+    const btnCloseSidebarMobile = this.container.querySelector('#btnCloseAiSidebarMobile');
+    const sidebarDrawer = this.container.querySelector('#aiSidebarDrawer');
+    const sidebarBackdrop = this.container.querySelector('#aiSidebarBackdrop');
+    const btnHeaderNewChat = this.container.querySelector('#btnAiHeaderNewChat');
+
+    if (btnToggleSidebarMobile && sidebarDrawer && sidebarBackdrop) {
+      btnToggleSidebarMobile.addEventListener('click', () => {
+        const willOpen = !sidebarDrawer.classList.contains('open');
+        sidebarDrawer.classList.toggle('open', willOpen);
+        sidebarBackdrop.classList.toggle('open', willOpen);
+      });
+    }
+
+    if (btnCloseSidebarMobile) {
+      btnCloseSidebarMobile.addEventListener('click', () => this._closeMobileDrawer());
+    }
+
+    if (sidebarBackdrop) {
+      sidebarBackdrop.addEventListener('click', () => this._closeMobileDrawer());
+    }
+
+    if (btnHeaderNewChat) {
+      btnHeaderNewChat.addEventListener('click', () => {
+        this.startNewChat();
+        this._closeMobileDrawer();
+      });
+    }
 
     // 1. API Key Toggle
     const btnToggleConfig = this.container.querySelector('#btnToggleApiConfig');
@@ -1114,7 +1164,7 @@ Tôi là gia sư AI học thuật được tích hợp trực tiếp vào hệ t
 
     if (textarea) {
       textarea.addEventListener('focus', () => {
-        this._safeScrollToTop();
+        this._scrollToBottom();
       });
 
       textarea.addEventListener('input', () => {
@@ -1127,7 +1177,6 @@ Tôi là gia sư AI học thuật được tích hợp trực tiếp vào hệ t
           e.preventDefault();
           const text = textarea.value.trim();
           if (text) {
-            this._safeScrollToTop();
             this._handleUserPrompt(text);
             textarea.value = '';
             textarea.style.height = 'auto';
@@ -1142,7 +1191,6 @@ Tôi là gia sư AI học thuật được tích hợp trực tiếp vào hệ t
         if (textarea) {
           const text = textarea.value.trim();
           if (text) {
-            this._safeScrollToTop();
             this._handleUserPrompt(text);
             textarea.value = '';
             textarea.style.height = 'auto';
@@ -1284,6 +1332,7 @@ Tôi là gia sư AI học thuật được tích hợp trực tiếp vào hệ t
         if (e.target.closest('.ai-history-del-btn')) return;
         const sessionId = item.getAttribute('data-session-id');
         if (sessionId) {
+          this._closeMobileDrawer();
           this.loadSession(sessionId);
         }
       });
@@ -1405,7 +1454,6 @@ Tôi là gia sư AI học thuật được tích hợp trực tiếp vào hệ t
     if (stream) {
       setTimeout(() => {
         stream.scrollTop = stream.scrollHeight;
-        this._safeScrollToTop();
       }, 50);
     }
   }
