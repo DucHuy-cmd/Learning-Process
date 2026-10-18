@@ -8644,3 +8644,73 @@ body.theme-light .btn-close-modal:hover {
   }
 }
 
+/* =====================================================================
+   SENIOR FULLSTACK CROSS-BROWSER MOBILE ENHANCEMENTS (ANDROID & IOS SAFARI)
+   ===================================================================== */
+@media (max-width: 768px) {
+  /* 1. iOS Safari Auto-Zoom Fix: Prevent zoom when focusing inputs with font-size < 16px */
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+
+  /* 2. Fast Responsive Taps: Eliminate 300ms tap delay and touch callouts */
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  button,
+  a,
+  input[type="button"],
+  input[type="submit"],
+  .btn-quiz-option,
+  .btn-active-exam-opt {
+    touch-action: manipulation;
+  }
+
+  /* 3. iOS Momentum Scrolling */
+  .table-responsive,
+  .gradebook-table-container,
+  .ai-messages-scroll,
+  .theory-sidebar,
+  .theory-content,
+  .mobile-nav-panel,
+  .admin-table-container,
+  .exam-history-list {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* 4. Safe Area Inset Support (iPhone Notch & Dynamic Island) */
+  .app-header {
+    padding-top: env(safe-area-inset-top, 0px) !important;
+    height: calc(56px + env(safe-area-inset-top, 0px)) !important;
+  }
+
+  .mobile-nav-panel {
+    padding-top: env(safe-area-inset-top, 0px) !important;
+    padding-bottom: env(safe-area-inset-bottom, 0px) !important;
+  }
+
+  /* 5. Mobile User Dropdown Bounds Protection */
+  .user-dropdown-menu {
+    max-width: calc(100vw - 20px) !important;
+    right: 0 !important;
+  }
+
+  /* 6. AI Header Subtitle Mobile Ellipsis */
+  .ai-sub-text {
+    max-width: 200px !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+}
+
+/* Graph Canvas & SVG Touch Support */
+.graph-canvas-container svg,
+#graphCanvas,
+#graphSvg {
+  touch-action: none;
+}
+

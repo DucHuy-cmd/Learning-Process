@@ -271,10 +271,10 @@ describe('QuizView UI Component', () => {
 
     quizView._recordExamLockdownViolation();
     expect(session.violationCount).toBe(1);
-    expect(session.lockdownCountdown).toBe(10);
-    expect(container.querySelector('#examLockdownCountdown').textContent).toBe('10');
+    expect(session.lockdownCountdown).toBe(35);
+    expect(container.querySelector('#examLockdownCountdown').textContent).toBe('35');
 
-    vi.advanceTimersByTime(9000);
+    vi.advanceTimersByTime(34000);
     expect(session.violationCount).toBe(1);
     expect(session.lockdownCountdown).toBe(1);
 
@@ -282,13 +282,13 @@ describe('QuizView UI Component', () => {
     expect(session.violationCount).toBe(2);
     expect(container.querySelector('.exam-lockdown-warning').textContent).toContain('CẢNH BÁO');
     expect(container.querySelector('.exam-lockdown-warning').textContent).toContain('cộng thêm 1 vi phạm');
-    expect(session.lockdownCountdown).toBe(10);
-    expect(container.querySelector('#examLockdownCountdown').textContent).toBe('10');
+    expect(session.lockdownCountdown).toBe(35);
+    expect(container.querySelector('#examLockdownCountdown').textContent).toBe('35');
     expect(session.lockdownTimerId).not.toBeNull();
     expect(requestFullscreen).not.toHaveBeenCalled();
 
     session.answers[session.questions[0].id] = session.questions[0].correctId;
-    vi.advanceTimersByTime(10000);
+    vi.advanceTimersByTime(35000);
     expect(session.violationCount).toBe(3);
     expect(session.lockdownTimerId).toBeNull();
     expect(quizView.activeExamSession).toBeNull();
@@ -315,7 +315,7 @@ describe('QuizView UI Component', () => {
     });
 
     quizView._recordExamLockdownViolation();
-    vi.advanceTimersByTime(10000);
+    vi.advanceTimersByTime(35000);
     expect(session.violationCount).toBe(2);
     expect(session.lockdownTimerId).not.toBeNull();
     container.querySelector('#btnResumeExamLockdown').click();

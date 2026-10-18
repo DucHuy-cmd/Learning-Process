@@ -83,29 +83,33 @@ export class GraphCanvas {
   _setupInteractions() {
     if (!this.svg) return;
 
-    // Canvas background panning
-    this.svg.addEventListener('mousedown', (e) => {
+    // Prevent default browser touch scrolling/pinching when interacting with canvas
+    if (this.svg.style) {
+      this.svg.style.touchAction = 'none';
+    }
+
+    const handleStartPan = (e) => {
       if (e.target.closest('.nodebox') || e.target.closest('.nodelabel') || e.target.closest('.node-sub') || e.target.closest('.zoom-controls') || this.isDraggingNode) {
         return;
       }
       this.isPanning = true;
       this.startX = e.clientX - this.panX;
       this.startY = e.clientY - this.panY;
-    });
+    };
 
-    window.addEventListener('mousemove', (e) => {
+    const handleMove = (clientX, clientY) => {
       // 1. Handle SVG Canvas Panning
       if (this.isPanning) {
-        this.panX = e.clientX - this.startX;
-        this.panY = e.clientY - this.startY;
+        this.panX = clientX - this.startX;
+        this.panY = clientY - this.startY;
         this._updateTransform();
         return;
       }
 
       // 2. Handle Node Dragging
       if (this.isDraggingNode && this.draggedNodeId) {
-        const dx = (e.clientX - this.dragStartX) / this.scale;
-        const dy = (e.clientY - this.dragStartY) / this.scale;
+        const dx = (clientX - this.dragStartX) / this.scale;
+        const dy = (clientY - this.dragStartY) / this.scale;
 
         if (!this.hasMovedDistance && Math.hypot(dx, dy) > 4) {
           this.hasMovedDistance = true;
@@ -137,9 +141,9 @@ export class GraphCanvas {
           }
         }
       }
-    });
+    };
 
-    window.addEventListener('mouseup', () => {
+    const handleEnd = () => {
       if (this.isPanning) {
         this.isPanning = false;
       }
@@ -161,7 +165,22 @@ export class GraphCanvas {
           this.onNodeClick(nodeId);
         }
       }
-    });
+    };
+
+    // Canvas background panning (mouse and pointer/touch)
+    this.svg.addEventListener('mousedown', handleStartPan);
+    if (typeof window !== 'undefined' && 'PointerEvent' in window) {
+      this.svg.addEventListener('pointerdown', handleStartPan);
+    }
+
+    window.addEventListener('mousemove', (e) => handleMove(e.clientX, e.clientY));
+    window.addEventListener('mouseup', handleEnd);
+
+    if (typeof window !== 'undefined' && 'PointerEvent' in window) {
+      window.addEventListener('pointermove', (e) => handleMove(e.clientX, e.clientY));
+      window.addEventListener('pointerup', handleEnd);
+      window.addEventListener('pointercancel', handleEnd);
+    }
 
     this.svg.addEventListener('wheel', (e) => {
       e.preventDefault();
@@ -413,18 +432,24 @@ export class GraphCanvas {
       g.setAttribute('id', `node_group_${nd.id}`);
       g.style.cursor = 'grab';
 
-      // Start drag listener on node
-      g.addEventListener('mousedown', (e) => {
-        e.stopPropagation();
+      // Start drag listener on node (mouse and touch/pointer)
+      g.style.touchAction = 'none';
+      const startDragNode = (e) => {
+        if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
         this.isDraggingNode = true;
         this.draggedNodeId = nd.id;
         this.dragStartX = e.clientX;
         this.dragStartY = e.clientY;
         const currentData = this.nodesMap.get(nd.id);
-        this.nodeInitialX = currentData.x;
-        this.nodeInitialY = currentData.y;
+        this.nodeInitialX = currentData ? currentData.x : 0;
+        this.nodeInitialY = currentData ? currentData.y : 0;
         this.hasMovedDistance = false;
-      });
+      };
+
+      g.addEventListener('mousedown', startDragNode);
+      if (typeof window !== 'undefined' && 'PointerEvent' in window) {
+        g.addEventListener('pointerdown', startDragNode);
+      }
 
       const color = KIND_COLORS[nd.kind] || KIND_COLORS.phong;
 

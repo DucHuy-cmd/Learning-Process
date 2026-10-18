@@ -1875,7 +1875,7 @@ export class QuizView {
     return `
       <div class="gradebook-modal-backdrop" id="gradebookModalBackdrop" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px;">
         <div class="gradebook-modal-card" style="background:var(--panel);border:1px solid var(--line);border-radius:12px;width:100%;max-width:960px;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 20px 40px rgba(0,0,0,0.4);overflow:hidden;">
-          <div style="padding:18px 24px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;">
+          <div style="padding:18px 24px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
             <div>
               <div style="font-size:12px;color:var(--accent);font-weight:700;text-transform:uppercase;">
                 📊 Sổ Điểm Điện Tử &amp; Danh Sách Nộp Bài
@@ -1884,7 +1884,7 @@ export class QuizView {
                 ${this._escapeHtml(exam.title)}
               </h3>
             </div>
-            <div style="display:flex;gap:10px;align-items:center;">
+            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
               <button type="button" class="btn-sm" id="btnExportGradebookExcel" style="background:#10b981;color:#fff;border:none;padding:6px 14px;font-size:13px;border-radius:6px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;">
                 📥 Xuất File Excel (.csv)
               </button>
@@ -1909,7 +1909,7 @@ export class QuizView {
             </div>
           </div>
 
-          <div style="padding:20px 24px;overflow-y:auto;flex:1;">
+          <div style="padding:20px 24px;overflow-y:auto;overflow-x:auto;-webkit-overflow-scrolling:touch;flex:1;">
             ${submissions.length === 0 ? `
               <div style="text-align:center;padding:40px;color:var(--dim);font-style:italic;">
                 Chưa có sinh viên nào nộp bài cho đề thi này.
@@ -1992,13 +1992,13 @@ export class QuizView {
         <div class="gradebook-modal-card" style="background:var(--panel);border:1px solid var(--line);border-radius:12px;width:100%;max-width:960px;max-height:92vh;display:flex;flex-direction:column;box-shadow:0 20px 40px rgba(0,0,0,0.4);overflow:hidden;">
           
           <!-- Modal Header -->
-          <div style="padding:18px 24px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;background:var(--panel-alt);">
+          <div style="padding:18px 24px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;background:var(--panel-alt);flex-wrap:wrap;gap:12px;">
             <div>
-              <div style="font-size:12px;color:var(--accent);font-weight:700;text-transform:uppercase;display:flex;align-items:center;gap:6px;">
+              <div style="font-size:12px;color:var(--accent);font-weight:700;text-transform:uppercase;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
                 <span>🔑 HỒ SƠ ĐÁP ÁN &amp; BAREM CHẤM DÀNH CHO ADMIN</span>
                 <span class="pill-badge" style="background:#10b981;color:#fff;font-size:11px;padding:1px 8px;border-radius:10px;">Bảo Mật Giáo Viên</span>
               </div>
-              <h3 style="font-size:18px;font-weight:700;color:var(--text);margin:3px 0 0;">
+              <h3 style="font-size:18px;font-weight:700;color:var(--text);margin:3px 0 0;word-break:break-word;">
                 ${this._escapeHtml(exam.title)} • Mã đề: <span style="color:var(--accent);">${this._escapeHtml(exam.examCode || exam.id)}</span>
               </h3>
             </div>

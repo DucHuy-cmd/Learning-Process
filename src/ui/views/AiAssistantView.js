@@ -459,7 +459,7 @@ Tôi là gia sư AI học thuật được tích hợp trực tiếp vào hệ t
               <div>
                 <h2 class="ai-title">AI Assistant</h2>
                 <div class="ai-sub-info">
-                  <span class="ai-sub-text">Trợ lý Thực nghiệm Toán Rời Rạc</span>
+                  <span class="ai-sub-text">Trợ lý Thực nghiệm Toán Rời Rạc &amp; Phân tích graph từ image/document</span>
                 </div>
               </div>
             </div>
