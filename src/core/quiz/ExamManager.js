@@ -216,9 +216,26 @@ export class ExamManager {
       return { success: false, error: 'Thời gian làm bài phải từ 1 đến 180 phút.' };
     }
 
-    const generatedCode = examCode && typeof examCode === 'string' && examCode.trim()
-      ? examCode.trim().toUpperCase()
-      : `TRR-${Math.floor(100 + Math.random() * 900)}`;
+    let generatedCode;
+    if (examCode && typeof examCode === 'string' && examCode.trim()) {
+      generatedCode = examCode.trim().toUpperCase();
+    } else {
+      const existingExams = this.getExams();
+      let maxNum = 100;
+      (existingExams || []).forEach(ex => {
+        if (!ex) return;
+        if (ex.examCode) {
+          const m = String(ex.examCode).match(/(\d+)/);
+          if (m) {
+            const n = parseInt(m[1], 10);
+            if (!isNaN(n) && n >= 100 && n < 1000 && n > maxNum) {
+              maxNum = n;
+            }
+          }
+        }
+      });
+      generatedCode = String(maxNum + 1);
+    }
 
     const exam = {
       id: `exam_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,

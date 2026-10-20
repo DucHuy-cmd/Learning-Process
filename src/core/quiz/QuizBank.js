@@ -2494,6 +2494,7 @@ export function generateExamPaper({
   count = 5,
   topic = QUIZ_TOPICS.ALL,
   difficulty = QUIZ_DIFFICULTIES.ALL,
+  examCode = 101,
 } = {}) {
   let pool = getAllQuestions();
 
@@ -2528,14 +2529,16 @@ export function generateExamPaper({
     ]);
   }
 
-  const examCode = Math.floor(100 + Math.random() * 900);
+  const finalExamCode = (examCode !== undefined && examCode !== null && examCode !== '')
+    ? examCode
+    : 101;
   const answerKey = {};
   selectedQuestions.forEach((q, idx) => {
     answerKey[idx + 1] = q.correctId;
   });
 
   return {
-    examCode,
+    examCode: finalExamCode,
     topic,
     difficulty,
     createdAt: new Date().toLocaleDateString('vi-VN'),

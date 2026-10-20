@@ -116,7 +116,8 @@ export class QuizView {
     this.selectedAssignFileId = 'all'; // 'all' or specific file.id
     this.selectedAssignCount = 'all'; // 'all' or string number e.g. '10', '20'
     this.studioPrintSource = 'all_word'; // 'all_word', specific file.id, or 'builtin'
-    this.printExamCode = null;
+    this.printExamCode = '101';
+    this.studioAssignExamCode = null;
     this.studioAssignTitle = null;
 
     this._generateNewExam();
@@ -455,6 +456,38 @@ export class QuizView {
     return `Đề ${maxNum + 1}`;
   }
 
+  _getNextExamCode() {
+    const existingExams = (examManager && typeof examManager.getExams === 'function')
+      ? examManager.getExams()
+      : [];
+    let maxNum = 100;
+    (existingExams || []).forEach(ex => {
+      if (!ex) return;
+      if (ex.examCode) {
+        const match = String(ex.examCode).match(/(\d+)/);
+        if (match) {
+          const n = parseInt(match[1], 10);
+          if (!isNaN(n) && n >= 100 && n < 1000 && n > maxNum) {
+            maxNum = n;
+          }
+        }
+      }
+      if (ex.title) {
+        const matchTitle = ex.title.trim().match(/Đề\s*(\d+)/i);
+        if (matchTitle) {
+          const titleNum = parseInt(matchTitle[1], 10);
+          if (!isNaN(titleNum)) {
+            const impliedCode = 100 + titleNum;
+            if (impliedCode > maxNum) {
+              maxNum = impliedCode - 1;
+            }
+          }
+        }
+      }
+    });
+    return String(maxNum + 1);
+  }
+
   _getSelectedDistributedQuestions() {
     if (!this.importedFiles || this.importedFiles.length === 0) {
       return this.importedQuestions || [];
@@ -524,7 +557,7 @@ export class QuizView {
     }
 
     if (!this.printExamCode) {
-      this.printExamCode = `TRR-${Math.floor(100 + Math.random() * 900)}`;
+      this.printExamCode = '101';
     }
 
     return {
@@ -1322,6 +1355,9 @@ export class QuizView {
     const defaultExamTitle = (this.studioAssignTitle !== null && this.studioAssignTitle !== undefined)
       ? this.studioAssignTitle
       : this._getNextExamTitle();
+    const defaultExamCode = (this.studioAssignExamCode !== null && this.studioAssignExamCode !== undefined)
+      ? this.studioAssignExamCode
+      : this._getNextExamCode();
 
     return `
       <!-- Studio Subtab Navigation (3 Tabs) -->
@@ -1603,7 +1639,7 @@ export class QuizView {
 
               <div>
                 <label style="display:block;font-size:12.5px;font-weight:600;color:var(--text);margin-bottom:6px;">Mã đề thi (Exam Code):</label>
-                <input type="text" id="txtAssignExamCode" class="form-input" placeholder="Ví dụ: TRR-101" value="TRR-${Math.floor(100 + Math.random() * 900)}" style="width:100%;padding:8px 12px;border-radius:6px;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);font-size:13px;font-family:monospace;font-weight:700;" />
+                <input type="text" id="txtAssignExamCode" class="form-input" placeholder="Ví dụ: 101, 102..." value="${this._escapeHtml(defaultExamCode)}" style="width:100%;padding:8px 12px;border-radius:6px;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);font-size:13px;font-family:monospace;font-weight:700;" />
               </div>
             </div>
 
@@ -1723,9 +1759,10 @@ export class QuizView {
               <div>
                 <div style="font-size:14px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:6px;">
                   <span>👩‍🏫 Studio Soạn Đề Thi Trắc Nghiệm Chuẩn A4</span>
-                  <span class="pill-badge" style="background:rgba(245,158,11,0.15);color:var(--accent);font-size:11px;padding:2px 8px;border-radius:10px;">
-                    Mã đề: ${exam.examCode}
-                  </span>
+                  <div style="display:inline-flex;align-items:center;gap:5px;background:rgba(245,158,11,0.15);padding:2px 8px;border-radius:6px;">
+                    <span style="font-size:11.5px;font-weight:700;color:var(--accent);">Mã đề:</span>
+                    <input type="text" id="txtPrintExamCode" class="form-input" value="${this._escapeHtml(exam.examCode || this.printExamCode || '101')}" placeholder="101" style="width:65px;padding:2px 6px;font-size:12px;font-weight:700;text-align:center;border-radius:4px;background:var(--panel);border:1px solid var(--accent);color:var(--accent);" />
+                  </div>
                 </div>
                 <p style="font-size:12px;color:var(--dim);margin:3px 0 0;">
                   Tạo đề thi chuẩn mẫu Bộ GD&amp;ĐT &amp; Đại học, in trực tiếp ra giấy A4 hoặc chép mã nguồn LaTeX cho Overleaf.
@@ -1741,7 +1778,7 @@ export class QuizView {
                   📋 Sao Chép Mã LaTeX (.tex)
                 </button>
                 <button type="button" class="btn-sm" id="btnGenNewExam" style="padding:8px 14px;font-size:13px;background:var(--panel-alt);border:1px solid var(--accent);color:var(--accent);font-weight:600;">
-                  🎲 Đổi Mã Đề Khác
+                  🔢 Đổi Mã Đề Kế Tiếp (+1)
                 </button>
               </div>
             </div>
@@ -3311,6 +3348,14 @@ export class QuizView {
       });
     }
 
+    // Track custom exam code input
+    const txtAssignExamCode = this.container.querySelector('#txtAssignExamCode');
+    if (txtAssignExamCode) {
+      txtAssignExamCode.addEventListener('input', (e) => {
+        this.studioAssignExamCode = e.target.value;
+      });
+    }
+
     // Create & Assign Exam Button (From multi-file distribution)
     const btnCreateAndAssign = this.container.querySelector('#btnCreateAndAssignExam');
     if (btnCreateAndAssign) {
@@ -3376,6 +3421,7 @@ export class QuizView {
           this.adminAnswerKeyExamId = result.exam.id;
           this._showAlert(`🎉 Tạo và phát đề thi thành công!\n\nĐề thi: "${title}" (Mã: ${result.exam.examCode})\nSố câu: ${questionIds.length} câu\nThời lượng: ${durationMinutes} phút\nĐối tượng: ${assignedTo.includes('all') ? 'Toàn bộ sinh viên' : assignedTo.length + ' sinh viên'}\n\nĐề thi đã được chuyển vào mục "Quản Lý Đề Thi". Hệ thống đã chuẩn bị sẵn File Đáp Án dành riêng cho Quản trị viên.`);
           this.studioAssignTitle = null;
+          this.studioAssignExamCode = null;
           this.render();
         } else {
           this._showAlert(result.error || result.message || 'Có lỗi xảy ra khi tạo đề thi.');
@@ -3605,10 +3651,26 @@ export class QuizView {
       });
     }
 
+    const txtPrintExamCode = this.container.querySelector('#txtPrintExamCode');
+    if (txtPrintExamCode) {
+      txtPrintExamCode.addEventListener('input', (e) => {
+        this.printExamCode = e.target.value.trim() || '101';
+      });
+      txtPrintExamCode.addEventListener('change', (e) => {
+        this.printExamCode = e.target.value.trim() || '101';
+        this.render();
+      });
+    }
+
     const btnGenNewExam = this.container.querySelector('#btnGenNewExam');
     if (btnGenNewExam) {
       btnGenNewExam.addEventListener('click', () => {
-        this.printExamCode = `TRR-${Math.floor(100 + Math.random() * 900)}`;
+        const currentNum = parseInt(this.printExamCode, 10);
+        if (!isNaN(currentNum)) {
+          this.printExamCode = String(currentNum + 1);
+        } else {
+          this.printExamCode = '102';
+        }
         this.render();
       });
     }
