@@ -21,7 +21,6 @@ const DB_FILE = process.env.VITEST
 function getDefaultStats() {
   return {};
 }
-
 export const serverUsers = [...DEMO_USERS];
 export const serverAiSessions = {};
 export const serverQuizStats = getDefaultStats();
@@ -29,6 +28,50 @@ export const serverExams = [...DEFAULT_EXAMS];
 export const serverExamSubmissions = [];
 export const serverCustomQuestions = [];
 export const serverImportedFiles = [];
+export const serverDeletedUsers = new Set();
+export const serverDeletedExams = new Set();
+export let serverDbResetTime = 0;
+
+export function markUserDeleted(identifier) {
+  if (!identifier) return;
+  serverDeletedUsers.add(String(identifier).trim().toLowerCase());
+}
+
+export function unmarkUserDeleted(identifier) {
+  if (!identifier) return;
+  serverDeletedUsers.delete(String(identifier).trim().toLowerCase());
+}
+
+export function isUserDeleted(identifier) {
+  if (!identifier) return false;
+  return serverDeletedUsers.has(String(identifier).trim().toLowerCase());
+}
+
+export function markExamDeleted(examId) {
+  if (!examId) return;
+  serverDeletedExams.add(String(examId).trim());
+}
+
+export function unmarkExamDeleted(examId) {
+  if (!examId) return;
+  serverDeletedExams.delete(String(examId).trim());
+}
+
+export function isExamDeleted(examId) {
+  if (!examId) return false;
+  return serverDeletedExams.has(String(examId).trim());
+}
+
+export function recordDbReset(studentList = []) {
+  serverDbResetTime = Date.now();
+  if (Array.isArray(studentList)) {
+    for (const u of studentList) {
+      if (u.id) markUserDeleted(u.id);
+      if (u.username) markUserDeleted(u.username);
+      if (u.email) markUserDeleted(u.email);
+    }
+  }
+}
 
 export function loadDatabase() {
   try {
@@ -88,6 +131,21 @@ export function loadDatabase() {
       if (Array.isArray(data.importedFiles)) {
         serverImportedFiles.length = 0;
         serverImportedFiles.push(...data.importedFiles);
+      }
+      if (Array.isArray(data.deletedUsers)) {
+        serverDeletedUsers.clear();
+        for (const item of data.deletedUsers) {
+          if (item) serverDeletedUsers.add(String(item).trim().toLowerCase());
+        }
+      }
+      if (Array.isArray(data.deletedExams)) {
+        serverDeletedExams.clear();
+        for (const item of data.deletedExams) {
+          if (item) serverDeletedExams.add(String(item).trim());
+        }
+      }
+      if (typeof data.dbResetTime === 'number') {
+        serverDbResetTime = data.dbResetTime;
       }
     }
   } catch {
@@ -178,6 +236,21 @@ export async function fetchFromKV() {
         serverImportedFiles.length = 0;
         serverImportedFiles.push(...data.importedFiles);
       }
+      if (Array.isArray(data.deletedUsers)) {
+        serverDeletedUsers.clear();
+        for (const item of data.deletedUsers) {
+          if (item) serverDeletedUsers.add(String(item).trim().toLowerCase());
+        }
+      }
+      if (Array.isArray(data.deletedExams)) {
+        serverDeletedExams.clear();
+        for (const item of data.deletedExams) {
+          if (item) serverDeletedExams.add(String(item).trim());
+        }
+      }
+      if (typeof data.dbResetTime === 'number') {
+        serverDbResetTime = data.dbResetTime;
+      }
       return true;
     }
   } catch (err) {
@@ -192,6 +265,9 @@ export async function writeToKV() {
   try {
     const payload = JSON.stringify({
       users: serverUsers,
+      deletedUsers: Array.from(serverDeletedUsers),
+      deletedExams: Array.from(serverDeletedExams),
+      dbResetTime: serverDbResetTime,
       aiSessions: serverAiSessions,
       quizStats: serverQuizStats,
       exams: serverExams,
@@ -222,6 +298,9 @@ export function saveDatabase() {
     }
     const data = {
       users: serverUsers,
+      deletedUsers: Array.from(serverDeletedUsers),
+      deletedExams: Array.from(serverDeletedExams),
+      dbResetTime: serverDbResetTime,
       aiSessions: serverAiSessions,
       quizStats: serverQuizStats,
       exams: serverExams,

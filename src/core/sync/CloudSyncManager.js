@@ -132,19 +132,92 @@ export class CloudSyncManager {
     try {
       const res = await fetch(`${this.baseUrl}/api/auth/users`);
       if (!res.ok) return;
-      const data = await res.json();
-      if (data.success && Array.isArray(data.users)) {
-        const serverUsers = data.users;
+
+      const contentType = typeof res.headers?.get === 'function' ? (res.headers.get('content-type') || '') : '';
+      if (contentType && !contentType.includes('application/json')) return;
+
+      const data = await res.json().catch(() => null);
+      if (data && data.success && Array.isArray(data.users)) {
+        // 1. Check for server database reset event
+        const serverDbResetTime = data.dbResetTime || 0;
+        const localDbResetTime = parseInt(authManager.storage?.getItem('trr_last_db_reset') || '0', 10);
+        if (serverDbResetTime > 0 && serverDbResetTime > localDbResetTime) {
+          console.info('[CloudSync] Server database reset detected. Purging local non-admin accounts and records.');
+          authManager.resetUsersToDefault({ force: true });
+          if (authManager.storage) {
+            try {
+              authManager.storage.setItem('trr_last_db_reset', String(serverDbResetTime));
+              authManager.storage.setItem('trr_exam_submissions_v1', JSON.stringify([]));
+              authManager.storage.setItem('trr_exam_violations_v1', JSON.stringify([]));
+              authManager.storage.setItem('trr_quiz_stats_map', JSON.stringify({}));
+              authManager.storage.setItem('trr_ai_sessions_v1', JSON.stringify({}));
+            } catch {}
+          }
+        }
+
+        // 2. Process tombstones of deleted accounts from server
+        if (Array.isArray(data.deletedUsers)) {
+          for (const delId of data.deletedUsers) {
+            authManager.markDeletedLocally(delId);
+            if (authManager.storage) {
+              try {
+                const subs = JSON.parse(authManager.storage.getItem('trr_exam_submissions_v1') || '[]');
+                const clean = subs.filter(s => 
+                  s.userId?.toLowerCase() !== delId.toLowerCase() && 
+                  s.username?.toLowerCase() !== delId.toLowerCase()
+                );
+                if (clean.length !== subs.length) {
+                  authManager.storage.setItem('trr_exam_submissions_v1', JSON.stringify(clean));
+                }
+              } catch {}
+            }
+          }
+        }
+
+        const localUsers = authManager.getUsers();
+
+        // 3. Filter server users to ensure no deleted user leaks in
+        const serverUsers = data.users.filter(su => {
+          return !authManager.isLocallyDeleted(su.id) && !authManager.isLocallyDeleted(su.username);
+        });
+
+        // 4. Merge server users with local users, preserving local passwords
+        const mergedUsers = serverUsers.map(su => {
+          const matchingLocal = localUsers.find(
+            lu => lu.id === su.id || lu.username.toLowerCase() === su.username.toLowerCase()
+          );
+          return {
+            ...su,
+            password: matchingLocal?.password || su.password || '123456',
+          };
+        });
+
+        // 5. Only push local accounts that are explicitly marked pendingSync AND not deleted
+        for (const lu of localUsers) {
+          if (lu.pendingSync === true) {
+            const isDel = authManager.isLocallyDeleted(lu.id) || authManager.isLocallyDeleted(lu.username);
+            if (!isDel && !mergedUsers.some(mu => mu.id === lu.id || mu.username.toLowerCase() === lu.username.toLowerCase())) {
+              mergedUsers.push(lu);
+              if (this.isConnected) {
+                this.pushRegister(lu).then(() => {
+                  delete lu.pendingSync;
+                }).catch(() => {});
+              }
+            }
+          }
+        }
+
         if (authManager.storage) {
           try {
-            authManager.storage.setItem('trr_registered_users', JSON.stringify(serverUsers));
+            authManager.storage.setItem('trr_registered_users', JSON.stringify(mergedUsers));
           } catch {}
         }
 
-        // Verify if currently logged-in user still exists on server
+        // 6. Verify if currently logged-in user still exists and wasn't deleted
         const currentUser = authManager.getCurrentUser();
         if (currentUser && currentUser.username !== 'admin' && currentUser.id !== 'user_admin') {
-          const stillExists = serverUsers.some(u => u.id === currentUser.id || u.username === currentUser.username);
+          const isDel = authManager.isLocallyDeleted(currentUser.id) || authManager.isLocallyDeleted(currentUser.username);
+          const stillExists = !isDel && mergedUsers.some(u => u.id === currentUser.id || u.username === currentUser.username);
           if (!stillExists) {
             console.warn('[CloudSync] Current user was removed from server. Logging out immediately.');
             authManager.logout();
@@ -835,6 +908,76 @@ export class CloudSyncManager {
       return null;
     }
   }
+
+
+  /**
+   * Fetches detailed database connectivity and health metrics.
+   * @returns {Promise<Object>}
+   */
+  async getDatabaseStatus() {
+    if (typeof fetch === 'undefined') {
+      return { success: false, connected: false, error: 'Offline environment' };
+    }
+    try {
+      const res = await fetch(`${this.baseUrl}/api/database/status`);
+      if (res.ok) {
+        const data = await res.json();
+        return { ...data, connected: true };
+      }
+    } catch {
+      // Fallback to /api/health
+    }
+    try {
+      const resHealth = await fetch(`${this.baseUrl}/api/health`);
+      if (resHealth.ok) {
+        const hData = await resHealth.json();
+        return {
+          success: true,
+          connected: true,
+          kvConfigured: hData.kvConfigured || false,
+          storageMode: hData.storageMode || 'unknown',
+          databaseLabel: hData.databaseLabel || (hData.kvConfigured ? 'Cloud KV (Upstash Redis)' : 'Local File Store'),
+          metrics: {
+            usersCount: hData.usersCount || 0,
+            examsCount: hData.examsCount || 0,
+          },
+        };
+      }
+    } catch {}
+    return {
+      success: false,
+      connected: false,
+      storageMode: 'offline',
+      databaseLabel: 'Ngoại tuyến (Không kết nối)',
+    };
+  }
+
+  /**
+   * Admin resets a student's password on backend server.
+   * @param {string} userId
+   * @param {string} [username='']
+   * @param {string} [newPassword='123456']
+   * @returns {Promise<Object>}
+   */
+  async adminResetPassword(userId, username = '', newPassword = '123456') {
+    if (typeof fetch === 'undefined' || !userId) return { success: false };
+    try {
+      const res = await fetch(`${this.baseUrl}/api/admin/users/${encodeURIComponent(userId)}/reset-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': 'user_admin',
+          'Authorization': 'Bearer user_admin',
+        },
+        body: JSON.stringify({ username, newPassword }),
+      });
+      if (!res.ok) return { success: false, status: res.status };
+      return await res.json();
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  }
+
 }
 
 export const cloudSyncManager = new CloudSyncManager();

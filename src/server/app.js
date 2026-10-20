@@ -17,7 +17,29 @@ import { isAIConfigured, analyzeGraphFileBackend, analyzeLogicFileBackend, execu
 import { validateGraphSpecification, MAX_FILE_SIZE_BYTES } from '../app/ai/GraphVisionAdapter.js';
 import { extractDocx } from '../app/ai/DocxExtractor.js';
 
-import { serverUsers, serverAiSessions, serverQuizStats, serverExams, serverExamSubmissions, serverCustomQuestions, serverImportedFiles, saveDatabase, isKVConfigured, fetchFromKV, writeToKV } from './auth/ServerDataStore.js';
+import { 
+  serverUsers, 
+  serverAiSessions, 
+  serverQuizStats, 
+  serverExams, 
+  serverExamSubmissions, 
+  serverCustomQuestions, 
+  serverImportedFiles, 
+  serverDeletedUsers,
+  serverDeletedExams,
+  serverDbResetTime,
+  markUserDeleted,
+  unmarkUserDeleted,
+  isUserDeleted,
+  markExamDeleted,
+  unmarkExamDeleted,
+  isExamDeleted,
+  recordDbReset,
+  saveDatabase, 
+  isKVConfigured, 
+  fetchFromKV, 
+  writeToKV 
+} from './auth/ServerDataStore.js';
 import { DEFAULT_EXAMS } from '../core/quiz/ExamManager.js';
 import { STATIC_QUESTION_BANK } from '../core/quiz/QuizBank.js';
 import { DEMO_USERS } from '../core/auth/AuthManager.js';
@@ -219,7 +241,33 @@ export async function handleRequest(req, res) {
       aiConfigured: isAIConfigured(),
       kvConfigured: isKVConfigured(),
       storageMode: isKVConfigured() ? 'cloud_kv' : (process.env.VERCEL ? 'ephemeral_tmp' : 'local_fs'),
+      databaseLabel: isKVConfigured() ? 'Cloud KV (Upstash Redis)' : (process.env.VERCEL ? 'Bộ nhớ tạm (Vercel Ephemeral)' : 'Tệp dữ liệu cục bộ (server_db.json)'),
+      databaseConnected: isKVConfigured() || !process.env.VERCEL,
+      usersCount: serverUsers.length,
+      examsCount: serverExams.length,
       supportedFormats: BACKEND_SUPPORTED_EXTENSIONS,
+    });
+    return;
+  }
+
+  // Route: GET /api/database/status
+  if (req.method === 'GET' && (pathname === '/api/database/status' || pathname === '/api/admin/database/status')) {
+    sendJson(res, 200, {
+      success: true,
+      status: 'ok',
+      kvConfigured: isKVConfigured(),
+      storageMode: isKVConfigured() ? 'cloud_kv' : (process.env.VERCEL ? 'ephemeral_tmp' : 'local_fs'),
+      databaseLabel: isKVConfigured() ? 'Cloud KV (Upstash Redis)' : (process.env.VERCEL ? 'Bộ nhớ tạm (Vercel Ephemeral)' : 'Tệp dữ liệu cục bộ (server_db.json)'),
+      metrics: {
+        usersCount: serverUsers.length,
+        studentsCount: serverUsers.filter(u => u.username !== 'admin' && u.id !== 'user_admin').length,
+        examsCount: serverExams.length,
+        submissionsCount: serverExamSubmissions.length,
+        deletedUsersCount: serverDeletedUsers.size,
+        deletedExamsCount: serverDeletedExams.size,
+        dbResetTime: serverDbResetTime,
+        lastUpdated: new Date().toISOString(),
+      },
     });
     return;
   }
@@ -233,6 +281,8 @@ export async function handleRequest(req, res) {
         delete copy.password;
         return copy;
       }),
+      deletedUsers: Array.from(serverDeletedUsers),
+      dbResetTime: serverDbResetTime,
     });
     return;
   }
@@ -275,7 +325,8 @@ export async function handleRequest(req, res) {
     try {
       const bodyBuffer = await readRequestBody(req);
       const data = JSON.parse(bodyBuffer.toString('utf8') || '{}');
-      if (!data.username || !data.fullName || !data.email) {
+      const cleanUsername = (data.username || '').trim().toLowerCase();
+      if (!cleanUsername || !data.fullName || !data.email) {
         sendJson(res, 400, { success: false, error: 'Thiếu thông tin đăng ký bắt buộc.' });
         return;
       }
@@ -294,6 +345,8 @@ export async function handleRequest(req, res) {
         role: 'student',
         createdAt: data.createdAt || new Date().toISOString(),
       };
+      unmarkUserDeleted(cleanUsername);
+      if (data.email) unmarkUserDeleted(data.email);
       serverUsers.push(newUser);
       saveDatabase();
       const publicUser = { ...newUser };
@@ -407,6 +460,9 @@ export async function handleRequest(req, res) {
       for (const del of toDelete) {
         const i = serverUsers.indexOf(del);
         if (i !== -1) serverUsers.splice(i, 1);
+        markUserDeleted(del.id);
+        markUserDeleted(del.username);
+        if (del.email) markUserDeleted(del.email);
         delete serverQuizStats[del.id];
         delete serverQuizStats[del.username];
         if (serverAiSessions[del.id]) delete serverAiSessions[del.id];
@@ -422,6 +478,34 @@ export async function handleRequest(req, res) {
     } else {
       sendJson(res, 404, { success: false, error: 'Không tìm thấy tài khoản.' });
     }
+    return;
+  }
+
+  // Route: POST /api/admin/users/:id/reset-password
+  if (req.method === 'POST' && pathname.includes('/reset-password') && pathname.startsWith('/api/admin/users/')) {
+    if (!isRequestFromAdmin(req)) {
+      sendJson(res, 403, { success: false, error: 'FORBIDDEN', message: 'Chỉ Quản trị viên mới có quyền đặt lại mật khẩu.' });
+      return;
+    }
+    const rawTarget = decodeURIComponent(pathname.replace('/api/admin/users/', '').replace('/reset-password', '')).trim().toLowerCase();
+    if (rawTarget === 'admin' || rawTarget === 'user_admin') {
+      sendJson(res, 400, { success: false, error: 'Không thể reset mật khẩu tài khoản Quản trị viên gốc qua tính năng này.' });
+      return;
+    }
+    const bodyBuffer = await readRequestBody(req);
+    const body = JSON.parse(bodyBuffer.toString('utf8') || '{}');
+    const newPassword = body.newPassword || '123456';
+    const found = serverUsers.find(u => u.id.toLowerCase() === rawTarget || u.username.toLowerCase() === rawTarget);
+    if (!found) {
+      sendJson(res, 404, { success: false, error: 'Không tìm thấy tài khoản sinh viên.' });
+      return;
+    }
+    found.password = newPassword;
+    saveDatabase();
+    if (isKVConfigured()) {
+      writeToKV().catch(() => {});
+    }
+    sendJson(res, 200, { success: true, message: `Mật khẩu của sinh viên @${found.username} đã được đặt lại thành ${newPassword}.` });
     return;
   }
 
@@ -446,6 +530,8 @@ export async function handleRequest(req, res) {
       role: 'admin',
       bio: 'Quản trị viên hệ thống',
     };
+    const previousStudents = serverUsers.filter(u => u.username !== 'admin' && u.id !== 'user_admin');
+    recordDbReset(previousStudents);
     serverUsers.length = 0;
     serverUsers.push({
       ...adminUser,

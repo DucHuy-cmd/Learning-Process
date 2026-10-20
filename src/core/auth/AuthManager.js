@@ -23,8 +23,10 @@ export const DEMO_USERS = [
   },
 ];
 
-const STORAGE_KEY_CURRENT = 'trr_current_user';
-const STORAGE_KEY_USERS = 'trr_registered_users';
+export const STORAGE_KEY_CURRENT = 'trr_current_user';
+export const STORAGE_KEY_USERS = 'trr_registered_users';
+export const STORAGE_KEY_DELETED = 'trr_deleted_users_v1';
+export const STORAGE_KEY_DB_RESET = 'trr_last_db_reset';
 
 export class AuthManager {
   /**
@@ -38,6 +40,122 @@ export class AuthManager {
 
     this._initStorage();
   }
+
+  /**
+   * Retrieves the set of permanently deleted user identifiers (id, username, email).
+   * @returns {string[]}
+   */
+  getDeletedUsers() {
+    if (!this.storage) return [];
+    try {
+      const raw = this.storage.getItem(STORAGE_KEY_DELETED);
+      const list = raw ? JSON.parse(raw) : [];
+      return Array.isArray(list) ? list : [];
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Marks an identifier as permanently deleted in local storage and removes matching user.
+   * @param {string} identifier
+   */
+  markDeletedLocally(identifier) {
+    if (!identifier || !this.storage) return;
+    const clean = String(identifier).trim().toLowerCase();
+    if (clean === 'admin' || clean === 'user_admin') return;
+
+    try {
+      const current = this.getDeletedUsers();
+      if (!current.includes(clean)) {
+        current.push(clean);
+        this.storage.setItem(STORAGE_KEY_DELETED, JSON.stringify(current));
+      }
+
+      // Purge matching user from registered list
+      const users = this.getUsers();
+      const remaining = users.filter(u => 
+        u.id?.toLowerCase() !== clean && 
+        u.username?.toLowerCase() !== clean && 
+        u.email?.toLowerCase() !== clean
+      );
+      if (remaining.length !== users.length) {
+        this.storage.setItem(STORAGE_KEY_USERS, JSON.stringify(remaining));
+      }
+
+      // If active user is deleted, logout immediately
+      if (this.currentUser && (
+        this.currentUser.id?.toLowerCase() === clean ||
+        this.currentUser.username?.toLowerCase() === clean ||
+        this.currentUser.email?.toLowerCase() === clean
+      )) {
+        this.logout();
+      }
+    } catch {}
+  }
+
+  /**
+   * Removes an identifier from the deleted tombstone list (e.g. when admin re-creates account).
+   * @param {string} identifier
+   */
+  unmarkDeletedLocally(identifier) {
+    if (!identifier || !this.storage) return;
+    const clean = String(identifier).trim().toLowerCase();
+    try {
+      const current = this.getDeletedUsers();
+      const updated = current.filter(x => x !== clean);
+      this.storage.setItem(STORAGE_KEY_DELETED, JSON.stringify(updated));
+    } catch {}
+  }
+
+  /**
+   * Checks whether an identifier is marked as deleted in local storage.
+   * @param {string} identifier
+   * @returns {boolean}
+   */
+  isLocallyDeleted(identifier) {
+    if (!identifier) return false;
+    const clean = String(identifier).trim().toLowerCase();
+    return this.getDeletedUsers().includes(clean);
+  }
+
+  /**
+   * Safe public method to purge a deleted user locally.
+   * @param {string} query
+   */
+  deleteUserLocally(query) {
+    this.markDeletedLocally(query);
+  }
+
+  /**
+   * Resets a student's password to default '123456' or specified password. Restricted to admin.
+   * @param {string} userIdOrUsername
+   * @param {string} [newPassword='123456']
+   * @returns {{ success: boolean, error?: string, user?: Object }}
+   */
+  adminResetPassword(userIdOrUsername, newPassword = '123456') {
+    if (!this.isAdmin()) {
+      return { success: false, error: 'Chỉ có Quản trị viên mới có quyền đặt lại mật khẩu.' };
+    }
+    const clean = String(userIdOrUsername || '').trim().toLowerCase();
+    if (clean === 'admin' || clean === 'user_admin') {
+      return { success: false, error: 'Không thể reset mật khẩu tài khoản Quản trị viên gốc qua tính năng này.' };
+    }
+    const users = this.getUsers();
+    const idx = users.findIndex(u => u.id?.toLowerCase() === clean || u.username?.toLowerCase() === clean);
+    if (idx === -1) {
+      return { success: false, error: 'Không tìm thấy tài khoản sinh viên.' };
+    }
+    const targetPassword = String(newPassword || '123456').trim();
+    users[idx].password = targetPassword;
+    if (this.storage) {
+      try {
+        this.storage.setItem(STORAGE_KEY_USERS, JSON.stringify(users));
+      } catch {}
+    }
+    return { success: true, user: users[idx] };
+  }
+
 
   /**
    * Initializes default demo users in storage if not already present.
@@ -97,6 +215,17 @@ export class AuthManager {
               return clean;
             });
 
+            // Filter out locally deleted users
+            const deletedList = this.getDeletedUsers();
+            if (deletedList.length > 0) {
+              const deletedSet = new Set(deletedList);
+              filtered = filtered.filter(u => 
+                !deletedSet.has(u.id?.toLowerCase()) && 
+                !deletedSet.has(u.username?.toLowerCase()) &&
+                (!u.email || !deletedSet.has(u.email?.toLowerCase()))
+              );
+            }
+
             this.storage.setItem(STORAGE_KEY_USERS, JSON.stringify(filtered));
           }
         } catch {
@@ -113,9 +242,10 @@ export class AuthManager {
             delete this.currentUser.password;
             this.storage.setItem(STORAGE_KEY_CURRENT, JSON.stringify(this.currentUser));
           } else if (parsed && parsed.id) {
-            // Check if user still exists in registered list
+            // Check if user still exists in registered list and is not deleted
+            const isDel = this.isLocallyDeleted(parsed.id) || this.isLocallyDeleted(parsed.username);
             const currentUsers = JSON.parse(this.storage.getItem(STORAGE_KEY_USERS) || '[]');
-            const stillValid = Array.isArray(currentUsers) && currentUsers.some(u => u.id === parsed.id || u.username === parsed.username);
+            const stillValid = !isDel && Array.isArray(currentUsers) && currentUsers.some(u => u.id === parsed.id || u.username === parsed.username);
             if (stillValid && parsed.id !== 'user_duchuy' && parsed.username !== 'duchuy') {
               this.currentUser = parsed;
             } else {
@@ -242,10 +372,6 @@ export class AuthManager {
       (userLower && u.username.toLowerCase() === userLower)
     );
 
-    if (matched.length === 0) {
-      return { success: false, error: 'Không tìm thấy tài khoản cần xóa.' };
-    }
-
     const remaining = users.filter(u => 
       u.id !== userId && 
       u.username.toLowerCase() !== targetLower &&
@@ -259,6 +385,11 @@ export class AuthManager {
         return { success: false, error: 'Lỗi cập nhật bộ nhớ trình duyệt.' };
       }
     }
+
+    // Record tombstones locally
+    if (userId) this.markDeletedLocally(userId);
+    if (username) this.markDeletedLocally(username);
+    if (matched[0]?.email) this.markDeletedLocally(matched[0].email);
 
     // If the active user itself is deleted, immediately clear session and notify logout
     if (this.currentUser && (
@@ -275,24 +406,46 @@ export class AuthManager {
       this._notifyListeners('logout', null);
     }
 
-    this._notifyListeners('user_deleted', { deletedUser: matched[0], users: remaining });
+    this._notifyListeners('user_deleted', { deletedUser: matched[0] || { id: userId, username }, users: remaining });
     return { success: true, deletedUser: matched[0] };
   }
 
   /**
    * Resets users list to only the default admin account.
+   * @param {Object} [options]
+   * @param {boolean} [options.force] - Allow internal sync override
    * @returns {{ success: boolean, error?: string }}
    */
-  resetUsersToDefault() {
-    if (!this.isAdmin()) {
+  resetUsersToDefault({ force = false } = {}) {
+    if (!force && !this.isAdmin()) {
       return { success: false, error: 'Chỉ có Quản trị viên mới có quyền reset dữ liệu tài khoản.' };
     }
-    const admin = this.getUsers().find(u => u.username === 'admin' || u.id === 'user_admin') || DEMO_USERS[0];
+    const currentUsers = this.getUsers();
+    // Tombstone all non-admin users
+    for (const u of currentUsers) {
+      if (u.username !== 'admin' && u.id !== 'user_admin' && u.role !== 'admin') {
+        if (u.id) this.markDeletedLocally(u.id);
+        if (u.username) this.markDeletedLocally(u.username);
+        if (u.email) this.markDeletedLocally(u.email);
+      }
+    }
+
+    const admin = currentUsers.find(u => u.username === 'admin' || u.id === 'user_admin') || DEMO_USERS[0];
     const defaultList = [{ ...admin, fullName: 'Quản Trị Viên', className: 'Quản trị viên', role: 'admin' }];
     if (this.storage) {
       try {
         this.storage.setItem(STORAGE_KEY_USERS, JSON.stringify(defaultList));
+        this.storage.setItem(STORAGE_KEY_DB_RESET, String(Date.now()));
       } catch {}
+    }
+    if (this.currentUser && this.currentUser.username !== 'admin' && this.currentUser.id !== 'user_admin') {
+      this.currentUser = null;
+      if (this.storage) {
+        try {
+          this.storage.removeItem(STORAGE_KEY_CURRENT);
+        } catch {}
+      }
+      this._notifyListeners('logout', null);
     }
     this._notifyListeners('users_reset', { users: defaultList });
     return { success: true };
@@ -316,9 +469,15 @@ export class AuthManager {
 
     const cleanUsername = username.trim().toLowerCase();
     const cleanEmail = (email && email.trim()) ? email.trim().toLowerCase() : `${cleanUsername}@toanrr.edu.vn`;
+    const cleanPassword = (password && String(password).trim()) ? String(password).trim() : '123456';
+
+    // Clear any previous deletion tombstone
+    this.unmarkDeletedLocally(cleanUsername);
+    if (cleanEmail) this.unmarkDeletedLocally(cleanEmail);
+
     const users = this.getUsers();
 
-    if (users.some(u => u.username.toLowerCase() === cleanUsername)) {
+    if (users.some(u => u.username && u.username.toLowerCase() === cleanUsername)) {
       return { success: false, error: 'Tên đăng nhập đã tồn tại trong hệ thống.' };
     }
 
@@ -328,7 +487,7 @@ export class AuthManager {
       fullName: fullName.trim(),
       className: className.trim(),
       email: cleanEmail,
-      password: password || '123456',
+      password: cleanPassword,
       avatar: avatar || '👨‍🎓',
       role: 'student',
       createdAt: new Date().toISOString(),
@@ -390,6 +549,10 @@ export class AuthManager {
       const fullName = rawFullName || rawUser;
       const cleanEmail = rawEmail || `${cleanUsername}@toanrr.edu.vn`;
 
+      // Clear any previous deletion tombstone when admin intentionally imports
+      this.unmarkDeletedLocally(cleanUsername);
+      if (cleanEmail) this.unmarkDeletedLocally(cleanEmail);
+
       const newUser = {
         id: `user_${Date.now()}_${Math.random().toString(36).slice(2, 7)}_${index}`,
         username: cleanUsername,
@@ -445,9 +608,13 @@ export class AuthManager {
     }
 
     const query = usernameOrEmail.trim().toLowerCase();
+    if (this.isLocallyDeleted(query)) {
+      return { success: false, error: 'Tài khoản này đã bị Quản trị viên xóa khỏi hệ thống.' };
+    }
+
     const users = this.getUsers();
     const found = users.find(
-      u => u.username.toLowerCase() === query || u.email.toLowerCase() === query
+      u => (u.username && u.username.toLowerCase() === query) || (u.email && u.email.toLowerCase() === query)
     );
 
     if (!found) {
@@ -500,12 +667,17 @@ export class AuthManager {
 
     const cleanUsername = username.trim().toLowerCase();
     const cleanEmail = email.trim().toLowerCase();
+
+    if (this.isLocallyDeleted(cleanUsername) || this.isLocallyDeleted(cleanEmail)) {
+      return { success: false, error: 'Tài khoản này đã bị Quản trị viên xóa khỏi hệ thống.' };
+    }
+
     const users = this.getUsers();
 
-    if (users.some(u => u.username.toLowerCase() === cleanUsername)) {
+    if (users.some(u => u.username && u.username.toLowerCase() === cleanUsername)) {
       return { success: false, error: 'Tên đăng nhập đã được sử dụng. Vui lòng chọn tên khác.' };
     }
-    if (users.some(u => u.email.toLowerCase() === cleanEmail)) {
+    if (users.some(u => u.email && u.email.toLowerCase() === cleanEmail)) {
       return { success: false, error: 'Địa chỉ email đã được đăng ký.' };
     }
 
