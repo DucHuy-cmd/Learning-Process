@@ -16,7 +16,7 @@ export class CloudSyncManager {
    * @param {string} [options.baseUrl] - API Base URL (defaults to window.location.origin or '')
    * @param {number} [options.timeoutMs=2000] - Connection ping timeout
    */
-  constructor({ baseUrl = '', timeoutMs = 2500 } = {}) {
+  constructor({ baseUrl = '', timeoutMs = 8000 } = {}) {
     this.baseUrl = baseUrl;
     this.timeoutMs = timeoutMs;
     this.isConnected = false;
@@ -76,10 +76,21 @@ export class CloudSyncManager {
 
     // If on browser localhost/127.0.0.1 on a different dev port (e.g. 5500, 8888, 5173), also test localhost:3000
     if (typeof window !== 'undefined' && window.location) {
-      const hostname = window.location.hostname;
-      const port = window.location.port;
-      if ((hostname === 'localhost' || hostname === '127.0.0.1') && port !== '3000') {
+      const hostname = window.location.hostname || '';
+      const port = window.location.port || '';
+      const protocol = window.location.protocol || '';
+
+      const isLocal = hostname === 'localhost' || hostname === '127.0.0.1' || protocol === 'file:';
+      if (isLocal && port !== '3000') {
         testUrls.push('http://localhost:3000/api/health');
+        testUrls.push('http://127.0.0.1:3000/api/health');
+      }
+
+      // If running locally or on static preview (and not in unit tests), fallback to cloud production
+      const isTestEnv = typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'test';
+      const isAlreadyOnProd = window.location.origin && window.location.origin.includes('mathplatform-ten.vercel.app');
+      if (!isTestEnv && !isAlreadyOnProd) {
+        testUrls.push('https://mathplatform-ten.vercel.app/api/health');
       }
     }
 
@@ -107,6 +118,10 @@ export class CloudSyncManager {
           } catch {}
           if (url.startsWith('http://localhost:3000')) {
             this.baseUrl = 'http://localhost:3000';
+          } else if (url.startsWith('http://127.0.0.1:3000')) {
+            this.baseUrl = 'http://127.0.0.1:3000';
+          } else if (url.startsWith('https://mathplatform-ten.vercel.app')) {
+            this.baseUrl = 'https://mathplatform-ten.vercel.app';
           }
           this._notify();
           return true;
@@ -121,11 +136,6 @@ export class CloudSyncManager {
     return false;
   }
 
-  /**
-   * Synchronizes registered users from the server into AuthManager.
-   * Purges deleted users and auto-logs out deleted accounts.
-   * @param {Object} authManager
-   */
   async syncUsers(authManager) {
     if (!authManager || typeof fetch === 'undefined') return;
 
@@ -918,47 +928,48 @@ export class CloudSyncManager {
     if (typeof fetch === 'undefined') {
       return { success: false, connected: false, error: 'Offline environment' };
     }
-    try {
-      const res = await fetch(`${this.baseUrl}/api/database/status`);
-      if (res.ok) {
-        const data = await res.json();
-        return { ...data, connected: true };
+    const endpoints = [];
+    if (this.baseUrl) {
+      endpoints.push(`${this.baseUrl}/api/database/status`);
+      endpoints.push(`${this.baseUrl}/api/health`);
+    } else {
+      endpoints.push('/api/database/status');
+      endpoints.push('/api/health');
+      const isTestEnv = typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'test';
+      if (!isTestEnv) {
+        endpoints.push('https://mathplatform-ten.vercel.app/api/database/status');
+        endpoints.push('https://mathplatform-ten.vercel.app/api/health');
       }
-    } catch {
-      // Fallback to /api/health
     }
-    try {
-      const resHealth = await fetch(`${this.baseUrl}/api/health`);
-      if (resHealth.ok) {
-        const hData = await resHealth.json();
-        return {
-          success: true,
-          connected: true,
-          kvConfigured: hData.kvConfigured || false,
-          storageMode: hData.storageMode || 'unknown',
-          databaseLabel: hData.databaseLabel || (hData.kvConfigured ? 'Cloud KV (Upstash Redis)' : 'Local File Store'),
-          metrics: {
-            usersCount: hData.usersCount || 0,
-            examsCount: hData.examsCount || 0,
-          },
-        };
+
+    for (const ep of endpoints) {
+      try {
+        const res = await fetch(ep);
+        if (res.ok) {
+          const data = await res.json();
+          if (ep.startsWith('https://mathplatform-ten.vercel.app')) {
+            this.baseUrl = 'https://mathplatform-ten.vercel.app';
+          }
+          return {
+            ...data,
+            connected: true,
+            storageMode: data.storageMode || (data.kvConfigured ? 'cloud_kv' : 'local_file'),
+            databaseLabel: data.databaseLabel || (data.kvConfigured ? 'Cloud KV (Upstash Redis)' : 'Local File Store'),
+          };
+        }
+      } catch {
+        // Fallback
       }
-    } catch {}
+    }
+
     return {
       success: false,
       connected: false,
       storageMode: 'offline',
-      databaseLabel: 'Ngoại tuyến (Không kết nối)',
+      databaseLabel: 'Chế độ Ngoại tuyến',
     };
   }
 
-  /**
-   * Admin resets a student's password on backend server.
-   * @param {string} userId
-   * @param {string} [username='']
-   * @param {string} [newPassword='123456']
-   * @returns {Promise<Object>}
-   */
   async adminResetPassword(userId, username = '', newPassword = '123456') {
     if (typeof fetch === 'undefined' || !userId) return { success: false };
     try {

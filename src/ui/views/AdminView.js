@@ -156,7 +156,7 @@ export class AdminView {
         </div>
 
         <!-- Navigation Tabs -->
-        <div class="admin-nav-tabs" style="display:flex;gap:10px;border-bottom:1px solid var(--line);margin-bottom:24px;">
+        <div class="admin-nav-tabs" style="display:none;">
           <button type="button" class="btn-admin-tab ${this.activeTab === 'students' ? 'active' : ''}" data-tab="students" style="padding:10px 18px;font-size:13.5px;font-weight:700;cursor:pointer;border:none;background:transparent;color:${this.activeTab === 'students' ? 'var(--accent)' : 'var(--dim)'};border-bottom:2px solid ${this.activeTab === 'students' ? 'var(--accent)' : 'transparent'};">
             👥 Quản Lý Sinh Viên (${studentCount})
           </button>
