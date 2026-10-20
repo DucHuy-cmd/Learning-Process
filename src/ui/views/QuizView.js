@@ -511,8 +511,7 @@ export class QuizView {
         if (count >= fileCount) {
           result.push(...fileQuestions);
         } else {
-          const picked = shuffle([...fileQuestions]).slice(0, count);
-          result.push(...picked);
+          result.push(...fileQuestions.slice(0, count));
         }
       }
     });
@@ -549,12 +548,7 @@ export class QuizView {
       ? parseInt(this.studioConfig.count, 10)
       : pool.length;
 
-    let selectedQuestions;
-    if (pool.length <= desiredCount) {
-      selectedQuestions = [...pool];
-    } else {
-      selectedQuestions = shuffle(pool).slice(0, desiredCount);
-    }
+    const selectedQuestions = pool.slice(0, Math.min(desiredCount, pool.length));
 
     if (!this.printExamCode) {
       this.printExamCode = '101';
@@ -1704,23 +1698,7 @@ export class QuizView {
               </div>
             </div>
 
-            <!-- Preview Questions Accordion -->
-            ${distSummary.totalSelected > 0 ? `
-              <details style="background:var(--panel-alt);border:1px solid var(--line);border-radius:8px;padding:12px 16px;margin-bottom:18px;">
-                <summary style="font-size:13px;font-weight:700;color:var(--text);cursor:pointer;display:flex;align-items:center;gap:6px;">
-                  <span>👁️ Xem trước câu hỏi sẽ phát (${distSummary.totalSelected} câu)</span>
-                </summary>
-                <div style="margin-top:12px;font-size:12.5px;color:var(--text);display:flex;flex-direction:column;gap:8px;">
-                  ${this._getSelectedDistributedQuestions().slice(0, 5).map((q, idx) => `
-                    <div style="background:var(--panel);padding:8px 12px;border-radius:6px;border:1px solid var(--line);">
-                      <div style="font-weight:600;margin-bottom:4px;">Câu ${idx + 1}: ${this._escapeHtml(q.question)}</div>
-                      <div style="font-size:11.5px;color:#10b981;">✓ Đáp án: ${q.correctId || 'A'}</div>
-                    </div>
-                  `).join('')}
-                  ${distSummary.totalSelected > 5 ? `<div style="text-align:center;font-size:12px;color:var(--dim);">... và còn ${distSummary.totalSelected - 5} câu hỏi khác được phân phối từ các bộ đề.</div>` : ''}
-                </div>
-              </details>
-            ` : ''}
+
 
             <div class="studio-assign-action-bar" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
               <div class="studio-assign-action-hint" style="font-size:12.5px;color:var(--dim);">
@@ -1847,7 +1825,7 @@ export class QuizView {
               <div style="width:48%;text-align:right;">
                 <div style="font-size:14px;font-weight:bold;text-transform:uppercase;">ĐỀ THI MÔN: TOÁN RỜI RẠC</div>
                 <div style="font-size:12px;font-weight:normal;margin-top:2px;">Thời gian làm bài: 45 phút (Không sử dụng tài liệu)</div>
-                <div style="display:inline-block;margin-top:6px;padding:3px 12px;border:1.5px solid #000;font-size:13px;font-weight:bold;">
+                <div id="printHeaderExamCode" style="display:inline-block;margin-top:6px;padding:3px 12px;border:1.5px solid #000;font-size:13px;font-weight:bold;">
                   MÃ ĐỀ THI: ${exam.examCode}
                 </div>
               </div>
@@ -1906,7 +1884,7 @@ export class QuizView {
               <div style="font-size:15px;font-weight:bold;text-transform:uppercase;">
                 ĐÁP ÁN &amp; HƯỚNG DẪN CHẤM CHI TIẾT
               </div>
-              <div style="font-size:13px;font-weight:bold;color:#047857;margin-top:3px;">
+              <div id="printTeacherKeyExamCode" style="font-size:13px;font-weight:bold;color:#047857;margin-top:3px;">
                 DÀNH CHO GIẢNG VIÊN / CÔ CHẤM THI — MÃ ĐỀ: ${exam.examCode}
               </div>
             </div>
@@ -3655,10 +3633,17 @@ export class QuizView {
     if (txtPrintExamCode) {
       txtPrintExamCode.addEventListener('input', (e) => {
         this.printExamCode = e.target.value.trim() || '101';
+        const printExamBadge = this.container.querySelector('#printHeaderExamCode');
+        if (printExamBadge) printExamBadge.textContent = `MÃ ĐỀ THI: ${this.printExamCode}`;
+        const teacherKeyBadge = this.container.querySelector('#printTeacherKeyExamCode');
+        if (teacherKeyBadge) teacherKeyBadge.textContent = `DÀNH CHO GIẢNG VIÊN / CÔ CHẤM THI — MÃ ĐỀ: ${this.printExamCode}`;
       });
       txtPrintExamCode.addEventListener('change', (e) => {
         this.printExamCode = e.target.value.trim() || '101';
-        this.render();
+        const printExamBadge = this.container.querySelector('#printHeaderExamCode');
+        if (printExamBadge) printExamBadge.textContent = `MÃ ĐỀ THI: ${this.printExamCode}`;
+        const teacherKeyBadge = this.container.querySelector('#printTeacherKeyExamCode');
+        if (teacherKeyBadge) teacherKeyBadge.textContent = `DÀNH CHO GIẢNG VIÊN / CÔ CHẤM THI — MÃ ĐỀ: ${this.printExamCode}`;
       });
     }
 
@@ -3671,7 +3656,12 @@ export class QuizView {
         } else {
           this.printExamCode = '102';
         }
-        this.render();
+        const txtPrintCode = this.container.querySelector('#txtPrintExamCode');
+        if (txtPrintCode) txtPrintCode.value = this.printExamCode;
+        const printExamBadge = this.container.querySelector('#printHeaderExamCode');
+        if (printExamBadge) printExamBadge.textContent = `MÃ ĐỀ THI: ${this.printExamCode}`;
+        const teacherKeyBadge = this.container.querySelector('#printTeacherKeyExamCode');
+        if (teacherKeyBadge) teacherKeyBadge.textContent = `DÀNH CHO GIẢNG VIÊN / CÔ CHẤM THI — MÃ ĐỀ: ${this.printExamCode}`;
       });
     }
 

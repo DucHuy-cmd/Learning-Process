@@ -5,7 +5,7 @@ import { authManager } from '../../src/core/auth/AuthManager.js';
 import { examManager, ExamManager } from '../../src/core/quiz/ExamManager.js';
 import { generateExamPaper } from '../../src/core/quiz/QuizBank.js';
 
-describe('Fixed Exam Code Verification', () => {
+describe('Fixed Exam Code & Stable Question Order Verification', () => {
   let dom;
   let window;
   let document;
@@ -70,7 +70,19 @@ describe('Fixed Exam Code Verification', () => {
     expect(res2.exam.examCode).toBe('102');
   });
 
-  it('QuizView Tab 2 has fixed default exam code that does not randomly change on re-render', () => {
+  it('QuizView Tab 2 has fixed default exam code and question preview accordion is removed', () => {
+    quizView.importedFiles = [
+      {
+        id: 'file1',
+        name: 'Đề_gk_toan_roi_rac.docx',
+        questions: [
+          { id: 'q1', question: 'Q1' },
+          { id: 'q2', question: 'Q2' },
+        ],
+      },
+    ];
+    quizView.fileDistributions = { file1: 2 };
+
     quizView.setTab('studio');
     quizView.studioSubTab = 'publish';
     quizView.render();
@@ -85,37 +97,48 @@ describe('Fixed Exam Code Verification', () => {
     const inputAfter1 = container.querySelector('#txtAssignExamCode');
     expect(inputAfter1.value).toBe(codeValBefore);
 
-    quizView.render();
-    const inputAfter2 = container.querySelector('#txtAssignExamCode');
-    expect(inputAfter2.value).toBe(codeValBefore);
+    // Question preview accordion ("Xem trước câu hỏi sẽ phát") must be completely removed
+    const previewDetails = container.querySelector('details summary');
+    expect(previewDetails).toBeNull();
+    expect(container.textContent).not.toContain('Xem trước câu hỏi sẽ phát');
   });
 
-  it('QuizView Tab 3 has editable fixed exam code and sequential increment button', () => {
-    quizView.importedQuestions = [
-      {
-        id: 'q1',
-        question: 'Câu hỏi test 1',
-        options: [
-          { id: 'A', text: 'Đáp án A' },
-          { id: 'B', text: 'Đáp án B' },
-        ],
-        correctId: 'A',
-      },
-    ];
+  it('QuizView Tab 3 keeps question order fixed and stable without randomizing on render', () => {
+    const dummyQuestions = Array.from({ length: 20 }, (_, i) => ({
+      id: `q_${i + 1}`,
+      question: `Nội dung câu hỏi ${i + 1}`,
+      options: [
+        { id: 'A', text: 'A' },
+        { id: 'B', text: 'B' },
+      ],
+      correctId: 'A',
+    }));
+
+    quizView.importedQuestions = dummyQuestions;
+    quizView.studioConfig.count = 10;
     quizView.setTab('studio');
     quizView.studioSubTab = 'print';
     quizView.render();
 
-    const inputCode = container.querySelector('#txtPrintExamCode');
-    expect(inputCode).not.toBeNull();
-    expect(inputCode.value).toBe('101');
+    // Verify first 10 questions in exact sequential order
+    const exam1 = quizView._getStudioPrintExam();
+    expect(exam1.questions.length).toBe(10);
+    expect(exam1.questions.map(q => q.id)).toEqual(dummyQuestions.slice(0, 10).map(q => q.id));
 
+    // Re-render and re-fetch: question IDs must NOT change or randomize
+    quizView.render();
+    const exam2 = quizView._getStudioPrintExam();
+    expect(exam2.questions.map(q => q.id)).toEqual(dummyQuestions.slice(0, 10).map(q => q.id));
+
+    // Changing exam code updates badges directly and leaves questions 100% still
     const btnNext = container.querySelector('#btnGenNewExam');
-    expect(btnNext).not.toBeNull();
     btnNext.click();
-
     expect(quizView.printExamCode).toBe('102');
-    const inputCodeAfter = container.querySelector('#txtPrintExamCode');
-    expect(inputCodeAfter.value).toBe('102');
+
+    const printHeaderBadge = container.querySelector('#printHeaderExamCode');
+    expect(printHeaderBadge.textContent).toContain('MÃ ĐỀ THI: 102');
+
+    const examAfterNext = quizView._getStudioPrintExam();
+    expect(examAfterNext.questions.map(q => q.id)).toEqual(dummyQuestions.slice(0, 10).map(q => q.id));
   });
 });
