@@ -138,7 +138,10 @@ export class QuizView {
     }
 
     if (cloudSyncManager && typeof cloudSyncManager.subscribe === 'function') {
-      cloudSyncManager.subscribe(() => {
+      cloudSyncManager.subscribe((status) => {
+        if (status && status.isConnected) {
+          this.syncCloudImportedFiles().catch(() => {});
+        }
         if (this.container && (this.activeTab === 'leaderboard' || this.activeTab === 'myExams')) {
           const badge = this.container.querySelector('#heroCloudBadge');
           if (badge) {
@@ -156,6 +159,7 @@ export class QuizView {
       try {
         cloudSyncManager.syncExams(examManager).catch(() => {});
         cloudSyncManager.syncExamSubmissions(examManager).catch(() => {});
+        this.syncCloudImportedFiles().catch(() => {});
       } catch {}
     }
 
@@ -215,7 +219,7 @@ export class QuizView {
     return { files: [], questions: [], rawText: '' };
   }
 
-  _saveWordFiles(files) {
+  _saveWordFiles(files, skipCloudPush = false) {
     this.importedFiles = Array.isArray(files) ? files : [];
     this.importedQuestions = this.importedFiles.flatMap(f => f.questions || []);
     if (!this.fileDistributions) {
@@ -233,6 +237,11 @@ export class QuizView {
         storage.setItem('toanrr_custom_imported_questions_v1', JSON.stringify(this.importedQuestions));
       }
     } catch {}
+
+    // Cloud Multi-Device Sync: Push to backend server
+    if (!skipCloudPush && cloudSyncManager && typeof cloudSyncManager.pushBatchImportedFiles === 'function') {
+      cloudSyncManager.pushBatchImportedFiles(this.importedFiles).catch(() => {});
+    }
   }
 
   _deleteImportedFile(fileId) {
@@ -254,7 +263,10 @@ export class QuizView {
     if (this.fileDistributions) {
       delete this.fileDistributions[fileId];
     }
-    this._saveWordFiles(updated);
+    this._saveWordFiles(updated, true);
+    if (cloudSyncManager && typeof cloudSyncManager.pushDeleteImportedFile === 'function') {
+      cloudSyncManager.pushDeleteImportedFile(fileId).catch(() => {});
+    }
     this._showAlert(`🗑️ Đã xóa dữ liệu file "${file.name}" thành công!`);
     this.render();
   }
@@ -276,6 +288,54 @@ export class QuizView {
         storage.removeItem('toanrr_custom_imported_raw_v1');
       }
     } catch {}
+    if (cloudSyncManager && typeof cloudSyncManager.pushClearAllImportedFiles === 'function') {
+      cloudSyncManager.pushClearAllImportedFiles().catch(() => {});
+    }
+  }
+
+  /**
+   * Multi-Device Cloud Synchronization for Imported Word Files.
+   * Pulls files from cloud and merges with local storage.
+   * @returns {Promise<boolean>}
+   */
+  async syncCloudImportedFiles() {
+    if (!cloudSyncManager || typeof cloudSyncManager.syncImportedFiles !== 'function') return false;
+    try {
+      const remoteFiles = await cloudSyncManager.syncImportedFiles();
+      if (Array.isArray(remoteFiles)) {
+        const localFiles = Array.isArray(this.importedFiles) ? this.importedFiles : [];
+        const mergedMap = new Map();
+
+        // 1. Add remote files first
+        remoteFiles.forEach(rf => {
+          if (rf && rf.id) mergedMap.set(rf.id, rf);
+        });
+
+        // 2. Add local files not yet on remote (offline upload recovery)
+        let hasNewLocalFiles = false;
+        localFiles.forEach(lf => {
+          if (lf && lf.id && !mergedMap.has(lf.id)) {
+            mergedMap.set(lf.id, lf);
+            hasNewLocalFiles = true;
+          }
+        });
+
+        const mergedList = Array.from(mergedMap.values());
+        this._saveWordFiles(mergedList, true);
+
+        if (hasNewLocalFiles && cloudSyncManager.isConnected) {
+          cloudSyncManager.pushBatchImportedFiles(mergedList).catch(() => {});
+        }
+
+        if (this.container && (this.activeTab === 'studio' || this.studioSubTab === 'wordUpload')) {
+          this.render();
+        }
+        return true;
+      }
+    } catch (err) {
+      console.warn('[QuizView] syncCloudImportedFiles error:', err);
+    }
+    return false;
   }
 
   _saveWordQuestions(questions, rawText = null) {
@@ -502,11 +562,12 @@ export class QuizView {
       if (this.container) {
         this.render();
       }
-      if (tabName === 'myExams') {
+      if (tabName === 'myExams' || tabName === 'studio') {
         try {
           if (cloudSyncManager && cloudSyncManager.isConnected) {
             cloudSyncManager.syncExams(examManager).catch(() => {});
             cloudSyncManager.syncExamSubmissions(examManager).catch(() => {});
+            this.syncCloudImportedFiles().catch(() => {});
           }
         } catch {}
       }
@@ -1340,12 +1401,23 @@ export class QuizView {
                 <!-- TABLE OF IMPORTED FILES -->
                 <div style="background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px;margin-top:14px;">
                   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
-                    <h4 style="margin:0;font-size:13.5px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:6px;">
-                      <span>📂 Danh Sách Các File Đã Nạp (${this.importedFiles.length})</span>
-                    </h4>
-                    <span style="font-size:12px;color:#10b981;font-weight:600;">
-                      Tổng cộng: ${this.importedQuestions.length} câu hỏi tự soạn
-                    </span>
+                    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                      <h4 style="margin:0;font-size:13.5px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:6px;">
+                        <span>📂 Danh Sách Các File Đã Nạp (${this.importedFiles.length})</span>
+                      </h4>
+                      <span class="pill-badge" id="cloudFileStatusBadge" style="background:rgba(59,130,246,0.15);color:#3b82f6;font-size:11px;padding:2px 8px;border-radius:10px;font-weight:600;">
+                        ☁️ Đã đồng bộ Cloud (PC ⇆ ĐT)
+                      </span>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:8px;">
+                      <button type="button" class="btn-sm" id="btnSyncCloudFiles" style="background:var(--panel-alt);border:1px solid var(--line);padding:4px 10px;font-size:12px;border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:5px;" title="Tải các file mới nhất từ máy chủ đám mây">
+                        <span>🔄</span>
+                        <span>Đồng bộ ngay</span>
+                      </button>
+                      <span style="font-size:12px;color:#10b981;font-weight:600;">
+                        Tổng cộng: ${this.importedQuestions.length} câu hỏi tự soạn
+                      </span>
+                    </div>
                   </div>
 
                   <div style="overflow-x:auto;">
@@ -1384,12 +1456,15 @@ export class QuizView {
                   </div>
                 </div>
               ` : `
-                <div style="text-align:center;padding:20px 16px;background:var(--panel);border:1px dashed var(--line);border-radius:8px;">
-                  <div style="font-size:24px;margin-bottom:4px;">📂</div>
-                  <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:2px;">Chưa có câu hỏi tự soạn nào</div>
-                  <div style="font-size:12px;color:var(--dim);">
-                    Vui lòng tải file mẫu Word về soạn câu hỏi, sau đó tải file lên để bắt đầu phân phối và phát đề.
+                <div style="text-align:center;padding:24px 16px;background:var(--panel);border:1px dashed var(--line);border-radius:8px;">
+                  <div style="font-size:26px;margin-bottom:6px;">☁️📂</div>
+                  <div style="font-size:13.5px;font-weight:700;color:var(--text);margin-bottom:4px;">Chưa có câu hỏi tự soạn nào trên thiết bị này</div>
+                  <div style="font-size:12px;color:var(--dim);max-width:520px;margin:0 auto 12px;line-height:1.5;">
+                    Vui lòng tải file mẫu Word về soạn câu hỏi rồi nạp lên, hoặc nếu bạn đã nạp file trên máy tính/điện thoại khác, bấm nút đồng bộ bên dưới để kéo file về!
                   </div>
+                  <button type="button" class="btn-sm" id="btnSyncCloudFilesEmpty" style="background:rgba(59,130,246,0.15);color:#3b82f6;border:1px solid rgba(59,130,246,0.3);padding:6px 14px;border-radius:6px;font-size:12.5px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
+                    🔄 Tải file từ Đám mây (Cloud Sync)
+                  </button>
                 </div>
               `}
             </div>
@@ -3036,6 +3111,36 @@ export class QuizView {
         this._showAlert('🗑️ Đã xóa sạch toàn bộ dữ liệu đề thi Word cũ! Giờ bạn có thể tải lên các file đề thi mới.');
         this.render();
       });
+    }
+
+    // Manual Cloud Sync Trigger
+    const handleManualSync = async (btn) => {
+      if (!btn) return;
+      const originalText = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '<span>⏳</span> <span>Đang đồng bộ...</span>';
+      try {
+        await this.syncCloudImportedFiles();
+        btn.innerHTML = '<span>✅</span> <span>Đã đồng bộ!</span>';
+        setTimeout(() => {
+          btn.disabled = false;
+          btn.innerHTML = originalText;
+        }, 1500);
+      } catch (err) {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+        this._showAlert(`⚠️ Lỗi khi đồng bộ đám mây: ${err.message || err}`);
+      }
+    };
+
+    const btnSyncCloudFiles = this.container.querySelector('#btnSyncCloudFiles');
+    if (btnSyncCloudFiles) {
+      btnSyncCloudFiles.addEventListener('click', () => handleManualSync(btnSyncCloudFiles));
+    }
+
+    const btnSyncCloudFilesEmpty = this.container.querySelector('#btnSyncCloudFilesEmpty');
+    if (btnSyncCloudFilesEmpty) {
+      btnSyncCloudFilesEmpty.addEventListener('click', () => handleManualSync(btnSyncCloudFilesEmpty));
     }
 
     // Delete single imported file

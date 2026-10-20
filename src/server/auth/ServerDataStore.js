@@ -28,6 +28,7 @@ export const serverQuizStats = getDefaultStats();
 export const serverExams = [...DEFAULT_EXAMS];
 export const serverExamSubmissions = [];
 export const serverCustomQuestions = [];
+export const serverImportedFiles = [];
 
 export function loadDatabase() {
   try {
@@ -83,6 +84,10 @@ export function loadDatabase() {
       if (Array.isArray(data.customQuestions)) {
         serverCustomQuestions.length = 0;
         serverCustomQuestions.push(...data.customQuestions);
+      }
+      if (Array.isArray(data.importedFiles)) {
+        serverImportedFiles.length = 0;
+        serverImportedFiles.push(...data.importedFiles);
       }
     }
   } catch {
@@ -169,6 +174,10 @@ export async function fetchFromKV() {
         serverCustomQuestions.length = 0;
         serverCustomQuestions.push(...data.customQuestions);
       }
+      if (Array.isArray(data.importedFiles)) {
+        serverImportedFiles.length = 0;
+        serverImportedFiles.push(...data.importedFiles);
+      }
       return true;
     }
   } catch (err) {
@@ -188,6 +197,7 @@ export async function writeToKV() {
       exams: serverExams,
       examSubmissions: serverExamSubmissions,
       customQuestions: serverCustomQuestions,
+      importedFiles: serverImportedFiles,
       lastUpdated: new Date().toISOString(),
     });
     const res = await fetch(KV_URL, {
@@ -217,6 +227,7 @@ export function saveDatabase() {
       exams: serverExams,
       examSubmissions: serverExamSubmissions,
       customQuestions: serverCustomQuestions,
+      importedFiles: serverImportedFiles,
       lastUpdated: new Date().toISOString(),
     };
     fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf8');

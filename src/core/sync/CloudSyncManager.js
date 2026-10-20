@@ -739,6 +739,103 @@ export class CloudSyncManager {
       return { success: true, offline: true };
     }
   }
+
+  /**
+   * Synchronizes imported Word files from backend server.
+   * @returns {Promise<Array<Object>|null>}
+   */
+  async syncImportedFiles() {
+    if (typeof fetch === 'undefined') return null;
+    try {
+      const res = await fetch(`${this.baseUrl}/api/quiz/imported-files`);
+      if (!res.ok) return null;
+      const data = await res.json();
+      if (data && data.success && Array.isArray(data.files)) {
+        this.lastSyncTime = new Date().toISOString();
+        this._notify();
+        return data.files;
+      }
+    } catch (err) {
+      console.warn('[CloudSyncManager] Error syncing imported files:', err);
+    }
+    return null;
+  }
+
+  /**
+   * Pushes an imported file to the backend server.
+   * @param {Object} fileEntry
+   * @returns {Promise<Object|null>}
+   */
+  async pushImportedFile(fileEntry) {
+    if (typeof fetch === 'undefined') return null;
+    try {
+      const res = await fetch(`${this.baseUrl}/api/quiz/imported-files`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ file: fileEntry }),
+      });
+      if (!res.ok) return null;
+      return await res.json();
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Pushes a batch of imported files to the backend server.
+   * @param {Array<Object>} files
+   * @returns {Promise<Object|null>}
+   */
+  async pushBatchImportedFiles(files) {
+    if (typeof fetch === 'undefined') return null;
+    try {
+      const res = await fetch(`${this.baseUrl}/api/quiz/imported-files`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ files }),
+      });
+      if (!res.ok) return null;
+      return await res.json();
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Deletes an imported file from the backend server.
+   * @param {string} fileId
+   * @returns {Promise<Object|null>}
+   */
+  async pushDeleteImportedFile(fileId) {
+    if (typeof fetch === 'undefined') return null;
+    try {
+      const res = await fetch(`${this.baseUrl}/api/quiz/imported-files/${encodeURIComponent(fileId)}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) return null;
+      return await res.json();
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Clears all imported files from the backend server.
+   * @returns {Promise<Object|null>}
+   */
+  async pushClearAllImportedFiles() {
+    if (typeof fetch === 'undefined') return null;
+    try {
+      const res = await fetch(`${this.baseUrl}/api/quiz/imported-files/clear-all`, {
+        method: 'POST',
+      });
+      if (!res.ok) return null;
+      return await res.json();
+    } catch {
+      return null;
+    }
+  }
 }
 
 export const cloudSyncManager = new CloudSyncManager();
+

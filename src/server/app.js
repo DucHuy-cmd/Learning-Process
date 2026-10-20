@@ -17,7 +17,7 @@ import { isAIConfigured, analyzeGraphFileBackend, analyzeLogicFileBackend, execu
 import { validateGraphSpecification, MAX_FILE_SIZE_BYTES } from '../app/ai/GraphVisionAdapter.js';
 import { extractDocx } from '../app/ai/DocxExtractor.js';
 
-import { serverUsers, serverAiSessions, serverQuizStats, serverExams, serverExamSubmissions, serverCustomQuestions, saveDatabase, isKVConfigured, fetchFromKV, writeToKV } from './auth/ServerDataStore.js';
+import { serverUsers, serverAiSessions, serverQuizStats, serverExams, serverExamSubmissions, serverCustomQuestions, serverImportedFiles, saveDatabase, isKVConfigured, fetchFromKV, writeToKV } from './auth/ServerDataStore.js';
 import { DEFAULT_EXAMS } from '../core/quiz/ExamManager.js';
 import { STATIC_QUESTION_BANK } from '../core/quiz/QuizBank.js';
 import { DEMO_USERS } from '../core/auth/AuthManager.js';
@@ -863,6 +863,113 @@ export async function handleRequest(req, res) {
       sendJson(res, 200, { success: true, message: `Đã xóa câu hỏi ${targetId} thành công.` });
     } else {
       sendJson(res, 404, { success: false, error: 'Không tìm thấy câu hỏi trong ngân hàng tùy chỉnh.' });
+    }
+    return;
+  }
+
+  // =========================================================================
+  // MULTI-DEVICE CLOUD SYNC FOR IMPORTED WORD FILES & QUESTIONS
+  // =========================================================================
+
+  // Route: GET /api/quiz/imported-files
+  if (req.method === 'GET' && pathname === '/api/quiz/imported-files') {
+    sendJson(res, 200, { success: true, files: serverImportedFiles });
+    return;
+  }
+
+  // Route: POST /api/quiz/imported-files/clear-all
+  if (req.method === 'POST' && (pathname === '/api/quiz/imported-files/clear-all' || pathname.endsWith('/imported-files/clear-all'))) {
+    serverImportedFiles.length = 0;
+    saveDatabase();
+    sendJson(res, 200, { success: true, message: 'Đã xóa toàn bộ file nạp trên máy chủ.', files: [] });
+    return;
+  }
+
+  // Route: POST /api/quiz/imported-files (Push single or batch files to cloud)
+  if (req.method === 'POST' && pathname === '/api/quiz/imported-files') {
+    try {
+      const bodyBuffer = await readRequestBody(req);
+      const data = JSON.parse(bodyBuffer.toString('utf8') || '{}');
+
+      // 1. Batch files payload
+      if (Array.isArray(data.files)) {
+        for (const f of data.files) {
+          if (!f || !f.name) continue;
+          const fileId = f.id || `file_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+          const entry = {
+            id: fileId,
+            name: String(f.name).trim(),
+            uploadedAt: f.uploadedAt || new Date().toISOString(),
+            questionCount: Array.isArray(f.questions) ? f.questions.length : (f.questionCount || 0),
+            questions: Array.isArray(f.questions) ? f.questions : [],
+            uploadedBy: f.uploadedBy || 'user_admin',
+          };
+          const existingIdx = serverImportedFiles.findIndex(item => item.id === entry.id || item.name.toLowerCase() === entry.name.toLowerCase());
+          if (existingIdx >= 0) {
+            serverImportedFiles[existingIdx] = entry;
+          } else {
+            serverImportedFiles.unshift(entry);
+          }
+        }
+        saveDatabase();
+        sendJson(res, 200, { success: true, files: serverImportedFiles });
+        return;
+      }
+
+      // 2. Single file payload
+      const rawFile = data.file || data;
+      if (!rawFile || !rawFile.name) {
+        sendJson(res, 400, { success: false, error: 'Thiếu thông tin file (tên file hoặc danh sách câu hỏi).' });
+        return;
+      }
+
+      const fileId = rawFile.id || `file_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      const fileEntry = {
+        id: fileId,
+        name: String(rawFile.name).trim(),
+        uploadedAt: rawFile.uploadedAt || new Date().toISOString(),
+        questionCount: Array.isArray(rawFile.questions) ? rawFile.questions.length : (rawFile.questionCount || 0),
+        questions: Array.isArray(rawFile.questions) ? rawFile.questions : [],
+        uploadedBy: rawFile.uploadedBy || 'user_admin',
+      };
+
+      const existingIdx = serverImportedFiles.findIndex(item => item.id === fileEntry.id || item.name.toLowerCase() === fileEntry.name.toLowerCase());
+      if (existingIdx >= 0) {
+        serverImportedFiles[existingIdx] = fileEntry;
+      } else {
+        serverImportedFiles.unshift(fileEntry);
+      }
+
+      saveDatabase();
+      sendJson(res, 200, { success: true, file: fileEntry, files: serverImportedFiles });
+      return;
+    } catch {
+      sendJson(res, 400, { success: false, error: 'Dữ liệu file không hợp lệ.' });
+      return;
+    }
+  }
+
+  // Route: DELETE /api/quiz/imported-files/:id or DELETE /api/quiz/imported-files?id=...
+  if (req.method === 'DELETE' && (pathname === '/api/quiz/imported-files' || pathname.startsWith('/api/quiz/imported-files/'))) {
+    let targetId = '';
+    if (pathname.startsWith('/api/quiz/imported-files/')) {
+      targetId = decodeURIComponent(pathname.replace('/api/quiz/imported-files/', '')).trim();
+    } else {
+      targetId = parsedUrl.searchParams.get('id') || '';
+    }
+
+    if (!targetId) {
+      sendJson(res, 400, { success: false, error: 'Thiếu mã file cần xóa.' });
+      return;
+    }
+
+    const idx = serverImportedFiles.findIndex(f => f.id === targetId);
+    if (idx !== -1) {
+      const deleted = serverImportedFiles.splice(idx, 1)[0];
+      saveDatabase();
+      sendJson(res, 200, { success: true, message: `Đã xóa file "${deleted.name}" thành công.`, deletedId: targetId, files: serverImportedFiles });
+    } else {
+      sendJson(res, 404, { success: false, error: 'Không tìm thấy file cần xóa trên máy chủ.' });
     }
     return;
   }
