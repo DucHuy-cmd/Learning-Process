@@ -488,6 +488,52 @@ export class QuizView {
     return String(maxNum + 1);
   }
 
+  _getStudioPrintPool() {
+    if (!this.importedQuestions || this.importedQuestions.length === 0) {
+      return [];
+    }
+    const source = (this.studioPrintSource && this.studioPrintSource !== 'builtin') 
+      ? this.studioPrintSource 
+      : 'all_word';
+
+    if (source === 'distributed') {
+      const distQ = this._getSelectedDistributedQuestions();
+      return (distQ && distQ.length > 0) ? distQ : (this.importedQuestions || []);
+    }
+    if (source !== 'all_word') {
+      const file = (this.importedFiles || []).find(f => f.id === source);
+      if (file && file.questions && file.questions.length > 0) {
+        return file.questions;
+      }
+    }
+    return this.importedQuestions || [];
+  }
+
+  _renderDistSummaryBanner(distSummary) {
+    if (distSummary.totalSelected === 0) {
+      return `
+        <div style="padding:14px 18px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:8px;margin-bottom:18px;text-align:center;">
+          <div style="font-size:13.5px;font-weight:700;color:#ef4444;margin-bottom:4px;">⚠️ Chưa có câu hỏi nào được chọn để phát đề!</div>
+          <div style="font-size:12.5px;color:var(--dim);">Vui lòng nhập số câu hoặc bấm các nút chọn nhanh (ví dụ: 10 câu, Tất cả) ở bảng phân phối ngay phía trên.</div>
+        </div>
+      `;
+    }
+    return `
+      <div style="padding:14px 18px;background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.3);border-radius:8px;margin-bottom:18px;">
+        <div style="font-weight:700;color:#2563eb;font-size:13.5px;margin-bottom:6px;">
+          🎯 Đang cấu hình phát đề gồm ${distSummary.totalSelected} câu hỏi tổng hợp từ ${distSummary.breakdown.length} bộ đề:
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          ${distSummary.breakdown.map(b => `
+            <span class="pill-badge" style="background:var(--panel);border:1px solid var(--line);color:var(--text);font-size:11.5px;padding:3px 8px;border-radius:6px;font-weight:600;">
+              📄 ${this._escapeHtml(b.fileName)}: <strong style="color:#2563eb;">${b.selectedCount}</strong> câu
+            </span>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }
+
   _getSelectedDistributedQuestions() {
     if (!this.importedFiles || this.importedFiles.length === 0) {
       return this.importedQuestions || [];
@@ -523,23 +569,7 @@ export class QuizView {
       return null;
     }
 
-    const source = (this.studioPrintSource && this.studioPrintSource !== 'builtin') 
-      ? this.studioPrintSource 
-      : 'all_word';
-
-    let pool = this.importedQuestions;
-    if (source === 'distributed') {
-      const distQ = this._getSelectedDistributedQuestions();
-      if (distQ && distQ.length > 0) {
-        pool = distQ;
-      }
-    } else if (source !== 'all_word') {
-      const file = this.importedFiles.find(f => f.id === source);
-      if (file && file.questions && file.questions.length > 0) {
-        pool = file.questions;
-      }
-    }
-
+    const pool = this._getStudioPrintPool();
     if (pool.length === 0) {
       return null;
     }
@@ -548,7 +578,12 @@ export class QuizView {
       ? parseInt(this.studioConfig.count, 10)
       : pool.length;
 
-    const selectedQuestions = pool.slice(0, Math.min(desiredCount, pool.length));
+    let selectedQuestions;
+    if (this.printShuffledQuestions && this.printShuffledQuestions.length > 0) {
+      selectedQuestions = this.printShuffledQuestions.slice(0, Math.min(desiredCount, this.printShuffledQuestions.length));
+    } else {
+      selectedQuestions = pool.slice(0, Math.min(desiredCount, pool.length));
+    }
 
     if (!this.printExamCode) {
       this.printExamCode = '101';
@@ -1333,13 +1368,7 @@ export class QuizView {
       : Math.min(parseInt(this.selectedAssignCount, 10), currentPoolSize);
 
     // Compute print pool & size for A4 Studio
-    let printPool = this.importedQuestions;
-    if (this.studioPrintSource && this.studioPrintSource !== 'all_word') {
-      const pf = this.importedFiles.find(file => file.id === this.studioPrintSource);
-      if (pf && pf.questions && pf.questions.length > 0) {
-        printPool = pf.questions;
-      }
-    }
+    const printPool = this._getStudioPrintPool();
     const printPoolSize = printPool.length;
     const currentStudioCount = (this.studioConfig.count && !isNaN(parseInt(this.studioConfig.count, 10)) && parseInt(this.studioConfig.count, 10) > 0)
       ? Math.min(parseInt(this.studioConfig.count, 10), printPoolSize)
@@ -1591,7 +1620,7 @@ export class QuizView {
                     </button>
                   </div>
 
-                  <div style="font-weight:700;color:#10b981;font-size:13.5px;display:flex;align-items:center;gap:6px;">
+                  <div id="distQuickTotalSummary" style="font-weight:700;color:#10b981;font-size:13.5px;display:flex;align-items:center;gap:6px;">
                     <span>🎯 Đã chọn: ${distSummary.totalSelected} / ${distSummary.totalAvailable} câu</span>
                   </div>
                 </div>
@@ -1599,25 +1628,9 @@ export class QuizView {
             </div>
 
             <!-- Distribution Info Banner (No jump-back buttons) -->
-            ${distSummary.totalSelected === 0 ? `
-              <div style="padding:14px 18px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:8px;margin-bottom:18px;text-align:center;">
-                <div style="font-size:13.5px;font-weight:700;color:#ef4444;margin-bottom:4px;">⚠️ Chưa có câu hỏi nào được chọn để phát đề!</div>
-                <div style="font-size:12.5px;color:var(--dim);">Vui lòng nhập số câu hoặc bấm các nút chọn nhanh (ví dụ: 10 câu, Tất cả) ở bảng phân phối ngay phía trên.</div>
-              </div>
-            ` : `
-              <div style="padding:14px 18px;background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.3);border-radius:8px;margin-bottom:18px;">
-                <div style="font-weight:700;color:#2563eb;font-size:13.5px;margin-bottom:6px;">
-                  🎯 Đang cấu hình phát đề gồm ${distSummary.totalSelected} câu hỏi tổng hợp từ ${distSummary.breakdown.length} bộ đề:
-                </div>
-                <div style="display:flex;gap:6px;flex-wrap:wrap;">
-                  ${distSummary.breakdown.map(b => `
-                    <span class="pill-badge" style="background:var(--panel);border:1px solid var(--line);color:var(--text);font-size:11.5px;padding:3px 8px;border-radius:6px;font-weight:600;">
-                      📄 ${this._escapeHtml(b.fileName)}: <strong style="color:#2563eb;">${b.selectedCount}</strong> câu
-                    </span>
-                  `).join('')}
-                </div>
-              </div>
-            `}
+            <div id="distSummaryInfoBanner">
+              ${this._renderDistSummaryBanner(distSummary)}
+            </div>
 
             <!-- CONFIGURATION BAR -->
             <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(240px, 1fr));gap:16px;margin-bottom:16px;">
@@ -1737,10 +1750,6 @@ export class QuizView {
               <div>
                 <div style="font-size:14px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:6px;">
                   <span>👩‍🏫 Studio Soạn Đề Thi Trắc Nghiệm Chuẩn A4</span>
-                  <div style="display:inline-flex;align-items:center;gap:5px;background:rgba(245,158,11,0.15);padding:2px 8px;border-radius:6px;">
-                    <span style="font-size:11.5px;font-weight:700;color:var(--accent);">Mã đề:</span>
-                    <input type="text" id="txtPrintExamCode" class="form-input" value="${this._escapeHtml(exam.examCode || this.printExamCode || '101')}" placeholder="101" style="width:65px;padding:2px 6px;font-size:12px;font-weight:700;text-align:center;border-radius:4px;background:var(--panel);border:1px solid var(--accent);color:var(--accent);" />
-                  </div>
                 </div>
                 <p style="font-size:12px;color:var(--dim);margin:3px 0 0;">
                   Tạo đề thi chuẩn mẫu Bộ GD&amp;ĐT &amp; Đại học, in trực tiếp ra giấy A4 hoặc chép mã nguồn LaTeX cho Overleaf.
@@ -1749,14 +1758,14 @@ export class QuizView {
 
               <!-- Quick Action Buttons -->
               <div class="studio-print-actions" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-                <button type="button" class="btn-primary" id="btnPrintExam" style="padding:8px 16px;font-size:13px;font-weight:600;">
+                <button type="button" class="btn-primary" id="btnPrintExam" style="padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;">
                   🖨️ In Đề / Xuất PDF (A4)
                 </button>
-                <button type="button" class="btn-secondary" id="btnCopyLatex" style="padding:8px 16px;font-size:13px;font-weight:600;border:1px solid var(--line);">
+                <button type="button" class="btn-secondary" id="btnCopyLatex" style="padding:8px 16px;font-size:13px;font-weight:600;border:1px solid var(--line);cursor:pointer;">
                   📋 Sao Chép Mã LaTeX (.tex)
                 </button>
-                <button type="button" class="btn-sm" id="btnGenNewExam" style="padding:8px 14px;font-size:13px;background:var(--panel-alt);border:1px solid var(--accent);color:var(--accent);font-weight:600;">
-                  🔢 Đổi Mã Đề Kế Tiếp (+1)
+                <button type="button" class="btn-sm" id="btnGenNewExam" style="padding:8px 14px;font-size:13px;background:var(--panel-alt);border:1px solid var(--accent);color:var(--accent);font-weight:600;cursor:pointer;">
+                  🎲 Đổi Mã Ngẫu Nhiên
                 </button>
               </div>
             </div>
@@ -1765,13 +1774,13 @@ export class QuizView {
             <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding-top:12px;border-top:1px solid var(--line);font-size:12.5px;">
               <div style="display:flex;align-items:center;gap:6px;">
                 <span style="color:var(--dim);font-weight:600;">Nguồn đề:</span>
-                <select id="selStudioPrintSource" class="form-input" style="padding:5px 10px;font-size:12.5px;border-radius:6px;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);font-weight:600;">
+                <select id="selStudioPrintSource" class="form-input" style="padding:5px 10px;font-size:12.5px;border-radius:6px;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);font-weight:600;max-width:380px;cursor:pointer;">
                   <option value="all_word" ${this.studioPrintSource === 'all_word' || !this.studioPrintSource ? 'selected' : ''}>
                     📂 Tất cả câu hỏi Word (${this.importedQuestions.length} câu)
                   </option>
                   ${distSummary.totalSelected > 0 ? `
-                    <option value="distributed" ${this.studioPrintSource === 'distributed' ? 'selected' : ''}>
-                      🎯 Bộ câu hỏi đã phân phối (${distSummary.totalSelected} câu: ${distSummary.breakdown.map(b => `${b.fileName} [${b.selectedCount}]`).join(', ')})
+                    <option value="distributed" ${this.studioPrintSource === 'distributed' ? 'selected' : ''} title="${distSummary.breakdown.map(b => `${b.fileName} [${b.selectedCount}]`).join(', ')}">
+                      🎯 Bộ câu hỏi đã phân phối (${distSummary.totalSelected} câu từ ${distSummary.breakdown.length} bộ đề)
                     </option>
                   ` : ''}
                   ${this.importedFiles.map(f => `
@@ -3231,9 +3240,35 @@ export class QuizView {
       });
     }
 
-    // Distribution Table: Per-File Question Count Input
+    // In-place UI updater for distribution table (avoids re-rendering and losing focus)
+    const updateDistributionUIInPlace = () => {
+      const distSummary = this._getDistributedSummary();
+      const distBannerEl = this.container.querySelector('#distSummaryInfoBanner');
+      if (distBannerEl) {
+        distBannerEl.innerHTML = this._renderDistSummaryBanner(distSummary);
+      }
+      const distTotalQuick = this.container.querySelector('#distQuickTotalSummary');
+      if (distTotalQuick) {
+        distTotalQuick.innerHTML = `<span>🎯 Đã chọn: ${distSummary.totalSelected} / ${distSummary.totalAvailable} câu</span>`;
+      }
+      const numDuration = this.container.querySelector('#numAssignDuration');
+      if (numDuration) {
+        numDuration.value = distSummary.totalSelected > 0 ? Math.max(15, Math.round(distSummary.totalSelected * 1.5)) : 15;
+      }
+      const hintEl = this.container.querySelector('.studio-assign-action-hint');
+      if (hintEl) {
+        hintEl.innerHTML = distSummary.totalSelected > 0
+          ? `<span style="color:#10b981;font-weight:700;">✅ Sẵn sàng phát đề với ${distSummary.totalSelected} câu hỏi tự soạn đã phân phối.</span>`
+          : '⚠️ Vui lòng phân phối câu hỏi ở tab Phân Phối Đề trước khi phát.';
+      }
+    };
+
+    // Distribution Table: Per-File Question Count Input (Smooth in-place editing)
     this.container.querySelectorAll('.input-distribute-file-count').forEach(input => {
-      input.addEventListener('change', (e) => {
+      input.addEventListener('focus', (e) => {
+        e.target.select();
+      });
+      const handleCountUpdate = (e) => {
         const fileId = e.target.getAttribute('data-file-id');
         const max = parseInt(e.target.getAttribute('max'), 10) || 0;
         let val = parseInt(e.target.value, 10);
@@ -3241,11 +3276,14 @@ export class QuizView {
           val = 0;
         } else if (val > max) {
           val = max;
+          e.target.value = max;
         }
         if (!this.fileDistributions) this.fileDistributions = {};
         this.fileDistributions[fileId] = val;
-        this.render();
-      });
+        updateDistributionUIInPlace();
+      };
+      input.addEventListener('input', handleCountUpdate);
+      input.addEventListener('change', handleCountUpdate);
     });
 
     // Distribution Table: Quick Count Buttons per File
@@ -3256,9 +3294,12 @@ export class QuizView {
         const count = parseInt(btn.getAttribute('data-count'), 10);
         const file = this.importedFiles.find(f => f.id === fileId);
         const max = file ? (file.questionCount || (file.questions ? file.questions.length : 0)) : 0;
+        const finalVal = Math.min(Math.max(0, count), max);
         if (!this.fileDistributions) this.fileDistributions = {};
-        this.fileDistributions[fileId] = Math.min(Math.max(0, count), max);
-        this.render();
+        this.fileDistributions[fileId] = finalVal;
+        const matchingInput = this.container.querySelector(`.input-distribute-file-count[data-file-id="${fileId}"]`);
+        if (matchingInput) matchingInput.value = finalVal;
+        updateDistributionUIInPlace();
       });
     });
 
@@ -3268,9 +3309,12 @@ export class QuizView {
       btnDistributeAll.addEventListener('click', () => {
         if (!this.fileDistributions) this.fileDistributions = {};
         this.importedFiles.forEach(f => {
-          this.fileDistributions[f.id] = f.questionCount || (f.questions ? f.questions.length : 0);
+          const max = f.questionCount || (f.questions ? f.questions.length : 0);
+          this.fileDistributions[f.id] = max;
+          const matchingInput = this.container.querySelector(`.input-distribute-file-count[data-file-id="${f.id}"]`);
+          if (matchingInput) matchingInput.value = max;
         });
-        this.render();
+        updateDistributionUIInPlace();
       });
     }
 
@@ -3280,9 +3324,12 @@ export class QuizView {
         if (!this.fileDistributions) this.fileDistributions = {};
         this.importedFiles.forEach(f => {
           const max = f.questionCount || (f.questions ? f.questions.length : 0);
-          this.fileDistributions[f.id] = Math.min(10, max);
+          const val = Math.min(10, max);
+          this.fileDistributions[f.id] = val;
+          const matchingInput = this.container.querySelector(`.input-distribute-file-count[data-file-id="${f.id}"]`);
+          if (matchingInput) matchingInput.value = val;
         });
-        this.render();
+        updateDistributionUIInPlace();
       });
     }
 
@@ -3292,8 +3339,10 @@ export class QuizView {
         if (!this.fileDistributions) this.fileDistributions = {};
         this.importedFiles.forEach(f => {
           this.fileDistributions[f.id] = 0;
+          const matchingInput = this.container.querySelector(`.input-distribute-file-count[data-file-id="${f.id}"]`);
+          if (matchingInput) matchingInput.value = 0;
         });
-        this.render();
+        updateDistributionUIInPlace();
       });
     }
 
@@ -3587,6 +3636,7 @@ export class QuizView {
     if (selPrintSource) {
       selPrintSource.addEventListener('change', (e) => {
         this.studioPrintSource = e.target.value;
+        this.printShuffledQuestions = null;
         this.render();
       });
     }
@@ -3614,6 +3664,7 @@ export class QuizView {
         } else {
           this.studioConfig.count = null;
         }
+        this.printShuffledQuestions = null;
         this.render();
       });
     }
@@ -3625,43 +3676,49 @@ export class QuizView {
         } else {
           this.studioConfig.count = parseInt(e.target.value, 10);
         }
+        this.printShuffledQuestions = null;
         this.render();
       });
     }
 
-    const txtPrintExamCode = this.container.querySelector('#txtPrintExamCode');
-    if (txtPrintExamCode) {
-      txtPrintExamCode.addEventListener('input', (e) => {
-        this.printExamCode = e.target.value.trim() || '101';
-        const printExamBadge = this.container.querySelector('#printHeaderExamCode');
-        if (printExamBadge) printExamBadge.textContent = `MÃ ĐỀ THI: ${this.printExamCode}`;
-        const teacherKeyBadge = this.container.querySelector('#printTeacherKeyExamCode');
-        if (teacherKeyBadge) teacherKeyBadge.textContent = `DÀNH CHO GIẢNG VIÊN / CÔ CHẤM THI — MÃ ĐỀ: ${this.printExamCode}`;
-      });
-      txtPrintExamCode.addEventListener('change', (e) => {
-        this.printExamCode = e.target.value.trim() || '101';
-        const printExamBadge = this.container.querySelector('#printHeaderExamCode');
-        if (printExamBadge) printExamBadge.textContent = `MÃ ĐỀ THI: ${this.printExamCode}`;
-        const teacherKeyBadge = this.container.querySelector('#printTeacherKeyExamCode');
-        if (teacherKeyBadge) teacherKeyBadge.textContent = `DÀNH CHO GIẢNG VIÊN / CÔ CHẤM THI — MÃ ĐỀ: ${this.printExamCode}`;
-      });
-    }
-
+    // 🎲 Đổi Mã Ngẫu Nhiên: generates new random code AND shuffles both questions and options
     const btnGenNewExam = this.container.querySelector('#btnGenNewExam');
     if (btnGenNewExam) {
       btnGenNewExam.addEventListener('click', () => {
-        const currentNum = parseInt(this.printExamCode, 10);
-        if (!isNaN(currentNum)) {
-          this.printExamCode = String(currentNum + 1);
-        } else {
-          this.printExamCode = '102';
+        let newCode = Math.floor(100 + Math.random() * 900);
+        while (String(newCode) === String(this.printExamCode)) {
+          newCode = Math.floor(100 + Math.random() * 900);
         }
-        const txtPrintCode = this.container.querySelector('#txtPrintExamCode');
-        if (txtPrintCode) txtPrintCode.value = this.printExamCode;
-        const printExamBadge = this.container.querySelector('#printHeaderExamCode');
-        if (printExamBadge) printExamBadge.textContent = `MÃ ĐỀ THI: ${this.printExamCode}`;
-        const teacherKeyBadge = this.container.querySelector('#printTeacherKeyExamCode');
-        if (teacherKeyBadge) teacherKeyBadge.textContent = `DÀNH CHO GIẢNG VIÊN / CÔ CHẤM THI — MÃ ĐỀ: ${this.printExamCode}`;
+        this.printExamCode = String(newCode);
+
+        const pool = this._getStudioPrintPool();
+        const desiredCount = (this.studioConfig.count && !isNaN(parseInt(this.studioConfig.count, 10)) && parseInt(this.studioConfig.count, 10) > 0)
+          ? Math.min(parseInt(this.studioConfig.count, 10), pool.length)
+          : pool.length;
+        const baseQuestions = pool.slice(0, desiredCount);
+
+        const shuffleOpts = (q) => {
+          if (!q || !Array.isArray(q.options) || q.options.length === 0) return q;
+          const orig = q.options.map(o => ({ ...o }));
+          const shuffled = shuffle(orig);
+          const labels = ['A', 'B', 'C', 'D', 'E', 'F'];
+          let newCorrect = q.correctId || 'A';
+          const newOpts = shuffled.map((opt, i) => {
+            const newId = labels[i] || opt.id;
+            if (opt.id === q.correctId) {
+              newCorrect = newId;
+            }
+            return { id: newId, text: opt.text };
+          });
+          return {
+            ...q,
+            options: newOpts,
+            correctId: newCorrect,
+          };
+        };
+
+        this.printShuffledQuestions = shuffle(baseQuestions).map(shuffleOpts);
+        this.render();
       });
     }
 
