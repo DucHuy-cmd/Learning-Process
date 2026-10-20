@@ -119,6 +119,7 @@ export class QuizView {
     this.printExamCode = '101';
     this.studioAssignExamCode = null;
     this.studioAssignTitle = null;
+    this.studioAssignDuration = null;
 
     this._generateNewExam();
 
@@ -133,6 +134,8 @@ export class QuizView {
     if (examManager && typeof examManager.subscribe === 'function') {
       examManager.subscribe(() => {
         if (this.container && !this.activeExamSession) {
+          // If teacher is currently in Studio tab, do not wipe out active inputs
+          if (this.activeTab === 'studio') return;
           this.render();
         }
       });
@@ -488,6 +491,27 @@ export class QuizView {
     return String(maxNum + 1);
   }
 
+  setStudioSubTab(subTab) {
+    this.studioSubTab = subTab;
+    if (!this.container) return;
+    const distSec = this.container.querySelector('#studioDistributeSection');
+    const pubSec = this.container.querySelector('#studioPublishSection');
+    const printSec = this.container.querySelector('#studioPrintSection');
+    const assignSec = this.container.querySelector('#studioAssignSection');
+
+    if (distSec) distSec.style.display = (subTab === 'distribute' || (subTab !== 'publish' && subTab !== 'print' && subTab !== 'assign')) ? 'block' : 'none';
+    if (pubSec) pubSec.style.display = (subTab === 'publish' || subTab === 'assign') ? 'block' : 'none';
+    if (assignSec) assignSec.style.display = subTab === 'print' ? 'none' : 'block';
+    if (printSec) printSec.style.display = subTab === 'print' ? 'block' : 'none';
+
+    const btnDist = this.container.querySelector('#tabStudioDistribute');
+    const btnPub = this.container.querySelector('#tabStudioPublish');
+    const btnPrint = this.container.querySelector('#tabStudioPrint');
+    if (btnDist) btnDist.classList.toggle('active', (subTab === 'distribute' || (subTab !== 'publish' && subTab !== 'print' && subTab !== 'assign')));
+    if (btnPub) btnPub.classList.toggle('active', (subTab === 'publish' || subTab === 'assign'));
+    if (btnPrint) btnPrint.classList.toggle('active', subTab === 'print');
+  }
+
   _getStudioPrintPool() {
     if (!this.importedQuestions || this.importedQuestions.length === 0) {
       return [];
@@ -621,15 +645,26 @@ export class QuizView {
       }
       this.activeTab = tabName;
       this.reviewSubmission = null;
-      if (this.container) {
+
+      const paneMyExams = this.container ? this.container.querySelector('#paneMyExams') : null;
+      const paneStudio = this.container ? this.container.querySelector('#paneStudio') : null;
+      const btnMyExams = this.container ? this.container.querySelector('#tabBtnMyExams') : null;
+      const btnStudio = this.container ? this.container.querySelector('#tabBtnStudio') : null;
+
+      if (paneMyExams && paneStudio) {
+        paneMyExams.style.display = tabName === 'myExams' ? 'block' : 'none';
+        paneStudio.style.display = tabName === 'studio' ? 'block' : 'none';
+        if (btnMyExams) btnMyExams.classList.toggle('active', tabName === 'myExams');
+        if (btnStudio) btnStudio.classList.toggle('active', tabName === 'studio');
+      } else if (this.container) {
         this.render();
       }
-      if (tabName === 'myExams' || tabName === 'studio') {
+
+      if (tabName === 'myExams') {
         try {
           if (cloudSyncManager && cloudSyncManager.isConnected) {
             cloudSyncManager.syncExams(examManager).catch(() => {});
             cloudSyncManager.syncExamSubmissions(examManager).catch(() => {});
-            this.syncCloudImportedFiles().catch(() => {});
           }
         } catch {}
       }
@@ -1381,6 +1416,9 @@ export class QuizView {
     const defaultExamCode = (this.studioAssignExamCode !== null && this.studioAssignExamCode !== undefined)
       ? this.studioAssignExamCode
       : this._getNextExamCode();
+    const defaultDuration = (this.studioAssignDuration !== null && this.studioAssignDuration !== undefined && this.studioAssignDuration !== '')
+      ? this.studioAssignDuration
+      : (distSummary.totalSelected > 0 ? Math.max(15, Math.round(distSummary.totalSelected * 1.5)) : 15);
 
     return `
       <!-- Studio Subtab Navigation (3 Tabs) -->
@@ -1582,9 +1620,11 @@ export class QuizView {
                             </td>
                             <td style="text-align:center;">
                               <div style="display:flex;align-items:center;justify-content:center;gap:6px;">
-                                <input type="number" min="0" max="${fileCount}" value="${selectedCount}"
+                                <input type="text" inputmode="numeric" pattern="[0-9]*" value="${selectedCount}" max="${fileCount}"
                                   class="form-input input-distribute-file-count"
                                   data-file-id="${f.id}"
+                                  placeholder="0"
+                                  autocomplete="off"
                                   style="width:75px;padding:6px;text-align:center;font-size:13.5px;font-weight:700;border-radius:6px;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);" />
                                 <span style="font-size:12px;color:var(--dim);font-weight:600;">/ ${fileCount}</span>
                               </div>
@@ -1641,7 +1681,7 @@ export class QuizView {
 
               <div>
                 <label style="display:block;font-size:12.5px;font-weight:600;color:var(--text);margin-bottom:6px;">Thời gian làm bài (phút): *</label>
-                <input type="number" id="numAssignDuration" min="1" max="180" value="${distSummary.totalSelected > 0 ? Math.max(15, Math.round(distSummary.totalSelected * 1.5)) : 15}" style="width:100%;padding:8px 12px;border-radius:6px;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);font-size:13px;" />
+                <input type="text" inputmode="numeric" pattern="[0-9]*" id="numAssignDuration" value="${defaultDuration}" placeholder="15" autocomplete="off" style="width:100%;padding:8px 12px;border-radius:6px;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);font-size:13px;font-weight:700;" />
               </div>
 
               <div>
@@ -1794,9 +1834,10 @@ export class QuizView {
               <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
                 <span style="color:var(--dim);font-weight:600;">Số lượng câu:</span>
                 <div style="display:flex;align-items:center;gap:6px;">
-                  <input type="number" id="numStudioCount" class="form-input" min="1" max="${printPoolSize || 1}"
+                  <input type="text" inputmode="numeric" pattern="[0-9]*" id="numStudioCount" class="form-input" min="1" max="${printPoolSize || 1}"
                     value="${currentStudioCount}"
                     placeholder="Số câu (1 - ${printPoolSize})"
+                    autocomplete="off"
                     style="width:80px;padding:5px 8px;font-size:13px;border-radius:6px;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);font-weight:700;text-align:center;" />
                   <span style="font-size:12px;color:var(--dim);font-weight:600;">/ ${printPoolSize} câu</span>
                 </div>
@@ -3046,71 +3087,71 @@ export class QuizView {
     const tabStudioAssign = this.container.querySelector('#tabStudioAssign');
 
     if (tabStudioDistribute) {
-      tabStudioDistribute.addEventListener('click', () => {
-        this.studioSubTab = 'distribute';
-        this.render();
+      tabStudioDistribute.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.setStudioSubTab('distribute');
       });
     }
 
     if (tabStudioPublish) {
-      tabStudioPublish.addEventListener('click', () => {
-        this.studioSubTab = 'publish';
-        this.render();
+      tabStudioPublish.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.setStudioSubTab('publish');
       });
     }
 
     if (tabStudioPrint) {
-      tabStudioPrint.addEventListener('click', () => {
-        this.studioSubTab = 'print';
-        this.render();
+      tabStudioPrint.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.setStudioSubTab('print');
       });
     }
 
     if (tabStudioAssign) {
-      tabStudioAssign.addEventListener('click', () => {
-        this.studioSubTab = 'assign';
-        this.render();
+      tabStudioAssign.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.setStudioSubTab('publish');
       });
     }
 
     // Navigation shortcuts between Studio subtabs
     const btnProceedToPublish = this.container.querySelector('#btnProceedToPublish');
     if (btnProceedToPublish) {
-      btnProceedToPublish.addEventListener('click', () => {
-        this.studioSubTab = 'publish';
-        this.render();
+      btnProceedToPublish.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.setStudioSubTab('publish');
       });
     }
 
     const btnBackToDistribute = this.container.querySelector('#btnBackToDistribute');
     if (btnBackToDistribute) {
-      btnBackToDistribute.addEventListener('click', () => {
-        this.studioSubTab = 'distribute';
-        this.render();
+      btnBackToDistribute.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.setStudioSubTab('distribute');
       });
     }
 
     const btnBackToDistributeEmpty = this.container.querySelector('#btnBackToDistributeEmpty');
     if (btnBackToDistributeEmpty) {
-      btnBackToDistributeEmpty.addEventListener('click', () => {
-        this.studioSubTab = 'distribute';
-        this.render();
+      btnBackToDistributeEmpty.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.setStudioSubTab('distribute');
       });
     }
 
     const btnModifyDistFromPublish = this.container.querySelector('#btnModifyDistFromPublish');
     if (btnModifyDistFromPublish) {
-      btnModifyDistFromPublish.addEventListener('click', () => {
-        this.studioSubTab = 'distribute';
-        this.render();
+      btnModifyDistFromPublish.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.setStudioSubTab('distribute');
       });
     }
 
     const btnProceedToPrint = this.container.querySelector('#btnProceedToPrint');
     if (btnProceedToPrint) {
-      btnProceedToPrint.addEventListener('click', () => {
-        this.studioSubTab = 'print';
-        this.render();
+      btnProceedToPrint.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.setStudioSubTab('print');
       });
     }
 
@@ -3251,9 +3292,12 @@ export class QuizView {
       if (distTotalQuick) {
         distTotalQuick.innerHTML = `<span>🎯 Đã chọn: ${distSummary.totalSelected} / ${distSummary.totalAvailable} câu</span>`;
       }
-      const numDuration = this.container.querySelector('#numAssignDuration');
-      if (numDuration) {
-        numDuration.value = distSummary.totalSelected > 0 ? Math.max(15, Math.round(distSummary.totalSelected * 1.5)) : 15;
+      // Only auto-update duration if teacher hasn't manually customized it
+      if (this.studioAssignDuration === null || this.studioAssignDuration === undefined || this.studioAssignDuration === '') {
+        const numDuration = this.container.querySelector('#numAssignDuration');
+        if (numDuration) {
+          numDuration.value = distSummary.totalSelected > 0 ? Math.max(15, Math.round(distSummary.totalSelected * 1.5)) : 15;
+        }
       }
       const hintEl = this.container.querySelector('.studio-assign-action-hint');
       if (hintEl) {
@@ -3263,20 +3307,29 @@ export class QuizView {
       }
     };
 
-    // Distribution Table: Per-File Question Count Input (Smooth in-place editing)
+    // Distribution Table: Per-File Question Count Input (Smooth, keyboard-friendly editing)
     this.container.querySelectorAll('.input-distribute-file-count').forEach(input => {
       input.addEventListener('focus', (e) => {
-        e.target.select();
+        try { e.target.select(); } catch {}
       });
       const handleCountUpdate = (e) => {
         const fileId = e.target.getAttribute('data-file-id');
         const max = parseInt(e.target.getAttribute('max'), 10) || 0;
-        let val = parseInt(e.target.value, 10);
-        if (isNaN(val) || val < 0) {
-          val = 0;
-        } else if (val > max) {
+        const raw = e.target.value.replace(/[^0-9]/g, '');
+        e.target.value = raw;
+
+        if (raw === '') {
+          // Allow empty during active typing/backspacing
+          if (!this.fileDistributions) this.fileDistributions = {};
+          this.fileDistributions[fileId] = 0;
+          updateDistributionUIInPlace();
+          return;
+        }
+
+        let val = parseInt(raw, 10);
+        if (val > max) {
           val = max;
-          e.target.value = max;
+          e.target.value = String(max);
         }
         if (!this.fileDistributions) this.fileDistributions = {};
         this.fileDistributions[fileId] = val;
@@ -3284,6 +3337,21 @@ export class QuizView {
       };
       input.addEventListener('input', handleCountUpdate);
       input.addEventListener('change', handleCountUpdate);
+      input.addEventListener('blur', (e) => {
+        const fileId = e.target.getAttribute('data-file-id');
+        const max = parseInt(e.target.getAttribute('max'), 10) || 0;
+        const raw = e.target.value.trim();
+        let val = parseInt(raw, 10);
+        if (isNaN(val) || val < 0) {
+          val = 0;
+        } else if (val > max) {
+          val = max;
+        }
+        e.target.value = String(val);
+        if (!this.fileDistributions) this.fileDistributions = {};
+        this.fileDistributions[fileId] = val;
+        updateDistributionUIInPlace();
+      });
     });
 
     // Distribution Table: Quick Count Buttons per File
@@ -3370,16 +3438,58 @@ export class QuizView {
     // Track custom exam title input
     const txtAssignTitle = this.container.querySelector('#txtAssignTitle');
     if (txtAssignTitle) {
+      txtAssignTitle.addEventListener('focus', (e) => {
+        try { e.target.select(); } catch {}
+      });
       txtAssignTitle.addEventListener('input', (e) => {
         this.studioAssignTitle = e.target.value;
+      });
+    }
+
+    // Track custom exam duration input
+    const numAssignDuration = this.container.querySelector('#numAssignDuration');
+    if (numAssignDuration) {
+      numAssignDuration.addEventListener('focus', (e) => {
+        try { e.target.select(); } catch {}
+      });
+      numAssignDuration.addEventListener('input', (e) => {
+        const raw = e.target.value.replace(/[^0-9]/g, '');
+        e.target.value = raw;
+        if (raw === '') {
+          this.studioAssignDuration = '';
+          return;
+        }
+        let val = parseInt(raw, 10);
+        if (val > 180) {
+          val = 180;
+          e.target.value = '180';
+        }
+        this.studioAssignDuration = val;
+      });
+      numAssignDuration.addEventListener('blur', (e) => {
+        const raw = e.target.value.trim();
+        let val = parseInt(raw, 10);
+        if (isNaN(val) || val < 1) {
+          val = 15;
+        } else if (val > 180) {
+          val = 180;
+        }
+        e.target.value = String(val);
+        this.studioAssignDuration = val;
       });
     }
 
     // Track custom exam code input
     const txtAssignExamCode = this.container.querySelector('#txtAssignExamCode');
     if (txtAssignExamCode) {
+      txtAssignExamCode.addEventListener('focus', (e) => {
+        try { e.target.select(); } catch {}
+      });
       txtAssignExamCode.addEventListener('input', (e) => {
         this.studioAssignExamCode = e.target.value;
+      });
+      txtAssignExamCode.addEventListener('blur', (e) => {
+        this.studioAssignExamCode = e.target.value.trim();
       });
     }
 
@@ -3449,6 +3559,7 @@ export class QuizView {
           this._showAlert(`🎉 Tạo và phát đề thi thành công!\n\nĐề thi: "${title}" (Mã: ${result.exam.examCode})\nSố câu: ${questionIds.length} câu\nThời lượng: ${durationMinutes} phút\nĐối tượng: ${assignedTo.includes('all') ? 'Toàn bộ sinh viên' : assignedTo.length + ' sinh viên'}\n\nĐề thi đã được chuyển vào mục "Quản Lý Đề Thi". Hệ thống đã chuẩn bị sẵn File Đáp Án dành riêng cho Quản trị viên.`);
           this.studioAssignTitle = null;
           this.studioAssignExamCode = null;
+          this.studioAssignDuration = null;
           this.render();
         } else {
           this._showAlert(result.error || result.message || 'Có lỗi xảy ra khi tạo đề thi.');
@@ -3645,22 +3756,33 @@ export class QuizView {
     const selStudioCount = this.container.querySelector('#selStudioCount');
 
     if (numStudioCount) {
+      numStudioCount.addEventListener('focus', (e) => {
+        try { e.target.select(); } catch {}
+      });
       numStudioCount.addEventListener('input', (e) => {
-        const val = e.target.value.trim();
-        if (val === '') {
+        const raw = e.target.value.replace(/[^0-9]/g, '');
+        e.target.value = raw;
+        if (raw === '') {
           this.studioConfig.count = null;
-        } else {
-          const parsed = parseInt(val, 10);
-          if (!isNaN(parsed) && parsed > 0) {
-            this.studioConfig.count = parsed;
+          return;
+        }
+        const parsed = parseInt(raw, 10);
+        const pool = this._getStudioPrintPool();
+        const max = pool.length || 1;
+        if (!isNaN(parsed) && parsed > 0) {
+          this.studioConfig.count = Math.min(parsed, max);
+          if (parsed > max) {
+            e.target.value = String(max);
           }
         }
       });
       numStudioCount.addEventListener('change', (e) => {
-        const val = e.target.value.trim();
-        const parsed = parseInt(val, 10);
+        const raw = e.target.value.trim();
+        const parsed = parseInt(raw, 10);
+        const pool = this._getStudioPrintPool();
+        const max = pool.length || 1;
         if (!isNaN(parsed) && parsed > 0) {
-          this.studioConfig.count = parsed;
+          this.studioConfig.count = Math.min(parsed, max);
         } else {
           this.studioConfig.count = null;
         }
