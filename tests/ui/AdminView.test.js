@@ -8,6 +8,7 @@ import { JSDOM } from 'jsdom';
 import { AdminView } from '../../src/ui/views/AdminView.js';
 import { authManager } from '../../src/core/auth/AuthManager.js';
 import { quizHistoryManager } from '../../src/core/quiz/QuizHistoryManager.js';
+import { cloudSyncManager } from '../../src/core/sync/CloudSyncManager.js';
 
 class MockStorage {
   constructor() {
@@ -200,5 +201,35 @@ describe('AdminView (Dedicated Database & Student Management Tab)', () => {
     const clickSpy = vi.spyOn(fileInput, 'click');
     btnImport.click();
     expect(clickSpy).toHaveBeenCalled();
+  });
+
+  it('imports accounts via CSV using single batch sync call without freezing', async () => {
+    authManager.quickLogin('user_admin');
+    await adminView.render();
+
+    const fileInput = container.querySelector('#adminFileInputUsers');
+    const batchSpy = vi.spyOn(cloudSyncManager, 'adminBatchCreateUsers').mockResolvedValue({
+      success: true,
+      addedCount: 2,
+      skippedCount: 0,
+      createdUsers: [],
+    });
+
+    const csvContent = 'username,password,fullName,className,email\nsv_test_batch1,123456,SV Batch 1,CNTT,sv1@mail.com\nsv_test_batch2,123456,SV Batch 2,CNTT,sv2@mail.com';
+    const mockFile = {
+      text: async () => csvContent,
+      name: 'test.csv',
+    };
+
+    Object.defineProperty(fileInput, 'files', {
+      value: [mockFile],
+      configurable: true,
+    });
+
+    fileInput.dispatchEvent(new window.Event('change'));
+    await new Promise(r => setTimeout(r, 80));
+
+    expect(batchSpy).toHaveBeenCalled();
+    batchSpy.mockRestore();
   });
 });

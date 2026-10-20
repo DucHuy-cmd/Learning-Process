@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file app.js
  * Backend HTTP Request Handler and API Router
  * 
@@ -378,8 +378,12 @@ export async function handleRequest(req, res) {
     return;
   }
 
-  // Route: POST /api/admin/users (Quản trị viên cấp tài khoản mới)
+  // Route: POST /api/admin/users (Quản trị viên cấp tài khoản mới - đơn lẻ)
   if (req.method === 'POST' && pathname === '/api/admin/users') {
+    if (!isRequestFromAdmin(req)) {
+      sendJson(res, 403, { success: false, error: 'Chỉ quản trị viên mới có quyền này.' });
+      return;
+    }
     try {
       const bodyBuffer = await readRequestBody(req);
       const data = JSON.parse(bodyBuffer.toString('utf8') || '{}');
@@ -403,11 +407,81 @@ export async function handleRequest(req, res) {
         role: 'student',
         createdAt: new Date().toISOString(),
       };
+      unmarkUserDeleted(cleanUsername);
+      if (newUser.email) unmarkUserDeleted(newUser.email);
       serverUsers.push(newUser);
-      saveDatabase();
+      await saveDatabase();
       const publicUser = { ...newUser };
       delete publicUser.password;
       sendJson(res, 200, { success: true, user: publicUser });
+      return;
+    } catch {
+      sendJson(res, 400, { success: false, error: 'Dữ liệu không hợp lệ.' });
+      return;
+    }
+  }
+
+  // Route: POST /api/admin/users/batch (Quản trị viên cấp tài khoản hàng loạt)
+  if (req.method === 'POST' && pathname === '/api/admin/users/batch') {
+    if (!isRequestFromAdmin(req)) {
+      sendJson(res, 403, { success: false, error: 'Chỉ quản trị viên mới có quyền này.' });
+      return;
+    }
+    try {
+      const bodyBuffer = await readRequestBody(req);
+      const body = JSON.parse(bodyBuffer.toString('utf8') || '{}');
+      const usersInput = Array.isArray(body.users) ? body.users : [];
+      if (usersInput.length === 0) {
+        sendJson(res, 400, { success: false, error: 'Danh sách tài khoản trống.' });
+        return;
+      }
+
+      const existingUsernames = new Set(serverUsers.map(u => u.username.toLowerCase()));
+      const createdUsers = [];
+      const skippedCount = { value: 0 };
+      const nowTs = Date.now();
+
+      for (let i = 0; i < usersInput.length; i++) {
+        const data = usersInput[i];
+        const cleanUsername = (data.username || '').trim().toLowerCase();
+        if (!cleanUsername || !data.fullName) {
+          skippedCount.value++;
+          continue;
+        }
+        if (existingUsernames.has(cleanUsername)) {
+          skippedCount.value++;
+          continue;
+        }
+        const newUser = {
+          id: data.id || `user_${nowTs}_${Math.random().toString(36).slice(2, 6)}_${i}`,
+          username: cleanUsername,
+          fullName: data.fullName,
+          className: data.className || 'Sinh viên',
+          email: data.email || `${cleanUsername}@toanrr.edu.vn`,
+          password: data.password || '123456',
+          avatar: data.avatar || '👨‍🎓',
+          role: 'student',
+          createdAt: new Date().toISOString(),
+        };
+        existingUsernames.add(cleanUsername);
+        unmarkUserDeleted(cleanUsername);
+        if (newUser.email) unmarkUserDeleted(newUser.email);
+        serverUsers.push(newUser);
+        createdUsers.push(newUser);
+      }
+
+      // Ghi database 1 lần duy nhất sau khi thêm toàn bộ
+      if (createdUsers.length > 0) {
+        await saveDatabase();
+      }
+
+      const publicUsers = createdUsers.map(u => { const p = { ...u }; delete p.password; return p; });
+      sendJson(res, 200, {
+        success: true,
+        addedCount: createdUsers.length,
+        skippedCount: skippedCount.value,
+        createdUsers: publicUsers,
+      });
       return;
     } catch {
       sendJson(res, 400, { success: false, error: 'Dữ liệu không hợp lệ.' });

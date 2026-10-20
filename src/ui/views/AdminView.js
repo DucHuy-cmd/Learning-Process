@@ -604,6 +604,13 @@ KV_REST_API_TOKEN=...</pre>
         const file = e.target.files && e.target.files[0];
         if (!file) return;
 
+        const originalBtnText = btnTriggerImport ? btnTriggerImport.innerHTML : '';
+        if (btnTriggerImport) {
+          btnTriggerImport.disabled = true;
+          btnTriggerImport.style.opacity = '0.7';
+          btnTriggerImport.innerHTML = '<span>⏳</span> Đang đọc file...';
+        }
+
         try {
           const text = await file.text();
           const records = this._parseUserImportText(text);
@@ -613,13 +620,35 @@ KV_REST_API_TOKEN=...</pre>
             return;
           }
 
+          if (btnTriggerImport) {
+            btnTriggerImport.innerHTML = `<span>⏳</span> Đang tạo ${records.length} tài khoản...`;
+          }
+          this._showAlert(`Đang xử lý ${records.length} dòng dữ liệu tài khoản...`, 'info');
+
+          // Yield thread briefly so browser renders loading state
+          await new Promise(r => setTimeout(r, 10));
+
           const res = authManager.batchImportUsers(records);
           if (res.success) {
             if (res.createdUsers && res.createdUsers.length > 0) {
-              for (const u of res.createdUsers) {
-                try {
-                  await cloudSyncManager.adminCreateUser(u);
-                } catch {}
+              if (btnTriggerImport) {
+                btnTriggerImport.innerHTML = `<span>⏳</span> Đang đồng bộ máy chủ (${res.createdUsers.length})...`;
+              }
+              this._showAlert(`Đang đồng bộ ${res.createdUsers.length} tài khoản lên máy chủ...`, 'info');
+
+              // 1. Fast batch HTTP request in 1 round-trip
+              let batchRes = null;
+              try {
+                batchRes = await cloudSyncManager.adminBatchCreateUsers(res.createdUsers);
+              } catch {}
+
+              // 2. Fallback: chunked parallel requests (10 at a time) if batch endpoint failed
+              if (!batchRes || !batchRes.success) {
+                const CHUNK_SIZE = 10;
+                for (let i = 0; i < res.createdUsers.length; i += CHUNK_SIZE) {
+                  const chunk = res.createdUsers.slice(i, i + CHUNK_SIZE);
+                  await Promise.all(chunk.map(u => cloudSyncManager.adminCreateUser(u).catch(() => null)));
+                }
               }
             }
             await this.render();
@@ -633,6 +662,13 @@ KV_REST_API_TOKEN=...</pre>
           }
         } catch (err) {
           this._showAlert(`Lỗi đọc file: ${err.message}`, 'error');
+        } finally {
+          if (btnTriggerImport) {
+            btnTriggerImport.disabled = false;
+            btnTriggerImport.style.opacity = '1';
+            btnTriggerImport.innerHTML = originalBtnText;
+          }
+          fileInputUsers.value = '';
         }
       });
     }
@@ -795,6 +831,10 @@ KV_REST_API_TOKEN=...</pre>
       alertBox.style.background = 'rgba(16, 185, 129, 0.12)';
       alertBox.style.color = '#10b981';
       alertBox.style.border = '1px solid rgba(16, 185, 129, 0.3)';
+    } else if (type === 'info') {
+      alertBox.style.background = 'rgba(59, 130, 246, 0.12)';
+      alertBox.style.color = '#3b82f6';
+      alertBox.style.border = '1px solid rgba(59, 130, 246, 0.3)';
     } else {
       alertBox.style.background = 'rgba(239, 68, 68, 0.12)';
       alertBox.style.color = '#ef4444';

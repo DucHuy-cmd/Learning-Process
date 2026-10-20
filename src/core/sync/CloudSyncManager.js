@@ -469,6 +469,31 @@ export class CloudSyncManager {
     };
   }
 
+    /**
+   * Admin batch-creates multiple users on the server in a single request.
+   * Reduces N sequential HTTP calls to 1, and server writes DB only once.
+   * @param {Array<Object>} usersArray - Array of user objects to create
+   * @returns {Promise<{ success: boolean, addedCount: number, skippedCount: number, createdUsers: Array } | null>}
+   */
+  async adminBatchCreateUsers(usersArray) {
+    if (typeof fetch === 'undefined') return null;
+    if (!Array.isArray(usersArray) || usersArray.length === 0) return null;
+    try {
+      const res = await fetch(`${this.baseUrl}/api/admin/users/batch`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...this._getAdminAuthHeaders(),
+        },
+        body: JSON.stringify({ users: usersArray }),
+      });
+      if (!res.ok) return null;
+      return await res.json();
+    } catch {
+      return null;
+    }
+  }
+
   /**
    * Admin creates a user on the server.
    * @param {Object} userData

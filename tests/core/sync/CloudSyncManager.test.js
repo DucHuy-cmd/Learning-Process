@@ -153,4 +153,31 @@ describe('CloudSyncManager (Multi-device Cloud Sync Service)', () => {
     const examRes = await sync.pushQuizExam('user_123', { score: 10, maxScore: 10 });
     expect(examRes.success).toBe(true);
   });
+
+  it('supports admin batch user creation via adminBatchCreateUsers()', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        success: true,
+        addedCount: 2,
+        skippedCount: 0,
+        createdUsers: [
+          { username: 'sv1', fullName: 'SV 1' },
+          { username: 'sv2', fullName: 'SV 2' },
+        ],
+      }),
+    });
+
+    const res = await sync.adminBatchCreateUsers([
+      { username: 'sv1', fullName: 'SV 1' },
+      { username: 'sv2', fullName: 'SV 2' },
+    ]);
+    expect(res).not.toBeNull();
+    expect(res.success).toBe(true);
+    expect(res.addedCount).toBe(2);
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/admin/users/batch'),
+      expect.objectContaining({ method: 'POST' })
+    );
+  });
 });

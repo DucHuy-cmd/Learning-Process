@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { EventEmitter } from 'node:events';
 import { handleRequest } from '../../src/server/app.js';
-import { serverExams, serverExamSubmissions } from '../../src/server/auth/ServerDataStore.js';
+import { serverExams, serverExamSubmissions, serverUsers } from '../../src/server/auth/ServerDataStore.js';
 
 function createMockHttp({ method, url, body, headers = {} }) {
   const req = new EventEmitter();
@@ -189,6 +189,62 @@ describe('Assigned exam API', () => {
 
     expect(result.statusCode).toBe(403);
     expect(result.data.error).toBe('FORBIDDEN');
+  });
+
+  describe('Batch user provisioning API (POST /api/admin/users/batch)', () => {
+    it('rejects batch user creation if not admin', async () => {
+      const result = await sendRequest({
+        method: 'POST',
+        url: '/api/admin/users/batch',
+        body: { users: [{ username: 'sv_test', fullName: 'Sinh Vien Test' }] },
+      });
+      expect(result.statusCode).toBe(403);
+      expect(result.data.success).toBe(false);
+    });
+
+    it('rejects empty user list with 400', async () => {
+      const result = await sendRequest({
+        method: 'POST',
+        url: '/api/admin/users/batch',
+        headers: { 'x-user-id': 'user_admin', Authorization: 'Bearer user_admin' },
+        body: { users: [] },
+      });
+      expect(result.statusCode).toBe(400);
+      expect(result.data.success).toBe(false);
+    });
+
+    it('successfully provisions multiple users in a single batch call', async () => {
+      const initialCount = serverUsers.length;
+      const batchData = [
+        { username: 'sv_batch_01', fullName: 'SV Batch 1', className: 'K66-CNTT' },
+        { username: 'sv_batch_02', fullName: 'SV Batch 2', className: 'K66-KTPM' },
+        { username: 'sv_batch_01', fullName: 'SV Batch 1 Dupe' }, // Duplicate, should be skipped
+      ];
+
+      const result = await sendRequest({
+        method: 'POST',
+        url: '/api/admin/users/batch',
+        headers: { 'x-user-id': 'user_admin', Authorization: 'Bearer user_admin' },
+        body: { users: batchData },
+      });
+
+      expect(result.statusCode).toBe(200);
+      expect(result.data.success).toBe(true);
+      expect(result.data.addedCount).toBe(2);
+      expect(result.data.skippedCount).toBe(1);
+      expect(result.data.createdUsers.length).toBe(2);
+      expect(result.data.createdUsers[0].password).toBeUndefined(); // passwords must be redacted
+
+      // Verify in server data store
+      expect(serverUsers.some(u => u.username === 'sv_batch_01')).toBe(true);
+      expect(serverUsers.some(u => u.username === 'sv_batch_02')).toBe(true);
+
+      // Cleanup
+      const idx1 = serverUsers.findIndex(u => u.username === 'sv_batch_01');
+      if (idx1 >= 0) serverUsers.splice(idx1, 1);
+      const idx2 = serverUsers.findIndex(u => u.username === 'sv_batch_02');
+      if (idx2 >= 0) serverUsers.splice(idx2, 1);
+    });
   });
 
 });
