@@ -30,7 +30,31 @@ export const serverCustomQuestions = [];
 export const serverImportedFiles = [];
 export const serverDeletedUsers = new Set();
 export const serverDeletedExams = new Set();
+export const serverDeletedImportedFiles = new Set();
 export let serverDbResetTime = 0;
+export let serverImportedFilesResetTime = 0;
+
+export function markImportedFileDeleted(fileId) {
+  if (!fileId) return;
+  serverDeletedImportedFiles.add(String(fileId).trim());
+}
+
+export function unmarkImportedFileDeleted(fileId) {
+  if (!fileId) return;
+  serverDeletedImportedFiles.delete(String(fileId).trim());
+}
+
+export function isImportedFileDeleted(fileId) {
+  if (!fileId) return false;
+  return serverDeletedImportedFiles.has(String(fileId).trim());
+}
+
+export function recordImportedFilesReset() {
+  serverImportedFilesResetTime = Date.now();
+  for (const f of serverImportedFiles) {
+    if (f && f.id) markImportedFileDeleted(f.id);
+  }
+}
 
 export function markUserDeleted(identifier) {
   if (!identifier) return;
@@ -128,9 +152,19 @@ export function loadDatabase() {
         serverCustomQuestions.length = 0;
         serverCustomQuestions.push(...data.customQuestions);
       }
+      if (Array.isArray(data.deletedImportedFiles)) {
+        serverDeletedImportedFiles.clear();
+        for (const item of data.deletedImportedFiles) {
+          if (item) serverDeletedImportedFiles.add(String(item).trim());
+        }
+      }
+      if (typeof data.importedFilesResetTime === 'number') {
+        serverImportedFilesResetTime = data.importedFilesResetTime;
+      }
       if (Array.isArray(data.importedFiles)) {
         serverImportedFiles.length = 0;
-        serverImportedFiles.push(...data.importedFiles);
+        const valid = data.importedFiles.filter(f => !serverDeletedImportedFiles.has(f.id));
+        serverImportedFiles.push(...valid);
       }
       if (Array.isArray(data.deletedUsers)) {
         serverDeletedUsers.clear();
@@ -232,9 +266,19 @@ export async function fetchFromKV() {
         serverCustomQuestions.length = 0;
         serverCustomQuestions.push(...data.customQuestions);
       }
+      if (Array.isArray(data.deletedImportedFiles)) {
+        serverDeletedImportedFiles.clear();
+        for (const item of data.deletedImportedFiles) {
+          if (item) serverDeletedImportedFiles.add(String(item).trim());
+        }
+      }
+      if (typeof data.importedFilesResetTime === 'number') {
+        serverImportedFilesResetTime = data.importedFilesResetTime;
+      }
       if (Array.isArray(data.importedFiles)) {
         serverImportedFiles.length = 0;
-        serverImportedFiles.push(...data.importedFiles);
+        const valid = data.importedFiles.filter(f => !serverDeletedImportedFiles.has(f.id));
+        serverImportedFiles.push(...valid);
       }
       if (Array.isArray(data.deletedUsers)) {
         serverDeletedUsers.clear();
@@ -267,7 +311,9 @@ export async function writeToKV() {
       users: serverUsers,
       deletedUsers: Array.from(serverDeletedUsers),
       deletedExams: Array.from(serverDeletedExams),
+      deletedImportedFiles: Array.from(serverDeletedImportedFiles),
       dbResetTime: serverDbResetTime,
+      importedFilesResetTime: serverImportedFilesResetTime,
       aiSessions: serverAiSessions,
       quizStats: serverQuizStats,
       exams: serverExams,
@@ -300,7 +346,9 @@ export function saveDatabase() {
       users: serverUsers,
       deletedUsers: Array.from(serverDeletedUsers),
       deletedExams: Array.from(serverDeletedExams),
+      deletedImportedFiles: Array.from(serverDeletedImportedFiles),
       dbResetTime: serverDbResetTime,
+      importedFilesResetTime: serverImportedFilesResetTime,
       aiSessions: serverAiSessions,
       quizStats: serverQuizStats,
       exams: serverExams,
@@ -316,8 +364,9 @@ export function saveDatabase() {
 
   // Also write to Cloud KV if configured
   if (isKVConfigured()) {
-    writeToKV().catch(() => {});
+    return writeToKV().catch(() => {});
   }
+  return Promise.resolve(true);
 }
 
 // Initial load

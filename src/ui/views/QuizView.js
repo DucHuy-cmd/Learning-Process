@@ -37,6 +37,7 @@ import {
   exportExamToLatex,
   QUIZ_TOPICS,
   QUIZ_DIFFICULTIES,
+  setCustomQuestionBank,
 } from '../../core/quiz/QuizBank.js';
 import { authManager } from '../../core/auth/AuthManager.js';
 import { quizHistoryManager } from '../../core/quiz/QuizHistoryManager.js';
@@ -248,7 +249,7 @@ export class QuizView {
     }
   }
 
-  _deleteImportedFile(fileId) {
+  async _deleteImportedFile(fileId) {
     const file = this.importedFiles.find(f => f.id === fileId);
     if (!file) return;
 
@@ -267,12 +268,44 @@ export class QuizView {
     if (this.fileDistributions) {
       delete this.fileDistributions[fileId];
     }
+    this._markFileDeletedLocally(fileId);
     this._saveWordFiles(updated, true);
     if (cloudSyncManager && typeof cloudSyncManager.pushDeleteImportedFile === 'function') {
-      cloudSyncManager.pushDeleteImportedFile(fileId).catch(() => {});
+      try {
+        await cloudSyncManager.pushDeleteImportedFile(fileId);
+      } catch {}
     }
     this._showAlert(`🗑️ Đã xóa dữ liệu file "${file.name}" thành công!`);
-    this.render();
+    await this.render();
+  }
+
+  _getDeletedFileIds() {
+    try {
+      const storage = this._getStorage();
+      if (storage) {
+        return JSON.parse(storage.getItem('toanrr_deleted_imported_files_v1') || '[]');
+      }
+    } catch {}
+    return [];
+  }
+
+  _markFileDeletedLocally(fileId) {
+    if (!fileId) return;
+    try {
+      const storage = this._getStorage();
+      if (storage) {
+        const list = this._getDeletedFileIds();
+        if (!list.includes(fileId)) {
+          list.push(fileId);
+          storage.setItem('toanrr_deleted_imported_files_v1', JSON.stringify(list));
+        }
+      }
+    } catch {}
+  }
+
+  _isFileDeletedLocally(fileId) {
+    if (!fileId) return false;
+    return this._getDeletedFileIds().includes(fileId);
   }
 
   _clearAllWordFiles() {
@@ -284,16 +317,26 @@ export class QuizView {
     this.selectedAssignCount = 'all';
     this.studioPrintSource = 'all_word';
     this.fileDistributions = {};
+    const now = Date.now();
     try {
       const storage = this._getStorage();
       if (storage) {
         storage.removeItem('toanrr_custom_imported_files_v1');
         storage.removeItem('toanrr_custom_imported_questions_v1');
         storage.removeItem('toanrr_custom_imported_raw_v1');
+        storage.setItem('toanrr_last_imported_files_clear', String(now));
+        storage.setItem('toanrr_deleted_imported_files_v1', JSON.stringify([]));
       }
     } catch {}
+    if (typeof setCustomQuestionBank === 'function') {
+      try {
+        setCustomQuestionBank([]);
+      } catch {}
+    }
     if (cloudSyncManager && typeof cloudSyncManager.pushClearAllImportedFiles === 'function') {
-      cloudSyncManager.pushClearAllImportedFiles().catch(() => {});
+      cloudSyncManager.pushClearAllImportedFiles().catch(err => {
+        console.warn('[QuizView] pushClearAllImportedFiles error:', err);
+      });
     }
   }
 
@@ -305,37 +348,67 @@ export class QuizView {
   async syncCloudImportedFiles() {
     if (!cloudSyncManager || typeof cloudSyncManager.syncImportedFiles !== 'function') return false;
     try {
-      const remoteFiles = await cloudSyncManager.syncImportedFiles();
-      if (Array.isArray(remoteFiles)) {
-        const localFiles = Array.isArray(this.importedFiles) ? this.importedFiles : [];
-        const mergedMap = new Map();
+      const remoteData = await cloudSyncManager.syncImportedFiles();
+      if (!remoteData) return false;
+      const remoteFiles = Array.isArray(remoteData) ? remoteData : (remoteData.files || []);
+      const serverResetTime = remoteData.resetTime || 0;
+      const serverDeleted = Array.isArray(remoteData.deletedFiles) ? remoteData.deletedFiles : [];
 
-        // 1. Add remote files first
-        remoteFiles.forEach(rf => {
-          if (rf && rf.id) mergedMap.set(rf.id, rf);
-        });
+      const storage = this._getStorage();
+      const localClearTime = storage ? parseInt(storage.getItem('toanrr_last_imported_files_clear') || '0', 10) : 0;
 
-        // 2. Add local files not yet on remote (offline upload recovery)
-        let hasNewLocalFiles = false;
+      // 1. If server was cleared after our last local update, purge local
+      if (serverResetTime > 0 && serverResetTime > localClearTime) {
+        this.importedFiles = [];
+        this.importedQuestions = [];
+        this.importRawText = '';
+        if (storage) {
+          storage.removeItem('toanrr_custom_imported_files_v1');
+          storage.removeItem('toanrr_custom_imported_questions_v1');
+          storage.removeItem('toanrr_custom_imported_raw_v1');
+          storage.setItem('toanrr_last_imported_files_clear', String(serverResetTime));
+        }
+      }
+
+      // 2. Mark any server-deleted files locally
+      for (const delId of serverDeleted) {
+        this._markFileDeletedLocally(delId);
+      }
+
+      // 3. Filter remote files using local and server tombstones
+      const validRemote = remoteFiles.filter(rf => rf && rf.id && !this._isFileDeletedLocally(rf.id));
+
+      // 4. Merge
+      const localFiles = Array.isArray(this.importedFiles)
+        ? this.importedFiles.filter(lf => lf && lf.id && !this._isFileDeletedLocally(lf.id))
+        : [];
+      const mergedMap = new Map();
+
+      validRemote.forEach(rf => mergedMap.set(rf.id, rf));
+
+      let hasNewLocalFiles = false;
+      if (localClearTime <= serverResetTime) {
+        // In sync with server clear; do not resurrect old local files
+      } else {
         localFiles.forEach(lf => {
-          if (lf && lf.id && !mergedMap.has(lf.id)) {
+          if (!mergedMap.has(lf.id)) {
             mergedMap.set(lf.id, lf);
             hasNewLocalFiles = true;
           }
         });
-
-        const mergedList = Array.from(mergedMap.values());
-        this._saveWordFiles(mergedList, true);
-
-        if (hasNewLocalFiles && cloudSyncManager.isConnected) {
-          cloudSyncManager.pushBatchImportedFiles(mergedList).catch(() => {});
-        }
-
-        if (this.container && (this.activeTab === 'studio' || this.studioSubTab === 'wordUpload')) {
-          this.render();
-        }
-        return true;
       }
+
+      const mergedList = Array.from(mergedMap.values());
+      this._saveWordFiles(mergedList, true);
+
+      if (hasNewLocalFiles && cloudSyncManager.isConnected) {
+        cloudSyncManager.pushBatchImportedFiles(mergedList).catch(() => {});
+      }
+
+      if (this.container && (this.activeTab === 'studio' || this.studioSubTab === 'wordUpload')) {
+        this.render();
+      }
+      return true;
     } catch (err) {
       console.warn('[QuizView] syncCloudImportedFiles error:', err);
     }
@@ -3169,7 +3242,7 @@ export class QuizView {
     if (btnClearAllWordData) {
       btnClearAllWordData.addEventListener('click', () => {
         const confirmed = typeof window !== 'undefined' && window.confirm
-          ? window.confirm('Bạn có chắc chắn muốn xóa hết toàn bộ các file đề thi Word cũ đã lưu không?\n\nThao tác này sẽ dọn dẹp sạch toàn bộ dữ liệu để bạn nạp file mới.')
+          ? window.confirm('Bạn có chắc chắn muốn xóa hết toàn bộ các file đề thi Word cũ đã lưu không?\n\nThao tác này sẽ dọn dẹp sạch toàn bộ dữ liệu trên cả máy này và máy chủ đám mây.')
           : true;
         if (!confirmed) return;
         this._clearAllWordFiles();
@@ -3720,6 +3793,10 @@ export class QuizView {
           return;
         }
 
+        btnClearAllExams.disabled = true;
+        const origText = btnClearAllExams.innerHTML;
+        btnClearAllExams.innerHTML = '<span>⏳ Đang xóa toàn bộ đề...</span>';
+
         examManager.clearAllExams();
         quizHistoryManager.clearAllExamHistory();
         if (cloudSyncManager && cloudSyncManager.isConnected) {
@@ -3730,7 +3807,7 @@ export class QuizView {
 
         this._showAlert('✅ Đã xóa toàn bộ đề thi và làm sạch dữ liệu bài làm của sinh viên thành công!');
         this.studioAssignTitle = null;
-        this.render();
+        await this.render();
       });
     }
 

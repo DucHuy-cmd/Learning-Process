@@ -836,7 +836,12 @@ export class CloudSyncManager {
       if (data && data.success && Array.isArray(data.files)) {
         this.lastSyncTime = new Date().toISOString();
         this._notify();
-        return data.files;
+        const filesArray = data.files;
+        Object.defineProperties(filesArray, {
+          deletedFiles: { value: Array.isArray(data.deletedFiles) ? data.deletedFiles : [], enumerable: false },
+          resetTime: { value: data.resetTime || 0, enumerable: false },
+        });
+        return filesArray;
       }
     } catch (err) {
       console.warn('[CloudSyncManager] Error syncing imported files:', err);
@@ -894,6 +899,9 @@ export class CloudSyncManager {
     try {
       const res = await fetch(`${this.baseUrl}/api/quiz/imported-files/${encodeURIComponent(fileId)}`, {
         method: 'DELETE',
+        headers: {
+          ...this._getAdminAuthHeaders(),
+        },
       });
       if (!res.ok) return null;
       return await res.json();
@@ -911,6 +919,10 @@ export class CloudSyncManager {
     try {
       const res = await fetch(`${this.baseUrl}/api/quiz/imported-files/clear-all`, {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...this._getAdminAuthHeaders(),
+        },
       });
       if (!res.ok) return null;
       return await res.json();

@@ -65,8 +65,9 @@ export class ExamManager {
   _initStorage() {
     if (!this.storage) return;
     try {
+      const isCleared = this.storage.getItem('trr_exams_cleared_by_admin') === 'true';
       if (!this.storage.getItem(STORAGE_KEY_EXAMS)) {
-        this.storage.setItem(STORAGE_KEY_EXAMS, JSON.stringify(DEFAULT_EXAMS));
+        this.storage.setItem(STORAGE_KEY_EXAMS, isCleared ? JSON.stringify([]) : JSON.stringify(DEFAULT_EXAMS));
       }
       if (!this.storage.getItem(STORAGE_KEY_SUBMISSIONS)) {
         this.storage.setItem(STORAGE_KEY_SUBMISSIONS, JSON.stringify([]));
@@ -628,6 +629,7 @@ export class ExamManager {
     this.memoryExamViolations = [];
     if (this.storage) {
       try {
+        this.storage.setItem('trr_exams_cleared_by_admin', 'true');
         this.storage.setItem(STORAGE_KEY_EXAMS, JSON.stringify([]));
         this.storage.setItem(STORAGE_KEY_SUBMISSIONS, JSON.stringify([]));
         this.storage.setItem(STORAGE_KEY_EXAM_VIOLATIONS, JSON.stringify([]));
@@ -643,6 +645,7 @@ export class ExamManager {
   clearAllData() {
     if (this.storage) {
       try {
+        this.storage.removeItem('trr_exams_cleared_by_admin');
         this.storage.setItem(STORAGE_KEY_EXAMS, JSON.stringify(DEFAULT_EXAMS));
         this.storage.setItem(STORAGE_KEY_SUBMISSIONS, JSON.stringify([]));
         this.storage.setItem(STORAGE_KEY_EXAM_VIOLATIONS, JSON.stringify([]));

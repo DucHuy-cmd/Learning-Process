@@ -27,13 +27,19 @@ import {
   serverImportedFiles, 
   serverDeletedUsers,
   serverDeletedExams,
+  serverDeletedImportedFiles,
   serverDbResetTime,
+  serverImportedFilesResetTime,
   markUserDeleted,
   unmarkUserDeleted,
   isUserDeleted,
   markExamDeleted,
   unmarkExamDeleted,
   isExamDeleted,
+  markImportedFileDeleted,
+  unmarkImportedFileDeleted,
+  isImportedFileDeleted,
+  recordImportedFilesReset,
   recordDbReset,
   saveDatabase, 
   isKVConfigured, 
@@ -633,7 +639,7 @@ export async function handleRequest(req, res) {
     const id = pathname.replace('/api/ai/history/', '').trim();
     if (serverAiSessions[id]) {
       delete serverAiSessions[id];
-      saveDatabase();
+      await saveDatabase();
       sendJson(res, 200, { success: true });
     } else {
       sendJson(res, 404, { success: false, error: 'Không tìm thấy phiên chat.' });
@@ -959,15 +965,28 @@ export async function handleRequest(req, res) {
 
   // Route: GET /api/quiz/imported-files
   if (req.method === 'GET' && pathname === '/api/quiz/imported-files') {
-    sendJson(res, 200, { success: true, files: serverImportedFiles });
+    sendJson(res, 200, {
+      success: true,
+      files: serverImportedFiles.filter(f => !serverDeletedImportedFiles.has(f.id)),
+      deletedFiles: Array.from(serverDeletedImportedFiles),
+      resetTime: serverImportedFilesResetTime,
+    });
     return;
   }
 
   // Route: POST /api/quiz/imported-files/clear-all
   if (req.method === 'POST' && (pathname === '/api/quiz/imported-files/clear-all' || pathname.endsWith('/imported-files/clear-all'))) {
+    recordImportedFilesReset();
     serverImportedFiles.length = 0;
-    saveDatabase();
-    sendJson(res, 200, { success: true, message: 'Đã xóa toàn bộ file nạp trên máy chủ.', files: [] });
+    serverCustomQuestions.length = 0;
+    await saveDatabase();
+    sendJson(res, 200, {
+      success: true,
+      message: 'Đã xóa toàn bộ file nạp trên máy chủ.',
+      files: [],
+      deletedFiles: Array.from(serverDeletedImportedFiles),
+      resetTime: serverImportedFilesResetTime,
+    });
     return;
   }
 
@@ -997,7 +1016,7 @@ export async function handleRequest(req, res) {
             serverImportedFiles.unshift(entry);
           }
         }
-        saveDatabase();
+        await saveDatabase();
         sendJson(res, 200, { success: true, files: serverImportedFiles });
         return;
       }
@@ -1026,7 +1045,8 @@ export async function handleRequest(req, res) {
         serverImportedFiles.unshift(fileEntry);
       }
 
-      saveDatabase();
+      unmarkImportedFileDeleted(fileId);
+      await saveDatabase();
       sendJson(res, 200, { success: true, file: fileEntry, files: serverImportedFiles });
       return;
     } catch {
@@ -1052,8 +1072,15 @@ export async function handleRequest(req, res) {
     const idx = serverImportedFiles.findIndex(f => f.id === targetId);
     if (idx !== -1) {
       const deleted = serverImportedFiles.splice(idx, 1)[0];
-      saveDatabase();
-      sendJson(res, 200, { success: true, message: `Đã xóa file "${deleted.name}" thành công.`, deletedId: targetId, files: serverImportedFiles });
+      markImportedFileDeleted(targetId);
+      await saveDatabase();
+      sendJson(res, 200, {
+        success: true,
+        message: `Đã xóa file "${deleted.name}" thành công.`,
+        deletedId: targetId,
+        files: serverImportedFiles,
+        deletedFiles: Array.from(serverDeletedImportedFiles),
+      });
     } else {
       sendJson(res, 404, { success: false, error: 'Không tìm thấy file cần xóa trên máy chủ.' });
     }
@@ -1143,6 +1170,11 @@ export async function handleRequest(req, res) {
       return;
     }
 
+    for (const ex of serverExams) {
+      if (ex && ex.id) markExamDeleted(ex.id);
+    }
+    markExamDeleted('exam_intro_eval_2026');
+
     serverExams.length = 0;
     serverExamSubmissions.length = 0;
     for (const k of Object.keys(serverQuizStats)) {
@@ -1150,10 +1182,7 @@ export async function handleRequest(req, res) {
         serverQuizStats[k].history = [];
       }
     }
-    saveDatabase();
-    if (isKVConfigured()) {
-      writeToKV().catch(() => {});
-    }
+    await saveDatabase();
     sendJson(res, 200, { success: true, message: 'Đã xóa toàn bộ đề thi và làm sạch dữ liệu bài làm của sinh viên thành công.' });
     return;
   }
@@ -1176,7 +1205,8 @@ export async function handleRequest(req, res) {
       const remainingSubs = serverExamSubmissions.filter(s => s.examId !== examId);
       serverExamSubmissions.length = 0;
       serverExamSubmissions.push(...remainingSubs);
-      saveDatabase();
+      markExamDeleted(examId);
+      await saveDatabase();
       sendJson(res, 200, { success: true });
     } else {
       sendJson(res, 404, { success: false, error: 'Không tìm thấy đề thi.' });
