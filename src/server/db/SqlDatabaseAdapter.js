@@ -53,14 +53,22 @@ export class SqlDatabaseAdapter {
     if (this.isCloudEnabled) {
       try {
         let batchSucceeded = false;
+        // Attempt fast combined DDL in a single query
         try {
-          const { neon } = await import('@neondatabase/serverless');
-          const sql = neon(this.postgresUrl);
-          const neonDdl = SCHEMA_STATEMENTS.map(s => sql.query(s));
-          await sql.transaction(neonDdl);
+          const combinedDdl = SCHEMA_STATEMENTS.join(';\n') + ';';
+          await this.executeRawPostgres(combinedDdl);
           batchSucceeded = true;
         } catch {
-          // If batch transaction fails (e.g. index exists notice treated as error), fall back to individual statements
+          // If combined DDL fails, try neon driver transaction
+          try {
+            const { neon } = await import('@neondatabase/serverless');
+            const sql = neon(this.postgresUrl);
+            const neonDdl = SCHEMA_STATEMENTS.map(s => sql.query(s));
+            await sql.transaction(neonDdl);
+            batchSucceeded = true;
+          } catch {
+            // Fall back to individual statements
+          }
         }
 
         if (!batchSucceeded) {

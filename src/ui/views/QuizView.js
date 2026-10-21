@@ -2933,7 +2933,7 @@ export class QuizView {
 
     if (result.success && cloudSyncManager) {
       try {
-        const isOnline = Boolean(cloudSyncManager && cloudSyncManager.isConnected);
+        const isOnline = Boolean(cloudSyncManager && (cloudSyncManager.isConnected || (typeof navigator !== 'undefined' && navigator.onLine !== false)));
         if (isOnline) {
           const serverRes = await cloudSyncManager.serverSubmitExam(result.submission);
           if (serverRes && serverRes.success) {
@@ -3760,7 +3760,7 @@ export class QuizView {
           };
 
           let serverConfirmedExam = null;
-          const isOnline = Boolean(cloudSyncManager && cloudSyncManager.isConnected);
+          const isOnline = Boolean(cloudSyncManager && (cloudSyncManager.isConnected || (typeof navigator !== 'undefined' && navigator.onLine !== false)));
 
           if (isOnline) {
             const serverRes = await cloudSyncManager.serverCreateExam(examPayload);

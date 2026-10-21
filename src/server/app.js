@@ -45,6 +45,8 @@ import {
   saveDatabase, 
   fetchFromPostgres,
   saveToPostgres,
+  saveExamToPostgres,
+  saveSubmissionToPostgres,
   isKVConfigured, 
   fetchFromKV, 
   writeToKV,
@@ -289,20 +291,8 @@ export async function handleRequest(req, res) {
     return;
   }
 
-  // Sync latest data from PostgreSQL (Neon) or Vercel KV for Serverless execution
-  if (sqlDb.isCloudEnabled) {
-    try {
-      await fetchFromPostgres();
-    } catch {}
-  } else if (isKVConfigured()) {
-    try {
-      await fetchFromKV();
-    } catch {}
-  }
-
-  // Route: GET /api/health
+  // Route: GET /api/health (fast ping response without waiting for database hydration)
   if (req.method === 'GET' && (pathname === '/api/health' || pathname.endsWith('/health'))) {
-    const dbStatus = sqlDb.getStatus();
     sendJson(res, 200, {
       status: 'ok',
       aiConfigured: isAIConfigured(),
@@ -316,6 +306,17 @@ export async function handleRequest(req, res) {
       supportedFormats: BACKEND_SUPPORTED_EXTENSIONS,
     });
     return;
+  }
+
+  // Sync latest data from PostgreSQL (Neon) or Vercel KV for Serverless execution
+  if (sqlDb.isCloudEnabled) {
+    try {
+      await fetchFromPostgres();
+    } catch {}
+  } else if (isKVConfigured()) {
+    try {
+      await fetchFromKV();
+    } catch {}
   }
 
   // Route: GET /api/database/status
@@ -1586,7 +1587,7 @@ export async function handleRequest(req, res) {
 
       unmarkExamDeleted(examId);
       serverExams.unshift(exam);
-      await saveDatabase();
+      await saveExamToPostgres(exam);
       sendJson(res, 201, { success: true, exam });
       return;
     } catch (err) {
@@ -1842,7 +1843,7 @@ export async function handleRequest(req, res) {
       };
 
       serverExamSubmissions.push(submission);
-      await saveDatabase();
+      await saveSubmissionToPostgres(submission);
       sendJson(res, 201, { success: true, submission });
       return;
     } catch (err) {

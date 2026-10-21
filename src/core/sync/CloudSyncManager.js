@@ -16,7 +16,7 @@ export class CloudSyncManager {
    * @param {string} [options.baseUrl] - API Base URL (defaults to window.location.origin or '')
    * @param {number} [options.timeoutMs=2000] - Connection ping timeout
    */
-  constructor({ baseUrl = '', timeoutMs = 8000 } = {}) {
+  constructor({ baseUrl = '', timeoutMs = 15000 } = {}) {
     this.baseUrl = baseUrl;
     this.timeoutMs = timeoutMs;
     this.isConnected = false;
@@ -35,7 +35,7 @@ export class CloudSyncManager {
    * @returns {Promise<Response>}
    */
   async fetchWithTimeout(url, options = {}, timeoutMs = null) {
-    const ms = timeoutMs || this.timeoutMs || 8000;
+    const ms = timeoutMs || this.timeoutMs || 15000;
     const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
     let timer = null;
 
@@ -829,7 +829,7 @@ export class CloudSyncManager {
           ...this._getAdminAuthHeaders(),
         },
         body: JSON.stringify(examData),
-      });
+      }, 25000);
       const data = await res.json().catch(() => null);
       if (res.status === 409 && data?.submission) {
         return {
@@ -841,6 +841,8 @@ export class CloudSyncManager {
       if (!res.ok) {
         return { success: false, error: data?.error || `Lỗi máy chủ (${res.status})`, status: res.status };
       }
+      this.isConnected = true;
+      this._notify();
       return data || { success: false, error: 'Phản hồi rỗng từ máy chủ' };
     } catch (err) {
       return { success: false, error: 'Lỗi mạng khi kết nối máy chủ: ' + err.message };
@@ -962,9 +964,11 @@ export class CloudSyncManager {
           timeSpentSeconds,
           integrityBan,
         }),
-      });
+      }, 25000);
       const data = await res.json().catch(() => null);
       if (res.status === 409 && data?.submission) {
+        this.isConnected = true;
+        this._notify();
         return {
           success: true,
           submission: data.submission,
@@ -974,6 +978,8 @@ export class CloudSyncManager {
       if (!res.ok) {
         return { success: false, error: data?.error || `Lỗi máy chủ (${res.status})`, status: res.status };
       }
+      this.isConnected = true;
+      this._notify();
       return {
         success: true,
         submission: data?.submission || submissionData,
