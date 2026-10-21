@@ -16,7 +16,13 @@ const __dirname = path.dirname(__filename);
 
 export class SqlDatabaseAdapter {
   constructor(options = {}) {
-    this.postgresUrl = options.postgresUrl || process.env.POSTGRES_URL || process.env.DATABASE_URL || '';
+    this.postgresUrl = options.postgresUrl || 
+      process.env.POSTGRES_URL || 
+      process.env.DATABASE_URL || 
+      process.env.STORAGE_URL || 
+      process.env.NEON_DATABASE_URL || 
+      Object.entries(process.env || {}).find(([k, v]) => (k.endsWith('_URL') && typeof v === 'string' && (v.startsWith('postgres://') || v.startsWith('postgresql://'))))?.[1] || 
+      '';
     this.isCloudEnabled = Boolean(this.postgresUrl);
     this.mode = this.isCloudEnabled ? 'postgres' : 'relational_sql';
 
