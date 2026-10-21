@@ -208,7 +208,7 @@ export class CloudSyncManager {
           return !authManager.isLocallyDeleted(su.id) && !authManager.isLocallyDeleted(su.username);
         });
 
-        // 5. Merge server users with local users, preserving local passwords
+        // 5. Merge server authoritative users with local users, preserving passwords
         const mergedUsers = serverUsers.map(su => {
           const matchingLocal = localUsers.find(
             lu => lu.id === su.id || lu.username.toLowerCase() === su.username.toLowerCase()
@@ -218,17 +218,6 @@ export class CloudSyncManager {
             password: matchingLocal?.password || su.password || '123456',
           };
         });
-
-        // 5. Preserve all valid local accounts (imported or created) that have not been explicitly deleted
-        for (const lu of localUsers) {
-          const isDel = authManager.isLocallyDeleted(lu.id) || authManager.isLocallyDeleted(lu.username);
-          if (!isDel && !mergedUsers.some(mu => mu.id === lu.id || mu.username.toLowerCase() === lu.username.toLowerCase())) {
-            mergedUsers.push(lu);
-            if (this.isConnected && lu.username !== 'admin') {
-              this.adminCreateUser(lu).catch(() => {});
-            }
-          }
-        }
 
         if (authManager.storage) {
           try {

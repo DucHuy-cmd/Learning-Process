@@ -233,26 +233,24 @@ describe('AdminView (Dedicated Database & Student Management Tab)', () => {
     batchSpy.mockRestore();
   });
 
-  it('renders unified continuous dashboard without tabs and with ping button removed', async () => {
+  it('renders unified continuous dashboard without tabs and with ping button and maintenance section removed', async () => {
     authManager.quickLogin('user_admin');
     await adminView.render();
 
-    // 1. Navigation tabs and Ping button are removed as requested
+    // 1. Navigation tabs, Ping button, and bottom maintenance are removed as requested
     expect(container.querySelector('.admin-nav-tabs')).toBeNull();
     expect(container.querySelector('#btnAdminPingDb')).toBeNull();
+    expect(container.querySelector('#tabContentMaintenance')).toBeNull();
 
-    // 2. All 3 sections are rendered sequentially and visible together
+    // 2. All active sections are rendered sequentially and visible together
     const studentsSection = container.querySelector('#tabContentStudents');
     const gradebookSection = container.querySelector('#tabContentGradebook');
-    const maintenanceSection = container.querySelector('#tabContentMaintenance');
 
     expect(studentsSection).not.toBeNull();
     expect(gradebookSection).not.toBeNull();
-    expect(maintenanceSection).not.toBeNull();
 
     expect(studentsSection.style.display).not.toBe('none');
     expect(gradebookSection.style.display).not.toBe('none');
-    expect(maintenanceSection.style.display).not.toBe('none');
   });
 
   it('provides student list export to CSV button', async () => {

@@ -303,67 +303,6 @@ export class AdminView {
             </div>
           </section>
         </div>
-
-        <!-- TAB 3: MAINTENANCE -->
-        <div id="tabContentMaintenance">
-          <section style="background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:22px;margin-bottom:24px;">
-            <h3 style="margin:0 0 12px;font-size:16px;color:var(--text);font-weight:700;display:flex;align-items:center;gap:8px;">
-              <span>🏛️</span>
-              <span>Thông Tin &amp; Cấu Hình Cơ Sở Dữ Liệu SQL Quan Hệ (PostgreSQL)</span>
-            </h3>
-
-            <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:16px;margin-bottom:20px;">
-              <div style="background:var(--panel-alt);border:1px solid var(--line);border-radius:8px;padding:14px 16px;">
-                <div style="font-size:12px;color:var(--dim);margin-bottom:4px;font-weight:600;">Hệ Quản Trị CSDL</div>
-                <div style="font-size:15px;font-weight:700;color:var(--text);">
-                  ${this.dbStatus.databaseLabel || 'PostgreSQL Relational DB (SQL)'}
-                </div>
-              </div>
-
-              <div style="background:var(--panel-alt);border:1px solid var(--line);border-radius:8px;padding:14px 16px;">
-                <div style="font-size:12px;color:var(--dim);margin-bottom:4px;font-weight:600;">Kiến Trúc &amp; Ràng Buộc</div>
-                <div style="font-size:15px;font-weight:700;color:#10b981;">
-                  ● Chuẩn 3NF (ACID, Primary &amp; Foreign Key Cascades)
-                </div>
-              </div>
-            </div>
-
-            <!-- SQL Tables Breakdown -->
-            <div style="margin-bottom:20px;">
-              <h4 style="margin:0 0 10px;font-size:13.5px;font-weight:700;color:var(--text);">
-                📊 Thống Kê Các Bảng Quan Hệ Trong Database (7 Bảng Chuẩn):
-              </h4>
-              <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));gap:10px;">
-                <div style="background:var(--panel-alt);padding:10px 14px;border-radius:6px;border:1px solid var(--line);">
-                  <div style="font-size:11.5px;color:var(--dim);font-weight:600;">users (Tài khoản)</div>
-                  <div style="font-size:16px;font-weight:800;color:var(--accent);">${allUsers.length} dòng</div>
-                </div>
-                <div style="background:var(--panel-alt);padding:10px 14px;border-radius:6px;border:1px solid var(--line);">
-                  <div style="font-size:11.5px;color:var(--dim);font-weight:600;">exams (Đề thi)</div>
-                  <div style="font-size:16px;font-weight:800;color:var(--accent);">${examManager.getExams().length} dòng</div>
-                </div>
-                <div style="background:var(--panel-alt);padding:10px 14px;border-radius:6px;border:1px solid var(--line);">
-                  <div style="font-size:11.5px;color:var(--dim);font-weight:600;">exam_submissions (Bài nộp)</div>
-                  <div style="font-size:16px;font-weight:800;color:var(--accent);">${examManager.getSubmissions().length} dòng</div>
-                </div>
-                <div style="background:var(--panel-alt);padding:10px 14px;border-radius:6px;border:1px solid var(--line);">
-                  <div style="font-size:11.5px;color:var(--dim);font-weight:600;">quiz_stats (Xếp hạng)</div>
-                  <div style="font-size:16px;font-weight:800;color:var(--accent);">Đang hoạt động</div>
-                </div>
-              </div>
-            </div>
-
-            <div style="background:var(--panel-alt);border:1px dashed var(--line);border-radius:8px;padding:16px;font-size:12.5px;color:var(--text);line-height:1.6;">
-              <h4 style="margin:0 0 8px;font-size:13.5px;font-weight:700;color:var(--accent);">
-                💡 Kết Nối PostgreSQL Cloud Trên Vercel:
-              </h4>
-              <p style="margin:0 0 8px;">
-                Hệ thống hỗ trợ kết nối trực tiếp với <strong>Vercel Postgres</strong>, <strong>Neon.tech</strong> hoặc <strong>Supabase</strong>. Chỉ cần gắn biến môi trường <code>POSTGRES_URL</code> vào mục Environment Variables:
-              </p>
-              <pre style="background:var(--bg);border:1px solid var(--line);padding:10px 14px;border-radius:6px;font-family:monospace;font-size:12px;overflow-x:auto;">POSTGRES_URL=postgres://default:...@...neon.tech/verceldb?sslmode=require</pre>
-            </div>
-          </section>
-        </div>
       </div>
     `;
 
@@ -776,7 +715,7 @@ export class AdminView {
             aiHistoryManager._writeAll({});
           }
 
-          // Wipe clean all local deletion tombstones and imported questions
+          // Wipe clean all local deletion tombstones, registered users, and imported questions
           if (authManager.storage) {
             try {
               authManager.storage.setItem('trr_deleted_users_v1', JSON.stringify([]));
@@ -784,12 +723,22 @@ export class AdminView {
               authManager.storage.setItem('toanrr_custom_imported_files_v1', JSON.stringify([]));
               authManager.storage.setItem('toanrr_custom_imported_questions_v1', JSON.stringify([]));
               authManager.storage.removeItem('toanrr_custom_imported_raw_v1');
-              authManager.storage.setItem('trr_registered_users', JSON.stringify(authManager.getUsers()));
+              authManager.storage.setItem('trr_registered_users', JSON.stringify([{
+                id: 'user_admin',
+                username: 'admin',
+                fullName: 'Quản Trị Viên',
+                className: 'Quản trị viên',
+                role: 'admin',
+              }]));
+              authManager.storage.setItem('trr_last_db_reset', String(Date.now()));
             } catch {}
           }
 
           try {
-            await cloudSyncManager.adminResetDatabase();
+            const resetRes = await cloudSyncManager.adminResetDatabase();
+            if (resetRes && resetRes.dbResetTime && authManager.storage) {
+              authManager.storage.setItem('trr_last_db_reset', String(resetRes.dbResetTime));
+            }
             if (typeof cloudSyncManager.pushClearAllImportedFiles === 'function') {
               await cloudSyncManager.pushClearAllImportedFiles();
             }

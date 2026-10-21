@@ -56,11 +56,12 @@ describe('Admin Database Management & Smart Features', () => {
     delete global.Event;
   });
 
-  it('renders Database status indicator and verifies ping button is removed', async () => {
+  it('renders Database status indicator and verifies ping button and bottom maintenance are removed', async () => {
     await adminView.render();
     const btnPing = container.querySelector('#btnAdminPingDb');
     expect(btnPing).toBeNull();
-    expect(container.textContent).toContain('Cấu Hình Cơ Sở Dữ Liệu SQL');
+    expect(container.textContent).toContain('Quản Trị Cơ Sở Dữ Liệu & Sinh Viên');
+    expect(container.querySelector('#tabContentMaintenance')).toBeNull();
   });
 
   it('provides 1-click password reset for student accounts', async () => {

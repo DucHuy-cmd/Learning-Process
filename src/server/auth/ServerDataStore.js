@@ -345,7 +345,7 @@ export async function fetchFromPostgres() {
 
     // 1. Load users
     const usersRes = await sqlDb.executeRawPostgres('SELECT * FROM users ORDER BY created_at ASC;');
-    if (Array.isArray(usersRes.rows) && usersRes.rows.length > 0) {
+    if (Array.isArray(usersRes.rows)) {
       serverUsers.length = 0;
       for (const row of usersRes.rows) {
         serverUsers.push({
