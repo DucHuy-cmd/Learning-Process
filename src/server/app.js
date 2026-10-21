@@ -137,7 +137,145 @@ export function sanitizeErrorMessage(msg) {
 }
 
 // Secret key for HMAC signing session tokens
-const SESSION_SECRET = process.env.SESSION_SECRET || 'toanrr_secret_session_key_2026_dijkstra';
+const SESSION_SECRET = process.env.SESSION_SECRET || (
+  process.env.NODE_ENV === 'production'
+    ? (() => {
+        console.warn('[SECURITY WARNING] SESSION_SECRET is not configured in production! Using an ephemeral random secret.');
+        return crypto.randomBytes(32).toString('hex');
+      })()
+    : 'toanrr_secret_session_key_2026_dijkstra'
+);
+
+/**
+ * Hashes a plaintext password using crypto.scrypt with a unique 16-byte random salt.
+ * Format: scrypt$<saltHex>$<derivedKeyHex>
+ * @param {string} plainPassword
+ * @returns {string}
+ */
+export function hashPassword(plainPassword) {
+  if (typeof plainPassword !== 'string') plainPassword = String(plainPassword || '');
+  const salt = crypto.randomBytes(16).toString('hex');
+  const derivedKey = crypto.scryptSync(plainPassword, salt, 32).toString('hex');
+  return `scrypt$${salt}$${derivedKey}`;
+}
+
+/**
+ * Verifies a plaintext password against a stored password string (scrypt hash or legacy plaintext).
+ * Uses constant-time buffer comparison to prevent timing side-channel attacks.
+ * @param {string} plainPassword
+ * @param {string} storedHashOrPlain
+ * @returns {boolean}
+ */
+export function verifyPassword(plainPassword, storedHashOrPlain) {
+  if (typeof plainPassword !== 'string') plainPassword = String(plainPassword || '');
+  if (!storedHashOrPlain || typeof storedHashOrPlain !== 'string') return false;
+
+  // 1. Scrypt format verification
+  if (storedHashOrPlain.startsWith('scrypt$')) {
+    const parts = storedHashOrPlain.split('$');
+    if (parts.length !== 3) return false;
+    const [, salt, expectedHex] = parts;
+    try {
+      const derivedKey = crypto.scryptSync(plainPassword, salt, 32);
+      const expectedKey = Buffer.from(expectedHex, 'hex');
+      if (derivedKey.length !== expectedKey.length) return false;
+      return crypto.timingSafeEqual(derivedKey, expectedKey);
+    } catch {
+      return false;
+    }
+  }
+
+  // 2. Legacy plaintext backward-compatibility (timing-safe)
+  const inputBuf = Buffer.from(plainPassword, 'utf8');
+  const storedBuf = Buffer.from(storedHashOrPlain, 'utf8');
+  if (inputBuf.length !== storedBuf.length) return false;
+  return crypto.timingSafeEqual(inputBuf, storedBuf);
+}
+
+// --- Rate Limiting for Authentication (Brute-force protection) ---
+export const LOGIN_RATE_LIMIT_MAX_ATTEMPTS = 5;
+export const LOGIN_RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute window
+export const LOGIN_RATE_LIMIT_LOCKOUT_MS = 15 * 60 * 1000; // 15 minutes lockout
+
+const loginRateLimitMap = new Map();
+
+/**
+ * Checks if a login request is rate limited for a given IP or username.
+ * @param {string} ip
+ * @param {string} [username]
+ * @returns {{ limited: boolean, retryAfterSeconds: number, remainingAttempts: number }}
+ */
+export function checkLoginRateLimit(ip, username = '') {
+  const now = Date.now();
+  const keys = [ip];
+  if (username) keys.push(`user:${username.toLowerCase().trim()}`);
+
+  for (const key of keys) {
+    const entry = loginRateLimitMap.get(key);
+    if (!entry) continue;
+
+    // Check if currently locked out
+    if (entry.lockedUntil && entry.lockedUntil > now) {
+      const retryAfterSeconds = Math.ceil((entry.lockedUntil - now) / 1000);
+      return { limited: true, retryAfterSeconds, remainingAttempts: 0 };
+    }
+
+    // Reset window if expired and lockout has passed
+    if (entry.firstAttempt && (now - entry.firstAttempt > LOGIN_RATE_LIMIT_WINDOW_MS) && (!entry.lockedUntil || entry.lockedUntil <= now)) {
+      loginRateLimitMap.delete(key);
+    }
+  }
+
+  const primaryEntry = loginRateLimitMap.get(ip);
+  const failedCount = primaryEntry ? primaryEntry.count : 0;
+  const remainingAttempts = Math.max(0, LOGIN_RATE_LIMIT_MAX_ATTEMPTS - failedCount);
+
+  return { limited: false, retryAfterSeconds: 0, remainingAttempts };
+}
+
+/**
+ * Records a failed login attempt. If failed attempts reach max, locks out for 15 minutes.
+ * @param {string} ip
+ * @param {string} [username]
+ */
+export function recordLoginFailure(ip, username = '') {
+  const now = Date.now();
+  const keys = [ip];
+  if (username) keys.push(`user:${username.toLowerCase().trim()}`);
+
+  for (const key of keys) {
+    let entry = loginRateLimitMap.get(key);
+    if (!entry || (now - entry.firstAttempt > LOGIN_RATE_LIMIT_WINDOW_MS && (!entry.lockedUntil || entry.lockedUntil <= now))) {
+      entry = { count: 1, firstAttempt: now, lockedUntil: null };
+    } else {
+      entry.count += 1;
+    }
+
+    if (entry.count >= LOGIN_RATE_LIMIT_MAX_ATTEMPTS) {
+      entry.lockedUntil = now + LOGIN_RATE_LIMIT_LOCKOUT_MS;
+    }
+    loginRateLimitMap.set(key, entry);
+  }
+}
+
+/**
+ * Resets failed login attempts upon successful authentication.
+ * @param {string} ip
+ * @param {string} [username]
+ */
+export function resetLoginRateLimit(ip, username = '') {
+  loginRateLimitMap.delete(ip);
+  if (username) {
+    loginRateLimitMap.delete(`user:${username.toLowerCase().trim()}`);
+  }
+}
+
+/**
+ * Clears all rate limiting entries (useful for testing).
+ */
+export function clearAllLoginRateLimits() {
+  loginRateLimitMap.clear();
+}
 
 /**
  * Creates a cryptographically signed session token for an authenticated user.
@@ -445,7 +583,21 @@ export async function handleRequest(req, res) {
         sendJson(res, 400, { success: false, error: 'Vui lòng nhập đầy đủ tên đăng nhập và mật khẩu.' });
         return;
       }
+
+      const clientIp = (req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '127.0.0.1').split(',')[0].trim();
       const q = String(username).trim().toLowerCase();
+
+      // Check brute-force rate limit
+      const rateLimit = checkLoginRateLimit(clientIp, q);
+      if (rateLimit.limited) {
+        sendJson(res, 429, {
+          success: false,
+          error: `Tài khoản hoặc IP tạm thời bị khóa do thử sai quá 5 lần liên tiếp. Vui lòng thử lại sau ${Math.ceil(rateLimit.retryAfterSeconds / 60)} phút.`,
+          retryAfterSeconds: rateLimit.retryAfterSeconds,
+        });
+        return;
+      }
+
       let found = null;
       if (sqlDb.isCloudEnabled) {
         try {
@@ -477,19 +629,35 @@ export async function handleRequest(req, res) {
         );
       }
       if (!found) {
+        recordLoginFailure(clientIp, q);
         sendJson(res, 401, { success: false, error: 'Tài khoản không tồn tại.' });
         return;
       }
+
+      // Password verification using constant-time timing-safe comparison
+      let passwordValid = false;
       if (found.username === 'admin' || found.id === 'user_admin' || found.role === 'admin') {
-        if (password !== getAdminPassword()) {
-          sendJson(res, 401, { success: false, error: 'Mật khẩu không chính xác.' });
-          return;
-        }
+        passwordValid = verifyPassword(password, getAdminPassword());
       } else {
         const expected = found.password || '123456';
-        if (expected !== password) {
-          sendJson(res, 401, { success: false, error: 'Mật khẩu không chính xác.' });
-          return;
+        passwordValid = verifyPassword(password, expected);
+      }
+
+      if (!passwordValid) {
+        recordLoginFailure(clientIp, q);
+        sendJson(res, 401, { success: false, error: 'Mật khẩu không chính xác.' });
+        return;
+      }
+
+      // Successful login: reset rate limit attempts
+      resetLoginRateLimit(clientIp, q);
+
+      // Auto-upgrade legacy plaintext password to secure scrypt hash for student accounts
+      if (found.role !== 'admin' && (!found.password || !found.password.startsWith('scrypt$'))) {
+        found.password = hashPassword(password);
+        saveDatabase().catch(() => {});
+        if (sqlDb.isCloudEnabled) {
+          sqlDb.executeRawPostgres('UPDATE users SET password = $1 WHERE id = $2;', [found.password, found.id]).catch(() => {});
         }
       }
 
@@ -529,7 +697,7 @@ export async function handleRequest(req, res) {
         fullName: data.fullName,
         className: data.className || 'Sinh viên',
         email: data.email.toLowerCase(),
-        password: data.password || '123456',
+        password: hashPassword(data.password || '123456'),
         avatar: data.avatar || '👤',
         role: 'student',
         createdAt: data.createdAt || new Date().toISOString(),
@@ -599,7 +767,7 @@ export async function handleRequest(req, res) {
         fullName: data.fullName,
         className: data.className || 'Sinh viên',
         email: data.email || `${cleanUsername}@toanrr.edu.vn`,
-        password: data.password || '123456',
+        password: hashPassword(data.password || '123456'),
         avatar: data.avatar || '👨‍🎓',
         role: 'student',
         createdAt: new Date().toISOString(),
@@ -696,7 +864,7 @@ export async function handleRequest(req, res) {
           fullName: fullName,
           className: (data.className || 'Sinh viên').trim(),
           email: (data.email || `${cleanUsername}@toanrr.edu.vn`).trim(),
-          password: String(data.password || '123456').trim(),
+          password: hashPassword(String(data.password || '123456').trim()),
           avatar: data.avatar || '👨‍🎓',
           role: 'student',
           createdAt: new Date().toISOString(),
@@ -854,7 +1022,14 @@ export async function handleRequest(req, res) {
       sendJson(res, 404, { success: false, error: 'Không tìm thấy tài khoản sinh viên.' });
       return;
     }
-    found.password = newPassword;
+    found.password = hashPassword(newPassword);
+    if (sqlDb.isCloudEnabled) {
+      try {
+        await sqlDb.executeRawPostgres('UPDATE users SET password = $1 WHERE id = $2 OR LOWER(username) = $3;', [found.password, found.id, found.username.toLowerCase()]);
+      } catch (dbErr) {
+        console.warn('[app.js] Error updating reset password in Postgres:', dbErr.message);
+      }
+    }
     await saveDatabase();
     sendJson(res, 200, { success: true, message: `Mật khẩu của sinh viên @${found.username} đã được đặt lại thành ${newPassword}.` });
     return;

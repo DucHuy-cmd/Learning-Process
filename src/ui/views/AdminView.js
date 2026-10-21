@@ -256,9 +256,9 @@ export class AdminView {
           </div>
 
           <!-- Table -->
-          <div style="overflow-x:auto;border:1px solid var(--line);border-radius:8px;">
-            <table style="width:100%;border-collapse:collapse;font-size:13px;text-align:left;">
-              <thead style="background:var(--panel-alt);border-bottom:1px solid var(--line);">
+          <div class="admin-table-scroll-wrap" style="overflow-x:auto;border:1px solid var(--line);border-radius:8px;">
+            <table class="admin-users-table" style="width:100%;border-collapse:collapse;font-size:13px;text-align:left;">
+              <thead class="admin-users-thead" style="background:var(--panel-alt);border-bottom:1px solid var(--line);">
                 <tr>
                   <th style="padding:10px 14px;font-weight:700;color:var(--dim);font-size:12px;text-transform:uppercase;">Thành viên</th>
                   <th style="padding:10px 14px;font-weight:700;color:var(--dim);font-size:12px;text-transform:uppercase;">Username</th>
@@ -267,7 +267,7 @@ export class AdminView {
                   <th style="padding:10px 14px;font-weight:700;color:var(--dim);font-size:12px;text-transform:uppercase;text-align:center;">Hành động</th>
                 </tr>
               </thead>
-              <tbody id="adminUsersTbody">
+              <tbody id="adminUsersTbody" class="admin-users-tbody">
                 ${this._renderUserTableRows(allUsers)}
               </tbody>
             </table>
@@ -615,8 +615,8 @@ export class AdminView {
         ? 'Quản trị viên'
         : (u.className || 'Sinh viên').replace(/Khoa CNTT\s*-\s*Giảng viên & Quản trị/gi, 'Sinh viên').replace(/\s*\(Thầy\/Cô\)/gi, '').trim();
       return `
-        <tr style="border-bottom:1px solid var(--line);background:${isUserAdmin ? 'rgba(245,158,11,0.04)' : 'transparent'};">
-          <td style="padding:10px 14px;">
+        <tr class="admin-user-row" style="border-bottom:1px solid var(--line);background:${isUserAdmin ? 'rgba(245,158,11,0.04)' : 'transparent'};">
+          <td class="admin-col-user" data-label="Thành viên" style="padding:10px 14px;">
             <div style="display:flex;align-items:center;gap:10px;">
               <span style="font-size:20px;">${u.avatar || '👤'}</span>
               <div>
@@ -625,28 +625,30 @@ export class AdminView {
               </div>
             </div>
           </td>
-          <td style="padding:10px 14px;">
+          <td class="admin-col-username" data-label="Username" style="padding:10px 14px;">
             <code style="background:var(--panel-alt);padding:2px 6px;border-radius:4px;font-size:12px;color:var(--accent);">@${u.username}</code>
           </td>
-          <td style="padding:10px 14px;">
+          <td class="admin-col-role" data-label="Vai trò" style="padding:10px 14px;">
             <span style="font-size:11.5px;padding:3px 8px;border-radius:4px;font-weight:700;background:${isUserAdmin ? 'rgba(245,158,11,0.18)' : 'rgba(59,130,246,0.12)'};color:${isUserAdmin ? '#f59e0b' : '#3b82f6'};border:1px solid ${isUserAdmin ? 'rgba(245,158,11,0.35)' : 'rgba(59,130,246,0.3)'};">
               ${isUserAdmin ? '👑 Quản trị viên' : '👨‍🎓 Sinh viên'}
             </span>
           </td>
-          <td style="padding:10px 14px;color:var(--dim);font-size:12.5px;">
+          <td class="admin-col-class" data-label="Lớp / Email" style="padding:10px 14px;color:var(--dim);font-size:12.5px;">
             <div>${cleanClassName}</div>
             <div style="font-size:11px;color:var(--dim);">${u.email || ''}</div>
           </td>
-          <td style="padding:10px 14px;text-align:center;">
+          <td class="admin-col-actions" data-label="Hành động" style="padding:10px 14px;text-align:center;">
             ${isUserAdmin ? `
               <span style="font-size:11.5px;color:var(--dim);font-style:italic;">Admin gốc</span>
             ` : `
-              <button type="button" class="btn-admin-reset-pwd" data-reset-user-id="${u.id}" data-username="${u.username}" data-user-name="${cleanFullName}" style="padding:4px 8px;font-size:11.5px;font-weight:600;color:var(--accent);background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.3);border-radius:6px;cursor:pointer;margin-right:6px;" title="Đặt lại mật khẩu về 123456">
-                🔑 Reset MK
-              </button>
-              <button type="button" class="btn-admin-delete-user" data-user-id="${u.id}" data-username="${u.username}" data-user-name="${cleanFullName}" style="padding:4px 10px;font-size:12px;font-weight:600;color:#ef4444;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.3);border-radius:6px;cursor:pointer;transition:all 0.15s;">
-                🗑️ Xóa tài khoản
-              </button>
+              <div class="admin-row-actions" style="display:inline-flex;gap:6px;align-items:center;">
+                <button type="button" class="btn-admin-reset-pwd" data-reset-user-id="${u.id}" data-username="${u.username}" data-user-name="${cleanFullName}" style="padding:6px 10px;font-size:12px;font-weight:600;color:var(--accent);background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.3);border-radius:6px;cursor:pointer;" title="Đặt lại mật khẩu về 123456">
+                  🔑 Reset MK
+                </button>
+                <button type="button" class="btn-admin-delete-user" data-user-id="${u.id}" data-username="${u.username}" data-user-name="${cleanFullName}" style="padding:6px 12px;font-size:12px;font-weight:600;color:#ef4444;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.3);border-radius:6px;cursor:pointer;transition:all 0.15s;">
+                  🗑️ Xóa tài khoản
+                </button>
+              </div>
             `}
           </td>
         </tr>

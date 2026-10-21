@@ -2170,8 +2170,8 @@ export class QuizView {
       : 0;
 
     return `
-      <div class="gradebook-modal-backdrop" id="gradebookModalBackdrop" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px;">
-        <div class="gradebook-modal-card" style="background:var(--panel);border:1px solid var(--line);border-radius:12px;width:100%;max-width:960px;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 20px 40px rgba(0,0,0,0.4);overflow:hidden;">
+      <div class="gradebook-modal-backdrop" id="gradebookModalBackdrop" style="position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px;">
+        <div class="gradebook-modal-card" style="background:var(--panel);border:1px solid var(--line);border-radius:12px;width:100%;max-width:960px;max-height:88vh;max-height:88dvh;display:flex;flex-direction:column;box-shadow:0 20px 40px rgba(0,0,0,0.4);overflow:hidden;">
           <div style="padding:18px 24px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
             <div>
               <div style="font-size:12px;color:var(--accent);font-weight:700;text-transform:uppercase;">
@@ -2296,8 +2296,8 @@ export class QuizView {
     }
 
     return `
-      <div class="gradebook-modal-backdrop" id="adminAnswerKeyBackdrop" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px;">
-        <div class="gradebook-modal-card" style="background:var(--panel);border:1px solid var(--line);border-radius:12px;width:100%;max-width:960px;max-height:92vh;display:flex;flex-direction:column;box-shadow:0 20px 40px rgba(0,0,0,0.4);overflow:hidden;">
+      <div class="gradebook-modal-backdrop" id="adminAnswerKeyBackdrop" style="position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px;">
+        <div class="gradebook-modal-card" style="background:var(--panel);border:1px solid var(--line);border-radius:12px;width:100%;max-width:960px;max-height:92vh;max-height:92dvh;display:flex;flex-direction:column;box-shadow:0 20px 40px rgba(0,0,0,0.4);overflow:hidden;">
           
           <!-- Modal Header -->
           <div style="padding:18px 24px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;background:var(--panel-alt);flex-wrap:wrap;gap:12px;">

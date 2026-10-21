@@ -7388,19 +7388,21 @@ body.theme-light .btn-close-modal:hover {
   border-radius: 4px;
 }
 
-/* Modal Overlay for Gradebook */
+/* Modal Overlay for Gradebook (Dynamic Viewport Responsive) */
 .gradebook-modal-backdrop {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.7);
+  inset: 0;
+  height: 100vh;
+  height: 100dvh;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 9999;
-  padding: 20px;
+  z-index: 99999;
+  padding: 16px;
+  box-sizing: border-box;
 }
 
 .gradebook-modal-card {
@@ -7409,11 +7411,39 @@ body.theme-light .btn-close-modal:hover {
   border-radius: 14px;
   max-width: 900px;
   width: 100%;
-  max-height: 85vh;
+  max-height: 88vh;
+  max-height: 88dvh;
   display: flex;
   flex-direction: column;
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4);
   overflow: hidden;
+}
+
+/* Exam Integrity Lockdown Overlay & Dialog (Dynamic Viewport Responsive) */
+.exam-lockdown-overlay {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  height: 100dvh !important;
+  background: rgba(0, 0, 0, 0.85) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  z-index: 999999 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 16px !important;
+  box-sizing: border-box !important;
+}
+
+.exam-lockdown-dialog {
+  max-width: 480px !important;
+  width: 100% !important;
+  max-height: 90vh !important;
+  max-height: 90dvh !important;
+  overflow-y: auto !important;
+  box-sizing: border-box !important;
 }
 
 /* Teacher's Studio Exam Assignment Button */
@@ -8312,6 +8342,100 @@ body.theme-light .btn-close-modal:hover {
   .admin-users-table-section,
   .admin-leaderboard-section {
     padding: 14px !important;
+  }
+
+  /* Admin Users Responsive Card View on Mobile/Tablet */
+  .admin-table-scroll-wrap {
+    overflow-x: visible !important;
+    border: none !important;
+  }
+
+  .admin-users-table,
+  .admin-users-tbody {
+    display: block !important;
+    width: 100% !important;
+  }
+
+  .admin-users-thead {
+    display: none !important;
+  }
+
+  .admin-user-row {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+    padding: 14px 16px !important;
+    margin-bottom: 12px !important;
+    border: 1px solid var(--line) !important;
+    border-radius: 12px !important;
+    background: var(--panel-alt) !important;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08) !important;
+  }
+
+  .admin-user-row td {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    padding: 3px 0 !important;
+    border: none !important;
+    font-size: 13px !important;
+  }
+
+  .admin-user-row td::before {
+    content: attr(data-label);
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--dim);
+    letter-spacing: 0.3px;
+  }
+
+  .admin-user-row td.admin-col-user::before {
+    display: none !important;
+  }
+
+  .admin-user-row td.admin-col-user {
+    border-bottom: 1px solid var(--line) !important;
+    padding-bottom: 8px !important;
+    margin-bottom: 2px !important;
+  }
+
+  .admin-user-row td.admin-col-actions {
+    margin-top: 6px !important;
+    padding-top: 10px !important;
+    border-top: 1px solid var(--line) !important;
+    justify-content: stretch !important;
+    width: 100% !important;
+  }
+
+  .admin-user-row td.admin-col-actions::before {
+    display: none !important;
+  }
+
+  .admin-row-actions {
+    display: flex !important;
+    gap: 8px !important;
+    width: 100% !important;
+  }
+
+  .admin-row-actions button {
+    flex: 1 !important;
+    min-height: 42px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 12.5px !important;
+    font-weight: 700 !important;
+    border-radius: 8px !important;
+    touch-action: manipulation !important;
+  }
+
+  .gradebook-modal-card {
+    max-height: 94vh !important;
+    max-height: 94dvh !important;
+    width: 100% !important;
+    margin: 0 !important;
+    border-radius: 12px !important;
   }
 
   /* 6. Auth Modal */

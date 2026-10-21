@@ -1,5 +1,17 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { handleRequest, createSessionToken, isRequestFromAdmin, getRequestAuth, sanitizeUserForAdmin } from '../../src/server/app.js';
+import { 
+  handleRequest, 
+  createSessionToken, 
+  isRequestFromAdmin, 
+  getRequestAuth, 
+  sanitizeUserForAdmin,
+  hashPassword,
+  verifyPassword,
+  checkLoginRateLimit,
+  recordLoginFailure,
+  resetLoginRateLimit,
+  clearAllLoginRateLimits
+} from '../../src/server/app.js';
 import { AuthManager, DEMO_USERS } from '../../src/core/auth/AuthManager.js';
 import { ExamManager } from '../../src/core/quiz/ExamManager.js';
 import { CloudSyncManager } from '../../src/core/sync/CloudSyncManager.js';
@@ -239,5 +251,139 @@ describe('Security & Admin Authentication Hardening', () => {
     // Verify submission is purged
     const remainingSubmissions = studentExamManager.getSubmissions().filter(s => s.examId === targetExamId);
     expect(remainingSubmissions.length).toBe(0);
+  });
+
+  describe('Part 1: Password Hashing (scrypt) & Backward Compatibility', () => {
+    it('hashPassword creates a salted scrypt hash with distinct salts', () => {
+      const plain = 'SecretPassword123!';
+      const hash1 = hashPassword(plain);
+      const hash2 = hashPassword(plain);
+
+      expect(hash1.startsWith('scrypt$')).toBe(true);
+      expect(hash2.startsWith('scrypt$')).toBe(true);
+      // Even with the same password, salts must differ, so hashes differ
+      expect(hash1).not.toBe(hash2);
+
+      const parts = hash1.split('$');
+      expect(parts.length).toBe(3);
+      expect(parts[0]).toBe('scrypt');
+      expect(parts[1].length).toBe(32); // 16 bytes = 32 hex chars
+      expect(parts[2].length).toBe(64); // 32 bytes = 64 hex chars
+    });
+
+    it('verifyPassword verifies correct password against scrypt hash and rejects wrong password', () => {
+      const plain = 'StrongPass@2026';
+      const hash = hashPassword(plain);
+
+      expect(verifyPassword(plain, hash)).toBe(true);
+      expect(verifyPassword('WrongPassword', hash)).toBe(false);
+      expect(verifyPassword('', hash)).toBe(false);
+      expect(verifyPassword(plain, null)).toBe(false);
+      expect(verifyPassword(plain, '')).toBe(false);
+    });
+
+    it('verifyPassword maintains seamless backward-compatibility with legacy plaintext passwords', () => {
+      const legacyPlain = '123456';
+      expect(verifyPassword('123456', legacyPlain)).toBe(true);
+      expect(verifyPassword('wrongpass', legacyPlain)).toBe(false);
+    });
+
+    it('POST /api/auth/login auto-upgrades legacy plaintext password to scrypt hash upon login', async () => {
+      clearAllLoginRateLimits();
+      const testUsername = `legacy_user_${Date.now()}`;
+      const legacyUser = {
+        id: `user_${testUsername}`,
+        username: testUsername,
+        fullName: 'Sinh Viên Cũ',
+        className: 'K65',
+        email: `${testUsername}@school.edu.vn`,
+        password: 'plain_password_123',
+        role: 'student',
+      };
+      serverUsers.push(legacyUser);
+
+      // Perform login with plaintext password
+      const { req, res } = createMockHttp({
+        method: 'POST',
+        url: '/api/auth/login',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ username: testUsername, password: 'plain_password_123' }),
+      });
+      await handleRequest(req, res);
+
+      expect(res.statusCode).toBe(200);
+      const data = JSON.parse(res.body);
+      expect(data.success).toBe(true);
+
+      // Verify that user's password in memory was automatically upgraded to scrypt
+      const updatedUser = serverUsers.find(u => u.username === testUsername);
+      expect(updatedUser.password.startsWith('scrypt$')).toBe(true);
+      expect(verifyPassword('plain_password_123', updatedUser.password)).toBe(true);
+
+      // Cleanup
+      const idx = serverUsers.findIndex(u => u.username === testUsername);
+      if (idx !== -1) serverUsers.splice(idx, 1);
+    });
+  });
+
+  describe('Part 1: Login Rate Limiting (Brute-force protection)', () => {
+    beforeEach(() => {
+      clearAllLoginRateLimits();
+    });
+
+    afterEach(() => {
+      clearAllLoginRateLimits();
+    });
+
+    it('checkLoginRateLimit tracks attempts and locks out after 5 consecutive failed attempts', () => {
+      const ip = '192.168.1.100';
+      const user = 'hacker_target';
+
+      // 4 failures are allowed
+      for (let i = 0; i < 4; i++) {
+        expect(checkLoginRateLimit(ip, user).limited).toBe(false);
+        recordLoginFailure(ip, user);
+      }
+      expect(checkLoginRateLimit(ip, user).remainingAttempts).toBe(1);
+
+      // 5th failure triggers lockout
+      recordLoginFailure(ip, user);
+      const status = checkLoginRateLimit(ip, user);
+      expect(status.limited).toBe(true);
+      expect(status.retryAfterSeconds).toBeGreaterThan(0);
+      expect(status.remainingAttempts).toBe(0);
+
+      // Reset clears lockout
+      resetLoginRateLimit(ip, user);
+      expect(checkLoginRateLimit(ip, user).limited).toBe(false);
+    });
+
+    it('POST /api/auth/login responds with HTTP 429 when rate limited after 5 failed attempts', async () => {
+      const ip = '10.0.0.55';
+      const targetUser = 'victim_user';
+
+      // Record 5 failed attempts
+      for (let i = 0; i < 5; i++) {
+        recordLoginFailure(ip, targetUser);
+      }
+
+      // Next login attempt from that IP for that user is blocked with 429
+      const { req, res } = createMockHttp({
+        method: 'POST',
+        url: '/api/auth/login',
+        headers: {
+          'content-type': 'application/json',
+          'x-forwarded-for': ip,
+        },
+        body: JSON.stringify({ username: targetUser, password: 'any_password' }),
+      });
+      await handleRequest(req, res);
+
+      expect(res.statusCode).toBe(429);
+      const data = JSON.parse(res.body);
+      expect(data.success).toBe(false);
+      expect(data.error).toContain('Tài khoản hoặc IP tạm thời bị khóa do thử sai quá 5 lần liên tiếp');
+      expect(data.retryAfterSeconds).toBeGreaterThan(0);
+    });
   });
 });
