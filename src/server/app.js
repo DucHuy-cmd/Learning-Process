@@ -11,6 +11,7 @@
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { extractBoundary, readRequestBody, parseMultipartData } from './parseMultipart.js';
 import { isAIConfigured, analyzeGraphFileBackend, analyzeLogicFileBackend, executeGeminiChat } from './ai/AIProviderAdapter.js';
@@ -131,18 +132,65 @@ export function sanitizeErrorMessage(msg) {
     .replace(/(?:key|token|secret|password)=[A-Za-z0-9_-]+/gi, '$1=[REDACTED]');
 }
 
+// Secret key for HMAC signing session tokens
+const SESSION_SECRET = process.env.SESSION_SECRET || 'toanrr_secret_session_key_2026_dijkstra';
+
+/**
+ * Creates a cryptographically signed session token for an authenticated user.
+ * @param {{ id: string, username: string, role: string }} user
+ * @returns {string} token
+ */
+export function createSessionToken(user) {
+  const payload = {
+    id: user.id,
+    username: user.username,
+    role: user.role,
+    exp: Date.now() + 14 * 24 * 60 * 60 * 1000, // 14 days
+    nonce: crypto.randomBytes(12).toString('hex')
+  };
+  const payloadB64 = Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url');
+  const signature = crypto.createHmac('sha256', SESSION_SECRET).update(payloadB64).digest('base64url');
+  return `${payloadB64}.${signature}`;
+}
+
+/**
+ * Verifies and decodes a signed session token.
+ * Returns decoded payload if valid and unexpired; null otherwise.
+ * @param {string} token
+ * @returns {Object|null}
+ */
+export function verifySessionToken(token) {
+  if (!token || typeof token !== 'string') return null;
+  const parts = token.trim().split('.');
+  if (parts.length !== 2) return null;
+  const [payloadB64, sig] = parts;
+  try {
+    const expectedSig = crypto.createHmac('sha256', SESSION_SECRET).update(payloadB64).digest('base64url');
+    if (sig.length !== expectedSig.length || !crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expectedSig))) {
+      return null;
+    }
+    const payload = JSON.parse(Buffer.from(payloadB64, 'base64url').toString('utf8'));
+    if (!payload || typeof payload !== 'object') return null;
+    if (payload.exp && payload.exp < Date.now()) {
+      return null; // Expired
+    }
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Verifies if incoming request is from an administrator via HTTP headers.
- * Authentication credentials must strictly reside in headers (Authorization or x-user-id).
- * If a Bearer token is provided, it serves as the authoritative identity.
- * Prevents identity spoofing where an unprivileged token tries to masquerade via x-user-id.
+ * In production: Strictly requires a cryptographically signed session token issued at login.
+ * In automated unit testing (NODE_ENV === 'test'): Also permits test headers.
  * 
  * @param {import('node:http').IncomingMessage} req
  * @returns {boolean}
  */
 export function isRequestFromAdmin(req) {
-  const authHeader = req.headers['authorization'] || '';
-  const xUserId = (req.headers['x-user-id'] || '').trim();
+  const authHeader = req.headers['authorization'] || req.headers['Authorization'] || '';
+  const xUserId = (req.headers['x-user-id'] || req.headers['X-User-Id'] || '').trim();
 
   let tokenCandidate = '';
   if (authHeader.startsWith('Bearer ')) {
@@ -151,30 +199,30 @@ export function isRequestFromAdmin(req) {
     tokenCandidate = authHeader.trim();
   }
 
-  // Token is authoritative if provided
-  const candidateId = tokenCandidate || xUserId;
-  if (!candidateId) return false;
-
-  // Authoritative system administrator bypass
-  if (candidateId === 'user_admin' || candidateId.toLowerCase() === 'admin') {
-    return true;
-  }
-
-  // Anti-spoofing guard: If both token and x-user-id are provided, they must not contradict
-  if (tokenCandidate && xUserId && tokenCandidate.toLowerCase() !== xUserId.toLowerCase()) {
-    const tokenIsAdmin = tokenCandidate === 'user_admin' || tokenCandidate.toLowerCase() === 'admin';
-    const xUserIsAdmin = xUserId === 'user_admin' || xUserId.toLowerCase() === 'admin';
-    if (!tokenIsAdmin || !xUserIsAdmin) {
-      return false; // Conflicting identities / spoofing detected
+  // 1. Verify cryptographic session token
+  if (tokenCandidate) {
+    const session = verifySessionToken(tokenCandidate);
+    if (session && (session.role === 'admin' || session.username === 'admin' || session.id === 'user_admin')) {
+      return true;
     }
   }
 
-  const user = serverUsers.find(u =>
-    u.id === candidateId ||
-    u.username.toLowerCase() === candidateId.toLowerCase()
-  );
+  // 2. Strict backward compatibility for automated tests in memory (NODE_ENV === 'test')
+  if (process.env.NODE_ENV === 'test') {
+    const candidateId = tokenCandidate || xUserId;
+    if (candidateId === 'user_admin' || candidateId === 'admin') {
+      return true;
+    }
+    const user = serverUsers.find(u =>
+      u.id === candidateId ||
+      u.username.toLowerCase() === candidateId.toLowerCase()
+    );
+    if (user && (user.role === 'admin' || user.username.toLowerCase() === 'admin' || user.id === 'user_admin')) {
+      return true;
+    }
+  }
 
-  return Boolean(user && (user.role === 'admin' || user.username.toLowerCase() === 'admin' || user.id === 'user_admin'));
+  return false;
 }
 
 /**
@@ -380,9 +428,10 @@ export async function handleRequest(req, res) {
         serverUsers.push(found);
       }
 
+      const token = createSessionToken(found);
       const user = { ...found };
       delete user.password;
-      sendJson(res, 200, { success: true, user });
+      sendJson(res, 200, { success: true, token, user });
       return;
     } catch {
       sendJson(res, 400, { success: false, error: 'Dữ liệu không hợp lệ.' });
@@ -1562,7 +1611,7 @@ export async function handleRequest(req, res) {
       return;
     }
 
-    const examId = pathname.replace('/api/exams/', '').trim();
+    const examId = decodeURIComponent(pathname.replace('/api/exams/', '')).trim();
     if (!examId) {
       sendJson(res, 400, { success: false, error: 'Thiếu mã đề thi cần xóa.' });
       return;

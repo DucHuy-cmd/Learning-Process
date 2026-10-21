@@ -3793,7 +3793,11 @@ export class QuizView {
           if (cloudSyncManager && cloudSyncManager.isConnected) {
             const serverRes = await cloudSyncManager.serverDeleteExam(examId);
             if (serverRes && !serverRes.success) {
-              this._showAlert(`❌ Lỗi máy chủ khi xóa đề thi: ${serverRes.error || 'Thất bại'}`);
+              const isForbidden = serverRes.error === 'FORBIDDEN' || (typeof serverRes.error === 'string' && serverRes.error.toLowerCase().includes('quản trị viên'));
+              const errMsg = isForbidden
+                ? 'Phiên đăng nhập Quản trị viên chưa được xác thực hoặc đã hết hạn. Vui lòng đăng nhập lại tài khoản admin.'
+                : (serverRes.error || 'Thất bại');
+              this._showAlert(`❌ Lỗi máy chủ khi xóa đề thi: ${errMsg}`);
               btn.disabled = false;
               return;
             }
@@ -3828,7 +3832,11 @@ export class QuizView {
           if (cloudSyncManager && cloudSyncManager.isConnected) {
             const serverRes = await cloudSyncManager.serverClearAllExams();
             if (serverRes && !serverRes.success) {
-              this._showAlert(`❌ Lỗi máy chủ khi xóa đề thi: ${serverRes.error || 'Thất bại'}`);
+              const isForbidden = serverRes.error === 'FORBIDDEN' || (typeof serverRes.error === 'string' && serverRes.error.toLowerCase().includes('quản trị viên'));
+              const errMsg = isForbidden
+                ? 'Phiên đăng nhập Quản trị viên chưa được xác thực hoặc đã hết hạn. Vui lòng đăng nhập lại tài khoản admin.'
+                : (serverRes.error || 'Thất bại');
+              this._showAlert(`❌ Lỗi máy chủ khi xóa đề thi: ${errMsg}`);
               return;
             }
           }

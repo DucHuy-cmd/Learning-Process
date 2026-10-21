@@ -277,6 +277,9 @@ export class AuthModal {
           if (isOnline) {
             const remoteResult = await cloudSyncManager.login(username, password);
             if (remoteResult && remoteResult.success && remoteResult.user) {
+              if (remoteResult.token) {
+                cloudSyncManager.setAuthToken(remoteResult.token);
+              }
               // Verified active user on server -> clear any stale local tombstones and sync into local
               authManager.unmarkDeletedLocally(username);
               if (remoteResult.user.username) authManager.unmarkDeletedLocally(remoteResult.user.username);

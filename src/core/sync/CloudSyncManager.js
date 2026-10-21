@@ -22,6 +22,7 @@ export class CloudSyncManager {
     this.isConnected = false;
     this.isSyncing = false;
     this.lastSyncTime = null;
+    this.authToken = '';
     this.listeners = new Set();
   }
 
@@ -317,6 +318,9 @@ export class CloudSyncManager {
         body: JSON.stringify({ username, password }),
       });
       const data = await res.json().catch(() => ({ success: false, error: 'Lỗi phản hồi máy chủ.' }));
+      if (data && data.success && data.token) {
+        this.setAuthToken(data.token);
+      }
       return data;
     } catch {
       return { success: false, error: 'Lỗi mạng khi kết nối máy chủ.' };
@@ -457,14 +461,57 @@ export class CloudSyncManager {
     }
   }
   /**
+   * Sets the active session authentication token.
+   * Persists token to localStorage so it survives page reloads.
+   * @param {string} token
+   */
+  setAuthToken(token) {
+    this.authToken = token || '';
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        if (token) {
+          window.localStorage.setItem('trr_auth_token', token);
+        } else {
+          window.localStorage.removeItem('trr_auth_token');
+        }
+      } catch {}
+    }
+  }
+
+  /**
+   * Retrieves the current authenticated session token.
+   * @returns {string}
+   */
+  getAuthToken() {
+    if (this.authToken) return this.authToken;
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        const stored = window.localStorage.getItem('trr_auth_token');
+        if (stored) {
+          this.authToken = stored;
+          return stored;
+        }
+      } catch {}
+    }
+    return '';
+  }
+
+  /**
    * Helper to retrieve admin credentials headers for authenticated admin operations.
+   * In production, sends the cryptographically signed session token.
+   * In automated test mode (NODE_ENV === 'test'), falls back to test headers.
    * @private
    */
   _getAdminAuthHeaders() {
-    return {
-      'x-user-id': 'user_admin',
-      'Authorization': 'Bearer user_admin',
-    };
+    const token = this.getAuthToken();
+    const headers = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    } else if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'test') {
+      headers['Authorization'] = 'Bearer user_admin';
+      headers['x-user-id'] = 'user_admin';
+    }
+    return headers;
   }
 
     /**

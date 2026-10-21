@@ -165,29 +165,59 @@ export class SqlDatabaseAdapter {
     if (!Array.isArray(queries) || queries.length === 0) return { success: true };
     await this.initSchema();
 
-    if (this.isCloudEnabled) {
-      const fullSql = 'BEGIN;\n' + queries.map(q => {
-        if (typeof q === 'string') return q.trim().replace(/;+$/, '') + ';';
-        let s = q.sql.trim().replace(/;+$/, '');
-        if (Array.isArray(q.params) && q.params.length > 0) {
-          q.params.forEach((val, idx) => {
-            const placeholder = new RegExp(`\\$${idx + 1}(?![0-9])`, 'g');
-            let formattedVal = 'NULL';
-            if (val !== null && val !== undefined) {
-              if (typeof val === 'number' || typeof val === 'boolean') {
-                formattedVal = String(val);
-              } else {
-                formattedVal = `'${String(val).replace(/'/g, "''")}'`;
-              }
-            }
-            s = s.replace(placeholder, formattedVal);
-          });
-        }
-        return s + ';';
-      }).join('\n') + '\nCOMMIT;';
+    const normalizedQueries = queries.map(q => {
+      if (typeof q === 'string') {
+        return { sql: q.trim(), params: [] };
+      }
+      return {
+        sql: (q.sql || '').trim(),
+        params: Array.isArray(q.params) ? q.params : []
+      };
+    });
 
-      const res = await this.executeRawPostgres(fullSql);
-      return { success: true, res };
+    if (this.isCloudEnabled) {
+      if (!this.postgresUrl) {
+        throw new Error('Postgres URL not configured');
+      }
+
+      // Method 1: Official @neondatabase/serverless atomic batch transaction via sql.transaction()
+      try {
+        const { neon } = await import('@neondatabase/serverless');
+        const sql = neon(this.postgresUrl);
+        const neonQueries = normalizedQueries.map(q => sql.query(q.sql, q.params));
+        const results = await sql.transaction(neonQueries);
+        return { success: true, results };
+      } catch (neonErr) {
+        // Method 2: Direct HTTP Neon endpoint batch transaction with { queries: [...] }
+        try {
+          const parsed = new URL(this.postgresUrl);
+          const host = parsed.hostname;
+          const queryUrl = `https://${host}/sql`;
+
+          const res = await fetch(queryUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Neon-Connection-String': this.postgresUrl,
+              Authorization: `Bearer ${parsed.password || parsed.username}`,
+            },
+            body: JSON.stringify({
+              queries: normalizedQueries.map(q => ({
+                query: q.sql,
+                params: q.params
+              }))
+            }),
+          });
+          if (!res.ok) {
+            const errText = await res.text().catch(() => '');
+            throw new Error(`HTTP ${res.status}: ${errText}`);
+          }
+          const data = await res.json().catch(() => ({}));
+          return { success: true, results: data.results || [] };
+        } catch (fetchErr) {
+          throw new Error(`Lỗi giao dịch PostgreSQL: ${neonErr.message || fetchErr.message}`);
+        }
+      }
     }
 
     // In-memory Relational Engine: snapshot rollback on error
@@ -197,10 +227,8 @@ export class SqlDatabaseAdapter {
     }
 
     try {
-      for (const q of queries) {
-        const sqlStr = typeof q === 'string' ? q : q.sql;
-        const params = typeof q === 'string' ? [] : (q.params || []);
-        await this.query(sqlStr, params);
+      for (const q of normalizedQueries) {
+        await this.query(q.sql, q.params);
       }
       return { success: true };
     } catch (err) {

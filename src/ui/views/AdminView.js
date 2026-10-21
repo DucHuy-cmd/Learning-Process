@@ -560,7 +560,11 @@ export class AdminView {
             }
             this._showAlert(msg, 'success');
           } else if (batchRes && !batchRes.success) {
-            this._showAlert(`❌ Lỗi từ máy chủ khi nhập tài khoản: ${batchRes.error || 'Thao tác thất bại.'}`, 'error');
+            const isForbidden = batchRes.error === 'FORBIDDEN' || (typeof batchRes.error === 'string' && batchRes.error.toLowerCase().includes('quản trị viên'));
+            const errMsg = isForbidden
+              ? 'Phiên đăng nhập Quản trị viên chưa được xác thực hoặc đã hết hạn. Vui lòng đăng nhập lại tài khoản admin.'
+              : (batchRes.error || 'Thao tác thất bại.');
+            this._showAlert(`❌ Lỗi từ máy chủ khi nhập tài khoản: ${errMsg}`, 'error');
           } else {
             // Fallback when cloudSyncManager is not available
             const res = authManager.batchImportUsers(records);

@@ -726,6 +726,7 @@ export class AuthManager {
     if (this.storage) {
       try {
         this.storage.removeItem(STORAGE_KEY_CURRENT);
+        this.storage.removeItem('trr_auth_token');
       } catch {
         // no-op
       }
