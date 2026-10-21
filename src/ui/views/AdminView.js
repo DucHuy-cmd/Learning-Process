@@ -30,7 +30,6 @@ export class AdminView {
     this.isServerConnected = false;
     this.isSyncing = false;
     this.activeTab = 'students';
-    this.gradebookSearchQuery = '';
     this.dbStatus = { storageMode: 'unknown', databaseLabel: 'Đang kiểm tra...', kvConfigured: false };
 
     authManager.onAuthStateChanged(() => {
@@ -261,48 +260,6 @@ export class AdminView {
           </div>
         </section>
         </div>
-
-        <!-- TAB 2: GRADEBOOK -->
-        <div id="tabContentGradebook">
-          <section style="background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px 22px;margin-bottom:24px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:16px;">
-              <div>
-                <h3 style="margin:0 0 4px;font-size:16px;color:var(--text);font-weight:700;display:flex;align-items:center;gap:8px;">
-                  <span>📊</span>
-                  <span>Bảng Điểm &amp; Bài Nộp Của Sinh Viên (${examManager.getSubmissions().length})</span>
-                </h3>
-                <p style="margin:0;font-size:12px;color:var(--dim);">
-                  Điểm số các bài thi chính thức, thời gian làm bài và số câu đúng được đồng bộ tự động.
-                </p>
-              </div>
-
-              <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-                <input type="text" id="adminGradebookSearchInput" value="${this.gradebookSearchQuery}" placeholder="🔍 Tìm theo tên SV, đề thi..." style="box-sizing:border-box;padding:7px 12px;font-size:12.5px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--text);min-width:220px;">
-                <button type="button" id="btnAdminExportGradebook" class="btn-sm" style="padding:7px 14px;font-size:12px;font-weight:600;background:var(--panel-alt);border:1px solid var(--line);border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:6px;color:var(--text);">
-                  <span>📥</span> Xuất File Điểm (.csv)
-                </button>
-              </div>
-            </div>
-
-            <div style="overflow-x:auto;border:1px solid var(--line);border-radius:8px;">
-              <table style="width:100%;border-collapse:collapse;font-size:13px;text-align:left;">
-                <thead style="background:var(--panel-alt);border-bottom:1px solid var(--line);">
-                  <tr>
-                    <th style="padding:10px 14px;font-weight:700;color:var(--dim);font-size:12px;text-transform:uppercase;">Sinh viên</th>
-                    <th style="padding:10px 14px;font-weight:700;color:var(--dim);font-size:12px;text-transform:uppercase;">Đề thi</th>
-                    <th style="padding:10px 14px;font-weight:700;color:var(--dim);font-size:12px;text-transform:uppercase;text-align:center;">Điểm số</th>
-                    <th style="padding:10px 14px;font-weight:700;color:var(--dim);font-size:12px;text-transform:uppercase;text-align:center;">Số câu đúng</th>
-                    <th style="padding:10px 14px;font-weight:700;color:var(--dim);font-size:12px;text-transform:uppercase;text-align:center;">Thời gian</th>
-                    <th style="padding:10px 14px;font-weight:700;color:var(--dim);font-size:12px;text-transform:uppercase;">Ngày nộp</th>
-                  </tr>
-                </thead>
-                <tbody id="adminGradebookTbody">
-                  ${this._renderGradebookRows(examManager.getSubmissions())}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        </div>
       </div>
     `;
 
@@ -425,43 +382,6 @@ export class AdminView {
    * @private
    */
   _bindEvents() {
-    // Gradebook search
-    const gradebookSearch = this.container.querySelector('#adminGradebookSearchInput');
-    if (gradebookSearch) {
-      gradebookSearch.addEventListener('input', (e) => {
-        this.gradebookSearchQuery = e.target.value;
-        const tbody = this.container.querySelector('#adminGradebookTbody');
-        if (tbody) {
-          tbody.innerHTML = this._renderGradebookRows(examManager.getSubmissions());
-        }
-      });
-    }
-
-    // Export Gradebook CSV
-    const btnExportGradebook = this.container.querySelector('#btnAdminExportGradebook');
-    if (btnExportGradebook) {
-      btnExportGradebook.addEventListener('click', () => {
-        const subs = examManager.getSubmissions();
-        if (subs.length === 0) {
-          this._showAlert('Chưa có bài thi nào để xuất bảng điểm!', 'error');
-          return;
-        }
-        let csv = '\uFEFFMSSV,Họ và tên,Lớp,Đề thi,Điểm số,Số câu đúng,Tổng câu,Thời gian (giây),Ngày nộp\r\n';
-        for (const s of subs) {
-          csv += `"${s.username || ''}","${s.fullName || ''}","${s.className || ''}","${s.examTitle || ''}",${s.score || 0},${s.correctCount || 0},${s.totalQuestions || 0},${s.timeSpentSeconds || 0},"${s.submittedAt || ''}"\r\n`;
-        }
-        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `Bang_Diem_Sinh_Vien_${new Date().toISOString().slice(0, 10)}.csv`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        this._showAlert('✓ Đã xuất bảng điểm sinh viên thành công!', 'success');
-      });
-    }
     // 1. Search box filtering
     const searchInput = this.container.querySelector('#adminUserSearchInput');
     if (searchInput) {
@@ -849,84 +769,6 @@ export class AdminView {
         alertBox.style.display = 'none';
       }
     }, 4500);
-  }
-
-  /**
-   * Renders rows for the exam submissions gradebook table.
-   * @param {Array<Object>} submissions
-   * @returns {string}
-   * @private
-   */
-  _renderGradebookRows(submissions) {
-    if (!Array.isArray(submissions) || submissions.length === 0) {
-      return `
-        <tr>
-          <td colspan="6" style="text-align:center;padding:32px;color:var(--dim);">
-            <div style="font-size:32px;margin-bottom:8px;">📝</div>
-            <div>Chưa có bài thi nào được sinh viên nộp lên hệ thống.</div>
-            <div style="font-size:12px;margin-top:4px;">Khi sinh viên làm bài thi, kết quả sẽ tự động đồng bộ vào đây.</div>
-          </td>
-        </tr>
-      `;
-    }
-
-    const q = this.gradebookSearchQuery.trim().toLowerCase();
-    const filtered = q
-      ? submissions.filter(s =>
-          (s.fullName || '').toLowerCase().includes(q) ||
-          (s.username || '').toLowerCase().includes(q) ||
-          (s.examTitle || '').toLowerCase().includes(q) ||
-          (s.className || '').toLowerCase().includes(q)
-        )
-      : submissions;
-
-    if (filtered.length === 0) {
-      return `
-        <tr>
-          <td colspan="6" style="text-align:center;padding:24px;color:var(--dim);">
-            Không tìm thấy bài nộp nào phù hợp với từ khóa "${this.gradebookSearchQuery}".
-          </td>
-        </tr>
-      `;
-    }
-
-    const sorted = [...filtered].sort((a, b) => new Date(b.submittedAt || 0) - new Date(a.submittedAt || 0));
-
-    return sorted.map(s => {
-      const score = typeof s.score === 'number' ? s.score : 0;
-      const scoreColor = score >= 8 ? '#10b981' : (score >= 5 ? '#3b82f6' : '#ef4444');
-      const scoreBg = score >= 8 ? 'rgba(16,185,129,0.12)' : (score >= 5 ? 'rgba(59,130,246,0.12)' : 'rgba(239,68,68,0.12)');
-      const durationMin = Math.floor((s.timeSpentSeconds || 0) / 60);
-      const durationSec = (s.timeSpentSeconds || 0) % 60;
-      const timeStr = `${durationMin}p ${durationSec < 10 ? '0' : ''}${durationSec}s`;
-      const dateStr = s.submittedAt ? new Date(s.submittedAt).toLocaleString('vi-VN') : '—';
-
-      return `
-        <tr style="border-bottom:1px solid var(--line);">
-          <td style="padding:10px 14px;">
-            <div style="font-weight:700;color:var(--text);">${this._escapeHtml(s.fullName || s.username || 'Sinh viên')}</div>
-            <div style="font-size:11.5px;color:var(--dim);">@${this._escapeHtml(s.username || s.userId || '')} • ${this._escapeHtml(s.className || 'Sinh viên')}</div>
-          </td>
-          <td style="padding:10px 14px;">
-            <strong style="color:var(--text);font-size:12.5px;">${this._escapeHtml(s.examTitle || s.examId || 'Đề thi')}</strong>
-          </td>
-          <td style="padding:10px 14px;text-align:center;">
-            <span style="font-size:14px;font-weight:800;padding:2px 8px;border-radius:6px;background:${scoreBg};color:${scoreColor};">
-              ${score.toFixed(1)} / 10
-            </span>
-          </td>
-          <td style="padding:10px 14px;text-align:center;font-weight:600;color:var(--text);">
-            ${s.correctCount || 0} / ${s.totalQuestions || 0}
-          </td>
-          <td style="padding:10px 14px;text-align:center;color:var(--dim);font-size:12px;">
-            ${timeStr}
-          </td>
-          <td style="padding:10px 14px;color:var(--dim);font-size:12px;">
-            ${dateStr}
-          </td>
-        </tr>
-      `;
-    }).join('');
   }
 
   /**

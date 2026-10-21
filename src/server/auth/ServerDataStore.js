@@ -368,9 +368,10 @@ export async function fetchFromPostgres() {
 
     // 2. Load exams
     const examsRes = await sqlDb.executeRawPostgres('SELECT * FROM exams ORDER BY created_at DESC;');
-    if (Array.isArray(examsRes.rows) && examsRes.rows.length > 0) {
+    if (Array.isArray(examsRes.rows)) {
       serverExams.length = 0;
       for (const r of examsRes.rows) {
+        if (isExamDeleted(r.id)) continue;
         serverExams.push({
           id: r.id,
           title: r.title,
@@ -393,6 +394,7 @@ export async function fetchFromPostgres() {
     if (Array.isArray(subRes.rows)) {
       serverExamSubmissions.length = 0;
       for (const r of subRes.rows) {
+        if (isExamDeleted(r.exam_id)) continue;
         serverExamSubmissions.push({
           id: r.id,
           examId: r.exam_id,
@@ -433,6 +435,7 @@ export async function fetchFromPostgres() {
     if (Array.isArray(ifRes.rows)) {
       serverImportedFiles.length = 0;
       for (const r of ifRes.rows) {
+        if (isImportedFileDeleted(r.id)) continue;
         serverImportedFiles.push({
           id: r.id,
           name: r.filename,
@@ -491,7 +494,7 @@ export async function saveToPostgres() {
 
     // 2. Upsert exams
     if (serverExams.length > 0) {
-      const activeExamIds = serverExams.map(e => `'${e.id}'`).join(',');
+      const activeExamIds = serverExams.map(e => `'${String(e.id).replace(/'/g, "''")}'`).join(',');
       await sqlDb.executeRawPostgres(`DELETE FROM exams WHERE id NOT IN (${activeExamIds});`);
     } else {
       await sqlDb.executeRawPostgres('DELETE FROM exams;');
@@ -547,7 +550,27 @@ export async function saveToPostgres() {
     }
 
     // 5. Imported files
-    if (serverImportedFiles.length === 0) {
+    if (serverImportedFiles.length > 0) {
+      const activeFileIds = serverImportedFiles.map(f => `'${String(f.id).replace(/'/g, "''")}'`).join(',');
+      await sqlDb.executeRawPostgres(`DELETE FROM imported_files WHERE id NOT IN (${activeFileIds});`);
+      for (const f of serverImportedFiles) {
+        if (!f || !f.id) continue;
+        await sqlDb.executeRawPostgres(`
+          INSERT INTO imported_files (id, filename, question_count, questions, uploaded_at)
+          VALUES ($1, $2, $3, $4::jsonb, $5)
+          ON CONFLICT (id) DO UPDATE SET
+            filename = EXCLUDED.filename,
+            question_count = EXCLUDED.question_count,
+            questions = EXCLUDED.questions;
+        `, [
+          f.id,
+          f.name || f.filename || 'Đề thi Word',
+          f.questionCount || (Array.isArray(f.questions) ? f.questions.length : 0),
+          JSON.stringify(f.questions || []),
+          f.uploadedAt || new Date().toISOString()
+        ]);
+      }
+    } else {
       await sqlDb.executeRawPostgres('DELETE FROM imported_files;');
     }
 

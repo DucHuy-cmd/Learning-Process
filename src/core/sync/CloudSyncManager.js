@@ -886,7 +886,10 @@ export class CloudSyncManager {
     try {
       const res = await fetch(`${this.baseUrl}/api/quiz/imported-files`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...this._getAdminAuthHeaders(),
+        },
         body: JSON.stringify({ file: fileEntry }),
       });
       if (!res.ok) return null;
@@ -906,7 +909,10 @@ export class CloudSyncManager {
     try {
       const res = await fetch(`${this.baseUrl}/api/quiz/imported-files`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...this._getAdminAuthHeaders(),
+        },
         body: JSON.stringify({ files }),
       });
       if (!res.ok) return null;

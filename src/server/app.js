@@ -1069,9 +1069,12 @@ export async function handleRequest(req, res) {
 
   // Route: GET /api/quiz/imported-files
   if (req.method === 'GET' && pathname === '/api/quiz/imported-files') {
+    if (sqlDb && sqlDb.isCloudEnabled) {
+      await fetchFromPostgres().catch(() => {});
+    }
     sendJson(res, 200, {
       success: true,
-      files: serverImportedFiles.filter(f => !serverDeletedImportedFiles.has(f.id)),
+      files: serverImportedFiles.filter(f => !isImportedFileDeleted(f.id) && !serverDeletedImportedFiles.has(f.id)),
       deletedFiles: Array.from(serverDeletedImportedFiles),
       resetTime: serverImportedFilesResetTime,
     });
@@ -1080,9 +1083,21 @@ export async function handleRequest(req, res) {
 
   // Route: POST /api/quiz/imported-files/clear-all
   if (req.method === 'POST' && (pathname === '/api/quiz/imported-files/clear-all' || pathname.endsWith('/imported-files/clear-all'))) {
+    const candidateId = (req.headers['authorization'] || '').replace('Bearer ', '').trim() || (req.headers['x-user-id'] || '').trim();
+    if (candidateId && !isRequestFromAdmin(req)) {
+      sendJson(res, 403, {
+        success: false,
+        error: 'FORBIDDEN',
+        message: 'Chỉ Quản trị viên mới có quyền xóa toàn bộ file nạp trên máy chủ.',
+      });
+      return;
+    }
     recordImportedFilesReset();
     serverImportedFiles.length = 0;
     serverCustomQuestions.length = 0;
+    if (sqlDb && sqlDb.isCloudEnabled) {
+      await sqlDb.executeRawPostgres('DELETE FROM imported_files;').catch(() => {});
+    }
     await saveDatabase();
     sendJson(res, 200, {
       success: true,
@@ -1096,6 +1111,15 @@ export async function handleRequest(req, res) {
 
   // Route: POST /api/quiz/imported-files (Push single or batch files to cloud)
   if (req.method === 'POST' && pathname === '/api/quiz/imported-files') {
+    const candidateId = (req.headers['authorization'] || '').replace('Bearer ', '').trim() || (req.headers['x-user-id'] || '').trim();
+    if (candidateId && !isRequestFromAdmin(req)) {
+      sendJson(res, 403, {
+        success: false,
+        error: 'FORBIDDEN',
+        message: 'Chỉ Quản trị viên mới có quyền tải lên / đồng bộ file đề thi.',
+      });
+      return;
+    }
     try {
       const bodyBuffer = await readRequestBody(req);
       const data = JSON.parse(bodyBuffer.toString('utf8') || '{}');
@@ -1122,7 +1146,7 @@ export async function handleRequest(req, res) {
           unmarkImportedFileDeleted(fileId);
         }
         await saveDatabase();
-        sendJson(res, 200, { success: true, files: serverImportedFiles });
+        sendJson(res, 200, { success: true, files: serverImportedFiles.filter(f => !isImportedFileDeleted(f.id)) });
         return;
       }
 
@@ -1152,7 +1176,7 @@ export async function handleRequest(req, res) {
 
       unmarkImportedFileDeleted(fileId);
       await saveDatabase();
-      sendJson(res, 200, { success: true, file: fileEntry, files: serverImportedFiles });
+      sendJson(res, 200, { success: true, file: fileEntry, files: serverImportedFiles.filter(f => !isImportedFileDeleted(f.id)) });
       return;
     } catch {
       sendJson(res, 400, { success: false, error: 'Dữ liệu file không hợp lệ.' });
@@ -1162,6 +1186,15 @@ export async function handleRequest(req, res) {
 
   // Route: DELETE /api/quiz/imported-files/:id or DELETE /api/quiz/imported-files?id=...
   if (req.method === 'DELETE' && (pathname === '/api/quiz/imported-files' || pathname.startsWith('/api/quiz/imported-files/'))) {
+    const candidateId = (req.headers['authorization'] || '').replace('Bearer ', '').trim() || (req.headers['x-user-id'] || '').trim();
+    if (candidateId && !isRequestFromAdmin(req)) {
+      sendJson(res, 403, {
+        success: false,
+        error: 'FORBIDDEN',
+        message: 'Chỉ Quản trị viên mới có quyền xóa file đề thi.',
+      });
+      return;
+    }
     let targetId = '';
     if (pathname.startsWith('/api/quiz/imported-files/')) {
       targetId = decodeURIComponent(pathname.replace('/api/quiz/imported-files/', '')).trim();
@@ -1178,12 +1211,15 @@ export async function handleRequest(req, res) {
     if (idx !== -1) {
       const deleted = serverImportedFiles.splice(idx, 1)[0];
       markImportedFileDeleted(targetId);
+      if (sqlDb && sqlDb.isCloudEnabled) {
+        await sqlDb.executeRawPostgres('DELETE FROM imported_files WHERE id = $1;', [targetId]).catch(() => {});
+      }
       await saveDatabase();
       sendJson(res, 200, {
         success: true,
         message: `Đã xóa file "${deleted.name}" thành công.`,
         deletedId: targetId,
-        files: serverImportedFiles,
+        files: serverImportedFiles.filter(f => !isImportedFileDeleted(f.id)),
         deletedFiles: Array.from(serverDeletedImportedFiles),
       });
     } else {
@@ -1194,7 +1230,13 @@ export async function handleRequest(req, res) {
 
   // Route: GET /api/exams
   if (req.method === 'GET' && pathname === '/api/exams') {
-    sendJson(res, 200, { success: true, exams: serverExams });
+    if (sqlDb && sqlDb.isCloudEnabled) {
+      await fetchFromPostgres().catch(() => {});
+    }
+    sendJson(res, 200, {
+      success: true,
+      exams: serverExams.filter(e => !isExamDeleted(e.id))
+    });
     return;
   }
 
@@ -1288,6 +1330,10 @@ export async function handleRequest(req, res) {
         serverQuizStats[k].history = [];
       }
     }
+    if (sqlDb && sqlDb.isCloudEnabled) {
+      await sqlDb.executeRawPostgres('DELETE FROM exams;').catch(() => {});
+      await sqlDb.executeRawPostgres('DELETE FROM exam_submissions;').catch(() => {});
+    }
     await saveDatabase();
     sendJson(res, 200, { success: true, message: 'Đã xóa toàn bộ đề thi và làm sạch dữ liệu bài làm của sinh viên thành công.' });
     return;
@@ -1308,15 +1354,17 @@ export async function handleRequest(req, res) {
     const idx = serverExams.findIndex(e => e.id === examId);
     if (idx !== -1) {
       serverExams.splice(idx, 1);
-      const remainingSubs = serverExamSubmissions.filter(s => s.examId !== examId);
-      serverExamSubmissions.length = 0;
-      serverExamSubmissions.push(...remainingSubs);
-      markExamDeleted(examId);
-      await saveDatabase();
-      sendJson(res, 200, { success: true });
-    } else {
-      sendJson(res, 404, { success: false, error: 'Không tìm thấy đề thi.' });
     }
+    const remainingSubs = serverExamSubmissions.filter(s => s.examId !== examId);
+    serverExamSubmissions.length = 0;
+    serverExamSubmissions.push(...remainingSubs);
+    markExamDeleted(examId);
+    if (sqlDb && sqlDb.isCloudEnabled) {
+      await sqlDb.executeRawPostgres('DELETE FROM exams WHERE id = $1;', [examId]).catch(() => {});
+      await sqlDb.executeRawPostgres('DELETE FROM exam_submissions WHERE exam_id = $1;', [examId]).catch(() => {});
+    }
+    await saveDatabase();
+    sendJson(res, 200, { success: true });
     return;
   }
 

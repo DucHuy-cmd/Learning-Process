@@ -382,7 +382,23 @@ export class QuizView {
       // 3. Filter remote files using local and server tombstones
       const validRemote = remoteFiles.filter(rf => rf && rf.id && !this._isFileDeletedLocally(rf.id));
 
-      // 4. Merge
+      const isAdmin = authManager && typeof authManager.isAdmin === 'function' && authManager.isAdmin();
+
+      // If user is a student/non-admin: student should NEVER override server state or push files back
+      if (!isAdmin) {
+        this.importedFiles = validRemote;
+        this.importedQuestions = validRemote.flatMap(f => f.questions || []);
+        if (storage) {
+          storage.setItem('toanrr_custom_imported_files_v1', JSON.stringify(this.importedFiles));
+          storage.setItem('toanrr_custom_imported_questions_v1', JSON.stringify(this.importedQuestions));
+        }
+        if (this.container && (this.activeTab === 'studio' || this.studioSubTab === 'wordUpload')) {
+          this.render();
+        }
+        return true;
+      }
+
+      // 4. Admin Merge:
       const localFiles = Array.isArray(this.importedFiles)
         ? this.importedFiles.filter(lf => lf && lf.id && !this._isFileDeletedLocally(lf.id))
         : [];
@@ -391,11 +407,9 @@ export class QuizView {
       validRemote.forEach(rf => mergedMap.set(rf.id, rf));
 
       let hasNewLocalFiles = false;
-      if (localClearTime <= serverResetTime) {
-        // In sync with server clear; do not resurrect old local files
-      } else {
+      if (localClearTime > serverResetTime) {
         localFiles.forEach(lf => {
-          if (!mergedMap.has(lf.id)) {
+          if (!mergedMap.has(lf.id) && !serverDeleted.includes(lf.id)) {
             mergedMap.set(lf.id, lf);
             hasNewLocalFiles = true;
           }

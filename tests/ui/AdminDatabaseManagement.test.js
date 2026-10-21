@@ -100,13 +100,13 @@ describe('Admin Database Management & Smart Features', () => {
     expect(parsed2[0].password).toBe('123456');
   });
 
-  it('renders student exam submissions directly in the gradebook section', async () => {
+  it('does not render gradebook section as requested by user', async () => {
     await adminView.render();
 
     const gradebookSection = container.querySelector('#tabContentGradebook');
-    expect(gradebookSection).not.toBeNull();
+    expect(gradebookSection).toBeNull();
     const tbody = container.querySelector('#adminGradebookTbody');
-    expect(tbody).not.toBeNull();
+    expect(tbody).toBeNull();
   });
 
   it('resets database cleanly, clears tombstones, and allows re-creating the same accounts', async () => {
