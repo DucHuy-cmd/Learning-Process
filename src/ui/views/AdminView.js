@@ -29,6 +29,8 @@ export class AdminView {
     this.searchQuery = '';
     this.isServerConnected = false;
     this.isSyncing = false;
+    this._syncCounter = 0;
+    this._activeSyncId = 0;
     this.activeTab = 'students';
     this.dbStatus = { storageMode: 'unknown', databaseLabel: 'Đang kiểm tra...', kvConfigured: false };
 
@@ -38,13 +40,14 @@ export class AdminView {
       }
     });
 
-    if (this.container) {
+    if (this.container && this.container.classList.contains('active')) {
       this.render();
     }
   }
 
   /**
    * Mounts and renders the Admin Management dashboard.
+   * Renders layout shell immediately with local data, then fetches background data in parallel.
    * @param {HTMLElement} [targetContainer]
    */
   async render(targetContainer = null) {
@@ -59,23 +62,18 @@ export class AdminView {
       return;
     }
 
-    // Check cloud connection state
-    try {
-      this.isServerConnected = await cloudSyncManager.checkConnection();
-      if (this.isServerConnected) {
-        this.dbStatus = await cloudSyncManager.getDatabaseStatus();
-        await cloudSyncManager.syncUsers(authManager);
-        await cloudSyncManager.syncQuizLeaderboard(quizHistoryManager);
-        await cloudSyncManager.syncExams(examManager);
-        await cloudSyncManager.syncExamSubmissions(examManager);
-      } else {
-        this.dbStatus = { storageMode: 'offline', databaseLabel: 'Chế độ Ngoại tuyến', kvConfigured: false };
-      }
-    } catch {
-      this.isServerConnected = false;
-      this.dbStatus = { storageMode: 'offline', databaseLabel: 'Chế độ Ngoại tuyến', kvConfigured: false };
-    }
+    // 1. Render layout shell with local data immediately (0ms delay)
+    this._renderDashboardLayout();
 
+    // 2. Fetch and sync latest cloud data in background (parallelized, race-condition protected)
+    return this._triggerBackgroundSync();
+  }
+
+  /**
+   * Synchronously renders the complete Admin Dashboard layout.
+   * @private
+   */
+  _renderDashboardLayout() {
     const allUsers = authManager.getUsers();
     const studentCount = allUsers.filter(u => u.username !== 'admin' && u.id !== 'user_admin').length;
 
@@ -123,7 +121,7 @@ export class AdminView {
               <span style="font-size:12px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:0.5px;">Tổng Sinh Viên</span>
               <span style="font-size:20px;">👥</span>
             </div>
-            <div style="font-size:26px;font-weight:800;color:var(--text);">${studentCount}</div>
+            <div id="adminMetricStudentCount" style="font-size:26px;font-weight:800;color:var(--text);">${studentCount}</div>
           </div>
 
           <!-- Card 2: Server Status -->
@@ -132,11 +130,14 @@ export class AdminView {
               <span style="font-size:12px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:0.5px;">Trạng Thái Máy Chủ</span>
               <span style="font-size:20px;">🌐</span>
             </div>
-            <div style="font-size:16px;font-weight:800;color:${this.isServerConnected ? '#10b981' : '#f59e0b'};display:flex;align-items:center;gap:6px;margin-bottom:6px;">
-              <span>${this.isServerConnected ? '● Đã kết nối' : '○ Chế độ Ngoại tuyến'}</span>
-            </div>
-            <div style="font-size:11.5px;font-weight:700;color:#10b981;">
-              🏛️ ${this.dbStatus.databaseLabel || 'PostgreSQL Relational DB (SQL)'}
+            <div id="adminMetricServerStatusWrap">
+              <div style="font-size:16px;font-weight:800;color:${this.isSyncing ? '#3b82f6' : (this.isServerConnected ? '#10b981' : '#f59e0b')};display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+                <span>${this.isSyncing ? '🔄 Đang đồng bộ máy chủ...' : (this.isServerConnected ? '● Đã kết nối' : '○ Chế độ Ngoại tuyến')}</span>
+                ${!this.isServerConnected && !this.isSyncing ? `<button type="button" id="btnAdminRetrySync" style="font-size:11px;padding:2px 8px;border-radius:4px;cursor:pointer;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);margin-left:6px;">🔄 Thử lại</button>` : ''}
+              </div>
+              <div style="font-size:11.5px;font-weight:700;color:#10b981;">
+                🏛️ ${this.dbStatus.databaseLabel || 'PostgreSQL Relational DB (SQL)'}
+              </div>
             </div>
           </div>
 
@@ -225,7 +226,7 @@ export class AdminView {
             <div>
               <h3 style="margin:0 0 4px;font-size:16px;color:var(--text);font-weight:700;display:flex;align-items:center;gap:8px;">
                 <span>📋</span>
-                <span>Danh Sách Cơ Sở Dữ Liệu Tài Khoản (${allUsers.length})</span>
+                <span id="adminUsersTableTitle">Danh Sách Cơ Sở Dữ Liệu Tài Khoản (${allUsers.length})</span>
               </h3>
               <p style="margin:0;font-size:12px;color:var(--dim);">
                 Quản trị viên có toàn quyền kiểm tra, xem thông tin và xóa bỏ các tài khoản kiểm thử hoặc sinh viên không hợp lệ.
@@ -264,6 +265,106 @@ export class AdminView {
     `;
 
     this._bindEvents();
+  }
+
+  /**
+   * Triggers parallel background sync with race condition protection.
+   * @private
+   */
+  async _triggerBackgroundSync() {
+    if (this.isSyncing) return;
+    const currentSyncId = ++this._syncCounter;
+    this._activeSyncId = currentSyncId;
+    this.isSyncing = true;
+    this._updateSyncIndicatorUI(true);
+
+    try {
+      this.isServerConnected = await cloudSyncManager.checkConnection();
+      if (currentSyncId !== this._activeSyncId) return;
+
+      if (this.isServerConnected) {
+        // Run independent read-only syncs concurrently
+        const [statusRes] = await Promise.allSettled([
+          cloudSyncManager.getDatabaseStatus(),
+          cloudSyncManager.syncUsers(authManager),
+          cloudSyncManager.syncQuizLeaderboard(quizHistoryManager),
+          cloudSyncManager.syncExams(examManager),
+          cloudSyncManager.syncExamSubmissions(examManager),
+        ]);
+
+        if (currentSyncId !== this._activeSyncId) return;
+
+        if (statusRes.status === 'fulfilled' && statusRes.value) {
+          this.dbStatus = statusRes.value;
+        }
+      } else {
+        this.dbStatus = { storageMode: 'offline', databaseLabel: 'Chế độ Ngoại tuyến', kvConfigured: false };
+      }
+    } catch {
+      this.isServerConnected = false;
+      this.dbStatus = { storageMode: 'offline', databaseLabel: 'Chế độ Ngoại tuyến', kvConfigured: false };
+    } finally {
+      if (currentSyncId === this._activeSyncId) {
+        this.isSyncing = false;
+        this._updateDashboardDataInPlace();
+      }
+    }
+  }
+
+  /**
+   * Updates sync status badge while syncing is in progress.
+   * @param {boolean} isSyncing
+   * @private
+   */
+  _updateSyncIndicatorUI(isSyncing) {
+    if (!this.container) return;
+    const wrap = this.container.querySelector('#adminMetricServerStatusWrap');
+    if (wrap) {
+      wrap.innerHTML = `
+        <div style="font-size:16px;font-weight:800;color:${isSyncing ? '#3b82f6' : (this.isServerConnected ? '#10b981' : '#f59e0b')};display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+          <span>${isSyncing ? '🔄 Đang đồng bộ máy chủ...' : (this.isServerConnected ? '● Đã kết nối' : '○ Chế độ Ngoại tuyến')}</span>
+          ${!this.isServerConnected && !isSyncing ? `<button type="button" id="btnAdminRetrySync" style="font-size:11px;padding:2px 8px;border-radius:4px;cursor:pointer;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);margin-left:6px;">🔄 Thử lại</button>` : ''}
+        </div>
+        <div style="font-size:11.5px;font-weight:700;color:#10b981;">
+          🏛️ ${this.dbStatus.databaseLabel || 'PostgreSQL Relational DB (SQL)'}
+        </div>
+      `;
+      const retryBtn = wrap.querySelector('#btnAdminRetrySync');
+      if (retryBtn) {
+        retryBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          this._triggerBackgroundSync();
+        });
+      }
+    }
+  }
+
+  /**
+   * Updates dynamic parts of the dashboard in-place without tearing down DOM or inputs.
+   * @private
+   */
+  _updateDashboardDataInPlace() {
+    if (!this.container) return;
+    const allUsers = authManager.getUsers();
+    const studentCount = allUsers.filter(u => u.username !== 'admin' && u.id !== 'user_admin').length;
+
+    // 1. Update Student Count
+    const countEl = this.container.querySelector('#adminMetricStudentCount');
+    if (countEl) countEl.textContent = String(studentCount);
+
+    // 2. Update Table Title Count
+    const titleCountEl = this.container.querySelector('#adminUsersTableTitle');
+    if (titleCountEl) titleCountEl.textContent = `Danh Sách Cơ Sở Dữ Liệu Tài Khoản (${allUsers.length})`;
+
+    // 3. Update Server Status Badge
+    this._updateSyncIndicatorUI(false);
+
+    // 4. Update Table Rows preserving search filter & focus
+    const tbody = this.container.querySelector('#adminUsersTbody');
+    if (tbody) {
+      tbody.innerHTML = this._renderUserTableRows(allUsers);
+      this._bindTableActionButtons();
+    }
   }
 
   /**

@@ -391,7 +391,12 @@ export class QuizView {
           storage.setItem('toanrr_custom_imported_questions_v1', JSON.stringify(this.importedQuestions));
         }
         if (this.container && (this.activeTab === 'studio' || this.studioSubTab === 'wordUpload')) {
-          this.render();
+          const activeEl = document.activeElement;
+          if (activeEl && this.container.contains(activeEl) && ['INPUT', 'SELECT', 'TEXTAREA'].includes(activeEl.tagName)) {
+            // User is actively editing/typing. Do not wipe DOM or disrupt focus.
+          } else {
+            this.render();
+          }
         }
         return true;
       }
@@ -422,7 +427,12 @@ export class QuizView {
       }
 
       if (this.container && (this.activeTab === 'studio' || this.studioSubTab === 'wordUpload')) {
-        this.render();
+        const activeEl = document.activeElement;
+        if (activeEl && this.container.contains(activeEl) && ['INPUT', 'SELECT', 'TEXTAREA'].includes(activeEl.tagName)) {
+          // User is actively editing/typing. Do not wipe DOM or disrupt focus.
+        } else {
+          this.render();
+        }
       }
       return true;
     } catch (err) {
@@ -500,6 +510,8 @@ export class QuizView {
 
     let totalSelected = 0;
     let totalAvailable = 0;
+    let hasExceeded = false;
+    const exceededFiles = [];
     const breakdown = [];
 
     this.importedFiles.forEach(file => {
@@ -510,20 +522,31 @@ export class QuizView {
         count = fileCount;
         this.fileDistributions[file.id] = count;
       } else {
-        count = Math.min(Math.max(0, parseInt(count, 10) || 0), fileCount);
+        count = Math.max(0, parseInt(count, 10) || 0);
       }
       totalSelected += count;
-      if (count > 0) {
-        breakdown.push({
+      const isExceeded = count > fileCount;
+      if (isExceeded) {
+        hasExceeded = true;
+        exceededFiles.push({
           fileId: file.id,
           fileName: file.name,
           selectedCount: count,
           availableCount: fileCount,
         });
       }
+      if (count > 0) {
+        breakdown.push({
+          fileId: file.id,
+          fileName: file.name,
+          selectedCount: count,
+          availableCount: fileCount,
+          isExceeded,
+        });
+      }
     });
 
-    return { totalSelected, totalAvailable, breakdown };
+    return { totalSelected, totalAvailable, breakdown, hasExceeded, exceededFiles };
   }
 
   /**
@@ -623,6 +646,21 @@ export class QuizView {
   }
 
   _renderDistSummaryBanner(distSummary) {
+    if (distSummary && distSummary.hasExceeded && distSummary.exceededFiles && distSummary.exceededFiles.length > 0) {
+      return `
+        <div style="padding:14px 18px;background:rgba(239,68,68,0.1);border:1.5px solid rgba(239,68,68,0.35);border-radius:8px;margin-bottom:18px;">
+          <div style="font-size:13.5px;font-weight:700;color:#ef4444;margin-bottom:6px;display:flex;align-items:center;gap:6px;">
+            <span>⚠️ Cảnh báo: Số câu chọn bốc vượt quá giới hạn sẵn có trong file!</span>
+          </div>
+          <div style="font-size:12.5px;color:var(--text);margin-bottom:8px;line-height:1.6;">
+            ${distSummary.exceededFiles.map(e => `• <strong>${this._escapeHtml(e.fileName)}</strong>: Bạn đang chọn <strong>${e.selectedCount}</strong> câu, nhưng file chỉ có <strong>${e.availableCount}</strong> câu.`).join('<br/>')}
+          </div>
+          <div style="font-size:12px;color:var(--dim);">
+            Vui lòng điều chỉnh lại số câu chọn bốc không vượt quá số câu sẵn có trước khi bấm "Tạo và Phát Đề Thi Cho Sinh Viên".
+          </div>
+        </div>
+      `;
+    }
     if (distSummary.totalSelected === 0) {
       return `
         <div style="padding:14px 18px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:8px;margin-bottom:18px;text-align:center;">
@@ -1695,10 +1733,11 @@ export class QuizView {
                       ${this.importedFiles.map(f => {
                         const fileCount = f.questionCount || (f.questions ? f.questions.length : 0);
                         const selectedCount = this.fileDistributions[f.id] !== undefined
-                          ? Math.min(Math.max(0, this.fileDistributions[f.id]), fileCount)
+                          ? Math.max(0, parseInt(this.fileDistributions[f.id], 10) || 0)
                           : fileCount;
+                        const isExceeded = selectedCount > fileCount;
                         return `
-                          <tr>
+                          <tr class="row-distribute-file" data-file-id="${f.id}">
                             <td style="font-weight:600;color:var(--text);">
                               📄 ${this._escapeHtml(f.name)}
                             </td>
@@ -1708,14 +1747,17 @@ export class QuizView {
                               </span>
                             </td>
                             <td style="text-align:center;">
-                              <div style="display:flex;align-items:center;justify-content:center;gap:6px;">
-                                <input type="text" inputmode="numeric" pattern="[0-9]*" value="${selectedCount}" max="${fileCount}"
-                                  class="form-input input-distribute-file-count"
-                                  data-file-id="${f.id}"
-                                  placeholder="0"
-                                  autocomplete="off"
-                                  style="width:75px;padding:6px;text-align:center;font-size:13.5px;font-weight:700;border-radius:6px;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);" />
-                                <span style="font-size:12px;color:var(--dim);font-weight:600;">/ ${fileCount}</span>
+                              <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;">
+                                <div style="display:flex;align-items:center;justify-content:center;gap:6px;">
+                                  <input type="number" min="0" value="${selectedCount}"
+                                    class="form-input input-distribute-file-count"
+                                    data-file-id="${f.id}"
+                                    placeholder="0"
+                                    autocomplete="off"
+                                    style="width:78px;padding:6px 8px;text-align:center;font-size:13.5px;font-weight:700;border-radius:6px;background:var(--panel-alt);border:1.5px solid ${isExceeded ? '#ef4444' : 'var(--line)'};color:${isExceeded ? '#ef4444' : 'var(--text)'};position:relative;z-index:2;pointer-events:auto;touch-action:manipulation;" />
+                                  <span class="span-dist-file-max" style="font-size:12px;color:${isExceeded ? '#ef4444' : 'var(--dim)'};font-weight:600;">/ ${fileCount}</span>
+                                </div>
+                                ${isExceeded ? `<span class="dist-file-warning-msg" style="font-size:10.5px;color:#ef4444;font-weight:600;">⚠️ Vượt quá ${fileCount} câu</span>` : ''}
                               </div>
                             </td>
                             <td>
@@ -1770,7 +1812,7 @@ export class QuizView {
 
               <div>
                 <label style="display:block;font-size:12.5px;font-weight:600;color:var(--text);margin-bottom:6px;">Thời gian làm bài (phút): *</label>
-                <input type="text" inputmode="numeric" pattern="[0-9]*" id="numAssignDuration" value="${defaultDuration}" placeholder="15" autocomplete="off" style="width:100%;padding:8px 12px;border-radius:6px;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);font-size:13px;font-weight:700;" />
+                <input type="number" min="1" max="180" id="numAssignDuration" value="${defaultDuration}" placeholder="15" autocomplete="off" style="width:100%;padding:8px 12px;border-radius:6px;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);font-size:13px;font-weight:700;position:relative;z-index:2;pointer-events:auto;touch-action:manipulation;" />
               </div>
 
               <div>
@@ -1923,11 +1965,11 @@ export class QuizView {
               <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
                 <span style="color:var(--dim);font-weight:600;">Số lượng câu:</span>
                 <div style="display:flex;align-items:center;gap:6px;">
-                  <input type="text" inputmode="numeric" pattern="[0-9]*" id="numStudioCount" class="form-input" min="1" max="${printPoolSize || 1}"
+                  <input type="number" id="numStudioCount" class="form-input" min="1" max="${printPoolSize || 1}"
                     value="${currentStudioCount}"
                     placeholder="Số câu (1 - ${printPoolSize})"
                     autocomplete="off"
-                    style="width:80px;padding:5px 8px;font-size:13px;border-radius:6px;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);font-weight:700;text-align:center;" />
+                    style="width:80px;padding:5px 8px;font-size:13px;border-radius:6px;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);font-weight:700;text-align:center;position:relative;z-index:2;pointer-events:auto;touch-action:manipulation;" />
                   <span style="font-size:12px;color:var(--dim);font-weight:600;">/ ${printPoolSize} câu</span>
                 </div>
                 <select id="selStudioCount" class="form-input" style="padding:5px 8px;font-size:12px;border-radius:6px;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);font-weight:600;">
@@ -3370,6 +3412,31 @@ export class QuizView {
       });
     }
 
+    // Helper to update individual row warning UI
+    const updateRowWarning = (inputEl, count, max) => {
+      const isExceeded = count > max;
+      inputEl.style.borderColor = isExceeded ? '#ef4444' : 'var(--line)';
+      inputEl.style.color = isExceeded ? '#ef4444' : 'var(--text)';
+      const row = inputEl.closest('tr');
+      if (row) {
+        const spanMax = row.querySelector('.span-dist-file-max');
+        if (spanMax) spanMax.style.color = isExceeded ? '#ef4444' : 'var(--dim)';
+        let warnEl = row.querySelector('.dist-file-warning-msg');
+        if (isExceeded) {
+          if (!warnEl) {
+            warnEl = document.createElement('span');
+            warnEl.className = 'dist-file-warning-msg';
+            warnEl.style.cssText = 'font-size:10.5px;color:#ef4444;font-weight:600;';
+            const wrap = inputEl.closest('td') ? inputEl.closest('td').firstElementChild : null;
+            if (wrap) wrap.appendChild(warnEl);
+          }
+          warnEl.textContent = `⚠️ Vượt quá ${max} câu`;
+        } else if (warnEl) {
+          warnEl.remove();
+        }
+      }
+    };
+
     // In-place UI updater for distribution table (avoids re-rendering and losing focus)
     const updateDistributionUIInPlace = () => {
       const distSummary = this._getDistributedSummary();
@@ -3379,7 +3446,11 @@ export class QuizView {
       }
       const distTotalQuick = this.container.querySelector('#distQuickTotalSummary');
       if (distTotalQuick) {
-        distTotalQuick.innerHTML = `<span>🎯 Đã chọn: ${distSummary.totalSelected} / ${distSummary.totalAvailable} câu</span>`;
+        if (distSummary.hasExceeded) {
+          distTotalQuick.innerHTML = `<span style="color:#ef4444;font-weight:700;">⚠️ Đã chọn: ${distSummary.totalSelected} / ${distSummary.totalAvailable} câu (Vượt quá số câu sẵn có)</span>`;
+        } else {
+          distTotalQuick.innerHTML = `<span style="color:#10b981;font-weight:700;">🎯 Đã chọn: ${distSummary.totalSelected} / ${distSummary.totalAvailable} câu</span>`;
+        }
       }
       // Only auto-update duration if teacher hasn't manually customized it
       if (this.studioAssignDuration === null || this.studioAssignDuration === undefined || this.studioAssignDuration === '') {
@@ -3390,55 +3461,58 @@ export class QuizView {
       }
       const hintEl = this.container.querySelector('.studio-assign-action-hint');
       if (hintEl) {
-        hintEl.innerHTML = distSummary.totalSelected > 0
-          ? `<span style="color:#10b981;font-weight:700;">✅ Sẵn sàng phát đề với ${distSummary.totalSelected} câu hỏi tự soạn đã phân phối.</span>`
-          : '⚠️ Vui lòng phân phối câu hỏi ở tab Phân Phối Đề trước khi phát.';
+        if (distSummary.hasExceeded) {
+          hintEl.innerHTML = `<span style="color:#ef4444;font-weight:700;">⚠️ Số câu chọn bốc vượt quá số câu sẵn có. Vui lòng điều chỉnh lại trước khi phát đề.</span>`;
+        } else if (distSummary.totalSelected > 0) {
+          hintEl.innerHTML = `<span style="color:#10b981;font-weight:700;">✅ Sẵn sàng phát đề với ${distSummary.totalSelected} câu hỏi tự soạn đã phân phối.</span>`;
+        } else {
+          hintEl.innerHTML = '⚠️ Vui lòng phân phối câu hỏi ở bảng phía trên trước khi phát.';
+        }
       }
     };
 
     // Distribution Table: Per-File Question Count Input (Smooth, keyboard-friendly editing)
     this.container.querySelectorAll('.input-distribute-file-count').forEach(input => {
-      input.addEventListener('focus', (e) => {
-        try { e.target.select(); } catch {}
-      });
       const handleCountUpdate = (e) => {
         const fileId = e.target.getAttribute('data-file-id');
-        const max = parseInt(e.target.getAttribute('max'), 10) || 0;
-        const raw = e.target.value.replace(/[^0-9]/g, '');
-        e.target.value = raw;
+        const file = (this.importedFiles || []).find(f => f.id === fileId);
+        const max = file ? (file.questionCount || (file.questions ? file.questions.length : 0)) : 0;
+        const raw = e.target.value.trim();
 
         if (raw === '') {
-          // Allow empty during active typing/backspacing
+          // Allow empty during active typing/backspacing without forcing a character
           if (!this.fileDistributions) this.fileDistributions = {};
           this.fileDistributions[fileId] = 0;
+          updateRowWarning(e.target, 0, max);
           updateDistributionUIInPlace();
           return;
         }
 
-        let val = parseInt(raw, 10);
-        if (val > max) {
-          val = max;
-          e.target.value = String(max);
-        }
+        const parsed = parseInt(raw, 10);
+        const val = isNaN(parsed) ? 0 : Math.max(0, parsed);
         if (!this.fileDistributions) this.fileDistributions = {};
         this.fileDistributions[fileId] = val;
+
+        // Visual warning if exceeding available questions, but DO NOT overwrite typing
+        updateRowWarning(e.target, val, max);
         updateDistributionUIInPlace();
       };
+
       input.addEventListener('input', handleCountUpdate);
       input.addEventListener('change', handleCountUpdate);
       input.addEventListener('blur', (e) => {
         const fileId = e.target.getAttribute('data-file-id');
-        const max = parseInt(e.target.getAttribute('max'), 10) || 0;
+        const file = (this.importedFiles || []).find(f => f.id === fileId);
+        const max = file ? (file.questionCount || (file.questions ? file.questions.length : 0)) : 0;
         const raw = e.target.value.trim();
         let val = parseInt(raw, 10);
         if (isNaN(val) || val < 0) {
           val = 0;
-        } else if (val > max) {
-          val = max;
+          e.target.value = '0';
         }
-        e.target.value = String(val);
         if (!this.fileDistributions) this.fileDistributions = {};
         this.fileDistributions[fileId] = val;
+        updateRowWarning(e.target, val, max);
         updateDistributionUIInPlace();
       });
     });
@@ -3449,13 +3523,16 @@ export class QuizView {
         e.preventDefault();
         const fileId = btn.getAttribute('data-file-id');
         const count = parseInt(btn.getAttribute('data-count'), 10);
-        const file = this.importedFiles.find(f => f.id === fileId);
+        const file = (this.importedFiles || []).find(f => f.id === fileId);
         const max = file ? (file.questionCount || (file.questions ? file.questions.length : 0)) : 0;
-        const finalVal = Math.min(Math.max(0, count), max);
+        const finalVal = Math.max(0, count);
         if (!this.fileDistributions) this.fileDistributions = {};
         this.fileDistributions[fileId] = finalVal;
         const matchingInput = this.container.querySelector(`.input-distribute-file-count[data-file-id="${fileId}"]`);
-        if (matchingInput) matchingInput.value = finalVal;
+        if (matchingInput) {
+          matchingInput.value = finalVal;
+          updateRowWarning(matchingInput, finalVal, max);
+        }
         updateDistributionUIInPlace();
       });
     });
@@ -3469,7 +3546,10 @@ export class QuizView {
           const max = f.questionCount || (f.questions ? f.questions.length : 0);
           this.fileDistributions[f.id] = max;
           const matchingInput = this.container.querySelector(`.input-distribute-file-count[data-file-id="${f.id}"]`);
-          if (matchingInput) matchingInput.value = max;
+          if (matchingInput) {
+            matchingInput.value = max;
+            updateRowWarning(matchingInput, max, max);
+          }
         });
         updateDistributionUIInPlace();
       });
@@ -3484,7 +3564,10 @@ export class QuizView {
           const val = Math.min(10, max);
           this.fileDistributions[f.id] = val;
           const matchingInput = this.container.querySelector(`.input-distribute-file-count[data-file-id="${f.id}"]`);
-          if (matchingInput) matchingInput.value = val;
+          if (matchingInput) {
+            matchingInput.value = val;
+            updateRowWarning(matchingInput, val, max);
+          }
         });
         updateDistributionUIInPlace();
       });
@@ -3495,9 +3578,13 @@ export class QuizView {
       btnDistributeClear.addEventListener('click', () => {
         if (!this.fileDistributions) this.fileDistributions = {};
         this.importedFiles.forEach(f => {
+          const max = f.questionCount || (f.questions ? f.questions.length : 0);
           this.fileDistributions[f.id] = 0;
           const matchingInput = this.container.querySelector(`.input-distribute-file-count[data-file-id="${f.id}"]`);
-          if (matchingInput) matchingInput.value = 0;
+          if (matchingInput) {
+            matchingInput.value = 0;
+            updateRowWarning(matchingInput, 0, max);
+          }
         });
         updateDistributionUIInPlace();
       });
@@ -3538,30 +3625,24 @@ export class QuizView {
     // Track custom exam duration input
     const numAssignDuration = this.container.querySelector('#numAssignDuration');
     if (numAssignDuration) {
-      numAssignDuration.addEventListener('focus', (e) => {
-        try { e.target.select(); } catch {}
-      });
       numAssignDuration.addEventListener('input', (e) => {
-        const raw = e.target.value.replace(/[^0-9]/g, '');
-        e.target.value = raw;
+        const raw = e.target.value.trim();
         if (raw === '') {
           this.studioAssignDuration = '';
           return;
         }
-        let val = parseInt(raw, 10);
-        if (val > 180) {
-          val = 180;
-          e.target.value = '180';
+        const val = parseInt(raw, 10);
+        if (!isNaN(val) && val >= 1) {
+          this.studioAssignDuration = val;
         }
-        this.studioAssignDuration = val;
       });
       numAssignDuration.addEventListener('blur', (e) => {
         const raw = e.target.value.trim();
         let val = parseInt(raw, 10);
         if (isNaN(val) || val < 1) {
           val = 15;
-        } else if (val > 180) {
-          val = 180;
+        } else if (val > 360) {
+          val = 360;
         }
         e.target.value = String(val);
         this.studioAssignDuration = val;
@@ -3571,9 +3652,6 @@ export class QuizView {
     // Track custom exam code input
     const txtAssignExamCode = this.container.querySelector('#txtAssignExamCode');
     if (txtAssignExamCode) {
-      txtAssignExamCode.addEventListener('focus', (e) => {
-        try { e.target.select(); } catch {}
-      });
       txtAssignExamCode.addEventListener('input', (e) => {
         this.studioAssignExamCode = e.target.value;
       });
@@ -3598,6 +3676,14 @@ export class QuizView {
 
         if (!title) {
           this._showAlert('Vui lòng nhập tiêu đề đề thi!');
+          return;
+        }
+
+        // Validate distribution limits: block if teacher selected more questions than available
+        const distSummary = this._getDistributedSummary();
+        if (distSummary && distSummary.hasExceeded && distSummary.exceededFiles && distSummary.exceededFiles.length > 0) {
+          const details = distSummary.exceededFiles.map(e => `• "${e.fileName}": chọn ${e.selectedCount} câu (chỉ có ${e.availableCount} câu sẵn có)`).join('\n');
+          this._showAlert(`⚠️ Không thể tạo đề thi: Số câu chọn bốc vượt quá số lượng câu sẵn có trong file:\n\n${details}\n\nVui lòng điều chỉnh lại số câu chọn bốc không vượt quá số câu sẵn có trước khi phát đề!`);
           return;
         }
 
@@ -3870,6 +3956,7 @@ export class QuizView {
       selPrintSource.addEventListener('change', (e) => {
         this.studioPrintSource = e.target.value;
         this.printShuffledQuestions = null;
+        this.studioSubTab = 'print';
         this.render();
       });
     }
@@ -3878,24 +3965,15 @@ export class QuizView {
     const selStudioCount = this.container.querySelector('#selStudioCount');
 
     if (numStudioCount) {
-      numStudioCount.addEventListener('focus', (e) => {
-        try { e.target.select(); } catch {}
-      });
       numStudioCount.addEventListener('input', (e) => {
-        const raw = e.target.value.replace(/[^0-9]/g, '');
-        e.target.value = raw;
+        const raw = e.target.value.trim();
         if (raw === '') {
           this.studioConfig.count = null;
           return;
         }
         const parsed = parseInt(raw, 10);
-        const pool = this._getStudioPrintPool();
-        const max = pool.length || 1;
         if (!isNaN(parsed) && parsed > 0) {
-          this.studioConfig.count = Math.min(parsed, max);
-          if (parsed > max) {
-            e.target.value = String(max);
-          }
+          this.studioConfig.count = parsed;
         }
       });
       numStudioCount.addEventListener('change', (e) => {
@@ -3905,10 +3983,13 @@ export class QuizView {
         const max = pool.length || 1;
         if (!isNaN(parsed) && parsed > 0) {
           this.studioConfig.count = Math.min(parsed, max);
+          e.target.value = String(this.studioConfig.count);
         } else {
           this.studioConfig.count = null;
+          e.target.value = String(max);
         }
         this.printShuffledQuestions = null;
+        this.studioSubTab = 'print';
         this.render();
       });
     }
@@ -3921,6 +4002,7 @@ export class QuizView {
           this.studioConfig.count = parseInt(e.target.value, 10);
         }
         this.printShuffledQuestions = null;
+        this.studioSubTab = 'print';
         this.render();
       });
     }

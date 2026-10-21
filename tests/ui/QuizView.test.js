@@ -466,4 +466,92 @@ describe('QuizView UI Component', () => {
     expect(quizView2.importedQuestions.length).toBe(0);
     expect(localStorage.getItem('toanrr_custom_imported_questions_v1')).toBeNull();
   });
+
+  it('handles multi-file question distribution input interaction smoothly without clamping mid-typing (e.g. entering 5 when available is 1)', () => {
+    authManager.login('admin', '2HV6868@');
+    const quizView = new QuizView({ container });
+    quizView.setTab('studio');
+    quizView.setStudioSubTab('publish');
+
+    quizView.importedFiles = [
+      {
+        id: 'file_test_1',
+        name: 'DeThi1.docx',
+        questionCount: 1,
+        questions: [{ id: 'q1', question: 'Q1', options: [{ id: 'A', text: 'A' }], correctId: 'A' }]
+      }
+    ];
+    quizView.render();
+
+    const inputCount = container.querySelector('.input-distribute-file-count[data-file-id="file_test_1"]');
+    expect(inputCount).not.toBeNull();
+    expect(inputCount.type).toBe('number');
+
+    // Simulate typing "5" into an input where available is 1
+    inputCount.value = '5';
+    inputCount.dispatchEvent(new window.Event('input', { bubbles: true }));
+
+    // User's typed value must NOT be forcefully clamped to 1
+    expect(inputCount.value).toBe('5');
+    expect(quizView.fileDistributions['file_test_1']).toBe(5);
+
+    // Distribution summary tracks that selection exceeds available
+    const summary = quizView._getDistributedSummary();
+    expect(summary.totalSelected).toBe(5);
+    expect(summary.totalAvailable).toBe(1);
+    expect(summary.hasExceeded).toBe(true);
+
+    // Visual warning element is displayed for the row
+    const warnEl = container.querySelector('.dist-file-warning-msg');
+    expect(warnEl).not.toBeNull();
+    expect(warnEl.textContent).toContain('Vượt quá 1 câu');
+  });
+
+  it('displays exceeding warning and prevents creating exam if chosen count exceeds available file questions', () => {
+    authManager.login('admin', '2HV6868@');
+    const quizView = new QuizView({ container });
+    quizView.setTab('studio');
+    quizView.setStudioSubTab('publish');
+
+    quizView.importedFiles = [
+      {
+        id: 'file_test_overflow',
+        name: 'FileChiCo1Cau.docx',
+        questionCount: 1,
+        questions: [{ id: 'q1', question: 'Q1', options: [{ id: 'A', text: 'A' }], correctId: 'A' }]
+      }
+    ];
+    quizView.fileDistributions = { file_test_overflow: 5 };
+    quizView.render();
+
+    let alertMessage = '';
+    window.alert = (msg) => { alertMessage = msg; };
+
+    const btnCreate = container.querySelector('#btnCreateAndAssignExam');
+    expect(btnCreate).not.toBeNull();
+    btnCreate.click();
+
+    // Must block exam creation and show helpful alert
+    expect(alertMessage).toContain('Số câu chọn bốc vượt quá số lượng câu sẵn có');
+    expect(alertMessage).toContain('FileChiCo1Cau.docx');
+    expect(alertMessage).toContain('5 câu');
+  });
+
+  it('does not wipe active form elements during syncCloudImportedFiles when teacher is typing', () => {
+    authManager.login('admin', '2HV6868@');
+    const quizView = new QuizView({ container });
+    quizView.setTab('studio');
+    quizView.render();
+
+    const titleInput = container.querySelector('#txtAssignTitle');
+    expect(titleInput).not.toBeNull();
+    titleInput.focus();
+    expect(document.activeElement).toBe(titleInput);
+
+    const renderSpy = vi.spyOn(quizView, 'render');
+    quizView.syncCloudImportedFiles();
+
+    // render() must not be called when an input is actively focused
+    expect(renderSpy).not.toHaveBeenCalled();
+  });
 });
