@@ -334,4 +334,108 @@ describe('Exam Workflow, Student Identity Resolution & Lockdown Integrity Tests'
       expect(q4.options.length).toBe(4);
     });
   });
+
+  describe('5. Student Dashboard Stats & Score Reset When Exams Are Deleted', () => {
+    it('resets submitted count and average score to match exactly the remaining active exams', () => {
+      // 1. Create a student
+      authManager.logout();
+      authManager.register({
+        username: 'sv_reset_test',
+        fullName: 'Sinh Viên Kiểm Tra Reset',
+        email: 'reset@school.edu.vn',
+        password: 'Password123!',
+      });
+      const student = authManager.getCurrentUser();
+      expect(student).not.toBeNull();
+
+      // Clear any previous exams
+      examManager.clearAllExams();
+
+      // 2. Create 2 exams assigned to all
+      const exam1 = examManager.createExam({
+        id: 'exam_res_1',
+        title: 'Đề Thi 1',
+        durationMinutes: 15,
+        questionIds: ['logic_q01'],
+        assignedTo: ['all'],
+      }).exam;
+
+      const exam2 = examManager.createExam({
+        id: 'exam_res_2',
+        title: 'Đề Thi 2',
+        durationMinutes: 15,
+        questionIds: ['logic_q02'],
+        assignedTo: ['all'],
+      }).exam;
+
+      // 3. Student submits both exams
+      examManager.submitExam({
+        examId: exam1.id,
+        userId: student.id,
+        answers: { logic_q01: 'B' },
+        timeSpentSeconds: 60,
+      });
+
+      examManager.submitExam({
+        examId: exam2.id,
+        userId: student.id,
+        answers: { logic_q02: 'A' },
+        timeSpentSeconds: 60,
+      });
+
+      // 4. Render QuizView for student
+      const quizView = new QuizView({ container });
+      quizView.setTab('myExams');
+
+      // Check initial badges with 2 exams: "ĐỀ ĐƯỢC GIAO" = 2, "ĐÃ NỘP BÀI" = 2, "ĐIỂM TB" = 5.0 / 10 (10 + 0)/2
+      expect(container.textContent).toContain('ĐỀ ĐƯỢC GIAO');
+      expect(container.textContent).toContain('ĐÃ NỘP BÀI');
+      expect(container.textContent).toContain('5.0 / 10');
+
+      // 5. Admin deletes exam 2 (which had score 0)
+      examManager.deleteExam(exam2.id);
+      quizView.render();
+
+      // Badges must now reflect only exam 1: "ĐỀ ĐƯỢC GIAO" = 1, "ĐÃ NỘP BÀI" = 1, "ĐIỂM TB" = 10.0 / 10
+      expect(container.textContent).toContain('10.0 / 10');
+
+      // 6. Admin deletes remaining exam 1 (or clears all exams)
+      examManager.deleteExam(exam1.id);
+      quizView.render();
+
+      // Badges must reset completely to 0 and 0 / 10!
+      expect(container.textContent).toContain('0 / 10');
+      expect(container.textContent).toContain('Hiện chưa có đề thi nào được phân công');
+    });
+
+    it('smoothly switches Studio subtabs without DOM tearing or recursive re-rendering', () => {
+      authManager.login('admin', '2HV6868@');
+      const quizView = new QuizView({ container });
+      quizView.setTab('studio');
+
+      const btnDist = container.querySelector('#tabStudioDistribute');
+      const btnPub = container.querySelector('#tabStudioPublish');
+      const btnPrint = container.querySelector('#tabStudioPrint');
+
+      expect(btnDist).not.toBeNull();
+      expect(btnPub).not.toBeNull();
+      expect(btnPrint).not.toBeNull();
+
+      // Switch to publish subtab
+      btnPub.click();
+      expect(quizView.studioSubTab).toBe('publish');
+      expect(container.querySelector('#studioPublishSection').style.display).toBe('block');
+      expect(container.querySelector('#studioDistributeSection').style.display).toBe('none');
+
+      // Switch to print subtab
+      btnPrint.click();
+      expect(quizView.studioSubTab).toBe('print');
+      expect(container.querySelector('#studioPrintSection').style.display).toBe('block');
+
+      // Switch back to distribute subtab
+      btnDist.click();
+      expect(quizView.studioSubTab).toBe('distribute');
+      expect(container.querySelector('#studioDistributeSection').style.display).toBe('block');
+    });
+  });
 });

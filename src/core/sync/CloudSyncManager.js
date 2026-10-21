@@ -929,13 +929,22 @@ export class CloudSyncManager {
           const localSubmissions = examManager.getSubmissions();
           const serverSubmissions = data.submissions;
 
-          // Merge: server submissions are primary
-          const serverKeySet = new Set(serverSubmissions.map(s => `${s.examId}___${s.userId}`));
-          const merged = [...serverSubmissions];
+          // Merge: server submissions are primary, filter out any deleted exams
+          const validServerSubmissions = serverSubmissions.filter(s => s && s.examId && !examManager._isExamDeletedLocally(s.examId));
+          const serverKeySet = new Set(validServerSubmissions.map(s => `${s.examId}___${s.userId}`));
+          const merged = [...validServerSubmissions];
 
-          // Retain local submissions not yet on server
+          // Retain local submissions not yet on server ONLY if exam exists and is not deleted
+          const currentExamIds = new Set(examManager.getExams().map(e => e.id));
           for (const ls of localSubmissions) {
-            if (ls && ls.examId && ls.userId && !serverKeySet.has(`${ls.examId}___${ls.userId}`)) {
+            if (
+              ls &&
+              ls.examId &&
+              ls.userId &&
+              !serverKeySet.has(`${ls.examId}___${ls.userId}`) &&
+              !examManager._isExamDeletedLocally(ls.examId) &&
+              currentExamIds.has(ls.examId)
+            ) {
               merged.push(ls);
             }
           }

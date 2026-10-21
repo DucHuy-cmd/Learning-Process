@@ -121,6 +121,12 @@ export class ExamManager {
     if (!this._memoryDeletedExams.includes(strId)) {
       this._memoryDeletedExams.push(strId);
     }
+
+    // Immediately purge deleted exam and its submissions from memory
+    this.memoryExams = (this.memoryExams || []).filter(e => e && e.id !== strId);
+    this.memorySubmissions = (this.memorySubmissions || []).filter(s => s && s.examId !== strId);
+    this.memoryExamViolations = (this.memoryExamViolations || []).filter(v => v && v.examId !== strId);
+
     if (this.storage) {
       try {
         const list = this._getDeletedExamIds();
@@ -128,6 +134,14 @@ export class ExamManager {
           list.push(strId);
           this.storage.setItem(STORAGE_KEY_DELETED_EXAMS, JSON.stringify(list));
         }
+
+        const remainingExams = this.getExams().filter(e => e && e.id !== strId);
+        const remainingSubs = this.getSubmissions().filter(s => s && s.examId !== strId);
+        const remainingViols = this.getExamViolationRecords().filter(v => v && v.examId !== strId);
+
+        this.storage.setItem(STORAGE_KEY_EXAMS, JSON.stringify(remainingExams));
+        this.storage.setItem(STORAGE_KEY_SUBMISSIONS, JSON.stringify(remainingSubs));
+        this.storage.setItem(STORAGE_KEY_EXAM_VIOLATIONS, JSON.stringify(remainingViols));
       } catch {}
     }
   }

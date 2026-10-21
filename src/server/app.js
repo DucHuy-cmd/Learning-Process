@@ -1518,6 +1518,18 @@ export async function handleRequest(req, res) {
 
       const durationMinutes = Number(data.durationMinutes);
 
+      // Ensure questionIds and customQuestions are strictly unique BEFORE registering
+      const seenQ = new Set();
+      questionIds = questionIds.map((id, idx) => {
+        let uniqueId = id;
+        if (!uniqueId || seenQ.has(uniqueId)) {
+          uniqueId = `q_${Date.now()}_${idx}_${Math.random().toString(36).slice(2, 6)}`;
+          if (customQuestions[idx]) customQuestions[idx].id = uniqueId;
+        }
+        seenQ.add(uniqueId);
+        return uniqueId;
+      });
+
       // Register any custom questions into server pool for grading and synchronization
       customQuestions.forEach(cq => {
         if (cq && cq.id) {
@@ -1552,20 +1564,6 @@ export async function handleRequest(req, res) {
       ) {
         sendJson(res, 400, { success: false, error: 'Thông tin đề thi, thời lượng, câu hỏi hoặc danh sách sinh viên không hợp lệ.' });
         return;
-      }
-
-      // Ensure questionIds are strictly unique
-      if (questionIds.length !== new Set(questionIds).size) {
-        const seen = new Set();
-        questionIds = questionIds.map((id, idx) => {
-          if (seen.has(id)) {
-            const uniqueId = `${id}_${idx}_${Math.random().toString(36).slice(2, 6)}`;
-            if (customQuestions[idx]) customQuestions[idx].id = uniqueId;
-            return uniqueId;
-          }
-          seen.add(id);
-          return id;
-        });
       }
 
       const examId = typeof data.id === 'string' && data.id.trim()

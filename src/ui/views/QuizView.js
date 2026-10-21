@@ -133,10 +133,11 @@ export class QuizView {
     }
 
     if (examManager && typeof examManager.subscribe === 'function') {
-      examManager.subscribe(() => {
-        if (this.container && !this.activeExamSession) {
-          // If teacher is currently in Studio tab, do not wipe out active inputs
-          if (this.activeTab === 'studio') return;
+      examManager.subscribe((event) => {
+        if (!this.container || this.activeExamSession) return;
+        // Never disrupt teacher in Studio tab with background re-renders
+        if (this.activeTab === 'studio') return;
+        if (['exams_synced', 'exam_deleted', 'exams_cleared', 'exam_created', 'data_reset', 'submissions_synced'].includes(event)) {
           this.render();
         }
       });
@@ -144,46 +145,31 @@ export class QuizView {
 
     if (cloudSyncManager && typeof cloudSyncManager.subscribe === 'function') {
       cloudSyncManager.subscribe((status) => {
-        if (status && status.isConnected) {
-          this.syncCloudImportedFiles().catch(() => {});
-          cloudSyncManager.syncExams(examManager).then(() => {
-            if (this.container && (this.activeTab === 'myExams' || this.activeTab === 'studio')) {
-              this.render();
-            }
-          }).catch(() => {});
-          cloudSyncManager.syncExamSubmissions(examManager).catch(() => {});
-        }
         if (this.container && (this.activeTab === 'leaderboard' || this.activeTab === 'myExams')) {
           const badge = this.container.querySelector('#heroCloudBadge');
           if (badge) {
-            badge.textContent = cloudSyncManager.isConnected ? '🟢 Đã kết nối Máy chủ (Live)' : '💾 Lưu trữ Trình duyệt (Offline)';
-            badge.style.background = cloudSyncManager.isConnected ? 'rgba(16,185,129,0.15)' : 'rgba(245,158,11,0.15)';
-            badge.style.color = cloudSyncManager.isConnected ? '#10b981' : '#f59e0b';
-            badge.style.borderColor = cloudSyncManager.isConnected ? 'rgba(16,185,129,0.3)' : 'rgba(245,158,11,0.3)';
+            badge.textContent = status?.isConnected ? '🟢 Đã kết nối Máy chủ (Live)' : '💾 Lưu trữ Trình duyệt (Offline)';
+            badge.style.background = status?.isConnected ? 'rgba(16,185,129,0.15)' : 'rgba(245,158,11,0.15)';
+            badge.style.color = status?.isConnected ? '#10b981' : '#f59e0b';
+            badge.style.borderColor = status?.isConnected ? 'rgba(16,185,129,0.3)' : 'rgba(245,158,11,0.3)';
           }
         }
       });
     }
 
-    if (examManager && typeof examManager.subscribe === 'function') {
-      examManager.subscribe((event) => {
-        if (['exams_synced', 'exam_deleted', 'exams_cleared'].includes(event)) {
-          if (this.container && (this.activeTab === 'myExams' || this.activeTab === 'studio')) {
-            this.render();
-          }
-        }
-      });
-    }
-
-    // Trigger initial sync
+    // Trigger initial sync once on mount
     if (cloudSyncManager) {
       try {
         cloudSyncManager.syncExams(examManager).then(() => {
-          if (this.container && (this.activeTab === 'myExams' || this.activeTab === 'studio')) {
+          if (this.container && this.activeTab === 'myExams') {
             this.render();
           }
         }).catch(() => {});
-        cloudSyncManager.syncExamSubmissions(examManager).catch(() => {});
+        cloudSyncManager.syncExamSubmissions(examManager).then(() => {
+          if (this.container && this.activeTab === 'myExams') {
+            this.render();
+          }
+        }).catch(() => {});
         this.syncCloudImportedFiles().catch(() => {});
       } catch {}
     }
@@ -410,11 +396,11 @@ export class QuizView {
           storage.setItem('toanrr_custom_imported_files_v1', JSON.stringify(this.importedFiles));
           storage.setItem('toanrr_custom_imported_questions_v1', JSON.stringify(this.importedQuestions));
         }
-        if (this.container && (this.activeTab === 'studio' || this.studioSubTab === 'wordUpload')) {
+        const oldIds = (this.importedFiles || []).map(f => f.id).join(',');
+        const newIds = validRemote.map(f => f.id).join(',');
+        if (oldIds !== newIds && this.container && (this.activeTab === 'studio' || this.studioSubTab === 'wordUpload')) {
           const activeEl = document.activeElement;
-          if (activeEl && this.container.contains(activeEl) && ['INPUT', 'SELECT', 'TEXTAREA'].includes(activeEl.tagName)) {
-            // User is actively editing/typing. Do not wipe DOM or disrupt focus.
-          } else {
+          if (!activeEl || !this.container.contains(activeEl) || !['INPUT', 'SELECT', 'TEXTAREA'].includes(activeEl.tagName)) {
             this.render();
           }
         }
@@ -440,17 +426,17 @@ export class QuizView {
       }
 
       const mergedList = Array.from(mergedMap.values());
+      const oldAdminIds = (this.importedFiles || []).map(f => f.id).join(',');
+      const newAdminIds = mergedList.map(f => f.id).join(',');
       this._saveWordFiles(mergedList, true);
 
       if (hasNewLocalFiles && cloudSyncManager.isConnected) {
         cloudSyncManager.pushBatchImportedFiles(mergedList).catch(() => {});
       }
 
-      if (this.container && (this.activeTab === 'studio' || this.studioSubTab === 'wordUpload')) {
+      if (oldAdminIds !== newAdminIds && this.container && (this.activeTab === 'studio' || this.studioSubTab === 'wordUpload')) {
         const activeEl = document.activeElement;
-        if (activeEl && this.container.contains(activeEl) && ['INPUT', 'SELECT', 'TEXTAREA'].includes(activeEl.tagName)) {
-          // User is actively editing/typing. Do not wipe DOM or disrupt focus.
-        } else {
+        if (!activeEl || !this.container.contains(activeEl) || !['INPUT', 'SELECT', 'TEXTAREA'].includes(activeEl.tagName)) {
           this.render();
         }
       }
@@ -732,6 +718,9 @@ export class QuizView {
         }
       }
     });
+    if (result.length === 0 && Array.isArray(this.importedQuestions) && this.importedQuestions.length > 0) {
+      return [...this.importedQuestions];
+    }
     return result;
   }
 
@@ -978,10 +967,17 @@ export class QuizView {
       : examManager.getExamsForUser(currentUser.id);
 
     // Compute user's exam summary
-    const mySubmissions = examManager.getSubmissions().filter(s => s.userId === currentUser.id);
+    const activeExamIds = new Set(assignedExams.map(e => e.id));
+
+    // Compute user's exam summary strictly matching remaining active assigned exams
+    const mySubmissions = examManager.getSubmissions().filter(s => 
+      s && s.userId === currentUser.id && 
+      activeExamIds.has(s.examId) && 
+      !examManager._isExamDeletedLocally(s.examId)
+    );
     const completedCount = mySubmissions.length;
     const avgScore = completedCount > 0 
-      ? Math.round((mySubmissions.reduce((acc, s) => acc + s.score, 0) / completedCount) * 10) / 10 
+      ? Math.round((mySubmissions.reduce((acc, s) => acc + (Number(s.score) || 0), 0) / completedCount) * 10) / 10 
       : 0;
 
     return `
@@ -1012,7 +1008,7 @@ export class QuizView {
           </div>
           <div style="background:var(--panel-alt);border:1px solid var(--line);padding:8px 16px;border-radius:8px;text-align:center;">
             <div style="font-size:11px;color:var(--dim);font-weight:600;">ĐIỂM TB (THANG 10)</div>
-            <div style="font-size:18px;font-weight:800;color:var(--accent);">${avgScore.toFixed(1)} / 10</div>
+            <div style="font-size:18px;font-weight:800;color:var(--accent);">${completedCount > 0 ? `${avgScore.toFixed(1)} / 10` : '0 / 10'}</div>
           </div>
         </div>
       </div>
@@ -3124,20 +3120,32 @@ export class QuizView {
     }
 
     if (tabMyExams) {
-      tabMyExams.addEventListener('click', () => {
+      tabMyExams.addEventListener('click', (e) => {
+        if (e) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
         this.setTab('myExams');
       });
     }
 
     const btnSwitchLocked = this.container.querySelector('#btnSwitchToMyExamsFromLockedPractice');
     if (btnSwitchLocked) {
-      btnSwitchLocked.addEventListener('click', () => {
+      btnSwitchLocked.addEventListener('click', (e) => {
+        if (e) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
         this.setTab('myExams');
       });
     }
 
     if (tabStudio) {
-      tabStudio.addEventListener('click', () => {
+      tabStudio.addEventListener('click', (e) => {
+        if (e) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
         this.setTab('studio');
       });
     }
@@ -3775,7 +3783,11 @@ export class QuizView {
     // Create & Assign Exam Button (From multi-file distribution)
     const btnCreateAndAssign = this.container.querySelector('#btnCreateAndAssignExam');
     if (btnCreateAndAssign) {
-      btnCreateAndAssign.addEventListener('click', async () => {
+      btnCreateAndAssign.addEventListener('click', async (e) => {
+        if (e) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
         if (this._isCreatingExam) return;
         this._isCreatingExam = true;
 
@@ -4245,7 +4257,11 @@ export class QuizView {
 
     const btnPrintExam = this.container.querySelector('#btnPrintExam');
     if (btnPrintExam) {
-      btnPrintExam.addEventListener('click', () => {
+      btnPrintExam.addEventListener('click', (e) => {
+        if (e) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
         const exam = this._getStudioPrintExam();
         if (!exam) {
           this._showAlert('Vui lòng nạp file Word câu hỏi trước khi in đề!');
