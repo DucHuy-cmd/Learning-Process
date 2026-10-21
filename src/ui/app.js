@@ -297,7 +297,7 @@ export class App {
             this.views.ai.onUserChanged(authManager.getCurrentUser());
           }
           if (this.views.admin && typeof this.views.admin.render === 'function' && this.currentView === 'admin') {
-            this.views.admin.render();
+            this.views.admin.render(null, { forceSync: true });
           }
         },
       });
@@ -318,7 +318,7 @@ export class App {
           this.views.ai.onUserChanged(authManager.getCurrentUser());
         }
         if (this.views.admin && typeof this.views.admin.render === 'function' && this.currentView === 'admin') {
-          this.views.admin.render();
+          this.views.admin.render(null, { forceSync: event === 'login' });
         }
       });
 

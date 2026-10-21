@@ -42,9 +42,15 @@ export class AdminView {
       submissions: { status: 'idle', label: 'Bài nộp', count: 0, error: null },
     };
 
-    authManager.onAuthStateChanged(() => {
+    authManager.onAuthStateChanged((event, user) => {
+      const isLogin = event === 'login' || Boolean(user && (user.role === 'admin' || user.username === 'admin'));
+      if (isLogin) {
+        Object.values(this.syncTasks).forEach(t => {
+          t.needsReauth = false;
+        });
+      }
       if (this.container && this.container.classList.contains('active')) {
-        this.render();
+        this.render(null, { forceSync: isLogin });
       }
     });
 
@@ -57,8 +63,10 @@ export class AdminView {
    * Mounts and renders the Admin Management dashboard.
    * Renders layout shell immediately with local data, then fetches background data in parallel.
    * @param {HTMLElement} [targetContainer]
+   * @param {Object} [options]
+   * @param {boolean} [options.forceSync=false]
    */
-  async render(targetContainer = null) {
+  async render(targetContainer = null, { forceSync = false } = {}) {
     if (targetContainer) {
       this.container = targetContainer;
     }
@@ -74,7 +82,7 @@ export class AdminView {
     this._renderDashboardLayout();
 
     // 2. Fetch and sync latest cloud data in background (parallelized, race-condition protected)
-    return this._triggerBackgroundSync();
+    return this._triggerBackgroundSync({ force: forceSync });
   }
 
   /**
@@ -489,10 +497,12 @@ export class AdminView {
   /**
    * Triggers parallel background sync with race condition protection,
    * guaranteed finally cleanup, individual task tracking, and data skew protection.
+   * @param {Object} [options]
+   * @param {boolean} [options.force=false]
    * @private
    */
-  async _triggerBackgroundSync() {
-    if (this.isSyncing) return;
+  async _triggerBackgroundSync({ force = false } = {}) {
+    if (this.isSyncing && !force) return;
     const currentSyncId = ++this._syncCounter;
     this._activeSyncId = currentSyncId;
     this.isSyncing = true;
@@ -1287,18 +1297,16 @@ export class AdminView {
     if (btnSync) {
       btnSync.addEventListener('click', async () => {
         if (this.isSyncing) return;
-        this.isSyncing = true;
         btnSync.disabled = true;
         btnSync.textContent = '⏳ Đang đồng bộ...';
         try {
-          await cloudSyncManager.syncUsers(authManager);
-          await cloudSyncManager.syncQuizLeaderboard(quizHistoryManager);
-          await this.render();
+          await this._triggerBackgroundSync({ force: true });
           this._showAlert('✓ Dữ liệu tài khoản và bảng xếp hạng đã được đồng bộ với máy chủ!', 'success');
         } catch {
           this._showAlert('Lỗi khi kết nối với máy chủ.', 'error');
         } finally {
-          this.isSyncing = false;
+          btnSync.disabled = false;
+          btnSync.innerHTML = '<span>🔄</span><span>Đồng bộ Máy chủ</span>';
         }
       });
     }

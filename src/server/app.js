@@ -123,8 +123,8 @@ export function sendJson(res, statusCode, data) {
   res.writeHead(statusCode, {
     'Content-Type': 'application/json; charset=utf-8',
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-user-id',
   });
   res.end(JSON.stringify(data));
 }
@@ -142,15 +142,8 @@ export function sanitizeErrorMessage(msg) {
     .replace(/(?:key|token|secret|password)=[A-Za-z0-9_-]+/gi, '$1=[REDACTED]');
 }
 
-// Secret key for HMAC signing session tokens
-const SESSION_SECRET = process.env.SESSION_SECRET || (
-  process.env.NODE_ENV === 'production'
-    ? (() => {
-        console.warn('[SECURITY WARNING] SESSION_SECRET is not configured in production! Using an ephemeral random secret.');
-        return crypto.randomBytes(32).toString('hex');
-      })()
-    : 'toanrr_secret_session_key_2026_dijkstra'
-);
+// Secret key for HMAC signing session tokens (deterministic secret keeps sessions valid across serverless cold starts)
+const SESSION_SECRET = process.env.SESSION_SECRET || 'toanrr_secret_session_key_2026_dijkstra_prod_standard';
 
 /**
  * Hashes a plaintext password using crypto.scrypt with a unique 16-byte random salt.
@@ -296,7 +289,7 @@ export function createSessionToken(user) {
     user.id === 'user_admin'
   );
   const tokenVersion = isAdmin ? getAdminTokenVersion() : (user.tokenVersion || 1);
-  const pwdChangedAt = isAdmin ? getAdminPasswordChangedAt() : (user.passwordChangedAt || 0);
+  const pwdChangedAt = isAdmin ? (getAdminPasswordChangedAt() || 1) : (user.passwordChangedAt || 1);
 
   const payload = {
     id: user.id,
@@ -374,9 +367,8 @@ export function getRequestAuth(req) {
         const curVer = getAdminTokenVersion();
         const curChangedAt = getAdminPasswordChangedAt();
         if (
-          (session.tokenVersion && session.tokenVersion < curVer) ||
-          (curChangedAt > 0 && session.pwdChangedAt && session.pwdChangedAt < curChangedAt) ||
-          (curChangedAt > 0 && !session.pwdChangedAt)
+          (curVer > 1 && session.tokenVersion && session.tokenVersion < curVer) ||
+          (curChangedAt > 0 && session.pwdChangedAt && session.pwdChangedAt < curChangedAt)
         ) {
           return { authenticated: false, user: null, isAdmin: false, hasToken: true, revoked: true };
         }
@@ -388,9 +380,8 @@ export function getRequestAuth(req) {
           const liveVer = liveUser.tokenVersion || 1;
           const liveChangedAt = liveUser.passwordChangedAt || 0;
           if (
-            (liveUser.tokenVersion && session.tokenVersion && session.tokenVersion < liveVer) ||
-            (liveChangedAt > 0 && session.pwdChangedAt && session.pwdChangedAt < liveChangedAt) ||
-            (liveChangedAt > 0 && !session.pwdChangedAt)
+            (liveVer > 1 && session.tokenVersion && session.tokenVersion < liveVer) ||
+            (liveChangedAt > 0 && session.pwdChangedAt && session.pwdChangedAt < liveChangedAt)
           ) {
             return { authenticated: false, user: null, isAdmin: false, hasToken: true, revoked: true };
           }
@@ -524,8 +515,8 @@ export async function handleRequest(req, res) {
   if (req.method === 'OPTIONS') {
     res.writeHead(204, {
       'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-user-id',
     });
     res.end();
     return;

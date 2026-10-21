@@ -178,6 +178,7 @@ export class CloudSyncManager {
       return { success: false, error: 'Chỉ có Quản trị viên mới được phép đồng bộ danh sách tài khoản.' };
     }
 
+    const requestToken = this.getAuthToken();
     try {
       const res = await this.fetchWithTimeout(`${this.baseUrl}/api/auth/users`, {
         headers: {
@@ -186,7 +187,10 @@ export class CloudSyncManager {
       });
       if (!res.ok) {
         if (res.status === 401 || res.status === 403) {
-          this.setAuthToken(null);
+          // Only clear token if it has not been replaced by a fresh login token while request was in-flight
+          if (this.getAuthToken() === requestToken) {
+            this.setAuthToken(null);
+          }
           return {
             success: false,
             error: 'Phiên quản trị viên đã hết hạn hoặc mật khẩu đã đổi (HTTP ' + res.status + '). Vui lòng đăng nhập lại.',
@@ -1422,8 +1426,7 @@ export class CloudSyncManager {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-user-id': 'user_admin',
-          'Authorization': 'Bearer user_admin',
+          ...this._getAdminAuthHeaders(),
         },
         body: JSON.stringify({ username, newPassword }),
       });
