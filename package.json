@@ -1,6 +1,6 @@
 {
   "name": "graph-algorithms-tracer",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Graph Algorithms Tracer - Educational platform for graph algorithm visualization and learning",
   "private": true,
   "type": "module",
