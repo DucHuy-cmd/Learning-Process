@@ -378,15 +378,42 @@ export async function fetchFromPostgres() {
         serverExams.length = 0;
         for (const r of examsRes.rows) {
           if (isExamDeleted(r.id)) continue;
+
+          const rawQuestions = typeof r.questions === 'string' ? JSON.parse(r.questions) : (r.questions || []);
+          const rawQuestionIds = typeof r.question_ids === 'string' ? JSON.parse(r.question_ids) : (r.question_ids || r.questionIds || []);
+          const rawCustomQuestions = typeof r.custom_questions === 'string' ? JSON.parse(r.custom_questions) : (r.custom_questions || r.customQuestions || []);
+          const rawAssignedTo = typeof r.assigned_to === 'string' ? JSON.parse(r.assigned_to) : (r.assigned_to || r.assignedTo || ['all']);
+
+          // Backward compatibility resolution:
+          // If rawQuestionIds is empty, check rawQuestions
+          let resolvedQuestionIds = Array.isArray(rawQuestionIds) ? [...rawQuestionIds] : [];
+          let resolvedCustomQuestions = Array.isArray(rawCustomQuestions) ? [...rawCustomQuestions] : [];
+
+          if (resolvedQuestionIds.length === 0 && Array.isArray(rawQuestions) && rawQuestions.length > 0) {
+            if (typeof rawQuestions[0] === 'string') {
+              resolvedQuestionIds = [...rawQuestions];
+            } else if (typeof rawQuestions[0] === 'object' && rawQuestions[0]?.id) {
+              resolvedQuestionIds = rawQuestions.map(q => q.id);
+              if (resolvedCustomQuestions.length === 0) {
+                resolvedCustomQuestions = [...rawQuestions];
+              }
+            }
+          }
+
           serverExams.push({
             id: r.id,
             title: r.title,
-            durationMinutes: r.duration_minutes || r.durationMinutes || 30,
+            description: r.description || '',
+            durationMinutes: Number(r.duration_minutes || r.durationMinutes) || 30,
             createdBy: r.created_by || r.createdBy || 'user_admin',
-            questions: typeof r.questions === 'string' ? JSON.parse(r.questions) : (r.questions || []),
-            shuffleQuestions: Boolean(r.shuffle_questions),
-            shuffleOptions: Boolean(r.shuffle_options),
-            maxAttempts: r.max_attempts || 1,
+            questionIds: resolvedQuestionIds,
+            customQuestions: resolvedCustomQuestions,
+            questions: rawQuestions,
+            assignedTo: Array.isArray(rawAssignedTo) && rawAssignedTo.length > 0 ? rawAssignedTo : ['all'],
+            examCode: r.exam_code || r.examCode || null,
+            shuffleQuestions: Boolean(r.shuffle_questions !== undefined ? r.shuffle_questions : r.shuffleQuestions),
+            shuffleOptions: Boolean(r.shuffle_options !== undefined ? r.shuffle_options : r.shuffleOptions),
+            maxAttempts: Number(r.max_attempts || r.maxAttempts) || 1,
             isPublished: r.is_published !== false,
             allowReview: r.allow_review !== false,
             showAnswersOnComplete: r.show_answers_on_complete !== false,
@@ -536,46 +563,63 @@ export async function saveToPostgres() {
     }
 
     // 2. Upsert exams
-    if (serverExams.length > 0) {
-      const activeExamIds = serverExams.map(e => `'${String(e.id).replace(/'/g, "''")}'`).join(',');
-      await sqlDb.executeRawPostgres(`DELETE FROM exams WHERE id NOT IN (${activeExamIds});`);
-    } else {
-      await sqlDb.executeRawPostgres('DELETE FROM exams;');
+    if (serverDeletedExams.size > 0) {
+      const deletedExamIds = Array.from(serverDeletedExams).map(id => `'${String(id).replace(/'/g, "''")}'`).join(',');
+      await sqlDb.executeRawPostgres(`DELETE FROM exams WHERE id IN (${deletedExamIds});`);
+      await sqlDb.executeRawPostgres(`DELETE FROM exam_submissions WHERE exam_id IN (${deletedExamIds});`);
     }
 
     for (const e of serverExams) {
-      if (!e || !e.id) continue;
+      if (!e || !e.id || isExamDeleted(e.id)) continue;
       await sqlDb.executeRawPostgres(`
-        INSERT INTO exams (id, title, duration_minutes, created_by, questions, shuffle_questions, shuffle_options, max_attempts, is_published, allow_review, show_answers_on_complete, created_at)
-        VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8, $9, $10, $11, $12)
+        INSERT INTO exams (
+          id, title, description, duration_minutes, created_by,
+          question_ids, custom_questions, questions, assigned_to, exam_code,
+          shuffle_questions, shuffle_options, max_attempts, is_published,
+          allow_review, show_answers_on_complete, created_at
+        )
+        VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8::jsonb, $9::jsonb, $10, $11, $12, $13, $14, $15, $16, $17)
         ON CONFLICT (id) DO UPDATE SET
           title = EXCLUDED.title,
+          description = EXCLUDED.description,
           duration_minutes = EXCLUDED.duration_minutes,
+          question_ids = EXCLUDED.question_ids,
+          custom_questions = EXCLUDED.custom_questions,
           questions = EXCLUDED.questions,
-          is_published = EXCLUDED.is_published;
+          assigned_to = EXCLUDED.assigned_to,
+          exam_code = EXCLUDED.exam_code,
+          shuffle_questions = EXCLUDED.shuffle_questions,
+          shuffle_options = EXCLUDED.shuffle_options,
+          max_attempts = EXCLUDED.max_attempts,
+          is_published = EXCLUDED.is_published,
+          allow_review = EXCLUDED.allow_review,
+          show_answers_on_complete = EXCLUDED.show_answers_on_complete;
       `, [
-        e.id, 
-        e.title, 
-        e.durationMinutes || 30, 
-        e.createdBy || 'user_admin', 
-        JSON.stringify(e.questions || []), 
-        Boolean(e.shuffleQuestions), 
-        Boolean(e.shuffleOptions), 
-        e.maxAttempts || 1, 
-        e.isPublished !== false, 
-        e.allowReview !== false, 
-        e.showAnswersOnComplete !== false, 
+        e.id,
+        e.title,
+        e.description || '',
+        Number(e.durationMinutes) || 30,
+        e.createdBy || 'user_admin',
+        JSON.stringify(e.questionIds || []),
+        JSON.stringify(e.customQuestions || []),
+        JSON.stringify(e.questions || e.customQuestions || []),
+        JSON.stringify(e.assignedTo || ['all']),
+        e.examCode || null,
+        Boolean(e.shuffleQuestions),
+        Boolean(e.shuffleOptions),
+        Number(e.maxAttempts) || 1,
+        e.isPublished !== false,
+        e.allowReview !== false,
+        e.showAnswersOnComplete !== false,
         e.createdAt || new Date().toISOString()
       ]);
     }
 
     // 3. Exam submissions
     try {
-      if (serverExamSubmissions.length === 0) {
-        await sqlDb.executeRawPostgres('DELETE FROM exam_submissions;');
-      } else {
+      if (serverExamSubmissions.length > 0) {
         for (const s of serverExamSubmissions) {
-          if (!s || !s.id) continue;
+          if (!s || !s.id || isExamDeleted(s.examId)) continue;
           await sqlDb.executeRawPostgres(`
             INSERT INTO exam_submissions (id, exam_id, user_id, exam_title, student_name, student_class, answers, score, max_score, total_questions, correct_count, time_spent_seconds, submitted_at)
             VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10, $11, $12, $13)

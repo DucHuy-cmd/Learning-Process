@@ -24,19 +24,30 @@ export const SCHEMA_STATEMENTS = [
   `CREATE TABLE IF NOT EXISTS exams (
     id VARCHAR(64) PRIMARY KEY,
     title VARCHAR(255) NOT NULL,
+    description TEXT DEFAULT '',
     duration_minutes INT NOT NULL DEFAULT 30,
     created_by VARCHAR(64) DEFAULT 'user_admin',
+    question_ids JSONB NOT NULL DEFAULT '[]'::jsonb,
+    custom_questions JSONB NOT NULL DEFAULT '[]'::jsonb,
     questions JSONB NOT NULL DEFAULT '[]'::jsonb,
-    shuffle_questions BOOLEAN DEFAULT FALSE,
-    shuffle_options BOOLEAN DEFAULT FALSE,
+    assigned_to JSONB NOT NULL DEFAULT '["all"]'::jsonb,
+    exam_code VARCHAR(64) DEFAULT NULL,
+    shuffle_questions BOOLEAN DEFAULT TRUE,
+    shuffle_options BOOLEAN DEFAULT TRUE,
     max_attempts INT DEFAULT 1,
     is_published BOOLEAN DEFAULT TRUE,
     allow_review BOOLEAN DEFAULT TRUE,
     show_answers_on_complete BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
   )`,
+  `ALTER TABLE exams ADD COLUMN IF NOT EXISTS description TEXT DEFAULT ''`,
+  `ALTER TABLE exams ADD COLUMN IF NOT EXISTS question_ids JSONB DEFAULT '[]'::jsonb`,
+  `ALTER TABLE exams ADD COLUMN IF NOT EXISTS custom_questions JSONB DEFAULT '[]'::jsonb`,
+  `ALTER TABLE exams ADD COLUMN IF NOT EXISTS assigned_to JSONB DEFAULT '["all"]'::jsonb`,
+  `ALTER TABLE exams ADD COLUMN IF NOT EXISTS exam_code VARCHAR(64) DEFAULT NULL`,
   `CREATE INDEX IF NOT EXISTS idx_exams_published ON exams(is_published)`,
   `CREATE INDEX IF NOT EXISTS idx_exams_created_at ON exams(created_at)`,
+  `CREATE INDEX IF NOT EXISTS idx_exams_code ON exams(exam_code)`,
 
   // 3. exam_submissions
   `CREATE TABLE IF NOT EXISTS exam_submissions (
@@ -57,6 +68,7 @@ export const SCHEMA_STATEMENTS = [
   `CREATE INDEX IF NOT EXISTS idx_submissions_exam_id ON exam_submissions(exam_id)`,
   `CREATE INDEX IF NOT EXISTS idx_submissions_user_id ON exam_submissions(user_id)`,
   `CREATE INDEX IF NOT EXISTS idx_submissions_submitted_at ON exam_submissions(submitted_at)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_submissions_exam_user_unique ON exam_submissions(exam_id, user_id)`,
 
   // 4. quiz_stats
   `CREATE TABLE IF NOT EXISTS quiz_stats (

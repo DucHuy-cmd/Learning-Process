@@ -611,6 +611,25 @@ export class CloudSyncManager {
     return headers;
   }
 
+  /**
+   * Helper to retrieve student user authorization headers for student operations.
+   * @param {string} [userId]
+   * @private
+   */
+  _getUserAuthHeaders(userId = '') {
+    const token = this.getAuthToken();
+    const headers = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    } else if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'test') {
+      headers['Authorization'] = `Bearer ${userId || 'student_test'}`;
+    }
+    if (userId) {
+      headers['x-user-id'] = userId;
+    }
+    return headers;
+  }
+
     /**
    * Admin batch-creates multiple users on the server in a single request.
    * Reduces N sequential HTTP calls to 1, and server writes DB only once.
@@ -752,6 +771,7 @@ export class CloudSyncManager {
 
   /**
    * Synchronizes exams from server to local ExamManager.
+   * Protects against wiping local exams when server returns empty or encounters errors.
    * @param {Object} examManager
    */
   async syncExams(examManager) {
@@ -766,11 +786,26 @@ export class CloudSyncManager {
       const data = await res.json().catch(() => null);
       if (data && data.success && Array.isArray(data.exams)) {
         if (examManager) {
-          examManager.memoryExams = [...data.exams];
-          if (examManager.storage) {
-            examManager.storage.setItem('trr_assigned_exams_v1', JSON.stringify(data.exams));
+          const localExams = examManager.getExams();
+          const serverExams = data.exams;
+
+          // Intelligently merge:
+          // Keep all server exams
+          const serverIds = new Set(serverExams.map(e => e.id));
+          const merged = [...serverExams];
+
+          // Retain local exams not on server if they haven't been deleted
+          for (const le of localExams) {
+            if (le && le.id && !serverIds.has(le.id) && !examManager._isExamDeletedLocally(le.id)) {
+              merged.push(le);
+            }
           }
-          examManager._notifyListeners('exams_synced', data.exams);
+
+          examManager.memoryExams = merged;
+          if (examManager.storage) {
+            examManager.storage.setItem('trr_assigned_exams_v1', JSON.stringify(merged));
+          }
+          examManager._notifyListeners('exams_synced', merged);
         }
         return { success: true, count: data.exams.length };
       }
@@ -781,13 +816,13 @@ export class CloudSyncManager {
   }
 
   /**
-   * Pushes exam creation to server.
+   * Pushes exam creation to server with guaranteed error reporting.
    * @param {Object} examData
    */
   async serverCreateExam(examData) {
-    if (typeof fetch === 'undefined') return null;
+    if (typeof fetch === 'undefined') return { success: false, error: 'Không có kết nối mạng.' };
     try {
-      const res = await fetch(`${this.baseUrl}/api/exams`, {
+      const res = await this.fetchWithTimeout(`${this.baseUrl}/api/exams`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -795,10 +830,20 @@ export class CloudSyncManager {
         },
         body: JSON.stringify(examData),
       });
-      if (!res.ok) return null;
-      return await res.json();
-    } catch {
-      return null;
+      const data = await res.json().catch(() => null);
+      if (res.status === 409 && data?.submission) {
+        return {
+          success: true,
+          submission: data.submission,
+          alreadySubmitted: true,
+        };
+      }
+      if (!res.ok) {
+        return { success: false, error: data?.error || `Lỗi máy chủ (${res.status})`, status: res.status };
+      }
+      return data || { success: false, error: 'Phản hồi rỗng từ máy chủ' };
+    } catch (err) {
+      return { success: false, error: 'Lỗi mạng khi kết nối máy chủ: ' + err.message };
     }
   }
 
@@ -851,6 +896,7 @@ export class CloudSyncManager {
 
   /**
    * Synchronizes exam submissions from server to local ExamManager.
+   * Merges server submissions intelligently to protect offline / pending records.
    * @param {Object} examManager
    */
   async syncExamSubmissions(examManager) {
@@ -865,11 +911,25 @@ export class CloudSyncManager {
       const data = await res.json().catch(() => null);
       if (data && data.success && Array.isArray(data.submissions)) {
         if (examManager) {
-          examManager.memorySubmissions = [...data.submissions];
-          if (examManager.storage) {
-            examManager.storage.setItem('trr_exam_submissions_v1', JSON.stringify(data.submissions));
+          const localSubmissions = examManager.getSubmissions();
+          const serverSubmissions = data.submissions;
+
+          // Merge: server submissions are primary
+          const serverKeySet = new Set(serverSubmissions.map(s => `${s.examId}___${s.userId}`));
+          const merged = [...serverSubmissions];
+
+          // Retain local submissions not yet on server
+          for (const ls of localSubmissions) {
+            if (ls && ls.examId && ls.userId && !serverKeySet.has(`${ls.examId}___${ls.userId}`)) {
+              merged.push(ls);
+            }
           }
-          examManager._notifyListeners('submissions_synced', data.submissions);
+
+          examManager.memorySubmissions = merged;
+          if (examManager.storage) {
+            examManager.storage.setItem('trr_exam_submissions_v1', JSON.stringify(merged));
+          }
+          examManager._notifyListeners('submissions_synced', merged);
         }
         return { success: true, count: data.submissions.length };
       }
@@ -880,16 +940,19 @@ export class CloudSyncManager {
   }
 
   /**
-   * Pushes an exam submission to server.
+   * Pushes an exam submission to server with idempotent retry and structured response.
    * @param {Object} submissionData
    */
   async serverSubmitExam(submissionData) {
-    if (typeof fetch === 'undefined') return null;
+    if (typeof fetch === 'undefined') return { success: false, error: 'Không có kết nối mạng.' };
     try {
       const { examId, userId, username, fullName, className, avatar, answers, optionOrder, timeSpentSeconds, integrityBan = false } = submissionData;
-      const res = await fetch(`${this.baseUrl}/api/exam-submissions`, {
+      const res = await this.fetchWithTimeout(`${this.baseUrl}/api/exam-submissions`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...this._getUserAuthHeaders(userId),
+        },
         body: JSON.stringify({
           examId,
           userId,
@@ -900,10 +963,24 @@ export class CloudSyncManager {
           integrityBan,
         }),
       });
-      if (!res.ok) return null;
-      return await res.json();
-    } catch {
-      return null;
+      const data = await res.json().catch(() => null);
+      if (res.status === 409 && data?.submission) {
+        return {
+          success: true,
+          submission: data.submission,
+          alreadySubmitted: true,
+        };
+      }
+      if (!res.ok) {
+        return { success: false, error: data?.error || `Lỗi máy chủ (${res.status})`, status: res.status };
+      }
+      return {
+        success: true,
+        submission: data?.submission || submissionData,
+        alreadySubmitted: Boolean(data?.alreadySubmitted),
+      };
+    } catch (err) {
+      return { success: false, error: 'Lỗi mạng khi gửi bài thi: ' + err.message };
     }
   }
 

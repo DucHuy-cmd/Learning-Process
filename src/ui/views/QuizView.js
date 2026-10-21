@@ -2878,7 +2878,7 @@ export class QuizView {
     this._submitActiveExam({ integrityBan: true });
   }
 
-  _submitActiveExam({ integrityBan = false } = {}) {
+  async _submitActiveExam({ integrityBan = false } = {}) {
     if (!this.activeExamSession) return;
 
     this._cancelExamLockdownCountdown(this.activeExamSession);
@@ -2928,23 +2928,50 @@ export class QuizView {
 
     const result = examManager.submitExam(submissionPayload);
 
+    let serverConfirmed = false;
+    let finalSubmission = result.submission;
+
+    if (result.success && cloudSyncManager) {
+      try {
+        const isOnline = Boolean(cloudSyncManager && cloudSyncManager.isConnected);
+        if (isOnline) {
+          const serverRes = await cloudSyncManager.serverSubmitExam(result.submission);
+          if (serverRes && serverRes.success) {
+            serverConfirmed = true;
+            if (serverRes.submission) {
+              finalSubmission = { ...result.submission, ...serverRes.submission };
+            }
+          } else {
+            // Server error or timeout -> enqueue for idempotent retry
+            examManager.enqueueOfflineSubmission(submissionPayload);
+          }
+        } else {
+          examManager.enqueueOfflineSubmission(submissionPayload);
+        }
+      } catch {
+        examManager.enqueueOfflineSubmission(submissionPayload);
+      }
+    }
+
     // ── Clear draft on successful submission ──────────────────────────────────
     if (result.success && currentUser) {
       examManager.clearDraft(session.exam.id, currentUser.id);
     }
     // ─────────────────────────────────────────────────────────────────────────
 
-    if (result.success && cloudSyncManager && cloudSyncManager.isConnected) {
-      cloudSyncManager.serverSubmitExam(result.submission).catch(() => {});
-    }
-
     this.activeExamSession = null;
 
     if (result.success) {
-      this._showAlert(integrityBan
-        ? `🚫 Bạn đã bị xử lý 0 ĐIỂM và cấm thi lại đề này do VI PHẠM quy chế 3 lần.\n\nĐiểm số: 0 / 10 điểm`
-        : `🎉 Bạn đã nộp bài thi thành công!\n\nĐiểm số: ${result.submission.score} / 10 điểm\nSố câu đúng: ${result.submission.correctCount} / ${result.submission.totalQuestions}\n\nKết quả đã được ghi nhận vào Bảng Xếp Hạng chính thức!`);
-      this.reviewSubmission = result.submission;
+      if (serverConfirmed) {
+        this._showAlert(integrityBan
+          ? `🚫 Bạn đã bị xử lý 0 ĐIỂM và cấm thi lại đề này do VI PHẠM quy chế 3 lần.\n\nĐiểm số: 0 / 10 điểm`
+          : `🎉 Bạn đã nộp bài thi thành công và máy chủ đã xác nhận!\n\nĐiểm số: ${finalSubmission.score} / 10 điểm\nSố câu đúng: ${finalSubmission.correctCount} / ${finalSubmission.totalQuestions}\n\nKết quả đã được ghi nhận vào Bảng Xếp Hạng chính thức!`);
+      } else {
+        this._showAlert(integrityBan
+          ? `🚫 Đã ghi nhận bài thi (vi phạm quy chế). Kết quả đang chờ đồng bộ máy chủ.`
+          : `📡 Bài thi đã được ghi nhận an toàn trên thiết bị!\n\nĐiểm số tạm tính: ${result.submission.score} / 10 điểm.\nKết quả đang ở hàng đợi và sẽ tự động đồng bộ lên máy chủ khi có kết nối.`);
+      }
+      this.reviewSubmission = finalSubmission;
     } else {
       // Primary submit failed (e.g. network hiccup) → enqueue for retry
       examManager.enqueueOfflineSubmission(submissionPayload);
@@ -2953,7 +2980,7 @@ export class QuizView {
         : `⚠️ ${result.error || 'Có lỗi xảy ra khi nộp bài thi.'}\n\nBài làm của bạn đã được lưu an toàn trên máy và sẽ tự động gửi lại khi có kết nối mạng.`);
     }
 
-    this.render();
+    await this.render();
   }
 
   // ── Zero Data Loss: Offline Queue Processor ───────────────────────────────
@@ -3663,7 +3690,7 @@ export class QuizView {
     // Create & Assign Exam Button (From multi-file distribution)
     const btnCreateAndAssign = this.container.querySelector('#btnCreateAndAssignExam');
     if (btnCreateAndAssign) {
-      btnCreateAndAssign.addEventListener('click', () => {
+      btnCreateAndAssign.addEventListener('click', async () => {
         const titleInput = this.container.querySelector('#txtAssignTitle');
         const durationInput = this.container.querySelector('#numAssignDuration');
         const examCodeInput = this.container.querySelector('#txtAssignExamCode');
@@ -3712,32 +3739,59 @@ export class QuizView {
         const customQuestions = [...questionsToAssign];
         const questionIds = customQuestions.map(q => q.id);
 
-        const result = examManager.createExam({
-          title,
-          description: `Đề thi trắc nghiệm ${durationMinutes} phút môn Toán Rời Rạc.`,
-          durationMinutes,
-          questionIds,
-          customQuestions,
-          examCode,
-          assignedTo,
-          createdBy: authManager.getCurrentUser() ? authManager.getCurrentUser().id : 'user_admin',
-          shuffleQuestions: chkShuffleQ ? chkShuffleQ.checked : true,
-          shuffleOptions: chkShuffleOpt ? chkShuffleOpt.checked : true,
-        });
+        const originalBtnHtml = btnCreateAndAssign.innerHTML;
+        btnCreateAndAssign.disabled = true;
+        btnCreateAndAssign.innerHTML = '<span>⏳</span> Đang lưu và phát đề lên máy chủ...';
 
-        if (result.success) {
-          if (cloudSyncManager && cloudSyncManager.isConnected) {
-            cloudSyncManager.serverCreateExam(result.exam).catch(() => {});
+        try {
+          const candidateId = `exam_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+          const examPayload = {
+            id: candidateId,
+            title,
+            description: `Đề thi trắc nghiệm ${durationMinutes} phút môn Toán Rời Rạc.`,
+            durationMinutes,
+            questionIds,
+            customQuestions,
+            examCode: (examCode && examCode.trim()) ? examCode.trim().toUpperCase() : null,
+            assignedTo,
+            createdBy: authManager.getCurrentUser() ? authManager.getCurrentUser().id : 'user_admin',
+            shuffleQuestions: chkShuffleQ ? chkShuffleQ.checked : true,
+            shuffleOptions: chkShuffleOpt ? chkShuffleOpt.checked : true,
+          };
+
+          let serverConfirmedExam = null;
+          const isOnline = Boolean(cloudSyncManager && cloudSyncManager.isConnected);
+
+          if (isOnline) {
+            const serverRes = await cloudSyncManager.serverCreateExam(examPayload);
+            if (!serverRes || !serverRes.success) {
+              this._showAlert(`❌ Không thể phát đề thi: ${serverRes?.error || 'Máy chủ từ chối yêu cầu'}. Vui lòng thử lại.`);
+              btnCreateAndAssign.disabled = false;
+              btnCreateAndAssign.innerHTML = originalBtnHtml;
+              return;
+            }
+            serverConfirmedExam = serverRes.exam;
           }
-          this.gradebookExamId = null;
-          this.adminAnswerKeyExamId = result.exam.id;
-          this._showAlert(`🎉 Tạo và phát đề thi thành công!\n\nĐề thi: "${title}" (Mã: ${result.exam.examCode})\nSố câu: ${questionIds.length} câu\nThời lượng: ${durationMinutes} phút\nĐối tượng: ${assignedTo.includes('all') ? 'Toàn bộ sinh viên' : assignedTo.length + ' sinh viên'}\n\nĐề thi đã được chuyển vào mục "Quản Lý Đề Thi". Hệ thống đã chuẩn bị sẵn File Đáp Án dành riêng cho Quản trị viên.`);
-          this.studioAssignTitle = null;
-          this.studioAssignExamCode = null;
-          this.studioAssignDuration = null;
-          this.render();
-        } else {
-          this._showAlert(result.error || result.message || 'Có lỗi xảy ra khi tạo đề thi.');
+
+          const result = examManager.createExam(serverConfirmedExam || examPayload);
+
+          if (result.success) {
+            this.gradebookExamId = null;
+            this.adminAnswerKeyExamId = result.exam.id;
+            this._showAlert(`🎉 Tạo và phát đề thi thành công!\n\nĐề thi: "${title}" (Mã: ${result.exam.examCode})\nSố câu: ${questionIds.length} câu\nThời lượng: ${durationMinutes} phút\nĐối tượng: ${assignedTo.includes('all') ? 'Toàn bộ sinh viên' : assignedTo.length + ' sinh viên'}\n\nĐề thi đã được chuyển vào mục "Quản Lý Đề Thi". Hệ thống đã chuẩn bị sẵn File Đáp Án dành riêng cho Quản trị viên.`);
+            this.studioAssignTitle = null;
+            this.studioAssignExamCode = null;
+            this.studioAssignDuration = null;
+            await this.render();
+          } else {
+            this._showAlert(result.error || result.message || 'Có lỗi xảy ra khi lưu đề thi.');
+            btnCreateAndAssign.disabled = false;
+            btnCreateAndAssign.innerHTML = originalBtnHtml;
+          }
+        } catch (err) {
+          this._showAlert(`❌ Lỗi phát đề thi: ${err.message}`);
+          btnCreateAndAssign.disabled = false;
+          btnCreateAndAssign.innerHTML = originalBtnHtml;
         }
       });
     }

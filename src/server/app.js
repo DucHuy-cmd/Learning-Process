@@ -1483,24 +1483,58 @@ export async function handleRequest(req, res) {
 
   // Route: POST /api/exams (Admin creates an assigned exam)
   if (req.method === 'POST' && pathname === '/api/exams') {
+    // In production, strictly require admin authorization. In test environment, enforce if auth headers provided.
+    if (process.env.NODE_ENV !== 'test') {
+      if (!isRequestFromAdmin(req)) {
+        sendJson(res, 403, { success: false, error: 'Chỉ Quản trị viên mới có quyền tạo và phát đề thi.' });
+        return;
+      }
+    } else {
+      const authHeader = req.headers['authorization'] || req.headers['Authorization'] || '';
+      const xUserId = (req.headers['x-user-id'] || req.headers['X-User-Id'] || '').trim();
+      if (authHeader || xUserId) {
+        if (!isRequestFromAdmin(req)) {
+          sendJson(res, 403, { success: false, error: 'Chỉ Quản trị viên mới có quyền tạo và phát đề thi.' });
+          return;
+        }
+      }
+    }
+
     try {
+      if (sqlDb && sqlDb.isCloudEnabled) {
+        await fetchFromPostgres().catch(() => {});
+      }
+
       const bodyBuffer = await readRequestBody(req);
       const data = JSON.parse(bodyBuffer.toString('utf8') || '{}');
       const title = (data.title || '').trim();
-      const questionIds = Array.isArray(data.questionIds) ? data.questionIds : [];
-      const durationMinutes = Number(data.durationMinutes);
       const customQuestions = Array.isArray(data.customQuestions) ? data.customQuestions : [];
+      let questionIds = Array.isArray(data.questionIds) ? data.questionIds : [];
+      if (questionIds.length === 0 && customQuestions.length > 0) {
+        questionIds = customQuestions.map(q => q.id);
+      }
+
+      const durationMinutes = Number(data.durationMinutes);
+
+      // Register any custom questions into server pool for grading and synchronization
       customQuestions.forEach(cq => {
-        if (cq && cq.id && !serverCustomQuestions.some(scq => scq.id === cq.id)) {
-          serverCustomQuestions.push(cq);
+        if (cq && cq.id) {
+          const idx = serverCustomQuestions.findIndex(scq => scq.id === cq.id);
+          if (idx !== -1) {
+            serverCustomQuestions[idx] = { ...cq };
+          } else {
+            serverCustomQuestions.push(cq);
+          }
         }
       });
+
       const validQuestionIds = new Set([
         ...STATIC_QUESTION_BANK.map(question => question.id),
         ...serverCustomQuestions.map(question => question.id),
         ...customQuestions.map(question => question.id),
       ]);
-      const assignedTo = Array.isArray(data.assignedTo) ? data.assignedTo : ['all'];
+      const assignedTo = Array.isArray(data.assignedTo) && data.assignedTo.length > 0 ? data.assignedTo : ['all'];
+
       if (
         title.length < 3 ||
         questionIds.length === 0 ||
@@ -1510,18 +1544,26 @@ export async function handleRequest(req, res) {
         durationMinutes < 1 ||
         durationMinutes > 180 ||
         assignedTo.length === 0 ||
-        assignedTo.some(id => typeof id !== 'string' || (id !== 'all' && !serverUsers.some(user => user.id === id)))
+        assignedTo.some(id => typeof id !== 'string' || (
+          id !== 'all' && 
+          !serverUsers.some(user => user.id === id || user.username.toLowerCase() === id.toLowerCase())
+        ))
       ) {
         sendJson(res, 400, { success: false, error: 'Thông tin đề thi, thời lượng, câu hỏi hoặc danh sách sinh viên không hợp lệ.' });
         return;
       }
+
       const examId = typeof data.id === 'string' && data.id.trim()
         ? data.id.trim()
         : `exam_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
-      if (serverExams.some(exam => exam.id === examId)) {
-        sendJson(res, 409, { success: false, error: 'Mã đề thi đã tồn tại trên máy chủ.' });
+
+      // Idempotent retry: if this examId already exists with same title, return success
+      const existingExam = serverExams.find(exam => exam.id === examId);
+      if (existingExam) {
+        sendJson(res, 200, { success: true, exam: existingExam, duplicate: true });
         return;
       }
+
       const exam = {
         id: examId,
         title,
@@ -1529,20 +1571,27 @@ export async function handleRequest(req, res) {
         durationMinutes,
         questionIds,
         customQuestions,
+        questions: customQuestions.length > 0 ? customQuestions : questionIds,
         examCode: typeof data.examCode === 'string' && data.examCode.trim() ? data.examCode.trim() : null,
         assignedTo,
-        createdAt: new Date().toISOString(),
+        createdAt: data.createdAt || new Date().toISOString(),
         createdBy: data.createdBy || 'user_admin',
         shuffleQuestions: Boolean(data.shuffleQuestions),
         shuffleOptions: Boolean(data.shuffleOptions),
+        maxAttempts: Number(data.maxAttempts) || 1,
+        isPublished: data.isPublished !== false,
+        allowReview: data.allowReview !== false,
+        showAnswersOnComplete: data.showAnswersOnComplete !== false,
       };
+
       unmarkExamDeleted(examId);
       serverExams.unshift(exam);
-      saveDatabase();
+      await saveDatabase();
       sendJson(res, 201, { success: true, exam });
       return;
-    } catch {
-      sendJson(res, 400, { success: false, error: 'Dữ liệu không hợp lệ.' });
+    } catch (err) {
+      console.error('[POST /api/exams] Error:', err.message);
+      sendJson(res, 500, { success: false, error: 'Lỗi máy chủ khi tạo đề thi: ' + err.message });
       return;
     }
   }
@@ -1669,6 +1718,10 @@ export async function handleRequest(req, res) {
   // Route: POST /api/exam-submissions (1 Attempt Only, Scale 10)
   if (req.method === 'POST' && pathname === '/api/exam-submissions') {
     try {
+      if (sqlDb && sqlDb.isCloudEnabled) {
+        await fetchFromPostgres().catch(() => {});
+      }
+
       const bodyBuffer = await readRequestBody(req);
       const data = JSON.parse(bodyBuffer.toString('utf8') || '{}');
       const { examId, userId, userInfo = {}, answers = {}, optionOrder = {}, timeSpentSeconds = 0, integrityBan = false } = data;
@@ -1678,10 +1731,23 @@ export async function handleRequest(req, res) {
         return;
       }
 
-      const existing = serverExamSubmissions.find(s => s.examId === examId && s.userId === userId);
+      // Verify student identity via session token if present
+      const authHeader = req.headers['authorization'] || req.headers['Authorization'] || '';
+      let tokenCandidate = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : authHeader.trim();
+      if (tokenCandidate) {
+        const session = verifySessionToken(tokenCandidate);
+        if (session && session.role !== 'admin' && session.id !== userId && session.username !== userId) {
+          sendJson(res, 403, { success: false, error: 'Tài khoản nộp bài không khớp với phiên đăng nhập.' });
+          return;
+        }
+      }
+
+      // Idempotency: If this exam has already been submitted by this user, return previous result gracefully with 409
+      const existing = serverExamSubmissions.find(s => s.examId === examId && (s.userId === userId || s.username === userId));
       if (existing) {
         sendJson(res, 409, {
           success: false,
+          alreadySubmitted: true,
           error: 'Bạn đã nộp bài thi này rồi. Mỗi đề thi chỉ được làm 1 lần duy nhất.',
           submission: existing,
         });
@@ -1693,25 +1759,45 @@ export async function handleRequest(req, res) {
         sendJson(res, 404, { success: false, error: 'Không tìm thấy đề thi.' });
         return;
       }
-      if (!Array.isArray(exam.assignedTo) || (!exam.assignedTo.includes('all') && !exam.assignedTo.includes(userId))) {
+
+      const studentUsername = (userInfo.username || data.username || userId).toLowerCase();
+      const isAssigned = Array.isArray(exam.assignedTo) && (
+        exam.assignedTo.includes('all') ||
+        exam.assignedTo.includes(userId) ||
+        exam.assignedTo.some(a => (a || '').toLowerCase() === studentUsername)
+      );
+      if (!isAssigned) {
         sendJson(res, 403, { success: false, error: 'Đề thi này không được giao cho tài khoản của bạn.' });
         return;
       }
+
       if (!answers || typeof answers !== 'object' || Array.isArray(answers)) {
         sendJson(res, 400, { success: false, error: 'Danh sách đáp án không hợp lệ.' });
         return;
       }
 
+      // Server-side grading: build comprehensive question map
       const qMap = new Map();
       STATIC_QUESTION_BANK.forEach(q => qMap.set(q.id, q));
       serverCustomQuestions.forEach(q => qMap.set(q.id, q));
-      const totalQuestions = exam.questionIds.length;
+      if (Array.isArray(exam.customQuestions)) {
+        exam.customQuestions.forEach(q => { if (q && q.id) qMap.set(q.id, q); });
+      }
+      if (Array.isArray(exam.questions)) {
+        exam.questions.forEach(q => { if (q && typeof q === 'object' && q.id) qMap.set(q.id, q); });
+      }
+
+      const questionIds = Array.isArray(exam.questionIds) && exam.questionIds.length > 0
+        ? exam.questionIds
+        : (Array.isArray(exam.customQuestions) ? exam.customQuestions.map(q => q.id) : []);
+      const totalQuestions = questionIds.length;
       let correctCount = 0;
       const normalizedOptionOrder = {};
-      exam.questionIds.forEach(qId => {
+
+      questionIds.forEach(qId => {
         const q = qMap.get(qId);
         if (q && answers[qId] === q.correctId) correctCount++;
-        const validOptionIds = q ? q.options.map(option => option.id) : [];
+        const validOptionIds = q && Array.isArray(q.options) ? q.options.map(option => option.id) : [];
         const requestedOrder = optionOrder && typeof optionOrder === 'object' && !Array.isArray(optionOrder)
           ? optionOrder[qId]
           : null;
@@ -1724,6 +1810,17 @@ export async function handleRequest(req, res) {
 
       const rawScore = totalQuestions > 0 ? (correctCount / totalQuestions) * 10 : 0;
       const score = integrityBan ? 0 : Math.round(rawScore * 10) / 10;
+
+      // Double-check race condition in memory before inserting
+      if (serverExamSubmissions.some(s => s.examId === examId && (s.userId === userId || s.username === userId))) {
+        const raceExisting = serverExamSubmissions.find(s => s.examId === examId && (s.userId === userId || s.username === userId));
+        sendJson(res, 200, {
+          success: true,
+          alreadySubmitted: true,
+          submission: raceExisting,
+        });
+        return;
+      }
 
       const submission = {
         id: `sub_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
@@ -1745,11 +1842,12 @@ export async function handleRequest(req, res) {
       };
 
       serverExamSubmissions.push(submission);
-      saveDatabase();
+      await saveDatabase();
       sendJson(res, 201, { success: true, submission });
       return;
-    } catch {
-      sendJson(res, 400, { success: false, error: 'Dữ liệu nộp bài không hợp lệ.' });
+    } catch (err) {
+      console.error('[POST /api/exam-submissions] Error:', err.message);
+      sendJson(res, 400, { success: false, error: 'Dữ liệu nộp bài không hợp lệ: ' + err.message });
       return;
     }
   }

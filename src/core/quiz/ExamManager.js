@@ -211,22 +211,17 @@ export class ExamManager {
       } catch {}
     }
 
+    const username = (user && user.username ? user.username : userId).toLowerCase();
+
     return this.getExams().filter(exam => {
       if (!Array.isArray(exam.assignedTo)) return false;
-      // If targeted specifically to this student ID, always include
-      if (exam.assignedTo.includes(userId)) return true;
+      // If targeted specifically to this student ID or username, always include
+      if (exam.assignedTo.includes(userId) || exam.assignedTo.some(a => (a || '').toLowerCase() === username)) {
+        return true;
+      }
 
       // If assigned to 'all':
       if (exam.assignedTo.includes('all')) {
-        // Keep initial demo seed exam visible for backward compatibility if present
-        if (exam.id === 'exam_intro_eval_2026') return true;
-        // If user has a registration timestamp, ensure exam was not created before user registered
-        if (user && user.createdAt && exam.createdAt) {
-          const userTime = new Date(user.createdAt).getTime();
-          const examTime = new Date(exam.createdAt).getTime();
-          // Allow 2 minutes tolerance for same-session registration/assignment
-          return examTime >= (userTime - 120000);
-        }
         return true;
       }
       return false;
@@ -240,6 +235,7 @@ export class ExamManager {
    * @returns {{ success: boolean, error?: string, exam?: Object }}
    */
   createExam({
+    id = null,
     title,
     description = '',
     durationMinutes = 15,
@@ -247,9 +243,14 @@ export class ExamManager {
     customQuestions = [],
     examCode = null,
     assignedTo = ['all'],
+    createdAt = null,
     createdBy = 'user_admin',
     shuffleQuestions = true,
     shuffleOptions = true,
+    maxAttempts = 1,
+    isPublished = true,
+    allowReview = true,
+    showAnswersOnComplete = true,
   }) {
     if (typeof title !== 'string' || title.trim().length < 3) {
       return { success: false, error: 'Tiêu đề đề thi phải có ít nhất 3 ký tự.' };
@@ -300,8 +301,12 @@ export class ExamManager {
       generatedCode = String(maxNum + 1);
     }
 
+    const examId = id && typeof id === 'string' && id.trim()
+      ? id.trim()
+      : `exam_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+
     const exam = {
-      id: `exam_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      id: examId,
       title: title.trim(),
       description: typeof description === 'string' ? description.trim() : '',
       durationMinutes: duration,
@@ -309,14 +314,25 @@ export class ExamManager {
       customQuestions: [...customList],
       examCode: generatedCode,
       assignedTo: Array.isArray(assignedTo) && assignedTo.length > 0 ? assignedTo : ['all'],
-      createdAt: new Date().toISOString(),
+      createdAt: createdAt || new Date().toISOString(),
       createdBy,
       shuffleQuestions: Boolean(shuffleQuestions),
       shuffleOptions: Boolean(shuffleOptions),
+      maxAttempts: Number(maxAttempts) || 1,
+      isPublished: isPublished !== false,
+      allowReview: allowReview !== false,
+      showAnswersOnComplete: showAnswersOnComplete !== false,
     };
 
+    this._unmarkExamDeletedLocally(examId);
+
     const exams = this.getExams();
-    exams.unshift(exam);
+    const existingIdx = exams.findIndex(e => e.id === examId);
+    if (existingIdx !== -1) {
+      exams[existingIdx] = exam;
+    } else {
+      exams.unshift(exam);
+    }
 
     if (this.storage) {
       try {
@@ -857,34 +873,54 @@ export class ExamManager {
   }
 
   /**
-   * Attempts to flush all queued offline submissions to the live system.
+   * Attempts to flush all queued offline submissions to the live system and server.
    * Each item that succeeds is removed from the queue.
-   * Safe to call at any time — silently skips already-submitted entries.
+   * Safe to call at any time — idempotently skips already-submitted entries.
    *
    * @param {Function} [onFlushed] - Optional callback(submission) called per successful flush
    */
-  flushOfflineQueue(onFlushed) {
+  async flushOfflineQueue(onFlushed) {
     const queue = this.getOfflineQueue();
     if (queue.length === 0) return;
 
     const remaining = [];
-    queue.forEach(item => {
-      // Skip if already submitted (idempotency guard)
-      if (this.getSubmission(item.examId, item.userId)) return;
-
-      const result = this.submitExam(item);
-      if (result.success) {
-        this.clearDraft(item.examId, item.userId);
-        if (typeof onFlushed === 'function') {
-          try { onFlushed(result.submission); } catch {}
-        }
-      } else {
-        // Keep in queue only if the failure is NOT a duplicate (already submitted)
-        if (!result.submission) {
+    for (const item of queue) {
+      let localSub = this.getSubmission(item.examId, item.userId);
+      if (!localSub) {
+        const result = this.submitExam(item);
+        if (result.success) {
+          localSub = result.submission;
+        } else if (result.submission) {
+          localSub = result.submission;
+        } else {
           remaining.push(item);
+          continue;
         }
       }
-    });
+
+      this.clearDraft(item.examId, item.userId);
+
+      // Attempt to push to server if online
+      if (typeof window !== 'undefined') {
+        try {
+          const { cloudSyncManager } = await import('../sync/CloudSyncManager.js');
+          if (cloudSyncManager) {
+            const isOnline = await cloudSyncManager.checkConnection().catch(() => false);
+            if (isOnline) {
+              const serverRes = await cloudSyncManager.serverSubmitExam(localSub);
+              if (!serverRes || !serverRes.success) {
+                remaining.push(item);
+                continue;
+              }
+            }
+          }
+        } catch {}
+      }
+
+      if (typeof onFlushed === 'function') {
+        try { onFlushed(localSub); } catch {}
+      }
+    }
 
     try {
       if (this.storage) {

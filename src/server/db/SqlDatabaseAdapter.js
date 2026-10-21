@@ -112,9 +112,14 @@ export class SqlDatabaseAdapter {
         await this.insert('exams', {
           id: e.id,
           title: e.title,
+          description: e.description || '',
           duration_minutes: e.durationMinutes || 30,
           created_by: e.createdBy || 'user_admin',
-          questions: e.questions || [],
+          question_ids: e.questionIds || [],
+          custom_questions: e.customQuestions || [],
+          questions: e.questions || e.customQuestions || [],
+          assigned_to: e.assignedTo || ['all'],
+          exam_code: e.examCode || null,
           shuffle_questions: Boolean(e.shuffleQuestions),
           shuffle_options: Boolean(e.shuffleOptions),
           max_attempts: e.maxAttempts || 1,
@@ -276,6 +281,15 @@ export class SqlDatabaseAdapter {
       for (const existing of table.values()) {
         if (existing.username && existing.username.toLowerCase() === cleanUser) {
           throw new Error(`Duplicate username: ${cleanUser}`);
+        }
+      }
+    }
+
+    // (exam_id, user_id) unique check for exam_submissions
+    if (tableName === 'exam_submissions' && record.exam_id && record.user_id) {
+      for (const existing of table.values()) {
+        if (existing.exam_id === record.exam_id && existing.user_id === record.user_id) {
+          throw new Error(`Duplicate submission for exam ${record.exam_id} and user ${record.user_id}`);
         }
       }
     }
