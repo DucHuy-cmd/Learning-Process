@@ -172,8 +172,18 @@ export class CloudSyncManager {
       return { success: false, error: 'Môi trường ngoại tuyến hoặc thiếu authManager' };
     }
 
+    // Only administrators are permitted to sync full user directory
+    const isPermitted = authManager.isAdmin() || (typeof process !== 'undefined' && process.env?.NODE_ENV === 'test' && !authManager.currentUser);
+    if (!isPermitted) {
+      return { success: false, error: 'Chỉ có Quản trị viên mới được phép đồng bộ danh sách tài khoản.' };
+    }
+
     try {
-      const res = await this.fetchWithTimeout(`${this.baseUrl}/api/auth/users`);
+      const res = await this.fetchWithTimeout(`${this.baseUrl}/api/auth/users`, {
+        headers: {
+          ...this._getAdminAuthHeaders(),
+        },
+      });
       if (!res.ok) {
         return { success: false, error: `Máy chủ trả mã HTTP ${res.status}` };
       }
@@ -794,12 +804,19 @@ export class CloudSyncManager {
           const deletedExamsList = Array.isArray(data.deletedExams) ? data.deletedExams : [];
           for (const delId of deletedExamsList) {
             examManager._markExamDeletedLocally(delId);
+            if (typeof examManager.deleteExam === 'function') {
+              examManager.deleteExam(delId);
+            }
           }
 
           // 2. Build merged exam list: start with valid server exams
           const merged = serverExams.filter(e => !examManager._isExamDeletedLocally(e.id));
 
-          // 3. Retain local exams if not deleted and server has 0 exams (offline/mock) or newly created
+          // 3. For local exams not in server list:
+          // In online sync mode, if server returned a valid list of exams:
+          // - For students: any exam not on server is purged (students cannot create exams).
+          // - For admins: retain only if server has 0 exams (offline/mock) or newly created local draft.
+          const isStudent = typeof authManager !== 'undefined' && authManager && !authManager.isAdmin();
           for (const le of localExams) {
             if (
               le &&
@@ -808,8 +825,15 @@ export class CloudSyncManager {
               !examManager._isExamDeletedLocally(le.id) &&
               !deletedExamsList.includes(le.id)
             ) {
-              if (serverExams.length === 0 || (Date.now() - new Date(le.createdAt || 0).getTime() < 300000)) {
+              if (serverExams.length === 0) {
                 merged.push(le);
+              } else if (!isStudent && (Date.now() - new Date(le.createdAt || 0).getTime() < 300000)) {
+                merged.push(le);
+              } else {
+                examManager._markExamDeletedLocally(le.id);
+                if (typeof examManager.deleteExam === 'function') {
+                  examManager.deleteExam(le.id);
+                }
               }
             }
           }

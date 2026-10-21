@@ -50,11 +50,13 @@ import {
   isKVConfigured, 
   fetchFromKV, 
   writeToKV,
-  sqlDb
+  sqlDb,
+  getServerAdminUser,
+  getAdminPassword,
+  getAdminUsername
 } from './auth/ServerDataStore.js';
 import { DEFAULT_EXAMS } from '../core/quiz/ExamManager.js';
 import { STATIC_QUESTION_BANK } from '../core/quiz/QuizBank.js';
-import { DEMO_USERS } from '../core/auth/AuthManager.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -183,14 +185,14 @@ export function verifySessionToken(token) {
 }
 
 /**
- * Verifies if incoming request is from an administrator via HTTP headers.
- * In production: Strictly requires a cryptographically signed session token issued at login.
- * In automated unit testing (NODE_ENV === 'test'): Also permits test headers.
+ * Resolves authentication status from incoming request headers.
+ * In production: Strictly requires a cryptographically signed session token.
+ * In test environment (NODE_ENV === 'test'): Permits test header fallback.
  * 
  * @param {import('node:http').IncomingMessage} req
- * @returns {boolean}
+ * @returns {{ authenticated: boolean, user: Object|null, isAdmin: boolean, hasToken: boolean }}
  */
-export function isRequestFromAdmin(req) {
+export function getRequestAuth(req) {
   const authHeader = req.headers['authorization'] || req.headers['Authorization'] || '';
   const xUserId = (req.headers['x-user-id'] || req.headers['X-User-Id'] || '').trim();
 
@@ -204,8 +206,13 @@ export function isRequestFromAdmin(req) {
   // 1. Verify cryptographic session token
   if (tokenCandidate) {
     const session = verifySessionToken(tokenCandidate);
-    if (session && (session.role === 'admin' || session.username === 'admin' || session.id === 'user_admin')) {
-      return true;
+    if (session) {
+      const isAdmin = Boolean(
+        session.role === 'admin' ||
+        session.username === 'admin' ||
+        session.id === 'user_admin'
+      );
+      return { authenticated: true, user: session, isAdmin, hasToken: true };
     }
   }
 
@@ -213,18 +220,66 @@ export function isRequestFromAdmin(req) {
   if (process.env.NODE_ENV === 'test') {
     const candidateId = tokenCandidate || xUserId;
     if (candidateId === 'user_admin' || candidateId === 'admin') {
-      return true;
+      return {
+        authenticated: true,
+        user: { id: 'user_admin', username: 'admin', role: 'admin' },
+        isAdmin: true,
+        hasToken: Boolean(tokenCandidate || xUserId),
+      };
     }
     const user = serverUsers.find(u =>
       u.id === candidateId ||
       u.username.toLowerCase() === candidateId.toLowerCase()
     );
-    if (user && (user.role === 'admin' || user.username.toLowerCase() === 'admin' || user.id === 'user_admin')) {
-      return true;
+    if (user) {
+      const isAdmin = Boolean(
+        user.role === 'admin' || user.username.toLowerCase() === 'admin' || user.id === 'user_admin'
+      );
+      return {
+        authenticated: true,
+        user,
+        isAdmin,
+        hasToken: Boolean(tokenCandidate || xUserId),
+      };
     }
   }
 
-  return false;
+  return {
+    authenticated: false,
+    user: null,
+    isAdmin: false,
+    hasToken: Boolean(tokenCandidate || xUserId),
+  };
+}
+
+/**
+ * Verifies if incoming request is from an administrator via HTTP headers.
+ * @param {import('node:http').IncomingMessage} req
+ * @returns {boolean}
+ */
+export function isRequestFromAdmin(req) {
+  const auth = getRequestAuth(req);
+  return Boolean(auth.isAdmin);
+}
+
+/**
+ * Sanitizes user record for administrative listing: removes password, tokens, hashes.
+ * @param {Object} u
+ * @returns {Object|null}
+ */
+export function sanitizeUserForAdmin(u) {
+  if (!u || typeof u !== 'object') return null;
+  return {
+    id: u.id,
+    username: u.username,
+    fullName: u.fullName || u.studentName || '',
+    className: u.className || u.studentClass || 'Sinh viên',
+    email: u.email || '',
+    avatar: u.avatar || '👤',
+    role: u.role || 'student',
+    bio: u.bio || '',
+    createdAt: u.createdAt || undefined,
+  };
 }
 
 /**
@@ -351,16 +406,30 @@ export async function handleRequest(req, res) {
 
   // Route: GET /api/auth/users
   if (req.method === 'GET' && pathname === '/api/auth/users') {
+    const auth = getRequestAuth(req);
+    if (!auth.authenticated) {
+      sendJson(res, 401, {
+        success: false,
+        error: 'UNAUTHORIZED',
+        message: 'Yêu cầu phiên đăng nhập Quản trị viên để truy cập danh sách tài khoản.',
+      });
+      return;
+    }
+    if (!auth.isAdmin) {
+      sendJson(res, 403, {
+        success: false,
+        error: 'FORBIDDEN',
+        message: 'Bạn không có quyền truy cập danh sách tài khoản người dùng.',
+      });
+      return;
+    }
+
     if (sqlDb.isCloudEnabled) {
       await fetchFromPostgres().catch(() => {});
     }
     sendJson(res, 200, {
       success: true,
-      users: serverUsers.map(u => {
-        const copy = { ...u };
-        delete copy.password;
-        return copy;
-      }),
+      users: serverUsers.map(u => sanitizeUserForAdmin(u)).filter(Boolean),
       deletedUsers: Array.from(serverDeletedUsers),
       dbResetTime: serverDbResetTime,
     });
@@ -412,7 +481,7 @@ export async function handleRequest(req, res) {
         return;
       }
       if (found.username === 'admin' || found.id === 'user_admin' || found.role === 'admin') {
-        if (password !== DEMO_USERS[0].password) {
+        if (password !== getAdminPassword()) {
           sendJson(res, 401, { success: false, error: 'Mật khẩu không chính xác.' });
           return;
         }
@@ -481,13 +550,27 @@ export async function handleRequest(req, res) {
 
   // Route: GET /api/admin/users (Quản trị viên xem toàn bộ database tài khoản)
   if (req.method === 'GET' && pathname === '/api/admin/users') {
+    const auth = getRequestAuth(req);
+    if (!auth.authenticated) {
+      sendJson(res, 401, {
+        success: false,
+        error: 'UNAUTHORIZED',
+        message: 'Yêu cầu phiên đăng nhập Quản trị viên để truy cập danh sách tài khoản.',
+      });
+      return;
+    }
+    if (!auth.isAdmin) {
+      sendJson(res, 403, {
+        success: false,
+        error: 'FORBIDDEN',
+        message: 'Chỉ Quản trị viên mới có quyền xem toàn bộ database tài khoản.',
+      });
+      return;
+    }
+
     sendJson(res, 200, {
       success: true,
-      users: serverUsers.map(u => {
-        const copy = { ...u };
-        delete copy.password;
-        return copy;
-      }),
+      users: serverUsers.map(u => sanitizeUserForAdmin(u)).filter(Boolean),
     });
     return;
   }
@@ -826,26 +909,9 @@ export async function handleRequest(req, res) {
     // 2. Update memory state only after DB commits
     recordDbReset(resetTimestamp);
 
-    const adminUser = serverUsers.find(u => u.username === 'admin' || u.id === 'user_admin') || {
-      id: 'user_admin',
-      username: 'admin',
-      fullName: 'Quản Trị Viên',
-      className: 'Quản trị viên',
-      email: 'admin@toanrr.edu.vn',
-      password: DEMO_USERS[0].password,
-      avatar: '👑',
-      role: 'admin',
-      bio: 'Quản trị viên hệ thống',
-    };
+    const adminUser = getServerAdminUser();
     serverUsers.length = 0;
-    serverUsers.push({
-      ...adminUser,
-      ...DEMO_USERS[0],
-      fullName: 'Quản Trị Viên',
-      className: 'Quản trị viên',
-      role: 'admin',
-      password: DEMO_USERS[0].password,
-    });
+    serverUsers.push(adminUser);
 
     for (const k of Object.keys(serverQuizStats)) delete serverQuizStats[k];
     for (const k of Object.keys(serverAiSessions)) delete serverAiSessions[k];
@@ -1679,6 +1745,8 @@ export async function handleRequest(req, res) {
       return;
     }
 
+    markExamDeleted(examId);
+
     if (sqlDb && sqlDb.isCloudEnabled) {
       try {
         await sqlDb.executeTransaction([
@@ -1689,6 +1757,12 @@ export async function handleRequest(req, res) {
           {
             sql: 'DELETE FROM exams WHERE id = $1;',
             params: [examId]
+          },
+          {
+            sql: `INSERT INTO system_metadata (key, value, updated_at)
+                  VALUES ('deleted_exams', $1::jsonb, CURRENT_TIMESTAMP)
+                  ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = EXCLUDED.updated_at;`,
+            params: [JSON.stringify(Array.from(serverDeletedExams))]
           }
         ]);
       } catch (err) {
@@ -1707,13 +1781,17 @@ export async function handleRequest(req, res) {
     const remainingSubs = serverExamSubmissions.filter(s => s.examId !== examId);
     serverExamSubmissions.length = 0;
     serverExamSubmissions.push(...remainingSubs);
-    markExamDeleted(examId);
 
     if (sqlDb.tables.exams) {
       sqlDb.tables.exams.delete(examId);
     }
+    await saveDatabase();
 
-    sendJson(res, 200, { success: true, message: 'Đã xóa đề thi thành công.' });
+    sendJson(res, 200, {
+      success: true,
+      message: 'Đã xóa đề thi thành công.',
+      deletedExams: Array.from(serverDeletedExams)
+    });
     return;
   }
 

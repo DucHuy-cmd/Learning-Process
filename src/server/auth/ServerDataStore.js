@@ -7,8 +7,29 @@ import { sqlDb } from '../db/SqlDatabaseAdapter.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { DEMO_USERS } from '../../core/auth/AuthManager.js';
 import { DEFAULT_EXAMS } from '../../core/quiz/ExamManager.js';
+
+export function getAdminPassword() {
+  return process.env.ADMIN_PASSWORD || '2HV6868@';
+}
+
+export function getAdminUsername() {
+  return (process.env.ADMIN_USERNAME || 'admin').trim().toLowerCase();
+}
+
+export function getServerAdminUser() {
+  return {
+    id: 'user_admin',
+    username: getAdminUsername(),
+    fullName: 'Quản Trị Viên',
+    className: 'Quản trị viên',
+    email: 'admin@toanrr.edu.vn',
+    password: getAdminPassword(),
+    avatar: '👑',
+    role: 'admin',
+    bio: 'Quản trị viên hệ thống',
+  };
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -22,7 +43,7 @@ const DB_FILE = process.env.VITEST
 function getDefaultStats() {
   return {};
 }
-export const serverUsers = [...DEMO_USERS];
+export const serverUsers = [getServerAdminUser()];
 export const serverAiSessions = {};
 export const serverQuizStats = getDefaultStats();
 export const serverExams = [...DEFAULT_EXAMS];
@@ -106,15 +127,16 @@ export function loadDatabase() {
         const legacyIds = new Set(['user_duchuy', 'user_giangvien', 'user_nhatvu', 'user_truongvu', 'user_ngochung']);
         let validUsers = data.users.filter(u => !legacyIds.has(u.id) && u.username !== 'duchuy');
         const adminIdx = validUsers.findIndex(u => u.username === 'admin' || u.id === 'user_admin' || u.role === 'admin');
+        const adminUser = getServerAdminUser();
         if (adminIdx === -1) {
-          validUsers.unshift({ ...DEMO_USERS[0] });
+          validUsers.unshift(adminUser);
         } else {
           validUsers[adminIdx] = {
             ...validUsers[adminIdx],
-            ...DEMO_USERS[0],
+            ...adminUser,
             role: 'admin',
             username: 'admin',
-            password: DEMO_USERS[0].password,
+            password: adminUser.password,
           };
         }
         // Ensure no other accounts have admin role
@@ -124,7 +146,7 @@ export function loadDatabase() {
           return u;
         });
         serverUsers.length = 0;
-        serverUsers.push(...(validUsers.length > 0 ? validUsers : DEMO_USERS));
+        serverUsers.push(...(validUsers.length > 0 ? validUsers : [adminUser]));
       }
       if (data.aiSessions && typeof data.aiSessions === 'object') {
         for (const k of Object.keys(serverAiSessions)) delete serverAiSessions[k];
@@ -223,15 +245,16 @@ export async function fetchFromKV() {
         const legacyIds = new Set(['user_duchuy', 'user_giangvien', 'user_nhatvu', 'user_truongvu', 'user_ngochung']);
         let validUsers = data.users.filter(u => !legacyIds.has(u.id) && u.username !== 'duchuy');
         const adminIdx = validUsers.findIndex(u => u.username === 'admin' || u.id === 'user_admin' || u.role === 'admin');
+        const adminUser = getServerAdminUser();
         if (adminIdx === -1) {
-          validUsers.unshift({ ...DEMO_USERS[0] });
+          validUsers.unshift(adminUser);
         } else {
           validUsers[adminIdx] = {
             ...validUsers[adminIdx],
-            ...DEMO_USERS[0],
+            ...adminUser,
             role: 'admin',
             username: 'admin',
-            password: DEMO_USERS[0].password,
+            password: adminUser.password,
           };
         }
         // Ensure no other accounts have admin role
@@ -241,7 +264,7 @@ export async function fetchFromKV() {
           return u;
         });
         serverUsers.length = 0;
-        serverUsers.push(...(validUsers.length > 0 ? validUsers : DEMO_USERS));
+        serverUsers.push(...(validUsers.length > 0 ? validUsers : [adminUser]));
       }
       if (data.aiSessions && typeof data.aiSessions === 'object') {
         for (const k of Object.keys(serverAiSessions)) delete serverAiSessions[k];
@@ -374,7 +397,7 @@ export async function fetchFromPostgres(options = {}) {
             }
             const adminIdx = serverUsers.findIndex(u => u.username === 'admin' || u.id === 'user_admin' || u.role === 'admin');
             if (adminIdx === -1) {
-              serverUsers.unshift({ ...DEMO_USERS[0] });
+              serverUsers.unshift(getServerAdminUser());
             }
           }
         } catch (usersErr) {
@@ -540,7 +563,28 @@ export async function fetchFromPostgres(options = {}) {
                   serverExams.length = 0;
                 }
               }
+              if (m.key === 'deleted_exams') {
+                const val = typeof m.value === 'string' ? JSON.parse(m.value) : m.value;
+                if (Array.isArray(val)) {
+                  for (const id of val) {
+                    if (id) serverDeletedExams.add(String(id).trim());
+                  }
+                }
+              }
+              if (m.key === 'deleted_users') {
+                const val = typeof m.value === 'string' ? JSON.parse(m.value) : m.value;
+                if (Array.isArray(val)) {
+                  for (const u of val) {
+                    if (u) serverDeletedUsers.add(String(u).trim().toLowerCase());
+                  }
+                }
+              }
             }
+          }
+          if (serverDeletedExams.size > 0) {
+            const valid = serverExams.filter(e => !isExamDeleted(e.id));
+            serverExams.length = 0;
+            serverExams.push(...valid);
           }
         } catch {}
       })(),
@@ -948,6 +992,21 @@ export async function saveToPostgres() {
     } else {
       await sqlDb.executeRawPostgres('DELETE FROM imported_files;');
     }
+
+    // 6. Durable system metadata: deleted_exams & deleted_users
+    try {
+      await sqlDb.executeRawPostgres(`
+        INSERT INTO system_metadata (key, value, updated_at)
+        VALUES ('deleted_exams', $1::jsonb, CURRENT_TIMESTAMP)
+        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = EXCLUDED.updated_at;
+      `, [JSON.stringify(Array.from(serverDeletedExams))]);
+
+      await sqlDb.executeRawPostgres(`
+        INSERT INTO system_metadata (key, value, updated_at)
+        VALUES ('deleted_users', $1::jsonb, CURRENT_TIMESTAMP)
+        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = EXCLUDED.updated_at;
+      `, [JSON.stringify(Array.from(serverDeletedUsers))]);
+    } catch {}
 
     return true;
   } catch (err) {

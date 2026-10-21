@@ -106,10 +106,6 @@ export class AdminView {
               <span>🔄</span>
               <span>Đồng bộ Máy chủ</span>
             </button>
-            <button type="button" class="btn-danger" id="btnAdminClearAllExams" style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;font-size:12.5px;font-weight:700;border-radius:8px;cursor:pointer;background:#ef4444;color:#fff;border:none;">
-              <span>🗑️</span>
-              <span>Xóa Đề Thi &amp; Điểm Sinh Viên</span>
-            </button>
             <button type="button" class="btn-danger" id="btnAdminFullDatabaseReset" style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;font-size:12.5px;font-weight:700;border-radius:8px;cursor:pointer;background:#dc2626;color:#fff;border:none;">
               <span>🔥</span>
               <span>Xóa Sạch &amp; Reset Database</span>
@@ -968,55 +964,6 @@ export class AdminView {
           this._showAlert('Lỗi khi kết nối với máy chủ.', 'error');
         } finally {
           this.isSyncing = false;
-        }
-      });
-    }
-
-    // 4. Clear All Exams & Student Submissions Button
-    const btnClearExams = this.container.querySelector('#btnAdminClearAllExams');
-    if (btnClearExams) {
-      btnClearExams.addEventListener('click', async () => {
-        if (typeof window !== 'undefined' && window.confirm && !window.confirm(
-          '⚠️ CẢNH BÁO QUAN TRỌNG:\n\nBạn có chắc chắn muốn xóa TOÀN BỘ đề thi đã giao và tất cả dữ liệu bài làm, điểm số thi trong tài khoản sinh viên không?\n\nHành động này không thể hoàn tác!'
-        )) {
-          return;
-        }
-
-        btnClearExams.disabled = true;
-        const originalTextClear = btnClearExams.innerHTML;
-        btnClearExams.innerHTML = '<span>⏳</span> Đang xóa...';
-
-        try {
-          let isOnline = false;
-          try {
-            isOnline = await cloudSyncManager.checkConnection();
-          } catch {}
-
-          if (isOnline) {
-            const serverRes = await cloudSyncManager.serverClearAllExams();
-            if (!serverRes || !serverRes.success) {
-              this._showAlert(`❌ Lỗi máy chủ khi xóa đề thi: ${serverRes?.error || 'Thất bại'}. Thao tác đã bị hủy.`, 'error');
-              return;
-            }
-          }
-
-          examManager.clearAllExams();
-          quizHistoryManager.clearAllExamHistory();
-
-          if (isOnline) {
-            try {
-              await cloudSyncManager.syncExams(examManager);
-              await cloudSyncManager.syncExamSubmissions(examManager);
-            } catch {}
-          }
-
-          await this.render();
-          this._showAlert('✓ Đã xóa sạch toàn bộ đề thi và làm sạch dữ liệu bài làm trong tài khoản sinh viên!', 'success');
-        } catch (err) {
-          this._showAlert(`Lỗi khi xóa đề thi: ${err.message}`, 'error');
-        } finally {
-          btnClearExams.disabled = false;
-          btnClearExams.innerHTML = originalTextClear;
         }
       });
     }

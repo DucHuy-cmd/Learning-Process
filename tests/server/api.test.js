@@ -664,8 +664,22 @@ describe('Phase 5A: Backend AI Vision Service & Input Pipeline', () => {
   // 9. BACKEND AUTH & AI HISTORY API ENDPOINTS
   // =========================================================================
   describe('Backend Auth & AI History Endpoints', () => {
-    it('GET /api/auth/users returns demo users without passwords', async () => {
+    it('GET /api/auth/users requires admin authentication (401 for unauthenticated)', async () => {
       const { req, res } = createMockHttp({ method: 'GET', url: '/api/auth/users' });
+      await handleRequest(req, res);
+
+      expect(res.statusCode).toBe(401);
+      const data = JSON.parse(res.body);
+      expect(data.success).toBe(false);
+      expect(data.error).toBe('UNAUTHORIZED');
+    });
+
+    it('GET /api/auth/users returns users without passwords when authenticated as admin', async () => {
+      const { req, res } = createMockHttp({
+        method: 'GET',
+        url: '/api/auth/users',
+        headers: { 'x-user-id': 'user_admin' }
+      });
       await handleRequest(req, res);
 
       expect(res.statusCode).toBe(200);

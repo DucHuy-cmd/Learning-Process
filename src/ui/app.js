@@ -492,7 +492,9 @@ export class App {
     try {
       cloudSyncManager.checkConnection().then(connected => {
         if (connected) {
-          cloudSyncManager.syncUsers(authManager);
+          if (authManager.isAdmin()) {
+            cloudSyncManager.syncUsers(authManager);
+          }
           cloudSyncManager.syncQuizLeaderboard(quizHistoryManager);
           cloudSyncManager.verifyCurrentUser(authManager);
           const user = authManager.getCurrentUser();

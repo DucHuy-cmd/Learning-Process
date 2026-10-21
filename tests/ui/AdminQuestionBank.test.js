@@ -50,7 +50,7 @@ describe('Admin Clean UI: AI Vision Question Bank Removed from AdminView', () =>
 
     // Verify general admin buttons remain
     expect(container.querySelector('#btnAdminManualSync')).not.toBeNull();
-    expect(container.querySelector('#btnAdminClearAllExams')).not.toBeNull();
+    expect(container.querySelector('#btnAdminFullDatabaseReset')).not.toBeNull();
   });
 
   it('AdminView header description focuses on student management and sync', async () => {

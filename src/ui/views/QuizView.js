@@ -1219,36 +1219,9 @@ export class QuizView {
       </div>
     ` : '';
 
-    const needsFullscreenGatekeeper = (
-      !session.lockdownPending &&
-      this._supportsFullscreen() &&
-      !this._isPhoneDevice() &&
-      !this._getFullscreenElement()
-    );
-
-    const gatekeeperOverlay = needsFullscreenGatekeeper ? `
-      <div class="exam-fullscreen-gatekeeper" role="dialog" aria-modal="true"
-        style="position:fixed;inset:0;background:rgba(15,23,42,0.96);backdrop-filter:blur(10px);z-index:999998;display:flex;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;">
-        <div style="background:var(--panel,#1e2130);border:2px solid var(--accent,#38bdf8);border-radius:18px;padding:36px 30px;max-width:500px;width:100%;box-shadow:0 25px 60px rgba(0,0,0,0.8);text-align:center;box-sizing:border-box;">
-          <div style="font-size:52px;margin-bottom:12px;">🖥️</div>
-          <h2 style="font-size:21px;font-weight:800;color:var(--text,#fff);margin:0 0 12px;">
-            Yêu Cầu Chế Độ Toàn Màn Hình
-          </h2>
-          <p style="font-size:14px;color:var(--dim,#cbd5e1);line-height:1.6;margin:0 0 20px;">
-            Để đảm bảo tính nghiêm túc và chống gian lận, bài thi bắt buộc phải chạy ở chế độ <strong>Toàn Màn Hình</strong>.<br>
-            <span style="color:#ef4444;font-weight:700;display:block;margin-top:6px;">Lưu ý: Bấm F11, Alt+Tab, chuyển tab hoặc thoát toàn màn hình sẽ tính là vi phạm quy chế. Quá 3 lần sẽ bị 0 điểm!</span>
-          </p>
-          <button type="button" class="btn-primary" id="btnEnterExamFullscreen" style="width:100%;padding:14px 24px;font-size:15.5px;font-weight:800;background:linear-gradient(135deg, #0ea5e9, #38bdf8);color:#000;border:none;border-radius:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;box-shadow:0 4px 15px rgba(56,189,248,0.4);">
-            <span>🚀</span> BẬT TOÀN MÀN HÌNH ĐỂ VÀO THI
-          </button>
-        </div>
-      </div>
-    ` : '';
-
     return `
       <div class="active-exam-room">
         ${lockdownOverlay}
-        ${gatekeeperOverlay}
         
         <!-- Top bar: Title, Timer, Submitting -->
         <div class="active-exam-topbar">
@@ -3397,17 +3370,6 @@ export class QuizView {
         });
       }
 
-      const btnEnterExamFullscreen = this.container.querySelector('#btnEnterExamFullscreen');
-      if (btnEnterExamFullscreen) {
-        btnEnterExamFullscreen.addEventListener('click', async () => {
-          await this._requestExamFullscreen();
-          if (this.activeExamSession) {
-            this.activeExamSession.fullscreenActive = Boolean(this._getFullscreenElement()) || this._isPhoneDevice();
-            this.render();
-          }
-        });
-      }
-
       // Jump to question
       this.container.querySelectorAll('.exam-q-jump-btn').forEach(btn => {
         btn.addEventListener('click', () => {
@@ -4277,7 +4239,14 @@ export class QuizView {
 
         btn.disabled = true;
         try {
-          if (cloudSyncManager && cloudSyncManager.isConnected) {
+          let isOnline = false;
+          try {
+            if (cloudSyncManager && typeof cloudSyncManager.checkConnection === 'function') {
+              isOnline = await cloudSyncManager.checkConnection();
+            }
+          } catch {}
+
+          if (isOnline && cloudSyncManager && typeof cloudSyncManager.serverDeleteExam === 'function') {
             const serverRes = await cloudSyncManager.serverDeleteExam(examId);
             if (serverRes && !serverRes.success) {
               const isForbidden = serverRes.error === 'FORBIDDEN' || (typeof serverRes.error === 'string' && serverRes.error.toLowerCase().includes('quản trị viên'));
@@ -4291,6 +4260,18 @@ export class QuizView {
           }
 
           examManager.deleteExam(examId);
+
+          if (isOnline && cloudSyncManager) {
+            try {
+              if (typeof cloudSyncManager.syncExams === 'function') {
+                await cloudSyncManager.syncExams(examManager);
+              }
+              if (typeof cloudSyncManager.syncExamSubmissions === 'function') {
+                await cloudSyncManager.syncExamSubmissions(examManager);
+              }
+            } catch {}
+          }
+
           this._showAlert(`🗑️ Đã xóa vĩnh viễn đề thi "${examTitle}".`);
           await this.render();
         } catch (err) {

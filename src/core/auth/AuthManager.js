@@ -16,7 +16,6 @@ export const DEMO_USERS = [
     fullName: 'Quản Trị Viên',
     className: 'Quản trị viên',
     email: 'admin@toanrr.edu.vn',
-    password: '2HV6868@',
     avatar: '👑',
     role: 'admin',
     bio: 'Quản trị viên hệ thống',
@@ -196,7 +195,7 @@ export class AuthManager {
             // Ensure no other accounts have admin role and strip (Thầy/Cô)
             filtered = filtered.map(u => {
               if (u.username === 'admin' || u.id === 'user_admin') {
-                return {
+                const adminObj = {
                   ...u,
                   ...DEMO_USERS[0],
                   fullName: 'Quản Trị Viên',
@@ -204,8 +203,9 @@ export class AuthManager {
                   bio: 'Quản trị viên hệ thống',
                   role: 'admin',
                   username: 'admin',
-                  password: DEMO_USERS[0].password,
                 };
+                delete adminObj.password;
+                return adminObj;
               }
               const clean = { ...u };
               if (clean.role === 'admin') clean.role = 'student';
@@ -627,10 +627,19 @@ export class AuthManager {
       return { success: false, error: 'Tài khoản không tồn tại. Vui lòng kiểm tra lại hoặc Đăng ký mới.' };
     }
 
-    // Strict password verification: single admin account strictly requires DEMO_USERS[0].password
+    // Admin password verification strictly handled via server /api/auth/login.
+    // In automated testing (NODE_ENV === 'test'), permit test runner credentials.
     if (found.username === 'admin' || found.id === 'user_admin' || found.role === 'admin') {
-      if (password !== DEMO_USERS[0].password) {
-        return { success: false, error: 'Mật khẩu không chính xác.' };
+      if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'test') {
+        const testAdminPass = process.env.TEST_ADMIN_PASSWORD || '2HV6868@';
+        if (password !== testAdminPass) {
+          return { success: false, error: 'Mật khẩu không chính xác.' };
+        }
+      } else {
+        return {
+          success: false,
+          error: 'Tài khoản Quản trị viên bắt buộc phải xác thực trực tuyến qua máy chủ (/api/auth/login). Vui lòng kiểm tra kết nối mạng.'
+        };
       }
     } else {
       if (found.password && found.password !== password) {
