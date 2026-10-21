@@ -287,7 +287,7 @@ describe('QuizView UI Component', () => {
     authManager.logout();
   });
 
-  it('records exactly 1 violation when 10s countdown expires and does not increment repeatedly', () => {
+  it('records violations cumulatively every 10s away and bans on 3rd violation', () => {
     vi.useFakeTimers();
     authManager.register({ username: 'sv_lockdown_timeout', fullName: 'Thí Sinh C', email: 'tsc@toanrr.edu.vn', password: '123456' });
     examManager.clearAllData();
@@ -298,38 +298,40 @@ describe('QuizView UI Component', () => {
 
     const session = quizView.activeExamSession;
 
-    // Student leaves screen
+    // Student leaves screen (Departure 1: 5s)
     quizView._handleScreenDeparture('tab_hidden');
     expect(session.violationCount).toBe(0);
     expect(session.lockdownCountdown).toBe(10);
     expect(container.querySelector('#examLockdownCountdown').textContent).toBe('10');
 
-    // 9 seconds elapse: still 0 violations
-    vi.advanceTimersByTime(9000);
+    // 5 seconds elapse: 0 violations, 5s remaining
+    vi.advanceTimersByTime(5000);
     expect(session.violationCount).toBe(0);
-    expect(session.lockdownCountdown).toBe(1);
+    expect(session.lockdownCountdown).toBe(5);
 
-    // 10th second expires: exactly 1 violation recorded
-    vi.advanceTimersByTime(1000);
+    // Student returns
+    container.querySelector('#btnResumeExamLockdown').click();
+    expect(session.isAway).toBe(false);
+    expect(session.cumulativeAwaySeconds).toBe(5);
+
+    // Student leaves screen again (Departure 2: 5s -> cumulative reaches 10s -> 1st violation recorded)
+    quizView._handleScreenDeparture('tab_hidden');
+    expect(session.lockdownCountdown).toBe(5);
+    vi.advanceTimersByTime(5000);
     expect(session.violationCount).toBe(1);
     expect(session.awayViolationRecorded).toBe(true);
-    expect(container.querySelector('.exam-lockdown-warning').textContent).toContain('Đã hết 10 giây');
-
-    // Staying away for another 15 seconds: violation count must NOT increment repeatedly
-    vi.advanceTimersByTime(15000);
-    expect(session.violationCount).toBe(1);
 
     // Student returns
     container.querySelector('#btnResumeExamLockdown').click();
     expect(session.isAway).toBe(false);
 
-    // Student leaves screen a 2nd time: fresh 10s cycle
+    // Student leaves screen a 3rd time: 10s -> violation 2
     quizView._handleScreenDeparture('tab_hidden');
     expect(session.lockdownCountdown).toBe(10);
     vi.advanceTimersByTime(10000);
     expect(session.violationCount).toBe(2);
 
-    // Student returns, then leaves a 3rd time: 3rd violation triggers ban & 0 points
+    // Student returns, then leaves a 4th time: 10s -> 3rd violation triggers ban & 0 points
     container.querySelector('#btnResumeExamLockdown').click();
     quizView._handleScreenDeparture('fullscreen_exit');
     vi.advanceTimersByTime(10000);

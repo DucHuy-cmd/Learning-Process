@@ -552,4 +552,39 @@ describe('Exam Lifecycle, Drafts, Idempotency & Persistence Test Suite', () => {
 
     expect(manager.getExams().some(e => e.id === 'my_precious_exam')).toBe(true);
   });
+
+  // Scenario 12: When exam is deleted on server, syncExams propagates deletion tombstone to student
+  it('Scenario 12: When exam is deleted on server, syncExams propagates deletion tombstone to student', async () => {
+    const storage = new MockStorage();
+    const manager = new ExamManager({ storage });
+
+    manager.createExam({
+      id: 'exam_to_be_deleted',
+      title: 'Đề Thi Sắp Bị Xóa',
+      durationMinutes: 30,
+      questionIds: ['logic_q01'],
+      assignedTo: ['all'],
+    });
+
+    expect(manager.getExams().some(e => e.id === 'exam_to_be_deleted')).toBe(true);
+
+    const sync = new CloudSyncManager({ baseUrl: 'http://localhost:3000' });
+
+    // Server returns empty exams list and deletedExams containing 'exam_to_be_deleted'
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        success: true,
+        exams: [],
+        deletedExams: ['exam_to_be_deleted'],
+      }),
+    });
+
+    await sync.syncExams(manager);
+
+    // Exam must be removed from student's active exam list
+    expect(manager.getExams().some(e => e.id === 'exam_to_be_deleted')).toBe(false);
+    // Exam must be marked deleted locally
+    expect(manager._isExamDeletedLocally('exam_to_be_deleted')).toBe(true);
+  });
 });

@@ -788,16 +788,29 @@ export class CloudSyncManager {
         if (examManager) {
           const localExams = examManager.getExams();
           const serverExams = data.exams;
-
-          // Intelligently merge:
-          // Keep all server exams
           const serverIds = new Set(serverExams.map(e => e.id));
-          const merged = [...serverExams];
 
-          // Retain local exams not on server if they haven't been deleted
+          // 1. Process deleted exam tombstones from server
+          const deletedExamsList = Array.isArray(data.deletedExams) ? data.deletedExams : [];
+          for (const delId of deletedExamsList) {
+            examManager._markExamDeletedLocally(delId);
+          }
+
+          // 2. Build merged exam list: start with valid server exams
+          const merged = serverExams.filter(e => !examManager._isExamDeletedLocally(e.id));
+
+          // 3. Retain local exams if not deleted and server has 0 exams (offline/mock) or newly created
           for (const le of localExams) {
-            if (le && le.id && !serverIds.has(le.id) && !examManager._isExamDeletedLocally(le.id)) {
-              merged.push(le);
+            if (
+              le &&
+              le.id &&
+              !serverIds.has(le.id) &&
+              !examManager._isExamDeletedLocally(le.id) &&
+              !deletedExamsList.includes(le.id)
+            ) {
+              if (serverExams.length === 0 || (Date.now() - new Date(le.createdAt || 0).getTime() < 300000)) {
+                merged.push(le);
+              }
             }
           }
 

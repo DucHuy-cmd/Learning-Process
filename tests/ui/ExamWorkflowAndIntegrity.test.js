@@ -205,9 +205,9 @@ describe('Exam Workflow, Student Identity Resolution & Lockdown Integrity Tests'
       expect(session.violationCount).toBe(0);
     });
 
-    it('records exactly 1 violation when 10 seconds expire and does not add violations every second', () => {
+    it('accumulates away time across tab switches (e.g. 5s + 5s = 10s) to record violations', () => {
       vi.useFakeTimers();
-      authManager.register({ username: 'sv_slow_return', fullName: 'Sinh Viên Rời Lâu', email: 'slow@school.vn', password: 'Password123!' });
+      authManager.register({ username: 'sv_cumulative_away', fullName: 'Sinh Viên Chuyển Tab', email: 'cumulative@school.vn', password: 'Password123!' });
       const quizView = new QuizView({ container });
       quizView.setTab('myExams');
       window.confirm = () => true;
@@ -217,18 +217,27 @@ describe('Exam Workflow, Student Identity Resolution & Lockdown Integrity Tests'
 
       const session = quizView.activeExamSession;
 
-      // Student departs
-      quizView._handleScreenDeparture('fullscreen_exit');
+      // Student departs 1st time for 5 seconds
+      quizView._handleScreenDeparture('window_blur');
+      expect(session.violationCount).toBe(0);
+      vi.advanceTimersByTime(5000);
+      expect(session.lockdownCountdown).toBe(5);
+
+      // Returns within 5 seconds: 0 violations so far, 5s cumulative
+      const resumeBtn = container.querySelector('#btnResumeExamLockdown');
+      if (resumeBtn) resumeBtn.click();
+      expect(session.isAway).toBe(false);
       expect(session.violationCount).toBe(0);
 
-      // Exactly 10 seconds expire
-      vi.advanceTimersByTime(10000);
+      // Student departs 2nd time (e.g. Alt+Tab to another tab)
+      quizView._handleScreenDeparture('tab_hidden');
+      // Countdown continues from remaining 5 seconds
+      expect(session.lockdownCountdown).toBe(5);
+
+      // 5 more seconds pass -> total 10 cumulative seconds -> 1 violation recorded!
+      vi.advanceTimersByTime(5000);
       expect(session.violationCount).toBe(1);
       expect(session.awayViolationRecorded).toBe(true);
-
-      // Student remains away for another 20 seconds: violationCount must NOT increment
-      vi.advanceTimersByTime(20000);
-      expect(session.violationCount).toBe(1);
     });
 
     it('handles multiple distinct departure episodes with fresh 10s countdowns and bans on 3rd violation', () => {

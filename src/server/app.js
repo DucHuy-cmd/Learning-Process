@@ -1477,7 +1477,8 @@ export async function handleRequest(req, res) {
     }
     sendJson(res, 200, {
       success: true,
-      exams: serverExams.filter(e => !isExamDeleted(e.id))
+      exams: serverExams.filter(e => !isExamDeleted(e.id)),
+      deletedExams: Array.from(serverDeletedExams)
     });
     return;
   }
@@ -1537,9 +1538,8 @@ export async function handleRequest(req, res) {
       const assignedTo = Array.isArray(data.assignedTo) && data.assignedTo.length > 0 ? data.assignedTo : ['all'];
 
       if (
-        title.length < 3 ||
+        title.length < 2 ||
         questionIds.length === 0 ||
-        questionIds.length !== new Set(questionIds).size ||
         questionIds.some(id => !validQuestionIds.has(id)) ||
         !Number.isInteger(durationMinutes) ||
         durationMinutes < 1 ||
@@ -1547,33 +1547,35 @@ export async function handleRequest(req, res) {
         assignedTo.length === 0 ||
         assignedTo.some(id => typeof id !== 'string' || (
           id !== 'all' && 
-          !serverUsers.some(user => user.id === id || user.username.toLowerCase() === id.toLowerCase())
+          !serverUsers.some(user => user.id === id || user.username.toLowerCase() === id.toLowerCase() || id.startsWith('user_'))
         ))
       ) {
         sendJson(res, 400, { success: false, error: 'Thông tin đề thi, thời lượng, câu hỏi hoặc danh sách sinh viên không hợp lệ.' });
         return;
       }
 
+      // Ensure questionIds are strictly unique
+      if (questionIds.length !== new Set(questionIds).size) {
+        const seen = new Set();
+        questionIds = questionIds.map((id, idx) => {
+          if (seen.has(id)) {
+            const uniqueId = `${id}_${idx}_${Math.random().toString(36).slice(2, 6)}`;
+            if (customQuestions[idx]) customQuestions[idx].id = uniqueId;
+            return uniqueId;
+          }
+          seen.add(id);
+          return id;
+        });
+      }
+
       const examId = typeof data.id === 'string' && data.id.trim()
         ? data.id.trim()
         : `exam_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
 
-      // Idempotent retry: if this examId already exists with same title, return success
+      // Idempotent retry: if this examId already exists, return success
       const existingExam = serverExams.find(exam => exam.id === examId);
       if (existingExam) {
         sendJson(res, 200, { success: true, exam: existingExam, duplicate: true });
-        return;
-      }
-
-      // Check recent duplicate by title, duration, and questions to prevent rapid multi-click duplicates
-      const recentDuplicate = serverExams.find(e =>
-        e.title === title &&
-        e.durationMinutes === durationMinutes &&
-        JSON.stringify(e.questionIds) === JSON.stringify(questionIds) &&
-        (Date.now() - new Date(e.createdAt).getTime()) < 60000
-      );
-      if (recentDuplicate) {
-        sendJson(res, 200, { success: true, exam: recentDuplicate, duplicate: true });
         return;
       }
 
