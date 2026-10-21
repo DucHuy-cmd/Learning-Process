@@ -185,6 +185,14 @@ export class CloudSyncManager {
         },
       });
       if (!res.ok) {
+        if (res.status === 401 || res.status === 403) {
+          this.setAuthToken(null);
+          return {
+            success: false,
+            error: 'Phiên quản trị viên đã hết hạn hoặc mật khẩu đã đổi (HTTP ' + res.status + '). Vui lòng đăng nhập lại.',
+            needsReauth: true,
+          };
+        }
         return { success: false, error: `Máy chủ trả mã HTTP ${res.status}` };
       }
 
@@ -583,6 +591,13 @@ export class CloudSyncManager {
         }
       } catch {}
     }
+  }
+
+  /**
+   * Clears the current authenticated session token (e.g. upon logout or session revocation).
+   */
+  clearAuthToken() {
+    this.setAuthToken(null);
   }
 
   /**

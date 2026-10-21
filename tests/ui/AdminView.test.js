@@ -46,6 +46,7 @@ describe('AdminView (Dedicated Database & Student Management Tab)', () => {
     global.document = document;
     global.window = window;
     global.Event = window.Event;
+    global.CustomEvent = window.CustomEvent;
 
     storage = new MockStorage();
     authManager.storage = storage;
@@ -255,5 +256,58 @@ describe('AdminView (Dedicated Database & Student Management Tab)', () => {
 
     const btnExport = container.querySelector('#btnAdminExportUsers');
     expect(btnExport).not.toBeNull();
+  });
+
+  it('renders re-auth notification and button when server session expired due to password change', async () => {
+    authManager.quickLogin('user_admin');
+
+    // Simulate server connection ok, but users sync returns 401 with needsReauth: true
+    vi.spyOn(cloudSyncManager, 'checkConnection').mockResolvedValue(true);
+    vi.spyOn(cloudSyncManager, 'getDatabaseStatus').mockResolvedValue({ storageMode: 'postgresql', databaseLabel: 'PostgreSQL Relational DB' });
+    vi.spyOn(cloudSyncManager, 'syncUsers').mockResolvedValue({
+      success: false,
+      error: 'Phiên quản trị viên đã hết hạn hoặc mật khẩu đã đổi (HTTP 401). Vui lòng đăng nhập lại.',
+      needsReauth: true,
+    });
+    vi.spyOn(cloudSyncManager, 'syncQuizLeaderboard').mockResolvedValue({ success: true });
+    vi.spyOn(cloudSyncManager, 'syncExams').mockResolvedValue({ success: true, count: 0 });
+    vi.spyOn(cloudSyncManager, 'syncExamSubmissions').mockResolvedValue({ success: true, count: 0 });
+
+    const openModalListener = vi.fn();
+    window.addEventListener('open-auth-modal', openModalListener);
+
+    await adminView.render();
+
+    const statusWrap = container.querySelector('#adminMetricServerStatusWrap');
+    expect(statusWrap.textContent).toContain('Cần đăng nhập lại');
+
+    const btnReLogin = container.querySelector('#btnAdminReLogin');
+    expect(btnReLogin).not.toBeNull();
+
+    const bannerBtn = container.querySelector('#btnAdminBannerReLogin');
+    expect(bannerBtn).not.toBeNull();
+
+    // Clicking re-login button triggers open-auth-modal event
+    btnReLogin.click();
+    expect(openModalListener).toHaveBeenCalled();
+    expect(openModalListener.mock.calls[0][0].detail).toEqual({ tab: 'login', username: 'admin' });
+  });
+
+  it('renders full connection and sync status when all background tasks succeed', async () => {
+    authManager.quickLogin('user_admin');
+
+    vi.spyOn(cloudSyncManager, 'checkConnection').mockResolvedValue(true);
+    vi.spyOn(cloudSyncManager, 'getDatabaseStatus').mockResolvedValue({ storageMode: 'postgresql', databaseLabel: 'PostgreSQL Relational DB' });
+    vi.spyOn(cloudSyncManager, 'syncUsers').mockResolvedValue({ success: true, count: 5 });
+    vi.spyOn(cloudSyncManager, 'syncQuizLeaderboard').mockResolvedValue({ success: true });
+    vi.spyOn(cloudSyncManager, 'syncExams').mockResolvedValue({ success: true, count: 2 });
+    vi.spyOn(cloudSyncManager, 'syncExamSubmissions').mockResolvedValue({ success: true, count: 3 });
+
+    await adminView.render();
+
+    const statusWrap = container.querySelector('#adminMetricServerStatusWrap');
+    expect(statusWrap.textContent).toContain('Đã kết nối & Đồng bộ hoàn tất');
+    expect(container.querySelector('#btnAdminReLogin')).toBeNull();
+    expect(container.querySelector('#adminReauthWarningWrap').textContent.trim()).toBe('');
   });
 });

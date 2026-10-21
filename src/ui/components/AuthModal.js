@@ -115,6 +115,21 @@ export class AuthModal {
         }
       }
     });
+
+    window.addEventListener('open-auth-modal', (e) => {
+      const tab = e.detail?.tab || 'login';
+      this.open(tab);
+      if (e.detail?.username) {
+        setTimeout(() => {
+          const inpUser = this.domElement.querySelector('#loginUsername');
+          if (inpUser) {
+            inpUser.value = e.detail.username;
+            const inpPass = this.domElement.querySelector('#loginPassword');
+            if (inpPass) inpPass.focus();
+          }
+        }, 50);
+      }
+    });
   }
 
   /**
