@@ -53,6 +53,10 @@ import {
   sqlDb,
   getServerAdminUser,
   getAdminPassword,
+  setAdminPassword,
+  getAdminTokenVersion,
+  getAdminPasswordChangedAt,
+  resetAdminSessionState,
   getAdminUsername
 } from './auth/ServerDataStore.js';
 import { DEFAULT_EXAMS } from '../core/quiz/ExamManager.js';
@@ -279,14 +283,25 @@ export function clearAllLoginRateLimits() {
 
 /**
  * Creates a cryptographically signed session token for an authenticated user.
- * @param {{ id: string, username: string, role: string }} user
+ * Tokens include tokenVersion and pwdChangedAt to support global session invalidation on password change.
+ * @param {{ id: string, username: string, role: string, tokenVersion?: number, passwordChangedAt?: number }} user
  * @returns {string} token
  */
 export function createSessionToken(user) {
+  const isAdmin = Boolean(
+    user.role === 'admin' ||
+    user.username === 'admin' ||
+    user.id === 'user_admin'
+  );
+  const tokenVersion = isAdmin ? getAdminTokenVersion() : (user.tokenVersion || 1);
+  const pwdChangedAt = isAdmin ? getAdminPasswordChangedAt() : (user.passwordChangedAt || 0);
+
   const payload = {
     id: user.id,
     username: user.username,
     role: user.role,
+    tokenVersion,
+    pwdChangedAt,
     exp: Date.now() + 14 * 24 * 60 * 60 * 1000, // 14 days
     nonce: crypto.randomBytes(12).toString('hex')
   };
@@ -325,10 +340,11 @@ export function verifySessionToken(token) {
 /**
  * Resolves authentication status from incoming request headers.
  * In production: Strictly requires a cryptographically signed session token.
+ * Checks tokenVersion and pwdChangedAt to ensure revoked sessions after password changes are rejected.
  * In test environment (NODE_ENV === 'test'): Permits test header fallback.
  * 
  * @param {import('node:http').IncomingMessage} req
- * @returns {{ authenticated: boolean, user: Object|null, isAdmin: boolean, hasToken: boolean }}
+ * @returns {{ authenticated: boolean, user: Object|null, isAdmin: boolean, hasToken: boolean, revoked?: boolean }}
  */
 export function getRequestAuth(req) {
   const authHeader = req.headers['authorization'] || req.headers['Authorization'] || '';
@@ -350,6 +366,35 @@ export function getRequestAuth(req) {
         session.username === 'admin' ||
         session.id === 'user_admin'
       );
+
+      // Enforce global session invalidation on password change
+      if (isAdmin) {
+        const curVer = getAdminTokenVersion();
+        const curChangedAt = getAdminPasswordChangedAt();
+        if (
+          (session.tokenVersion && session.tokenVersion < curVer) ||
+          (curChangedAt > 0 && session.pwdChangedAt && session.pwdChangedAt < curChangedAt) ||
+          (curChangedAt > 0 && !session.pwdChangedAt)
+        ) {
+          return { authenticated: false, user: null, isAdmin: false, hasToken: true, revoked: true };
+        }
+      } else {
+        const liveUser = serverUsers.find(
+          u => u.id === session.id || (u.username && u.username.toLowerCase() === (session.username || '').toLowerCase())
+        );
+        if (liveUser) {
+          const liveVer = liveUser.tokenVersion || 1;
+          const liveChangedAt = liveUser.passwordChangedAt || 0;
+          if (
+            (liveUser.tokenVersion && session.tokenVersion && session.tokenVersion < liveVer) ||
+            (liveChangedAt > 0 && session.pwdChangedAt && session.pwdChangedAt < liveChangedAt) ||
+            (liveChangedAt > 0 && !session.pwdChangedAt)
+          ) {
+            return { authenticated: false, user: null, isAdmin: false, hasToken: true, revoked: true };
+          }
+        }
+      }
+
       return { authenticated: true, user: session, isAdmin, hasToken: true };
     }
   }
@@ -716,6 +761,108 @@ export async function handleRequest(req, res) {
     }
   }
 
+  // Route: POST /api/auth/change-password (Đổi mật khẩu & đăng xuất khỏi mọi thiết bị khác)
+  if (req.method === 'POST' && pathname === '/api/auth/change-password') {
+    const auth = getRequestAuth(req);
+    if (!auth.authenticated || !auth.user) {
+      sendJson(res, 401, {
+        success: false,
+        error: auth.revoked ? 'SESSION_REVOKED' : 'UNAUTHORIZED',
+        message: auth.revoked
+          ? 'Phiên làm việc đã bị hủy do mật khẩu đã được thay đổi. Vui lòng đăng nhập lại.'
+          : 'Vui lòng đăng nhập để thực hiện đổi mật khẩu.',
+      });
+      return;
+    }
+
+    try {
+      const bodyBuffer = await readRequestBody(req);
+      const { currentPassword, newPassword } = JSON.parse(bodyBuffer.toString('utf8') || '{}');
+      if (!currentPassword || !newPassword) {
+        sendJson(res, 400, { success: false, error: 'Vui lòng nhập mật khẩu hiện tại và mật khẩu mới.' });
+        return;
+      }
+
+      if (String(newPassword).length < 6) {
+        sendJson(res, 400, { success: false, error: 'Mật khẩu mới phải có ít nhất 6 ký tự.' });
+        return;
+      }
+
+      const isUserAdmin = Boolean(
+        auth.isAdmin ||
+        auth.user.role === 'admin' ||
+        auth.user.username === 'admin' ||
+        auth.user.id === 'user_admin'
+      );
+
+      if (isUserAdmin) {
+        if (!verifyPassword(currentPassword, getAdminPassword())) {
+          sendJson(res, 400, { success: false, error: 'Mật khẩu hiện tại không chính xác.' });
+          return;
+        }
+
+        setAdminPassword(newPassword);
+        const adminUser = getServerAdminUser();
+        const newToken = createSessionToken(adminUser);
+        const publicUser = { ...adminUser };
+        delete publicUser.password;
+
+        sendJson(res, 200, {
+          success: true,
+          message: 'Đổi mật khẩu Quản trị viên thành công. Toàn bộ các phiên đăng nhập khác đã được đăng xuất.',
+          token: newToken,
+          user: publicUser,
+        });
+        return;
+      }
+
+      // Student account
+      const found = serverUsers.find(
+        u => u.id === auth.user.id || (u.username && u.username.toLowerCase() === auth.user.username.toLowerCase())
+      );
+      if (!found) {
+        sendJson(res, 404, { success: false, error: 'Không tìm thấy tài khoản sinh viên.' });
+        return;
+      }
+
+      if (!verifyPassword(currentPassword, found.password || '123456')) {
+        sendJson(res, 400, { success: false, error: 'Mật khẩu hiện tại không chính xác.' });
+        return;
+      }
+
+      found.password = hashPassword(newPassword);
+      found.passwordChangedAt = Date.now();
+      found.tokenVersion = (found.tokenVersion || 1) + 1;
+
+      if (sqlDb.isCloudEnabled) {
+        try {
+          await sqlDb.executeRawPostgres(
+            'UPDATE users SET password = $1 WHERE id = $2 OR LOWER(username) = $3;',
+            [found.password, found.id, found.username.toLowerCase()]
+          );
+        } catch (dbErr) {
+          console.warn('[app.js] Error updating password in Postgres:', dbErr.message);
+        }
+      }
+      await saveDatabase();
+
+      const newToken = createSessionToken(found);
+      const publicUser = { ...found };
+      delete publicUser.password;
+
+      sendJson(res, 200, {
+        success: true,
+        message: 'Đổi mật khẩu thành công. Toàn bộ các phiên đăng nhập khác của tài khoản này trên các thiết bị đã được đăng xuất.',
+        token: newToken,
+        user: publicUser,
+      });
+      return;
+    } catch {
+      sendJson(res, 400, { success: false, error: 'Dữ liệu không hợp lệ.' });
+      return;
+    }
+  }
+
   // Route: GET /api/admin/users (Quản trị viên xem toàn bộ database tài khoản)
   if (req.method === 'GET' && pathname === '/api/admin/users') {
     const auth = getRequestAuth(req);
@@ -1023,6 +1170,8 @@ export async function handleRequest(req, res) {
       return;
     }
     found.password = hashPassword(newPassword);
+    found.passwordChangedAt = Date.now();
+    found.tokenVersion = (found.tokenVersion || 1) + 1;
     if (sqlDb.isCloudEnabled) {
       try {
         await sqlDb.executeRawPostgres('UPDATE users SET password = $1 WHERE id = $2 OR LOWER(username) = $3;', [found.password, found.id, found.username.toLowerCase()]);
@@ -1031,7 +1180,7 @@ export async function handleRequest(req, res) {
       }
     }
     await saveDatabase();
-    sendJson(res, 200, { success: true, message: `Mật khẩu của sinh viên @${found.username} đã được đặt lại thành ${newPassword}.` });
+    sendJson(res, 200, { success: true, message: `Mật khẩu của sinh viên @${found.username} đã được đặt lại thành ${newPassword}. Toàn bộ phiên đăng nhập cũ trên mọi thiết bị đã được đăng xuất an toàn.` });
     return;
   }
 

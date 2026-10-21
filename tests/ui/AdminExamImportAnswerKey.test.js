@@ -30,7 +30,7 @@ describe('Admin Exam Import & Dedicated Answer Key Test Suite', () => {
 
     container = document.getElementById('quizContainer');
     global.localStorage = window.localStorage;
-    authManager.login('admin', '2HV6868@');
+    authManager.login('admin', '2HV0789@@');
     examManager.clearAllData();
   });
 
@@ -247,7 +247,7 @@ describe('Admin Exam Import & Dedicated Answer Key Test Suite', () => {
     }).exam;
 
     const quizView = new QuizView({ container });
-    authManager.login('admin', '2HV6868@');
+    authManager.login('admin', '2HV0789@@');
     quizView.setTab('myExams');
     quizView.render();
 
@@ -474,7 +474,7 @@ describe('Admin Exam Import & Dedicated Answer Key Test Suite', () => {
 
   it('moves distributed exams table to Quản Lý Đề Thi tab for admin tracking', () => {
     const quizView = new QuizView({ container });
-    authManager.login('admin', '2HV6868@');
+    authManager.login('admin', '2HV0789@@');
     quizView.setTab('myExams');
     quizView.render();
 
@@ -494,7 +494,7 @@ describe('Admin Exam Import & Dedicated Answer Key Test Suite', () => {
 
   it('allows teacher to type custom question count and picks that exact number of questions', () => {
     const quizView = new QuizView({ container });
-    authManager.login('admin', '2HV6868@');
+    authManager.login('admin', '2HV0789@@');
     quizView.setTab('studio');
     quizView.studioSubTab = 'assign';
 
@@ -540,7 +540,7 @@ describe('Admin Exam Import & Dedicated Answer Key Test Suite', () => {
 
   it('allows picking 10 questions from file A and 10 questions from file B to create a combined 20-question exam across 3 tabs', () => {
     const quizView = new QuizView({ container });
-    authManager.login('admin', '2HV6868@');
+    authManager.login('admin', '2HV0789@@');
     quizView.setTab('studio');
     quizView.studioSubTab = 'distribute';
 
@@ -621,7 +621,7 @@ describe('Admin Exam Import & Dedicated Answer Key Test Suite', () => {
 
   it('correctly opens Admin Answer Key and Gradebook modals from the distributed exams table', () => {
     const quizView = new QuizView({ container });
-    authManager.login('admin', '2HV6868@');
+    authManager.login('admin', '2HV0789@@');
 
     // Create an exam first
     const createRes = examManager.createExam({
@@ -680,7 +680,7 @@ describe('Admin Exam Import & Dedicated Answer Key Test Suite', () => {
 
   it('guarantees A4 Print section is outside studioAssignSection and visible when studioSubTab is print', () => {
     const quizView = new QuizView({ container });
-    authManager.login('admin', '2HV6868@');
+    authManager.login('admin', '2HV0789@@');
     quizView.setTab('studio');
     quizView.studioSubTab = 'print';
     quizView.render();
@@ -703,7 +703,7 @@ describe('Admin Exam Import & Dedicated Answer Key Test Suite', () => {
 
   it('customizes A4 print studio: allows flexible question count, removes topic & difficulty, and eliminates 150 builtin sample bank', () => {
     const quizView = new QuizView({ container });
-    authManager.login('admin', '2HV6868@');
+    authManager.login('admin', '2HV0789@@');
     quizView.setTab('studio');
     quizView.studioSubTab = 'print';
 
@@ -759,7 +759,7 @@ describe('Admin Exam Import & Dedicated Answer Key Test Suite', () => {
 
   it('automatically numbers exam titles sequentially as Đề 1, Đề 2, ... and removes redundant headers from Tab 1 and Tab 2', () => {
     const quizView = new QuizView({ container });
-    authManager.login('admin', '2HV6868@');
+    authManager.login('admin', '2HV0789@@');
     examManager.clearAllExams();
     quizView.setTab('studio');
 
@@ -844,7 +844,7 @@ describe('Admin Exam Import & Dedicated Answer Key Test Suite', () => {
   });
 
   it('renders clear descriptive labels for question shuffle vs option shuffle', () => {
-    authManager.login('admin', '2HV6868@');
+    authManager.login('admin', '2HV0789@@');
     const quizView = new QuizView({ container });
     quizView.setTab('studio');
     quizView.studioSubTab = 'publish';

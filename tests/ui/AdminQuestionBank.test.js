@@ -28,7 +28,7 @@ describe('Admin Clean UI: AI Vision Question Bank Removed from AdminView', () =>
   beforeEach(() => {
     customQuestionBank.length = 0;
     // Login as admin
-    authManager.login('admin', '2HV6868@');
+    authManager.login('admin', '2HV0789@@');
   });
 
   it('AdminView does NOT render AI Vision buttons, metric card, or question bank table', async () => {

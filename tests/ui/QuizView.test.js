@@ -30,7 +30,7 @@ describe('QuizView UI Component', () => {
 
     container = document.getElementById('quizContainer');
     global.localStorage = window.localStorage;
-    authManager.login('admin', '2HV6868@');
+    authManager.login('admin', '2HV0789@@');
   });
 
   afterEach(() => {
@@ -67,7 +67,7 @@ describe('QuizView UI Component', () => {
   });
 
   it('switches between myExams and studio tabs via setTab method for admin', () => {
-    authManager.login('admin', '2HV6868@');
+    authManager.login('admin', '2HV0789@@');
     const quizView = new QuizView({ container });
     expect(quizView.activeTab).toBe('myExams');
 
@@ -366,7 +366,7 @@ describe('QuizView UI Component', () => {
   });
 
   it('allows Admin to create new exam from imported questions, assign to students, and view gradebook in Studio', () => {
-    authManager.login('admin', '2HV6868@');
+    authManager.login('admin', '2HV0789@@');
     const quizView = new QuizView({ container });
     quizView.setTab('studio');
 
@@ -411,7 +411,7 @@ describe('QuizView UI Component', () => {
 
   it('supports clearing all exams and student submissions from Exam Management', () => {
     const quizView = new QuizView({ container });
-    authManager.login('admin', '2HV6868@');
+    authManager.login('admin', '2HV0789@@');
     quizView.setTab('myExams');
     quizView.render();
 
@@ -425,7 +425,7 @@ describe('QuizView UI Component', () => {
   });
 
   it('renders Teacher A4 and LaTeX print section in Studio print subtab', () => {
-    authManager.login('admin', '2HV6868@');
+    authManager.login('admin', '2HV0789@@');
     const quizView = new QuizView({ container });
     quizView.setTab('studio');
     quizView.studioSubTab = 'print';
@@ -452,7 +452,7 @@ describe('QuizView UI Component', () => {
   });
 
   it('persists imported Word questions across multiple sessions in localStorage and allows clearing', () => {
-    authManager.login('admin', '2HV6868@');
+    authManager.login('admin', '2HV0789@@');
     const quizView1 = new QuizView({ container });
     quizView1.setTab('studio');
 
@@ -482,7 +482,7 @@ describe('QuizView UI Component', () => {
   });
 
   it('handles multi-file question distribution input interaction smoothly without clamping mid-typing (e.g. entering 5 when available is 1)', () => {
-    authManager.login('admin', '2HV6868@');
+    authManager.login('admin', '2HV0789@@');
     const quizView = new QuizView({ container });
     quizView.setTab('studio');
     quizView.setStudioSubTab('publish');
@@ -522,7 +522,7 @@ describe('QuizView UI Component', () => {
   });
 
   it('displays exceeding warning and prevents creating exam if chosen count exceeds available file questions', () => {
-    authManager.login('admin', '2HV6868@');
+    authManager.login('admin', '2HV0789@@');
     const quizView = new QuizView({ container });
     quizView.setTab('studio');
     quizView.setStudioSubTab('publish');
@@ -552,7 +552,7 @@ describe('QuizView UI Component', () => {
   });
 
   it('does not wipe active form elements during syncCloudImportedFiles when teacher is typing', () => {
-    authManager.login('admin', '2HV6868@');
+    authManager.login('admin', '2HV0789@@');
     const quizView = new QuizView({ container });
     quizView.setTab('studio');
     quizView.render();

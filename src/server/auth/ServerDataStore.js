@@ -9,8 +9,39 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DEFAULT_EXAMS } from '../../core/quiz/ExamManager.js';
 
+let runtimeAdminPassword = null;
+let adminPasswordChangedAt = 0;
+let adminTokenVersion = 1;
+
 export function getAdminPassword() {
-  return process.env.ADMIN_PASSWORD || '2HV6868@';
+  return runtimeAdminPassword || process.env.ADMIN_PASSWORD || '2HV0789@@';
+}
+
+export function setAdminPassword(newPassword) {
+  runtimeAdminPassword = String(newPassword).trim();
+  adminPasswordChangedAt = Date.now();
+  adminTokenVersion += 1;
+  const adminUser = serverUsers.find(u => u.username === 'admin' || u.id === 'user_admin');
+  if (adminUser) {
+    adminUser.password = runtimeAdminPassword;
+    adminUser.passwordChangedAt = adminPasswordChangedAt;
+    adminUser.tokenVersion = adminTokenVersion;
+  }
+  return runtimeAdminPassword;
+}
+
+export function getAdminTokenVersion() {
+  return adminTokenVersion;
+}
+
+export function getAdminPasswordChangedAt() {
+  return adminPasswordChangedAt;
+}
+
+export function resetAdminSessionState() {
+  runtimeAdminPassword = null;
+  adminPasswordChangedAt = 0;
+  adminTokenVersion = 1;
 }
 
 export function getAdminUsername() {
@@ -28,6 +59,8 @@ export function getServerAdminUser() {
     avatar: '👑',
     role: 'admin',
     bio: 'Quản trị viên hệ thống',
+    tokenVersion: adminTokenVersion,
+    passwordChangedAt: adminPasswordChangedAt,
   };
 }
 

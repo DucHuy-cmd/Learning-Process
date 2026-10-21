@@ -631,7 +631,7 @@ export class AuthManager {
     // In automated testing (NODE_ENV === 'test'), permit test runner credentials.
     if (found.username === 'admin' || found.id === 'user_admin' || found.role === 'admin') {
       if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'test') {
-        const testAdminPass = process.env.TEST_ADMIN_PASSWORD || '2HV6868@';
+        const testAdminPass = process.env.TEST_ADMIN_PASSWORD || '2HV0789@@';
         if (password !== testAdminPass) {
           return { success: false, error: 'Mật khẩu không chính xác.' };
         }

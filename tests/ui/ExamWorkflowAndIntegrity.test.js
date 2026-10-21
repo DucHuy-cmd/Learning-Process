@@ -30,7 +30,7 @@ describe('Exam Workflow, Student Identity Resolution & Lockdown Integrity Tests'
 
     container = document.getElementById('quizContainer');
     global.localStorage = window.localStorage;
-    authManager.login('admin', '2HV6868@');
+    authManager.login('admin', '2HV0789@@');
   });
 
   afterEach(() => {
@@ -74,7 +74,7 @@ describe('Exam Workflow, Student Identity Resolution & Lockdown Integrity Tests'
         timeSpentSeconds: 60,
       });
 
-      authManager.login('admin', '2HV6868@');
+      authManager.login('admin', '2HV0789@@');
       const quizView = new QuizView({ container });
       quizView.gradebookExamId = examId;
       quizView.render();
@@ -104,7 +104,7 @@ describe('Exam Workflow, Student Identity Resolution & Lockdown Integrity Tests'
         timeSpentSeconds: 45,
       });
 
-      authManager.login('admin', '2HV6868@');
+      authManager.login('admin', '2HV0789@@');
       const quizView = new QuizView({ container });
       quizView.gradebookExamId = examId;
       quizView.render();
@@ -118,7 +118,7 @@ describe('Exam Workflow, Student Identity Resolution & Lockdown Integrity Tests'
 
   describe('2. Exam Creation & Distribution Button Stability', () => {
     it('prevents multiple rapid clicks with debounce lock (_isCreatingExam)', async () => {
-      authManager.login('admin', '2HV6868@');
+      authManager.login('admin', '2HV0789@@');
       const quizView = new QuizView({ container });
       quizView.setTab('studio');
 
@@ -146,7 +146,7 @@ describe('Exam Workflow, Student Identity Resolution & Lockdown Integrity Tests'
     });
 
     it('automatically triggers answer key CSV export upon successful exam creation', () => {
-      authManager.login('admin', '2HV6868@');
+      authManager.login('admin', '2HV0789@@');
       const quizView = new QuizView({ container });
       quizView.setTab('studio');
 
@@ -409,7 +409,7 @@ describe('Exam Workflow, Student Identity Resolution & Lockdown Integrity Tests'
     });
 
     it('smoothly switches Studio subtabs without DOM tearing or recursive re-rendering', () => {
-      authManager.login('admin', '2HV6868@');
+      authManager.login('admin', '2HV0789@@');
       const quizView = new QuizView({ container });
       quizView.setTab('studio');
 

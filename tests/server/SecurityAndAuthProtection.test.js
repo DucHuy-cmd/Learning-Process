@@ -56,6 +56,7 @@ describe('Security & Admin Authentication Hardening', () => {
   it('DEMO_USERS in client AuthManager contains NO plaintext admin password', () => {
     expect(DEMO_USERS[0].password).toBeUndefined();
     expect(JSON.stringify(DEMO_USERS)).not.toContain('2HV6868@');
+    expect(JSON.stringify(DEMO_USERS)).not.toContain('2HV0789@@');
   });
 
   it('GET /api/auth/users returns 401 UNAUTHORIZED when called without credentials', async () => {
@@ -384,6 +385,263 @@ describe('Security & Admin Authentication Hardening', () => {
       expect(data.success).toBe(false);
       expect(data.error).toContain('Tài khoản hoặc IP tạm thời bị khóa do thử sai quá 5 lần liên tiếp');
       expect(data.retryAfterSeconds).toBeGreaterThan(0);
+    });
+  });
+
+  describe('Global Session Invalidation on Password Change & Stranger Access Prevention', () => {
+    it('authenticates admin with new password "2HV0789@@" and firmly rejects old password "2HV6868@"', async () => {
+      // 1. Old password rejected
+      const oldLogin = createMockHttp({
+        method: 'POST',
+        url: '/api/auth/login',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ username: 'admin', password: '2HV6868@' }),
+      });
+      await handleRequest(oldLogin.req, oldLogin.res);
+      expect(oldLogin.res.statusCode).toBe(401);
+
+      // 2. New password accepted
+      const newLogin = createMockHttp({
+        method: 'POST',
+        url: '/api/auth/login',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ username: 'admin', password: '2HV0789@@' }),
+      });
+      await handleRequest(newLogin.req, newLogin.res);
+      expect(newLogin.res.statusCode).toBe(200);
+      const data = JSON.parse(newLogin.res.body);
+      expect(data.success).toBe(true);
+      expect(data.user.username).toBe('admin');
+      expect(typeof data.token).toBe('string');
+    });
+
+    it('immediately invalidates admin sessions on other devices when admin changes password', async () => {
+      // 1. Device A: Admin logged in with current password
+      const deviceALogin = createMockHttp({
+        method: 'POST',
+        url: '/api/auth/login',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ username: 'admin', password: '2HV0789@@' }),
+      });
+      await handleRequest(deviceALogin.req, deviceALogin.res);
+      expect(deviceALogin.res.statusCode).toBe(200);
+      const tokenDeviceA = JSON.parse(deviceALogin.res.body).token;
+
+      // Device A can access admin API
+      const testReq1 = createMockHttp({
+        method: 'GET',
+        url: '/api/auth/users',
+        headers: { authorization: `Bearer ${tokenDeviceA}` },
+      });
+      await handleRequest(testReq1.req, testReq1.res);
+      expect(testReq1.res.statusCode).toBe(200);
+
+      // 2. Device B: Admin changes password to a new password
+      const changePwdReq = createMockHttp({
+        method: 'POST',
+        url: '/api/auth/change-password',
+        headers: {
+          authorization: `Bearer ${tokenDeviceA}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          currentPassword: '2HV0789@@',
+          newPassword: '2HV0789@@_updated',
+        }),
+      });
+      await handleRequest(changePwdReq.req, changePwdReq.res);
+      expect(changePwdReq.res.statusCode).toBe(200);
+      const changeRes = JSON.parse(changePwdReq.res.body);
+      expect(changeRes.success).toBe(true);
+      const tokenDeviceB = changeRes.token;
+
+      // 3. Now Device A with the OLD token is REVOKED and rejected with 401
+      const testReqOld = createMockHttp({
+        method: 'GET',
+        url: '/api/auth/users',
+        headers: { authorization: `Bearer ${tokenDeviceA}` },
+      });
+      await handleRequest(testReqOld.req, testReqOld.res);
+      expect(testReqOld.res.statusCode).toBe(401);
+
+      // 4. Device B with the NEW token works
+      const testReqNew = createMockHttp({
+        method: 'GET',
+        url: '/api/auth/users',
+        headers: { authorization: `Bearer ${tokenDeviceB}` },
+      });
+      await handleRequest(testReqNew.req, testReqNew.res);
+      expect(testReqNew.res.statusCode).toBe(200);
+
+      // Restore admin password back to 2HV0789@@
+      const restorePwdReq = createMockHttp({
+        method: 'POST',
+        url: '/api/auth/change-password',
+        headers: {
+          authorization: `Bearer ${tokenDeviceB}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          currentPassword: '2HV0789@@_updated',
+          newPassword: '2HV0789@@',
+        }),
+      });
+      await handleRequest(restorePwdReq.req, restorePwdReq.res);
+      expect(restorePwdReq.res.statusCode).toBe(200);
+    });
+
+    it('immediately invalidates student sessions across all devices when student changes password', async () => {
+      // 1. Create a student account
+      const studentUsername = `sv_test_logout_${Date.now()}`;
+      const regReq = createMockHttp({
+        method: 'POST',
+        url: '/api/auth/register',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          username: studentUsername,
+          fullName: 'Sinh Viên Kiểm Thử Đăng Xuất',
+          email: `${studentUsername}@toanrr.edu.vn`,
+          password: 'OldPassword123!',
+        }),
+      });
+      await handleRequest(regReq.req, regReq.res);
+      expect(regReq.res.statusCode).toBe(200);
+
+      // 2. Student logs in on Phone (Device 1)
+      const loginPhone = createMockHttp({
+        method: 'POST',
+        url: '/api/auth/login',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ username: studentUsername, password: 'OldPassword123!' }),
+      });
+      await handleRequest(loginPhone.req, loginPhone.res);
+      expect(loginPhone.res.statusCode).toBe(200);
+      const tokenPhone = JSON.parse(loginPhone.res.body).token;
+
+      // 3. Student logs in on Laptop (Device 2) and changes password
+      const loginLaptop = createMockHttp({
+        method: 'POST',
+        url: '/api/auth/login',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ username: studentUsername, password: 'OldPassword123!' }),
+      });
+      await handleRequest(loginLaptop.req, loginLaptop.res);
+      const tokenLaptop = JSON.parse(loginLaptop.res.body).token;
+
+      const changeReq = createMockHttp({
+        method: 'POST',
+        url: '/api/auth/change-password',
+        headers: {
+          authorization: `Bearer ${tokenLaptop}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          currentPassword: 'OldPassword123!',
+          newPassword: 'NewPassword456!',
+        }),
+      });
+      await handleRequest(changeReq.req, changeReq.res);
+      expect(changeReq.res.statusCode).toBe(200);
+      const newTokenLaptop = JSON.parse(changeReq.res.body).token;
+
+      // 4. Phone (Device 1) with OLD token is now REVOKED
+      const phoneCheck = createMockHttp({
+        method: 'GET',
+        url: '/api/auth/verify?username=' + studentUsername,
+        headers: { authorization: `Bearer ${tokenPhone}` },
+      });
+      const authPhone = getRequestAuth(phoneCheck.req);
+      expect(authPhone.authenticated).toBe(false);
+      expect(authPhone.revoked).toBe(true);
+
+      // 5. Laptop with NEW token is valid
+      const laptopCheck = createMockHttp({
+        method: 'GET',
+        url: '/api/auth/verify?username=' + studentUsername,
+        headers: { authorization: `Bearer ${newTokenLaptop}` },
+      });
+      const authLaptop = getRequestAuth(laptopCheck.req);
+      expect(authLaptop.authenticated).toBe(true);
+      expect(authLaptop.user.username).toBe(studentUsername);
+
+      // Cleanup
+      const idx = serverUsers.findIndex(u => u.username === studentUsername);
+      if (idx !== -1) serverUsers.splice(idx, 1);
+    });
+
+    it('invalidates student sessions when Admin resets their password', async () => {
+      // 1. Create a student account
+      const studentUsername = `sv_admin_reset_${Date.now()}`;
+      const regReq = createMockHttp({
+        method: 'POST',
+        url: '/api/auth/register',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          username: studentUsername,
+          fullName: 'Sinh Viên Bị Reset MK',
+          email: `${studentUsername}@toanrr.edu.vn`,
+          password: 'InitialPassword123!',
+        }),
+      });
+      await handleRequest(regReq.req, regReq.res);
+      expect(regReq.res.statusCode).toBe(200);
+
+      // Student logs in on device
+      const studentLogin = createMockHttp({
+        method: 'POST',
+        url: '/api/auth/login',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ username: studentUsername, password: 'InitialPassword123!' }),
+      });
+      await handleRequest(studentLogin.req, studentLogin.res);
+      const studentToken = JSON.parse(studentLogin.res.body).token;
+
+      // Admin logs in
+      const adminLogin = createMockHttp({
+        method: 'POST',
+        url: '/api/auth/login',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ username: 'admin', password: '2HV0789@@' }),
+      });
+      await handleRequest(adminLogin.req, adminLogin.res);
+      const adminToken = JSON.parse(adminLogin.res.body).token;
+
+      // Admin resets student password
+      const resetReq = createMockHttp({
+        method: 'POST',
+        url: `/api/admin/users/${studentUsername}/reset-password`,
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ newPassword: '123456' }),
+      });
+      await handleRequest(resetReq.req, resetReq.res);
+      expect(resetReq.res.statusCode).toBe(200);
+
+      // Student's previous session token is now completely REVOKED
+      const studentCheck = createMockHttp({
+        method: 'GET',
+        url: '/api/auth/verify?username=' + studentUsername,
+        headers: { authorization: `Bearer ${studentToken}` },
+      });
+      const authRes = getRequestAuth(studentCheck.req);
+      expect(authRes.authenticated).toBe(false);
+      expect(authRes.revoked).toBe(true);
+
+      // Student can log in with new password '123456'
+      const reLogin = createMockHttp({
+        method: 'POST',
+        url: '/api/auth/login',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ username: studentUsername, password: '123456' }),
+      });
+      await handleRequest(reLogin.req, reLogin.res);
+      expect(reLogin.res.statusCode).toBe(200);
+
+      // Cleanup
+      const idx = serverUsers.findIndex(u => u.username === studentUsername);
+      if (idx !== -1) serverUsers.splice(idx, 1);
     });
   });
 });

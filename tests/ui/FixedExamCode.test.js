@@ -24,7 +24,7 @@ describe('Fixed Exam Code & Stable Question Order Verification', () => {
     global.document = document;
     global.localStorage = window.localStorage;
 
-    authManager.login('admin', '2HV6868@');
+    authManager.login('admin', '2HV0789@@');
     examManager.clearAllData();
 
     container = document.getElementById('quizContainer');
