@@ -1198,7 +1198,7 @@ export class QuizView {
             ${(session.awayViolationRecorded || session.violationCount > 0) ? 'Cảnh Báo: Đã Ghi Nhận Vi Phạm Quy Chế!' : 'Cảnh Báo: Rời Màn Hình Làm Bài!'}
           </h2>
           <p style="font-size:14px;color:var(--text,#e2e8f0);line-height:1.5;margin:0 0 14px;">
-            Hệ thống phát hiện bạn vừa chuyển tab (Alt+Tab), rời cửa sổ làm bài hoặc thoát toàn màn hình. Thời gian rời màn hình được tính <strong>cộng dồn</strong>.
+            Hệ thống phát hiện bạn vừa chuyển tab (Alt+Tab), bấm F11, rời cửa sổ làm bài hoặc thoát toàn màn hình. Thời gian rời màn hình được tính <strong>cộng dồn</strong>.
           </p>
           ${(session.awayViolationRecorded || session.violationCount > 0) ? `
             <div class="exam-lockdown-warning" role="alert" style="background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.4);border-radius:8px;padding:12px;color:#f87171;font-weight:700;font-size:13.5px;margin-bottom:18px;">
@@ -1219,9 +1219,36 @@ export class QuizView {
       </div>
     ` : '';
 
+    const needsFullscreenGatekeeper = (
+      !session.lockdownPending &&
+      this._supportsFullscreen() &&
+      !this._isPhoneDevice() &&
+      !this._getFullscreenElement()
+    );
+
+    const gatekeeperOverlay = needsFullscreenGatekeeper ? `
+      <div class="exam-fullscreen-gatekeeper" role="dialog" aria-modal="true"
+        style="position:fixed;inset:0;background:rgba(15,23,42,0.96);backdrop-filter:blur(10px);z-index:999998;display:flex;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;">
+        <div style="background:var(--panel,#1e2130);border:2px solid var(--accent,#38bdf8);border-radius:18px;padding:36px 30px;max-width:500px;width:100%;box-shadow:0 25px 60px rgba(0,0,0,0.8);text-align:center;box-sizing:border-box;">
+          <div style="font-size:52px;margin-bottom:12px;">🖥️</div>
+          <h2 style="font-size:21px;font-weight:800;color:var(--text,#fff);margin:0 0 12px;">
+            Yêu Cầu Chế Độ Toàn Màn Hình
+          </h2>
+          <p style="font-size:14px;color:var(--dim,#cbd5e1);line-height:1.6;margin:0 0 20px;">
+            Để đảm bảo tính nghiêm túc và chống gian lận, bài thi bắt buộc phải chạy ở chế độ <strong>Toàn Màn Hình</strong>.<br>
+            <span style="color:#ef4444;font-weight:700;display:block;margin-top:6px;">Lưu ý: Bấm F11, Alt+Tab, chuyển tab hoặc thoát toàn màn hình sẽ tính là vi phạm quy chế. Quá 3 lần sẽ bị 0 điểm!</span>
+          </p>
+          <button type="button" class="btn-primary" id="btnEnterExamFullscreen" style="width:100%;padding:14px 24px;font-size:15.5px;font-weight:800;background:linear-gradient(135deg, #0ea5e9, #38bdf8);color:#000;border:none;border-radius:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;box-shadow:0 4px 15px rgba(56,189,248,0.4);">
+            <span>🚀</span> BẬT TOÀN MÀN HÌNH ĐỂ VÀO THI
+          </button>
+        </div>
+      </div>
+    ` : '';
+
     return `
       <div class="active-exam-room">
         ${lockdownOverlay}
+        ${gatekeeperOverlay}
         
         <!-- Top bar: Title, Timer, Submitting -->
         <div class="active-exam-topbar">
@@ -2746,54 +2773,188 @@ export class QuizView {
     }, 1000);
   }
 
+  _getFullscreenElement() {
+    if (typeof document === 'undefined') return null;
+    return (
+      document.fullscreenElement ||
+      document.webkitFullscreenElement ||
+      document.mozFullScreenElement ||
+      document.msFullscreenElement ||
+      null
+    );
+  }
+
+  _supportsFullscreen() {
+    if (typeof document === 'undefined') return false;
+    const docEl = document.documentElement;
+    if (!docEl) return false;
+    return Boolean(
+      docEl.requestFullscreen ||
+      docEl.webkitRequestFullscreen ||
+      docEl.mozRequestFullScreen ||
+      docEl.msRequestFullscreen
+    );
+  }
+
+  _isPhoneDevice() {
+    if (typeof navigator === 'undefined') return false;
+    return /iPhone|iPod/i.test(navigator.userAgent);
+  }
+
   _attachExamLockdownListeners() {
     if (typeof document === 'undefined' || this._examLockdownHandlers) return;
-    const isMobile = typeof navigator !== 'undefined' && (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (typeof window !== 'undefined' && window.innerWidth < 768));
 
-    this._examLockdownHandlers = {
-      fullscreenchange: () => {
-        if (isMobile) return;
-        const session = this.activeExamSession;
-        if (!session) return;
-        const isFullscreen = document.fullscreenElement === document.documentElement;
-        if (isFullscreen) {
-          session.fullscreenActive = true;
-          if (session.isAway) {
-            this._flushAwayTime(session);
-          }
-        } else if (session.fullscreenActive) {
-          session.fullscreenActive = false;
-          this._handleScreenDeparture('fullscreen_exit');
+    const onFullscreenChange = () => {
+      if (this._isPhoneDevice() || !this._supportsFullscreen()) return;
+      const session = this.activeExamSession;
+      if (!session) return;
+      const isFullscreen = Boolean(this._getFullscreenElement());
+      if (isFullscreen) {
+        session.fullscreenActive = true;
+        if (session.isAway) {
+          this._flushAwayTime(session);
         }
-      },
-      visibilitychange: () => {
-        if (document.visibilityState === 'hidden') {
-          this._handleScreenDeparture('visibility_hidden');
-        } else if (document.visibilityState === 'visible') {
-          const session = this.activeExamSession;
-          if (session && session.isAway) {
-            this._flushAwayTime(session);
-            this.render();
-          }
-        }
-      },
-      blur: () => {
-        this._handleScreenDeparture('window_blur');
-      },
-      focus: () => {
+      } else {
+        session.fullscreenActive = false;
+        this._handleScreenDeparture('fullscreen_exit');
+      }
+    };
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        this._handleScreenDeparture('visibility_hidden');
+      } else if (document.visibilityState === 'visible') {
         const session = this.activeExamSession;
         if (session && session.isAway) {
           this._flushAwayTime(session);
           this.render();
         }
-      },
+      }
     };
 
-    document.addEventListener('fullscreenchange', this._examLockdownHandlers.fullscreenchange);
-    document.addEventListener('visibilitychange', this._examLockdownHandlers.visibilitychange);
+    const onBlur = () => {
+      this._handleScreenDeparture('window_blur');
+    };
+
+    const onFocus = () => {
+      const session = this.activeExamSession;
+      if (session && session.isAway) {
+        this._flushAwayTime(session);
+        this.render();
+      }
+    };
+
+    const onPageHide = () => {
+      this._handleScreenDeparture('pagehide');
+    };
+
+    const onResize = () => {
+      if (this._isPhoneDevice() || !this._supportsFullscreen()) return;
+      const session = this.activeExamSession;
+      if (!session || session.timeRemaining <= 0) return;
+      if (!this._getFullscreenElement()) {
+        this._handleScreenDeparture('fullscreen_exit');
+      }
+    };
+
+    const onKeyDown = (e) => {
+      const session = this.activeExamSession;
+      if (!session || session.timeRemaining <= 0) return;
+
+      // 1. F11 Key (Browser Fullscreen toggle)
+      if (e.key === 'F11' || e.keyCode === 122) {
+        e.preventDefault();
+        e.stopPropagation();
+        this._handleScreenDeparture('f11_pressed');
+        return;
+      }
+
+      // 2. Alt + Tab or Alt key combination
+      if (e.altKey && (e.key === 'Tab' || e.keyCode === 9)) {
+        e.preventDefault();
+        e.stopPropagation();
+        this._handleScreenDeparture('alt_tab_pressed');
+        return;
+      }
+
+      // 3. Escape key (Exiting fullscreen)
+      if (e.key === 'Escape' || e.keyCode === 27) {
+        e.preventDefault();
+        e.stopPropagation();
+        this._handleScreenDeparture('escape_pressed');
+        return;
+      }
+
+      // 4. Windows Key / Command (Meta) Key
+      if (e.key === 'Meta' || e.keyCode === 91 || e.keyCode === 92 || e.keyCode === 93) {
+        this._handleScreenDeparture('meta_key_pressed');
+        return;
+      }
+
+      // 5. DevTools shortcuts: F12, Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+Shift+C, Cmd+Option+I, Cmd+Option+J, Cmd+Option+C, Ctrl+U, Cmd+Option+U
+      const isDevTools =
+        e.key === 'F12' || e.keyCode === 123 ||
+        ((e.ctrlKey || e.metaKey) && e.shiftKey && ['i', 'j', 'c'].includes(e.key?.toLowerCase())) ||
+        ((e.ctrlKey || e.metaKey) && (e.key?.toLowerCase() === 'u'));
+
+      if (isDevTools) {
+        e.preventDefault();
+        e.stopPropagation();
+        this._handleScreenDeparture('devtools_attempt');
+        return;
+      }
+
+      // 6. Navigation / Tab manipulation shortcuts: Ctrl+T, Ctrl+N, Ctrl+W, Ctrl+Tab
+      const isNavShortcut = (e.ctrlKey || e.metaKey) && ['t', 'n', 'w'].includes(e.key?.toLowerCase());
+      if (isNavShortcut) {
+        e.preventDefault();
+        e.stopPropagation();
+        this._handleScreenDeparture('tab_navigation_attempt');
+        return;
+      }
+
+      // 7. Clipboard & Print shortcuts: Ctrl+C, Ctrl+X, Ctrl+V, Ctrl+A, Ctrl+P, Ctrl+S
+      const isRestricted = (e.ctrlKey || e.metaKey) && ['c', 'x', 'v', 'a', 'p', 's'].includes(e.key?.toLowerCase());
+      if (isRestricted) {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+    };
+
+    const preventDefaultEvent = (e) => {
+      e.preventDefault();
+    };
+
+    this._examLockdownHandlers = {
+      onFullscreenChange,
+      onVisibilityChange,
+      onBlur,
+      onFocus,
+      onPageHide,
+      onResize,
+      onKeyDown,
+      preventDefaultEvent,
+    };
+
+    document.addEventListener('fullscreenchange', onFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', onFullscreenChange);
+    document.addEventListener('mozfullscreenchange', onFullscreenChange);
+    document.addEventListener('MSFullscreenChange', onFullscreenChange);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    document.addEventListener('contextmenu', preventDefaultEvent);
+    document.addEventListener('copy', preventDefaultEvent);
+    document.addEventListener('cut', preventDefaultEvent);
+    document.addEventListener('paste', preventDefaultEvent);
+    document.addEventListener('selectstart', preventDefaultEvent);
+    document.addEventListener('dragstart', preventDefaultEvent);
+
     if (typeof window !== 'undefined') {
-      window.addEventListener('blur', this._examLockdownHandlers.blur);
-      window.addEventListener('focus', this._examLockdownHandlers.focus);
+      window.addEventListener('blur', onBlur);
+      window.addEventListener('focus', onFocus);
+      window.addEventListener('pagehide', onPageHide);
+      window.addEventListener('resize', onResize);
+      window.addEventListener('keydown', onKeyDown, true);
     }
   }
 
@@ -2802,12 +2963,26 @@ export class QuizView {
       this._cancelExamLockdownCountdown(this.activeExamSession);
     }
     if (typeof document !== 'undefined' && this._examLockdownHandlers) {
-      document.removeEventListener('fullscreenchange', this._examLockdownHandlers.fullscreenchange);
-      document.removeEventListener('visibilitychange', this._examLockdownHandlers.visibilitychange);
+      const h = this._examLockdownHandlers;
+      document.removeEventListener('fullscreenchange', h.onFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', h.onFullscreenChange);
+      document.removeEventListener('mozfullscreenchange', h.onFullscreenChange);
+      document.removeEventListener('MSFullscreenChange', h.onFullscreenChange);
+      document.removeEventListener('visibilitychange', h.onVisibilityChange);
+      document.removeEventListener('contextmenu', h.preventDefaultEvent);
+      document.removeEventListener('copy', h.preventDefaultEvent);
+      document.removeEventListener('cut', h.preventDefaultEvent);
+      document.removeEventListener('paste', h.preventDefaultEvent);
+      document.removeEventListener('selectstart', h.preventDefaultEvent);
+      document.removeEventListener('dragstart', h.preventDefaultEvent);
     }
     if (typeof window !== 'undefined' && this._examLockdownHandlers) {
-      window.removeEventListener('blur', this._examLockdownHandlers.blur);
-      window.removeEventListener('focus', this._examLockdownHandlers.focus);
+      const h = this._examLockdownHandlers;
+      window.removeEventListener('blur', h.onBlur);
+      window.removeEventListener('focus', h.onFocus);
+      window.removeEventListener('pagehide', h.onPageHide);
+      window.removeEventListener('resize', h.onResize);
+      window.removeEventListener('keydown', h.onKeyDown, true);
     }
     this._examLockdownHandlers = null;
   }
@@ -2831,7 +3006,7 @@ export class QuizView {
     this.render();
   }
 
-  _handleScreenReturn() {
+  async _handleScreenReturn() {
     const session = this.activeExamSession;
     if (!session) return;
 
@@ -2846,14 +3021,15 @@ export class QuizView {
     session.awayStartedAt = null;
     session.lockdownCountdown = null;
 
-    this._requestExamFullscreen({ preserveLockdownState: false });
+    await this._requestExamFullscreen({ preserveLockdownState: false });
     this.render();
   }
 
   _flushAwayTime(session) {
     if (!session || !session.isAway || !session.awayStartedAt) return;
     const now = Date.now();
-    const elapsedSeconds = Math.max(0, Math.floor((now - session.awayStartedAt) / 1000));
+    const elapsedMs = now - session.awayStartedAt;
+    const elapsedSeconds = Math.max(0, Math.floor(elapsedMs / 1000));
     if (elapsedSeconds <= 0) {
       const remainingInPool = Math.max(0, 10 - (session.cumulativeAwaySeconds || 0));
       session.lockdownCountdown = remainingInPool;
@@ -2862,7 +3038,7 @@ export class QuizView {
       return;
     }
 
-    session.awayStartedAt = now;
+    session.awayStartedAt += elapsedSeconds * 1000;
     session.cumulativeAwaySeconds = (session.cumulativeAwaySeconds || 0) + elapsedSeconds;
 
     // Check if 10-second cumulative threshold(s) crossed
@@ -2889,7 +3065,7 @@ export class QuizView {
         return;
       }
       this._flushAwayTime(session);
-    }, 500);
+    }, 250);
   }
 
   _cancelExamLockdownCountdown(session) {
@@ -2928,28 +3104,43 @@ export class QuizView {
   }
 
   _requestExamFullscreen({ preserveLockdownState = false } = {}) {
-    const isMobile = typeof navigator !== 'undefined' && (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (typeof window !== 'undefined' && window.innerWidth < 768));
-    if (isMobile) {
+    if (this._isPhoneDevice() || !this._supportsFullscreen()) {
       const session = this.activeExamSession;
       if (session) {
         session.fullscreenActive = true;
-        session.lockdownPending = false;
+        if (!preserveLockdownState) {
+          session.lockdownPending = false;
+        }
       }
-      return;
+      return Promise.resolve();
     }
-    if (typeof document === 'undefined' || typeof document.documentElement.requestFullscreen !== 'function') {
-      return;
-    }
+
+    if (typeof document === 'undefined') return Promise.resolve();
+    const docEl = document.documentElement;
+    const requestMethod = (
+      docEl.requestFullscreen ||
+      docEl.webkitRequestFullscreen ||
+      docEl.mozRequestFullScreen ||
+      docEl.msRequestFullscreen
+    );
+
+    if (typeof requestMethod !== 'function') return Promise.resolve();
     const session = this.activeExamSession;
+
     try {
-      Promise.resolve(document.documentElement.requestFullscreen()).then(() => {
+      return Promise.resolve(requestMethod.call(docEl)).then(() => {
         if (this.activeExamSession !== session) return;
         session.fullscreenActive = true;
         if (!preserveLockdownState) {
           session.lockdownPending = false;
         }
-      }).catch(() => {});
-    } catch {}
+      }).catch((err) => {
+        console.warn('[ExamLockdown] Fullscreen request rejected:', err);
+      });
+    } catch (err) {
+      console.warn('[ExamLockdown] Fullscreen invocation error:', err);
+      return Promise.resolve();
+    }
   }
 
   _finishExamForViolationBan() {
@@ -2965,8 +3156,11 @@ export class QuizView {
       this.activeExamSession.timerId = null;
     }
     this._detachExamLockdownListeners();
-    if (typeof document !== 'undefined' && document.fullscreenElement && typeof document.exitFullscreen === 'function') {
-      Promise.resolve(document.exitFullscreen()).catch(() => {});
+    if (typeof document !== 'undefined' && this._getFullscreenElement()) {
+      const exitMethod = document.exitFullscreen || document.webkitExitFullscreen || document.mozCancelFullScreen || document.msExitFullscreen;
+      if (typeof exitMethod === 'function') {
+        Promise.resolve(exitMethod.call(document)).catch(() => {});
+      }
     }
 
     const currentUser = authManager.getCurrentUser();
@@ -3198,8 +3392,19 @@ export class QuizView {
     if (this.activeExamSession) {
       const btnResumeExamLockdown = this.container.querySelector('#btnResumeExamLockdown');
       if (btnResumeExamLockdown) {
-        btnResumeExamLockdown.addEventListener('click', () => {
-          this._handleScreenReturn();
+        btnResumeExamLockdown.addEventListener('click', async () => {
+          await this._handleScreenReturn();
+        });
+      }
+
+      const btnEnterExamFullscreen = this.container.querySelector('#btnEnterExamFullscreen');
+      if (btnEnterExamFullscreen) {
+        btnEnterExamFullscreen.addEventListener('click', async () => {
+          await this._requestExamFullscreen();
+          if (this.activeExamSession) {
+            this.activeExamSession.fullscreenActive = Boolean(this._getFullscreenElement()) || this._isPhoneDevice();
+            this.render();
+          }
         });
       }
 

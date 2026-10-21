@@ -438,4 +438,227 @@ describe('Exam Workflow, Student Identity Resolution & Lockdown Integrity Tests'
       expect(container.querySelector('#studioDistributeSection').style.display).toBe('block');
     });
   });
+
+  describe('6. Anti-Cheat & Screen Lockdown Robustness (F11, Alt+Tab, DevTools, Cumulative 10s Timer)', () => {
+    it('catches F11 keydown, triggers countdown, and bans with 0 points after 3 consecutive 10s cycles', () => {
+      vi.useFakeTimers();
+      authManager.register({
+        username: 'sv_anticheat_f11',
+        fullName: 'Sinh Viên F11',
+        email: 'f11@school.edu.vn',
+        password: 'Password123!',
+      });
+      const student = authManager.getCurrentUser();
+      examManager.clearAllData();
+
+      const examRes = examManager.createExam({
+        title: 'Đề Thi Chống Gian Lận F11',
+        questionIds: ['logic_q01'],
+        durationMinutes: 15,
+        assignedTo: [student.id],
+        createdBy: 'user_admin',
+      });
+      const examId = examRes.exam.id;
+
+      const quizView = new QuizView({ container });
+      quizView.setTab('myExams');
+      window.confirm = () => true;
+
+      const startBtn = container.querySelector(`.btn-start-exam[data-exam-id="${examId}"]`);
+      expect(startBtn).not.toBeNull();
+      startBtn.click();
+
+      expect(quizView.activeExamSession).not.toBeNull();
+      const session = quizView.activeExamSession;
+      expect(session.violationCount).toBe(0);
+
+      // 1. Simulate pressing F11
+      const f11Event = new window.KeyboardEvent('keydown', { key: 'F11', keyCode: 122, cancelable: true, bubbles: true });
+      window.dispatchEvent(f11Event);
+
+      expect(f11Event.defaultPrevented).toBe(true);
+      expect(session.isAway).toBe(true);
+      expect(session.awayReason).toBe('f11_pressed');
+      expect(session.lockdownPending).toBe(true);
+      expect(session.lockdownCountdown).toBe(10);
+
+      // 2. 10s elapse without returning -> 1st violation recorded
+      vi.advanceTimersByTime(10000);
+      expect(session.violationCount).toBe(1);
+      expect(session.lockdownCountdown).toBe(10);
+
+      // 3. Another 10s elapse without returning -> 2nd violation recorded
+      vi.advanceTimersByTime(10000);
+      expect(session.violationCount).toBe(2);
+      expect(session.lockdownCountdown).toBe(10);
+
+      // 4. Another 10s elapse without returning -> 3rd violation triggers ban & 0 points
+      vi.advanceTimersByTime(10000);
+      expect(quizView.activeExamSession).toBeNull();
+
+      const sub = examManager.getSubmission(examId, student.id);
+      expect(sub).not.toBeNull();
+      expect(sub.score).toBe(0);
+      expect(sub.integrityBan).toBe(true);
+    });
+
+    it('catches Alt+Tab keydown and accumulates departure time across brief exits', () => {
+      vi.useFakeTimers();
+      authManager.register({
+        username: 'sv_anticheat_alttab',
+        fullName: 'Sinh Viên AltTab',
+        email: 'alttab@school.edu.vn',
+        password: 'Password123!',
+      });
+      const student = authManager.getCurrentUser();
+      examManager.clearAllData();
+
+      const examRes = examManager.createExam({
+        title: 'Đề Thi Chống Gian Lận AltTab',
+        questionIds: ['logic_q01'],
+        durationMinutes: 15,
+        assignedTo: [student.id],
+        createdBy: 'user_admin',
+      });
+      const examId = examRes.exam.id;
+
+      const quizView = new QuizView({ container });
+      quizView.setTab('myExams');
+      window.confirm = () => true;
+
+      container.querySelector(`.btn-start-exam[data-exam-id="${examId}"]`).click();
+      const session = quizView.activeExamSession;
+
+      // Departure 1: Alt + Tab
+      const altTabEvent = new window.KeyboardEvent('keydown', { key: 'Tab', keyCode: 9, altKey: true, cancelable: true, bubbles: true });
+      window.dispatchEvent(altTabEvent);
+
+      expect(altTabEvent.defaultPrevented).toBe(true);
+      expect(session.isAway).toBe(true);
+      expect(session.awayReason).toBe('alt_tab_pressed');
+
+      // Away for 5 seconds
+      vi.advanceTimersByTime(5000);
+      expect(session.violationCount).toBe(0);
+      expect(session.lockdownCountdown).toBe(5);
+
+      // Returns in time
+      container.querySelector('#btnResumeExamLockdown').click();
+      expect(session.isAway).toBe(false);
+      expect(session.cumulativeAwaySeconds).toBe(5);
+
+      // Departure 2: Window blur
+      window.dispatchEvent(new window.Event('blur'));
+      expect(session.isAway).toBe(true);
+      expect(session.lockdownCountdown).toBe(5);
+
+      // Another 5 seconds -> cumulative reaches 10s -> 1st violation!
+      vi.advanceTimersByTime(5000);
+      expect(session.violationCount).toBe(1);
+    });
+
+    it('blocks DevTools shortcuts, text selection, copy, cut, and right-click context menu', () => {
+      authManager.register({
+        username: 'sv_anticheat_devtools',
+        fullName: 'Sinh Viên DevTools',
+        email: 'devtools@school.edu.vn',
+        password: 'Password123!',
+      });
+      const student = authManager.getCurrentUser();
+      examManager.clearAllData();
+
+      const examRes = examManager.createExam({
+        title: 'Đề Thi Chống DevTools & Copy',
+        questionIds: ['logic_q01'],
+        durationMinutes: 15,
+        assignedTo: [student.id],
+        createdBy: 'user_admin',
+      });
+      const examId = examRes.exam.id;
+
+      const quizView = new QuizView({ container });
+      quizView.setTab('myExams');
+      window.confirm = () => true;
+
+      container.querySelector(`.btn-start-exam[data-exam-id="${examId}"]`).click();
+      const session = quizView.activeExamSession;
+
+      // 1. F12 keydown
+      const f12Event = new window.KeyboardEvent('keydown', { key: 'F12', keyCode: 123, cancelable: true, bubbles: true });
+      window.dispatchEvent(f12Event);
+      expect(f12Event.defaultPrevented).toBe(true);
+      expect(session.awayReason).toBe('devtools_attempt');
+
+      // Return
+      container.querySelector('#btnResumeExamLockdown').click();
+
+      // 2. Ctrl + Shift + I
+      const ctrlShiftIEvent = new window.KeyboardEvent('keydown', { key: 'I', ctrlKey: true, shiftKey: true, cancelable: true, bubbles: true });
+      window.dispatchEvent(ctrlShiftIEvent);
+      expect(ctrlShiftIEvent.defaultPrevented).toBe(true);
+      expect(session.awayReason).toBe('devtools_attempt');
+
+      // 3. Right-click contextmenu
+      const contextMenuEvent = new window.MouseEvent('contextmenu', { cancelable: true, bubbles: true });
+      document.dispatchEvent(contextMenuEvent);
+      expect(contextMenuEvent.defaultPrevented).toBe(true);
+
+      // 4. Copy & Cut
+      const copyEvent = new window.Event('copy', { cancelable: true, bubbles: true });
+      document.dispatchEvent(copyEvent);
+      expect(copyEvent.defaultPrevented).toBe(true);
+
+      const cutEvent = new window.Event('cut', { cancelable: true, bubbles: true });
+      document.dispatchEvent(cutEvent);
+      expect(cutEvent.defaultPrevented).toBe(true);
+
+      // 5. Selectstart
+      const selectEvent = new window.Event('selectstart', { cancelable: true, bubbles: true });
+      document.dispatchEvent(selectEvent);
+      expect(selectEvent.defaultPrevented).toBe(true);
+    });
+
+    it('handles mobile app switching via pagehide and visibilitychange correctly', () => {
+      vi.useFakeTimers();
+      authManager.register({
+        username: 'sv_anticheat_mobile',
+        fullName: 'Sinh Viên Mobile',
+        email: 'mobile@school.edu.vn',
+        password: 'Password123!',
+      });
+      const student = authManager.getCurrentUser();
+      examManager.clearAllData();
+
+      const examRes = examManager.createExam({
+        title: 'Đề Mobile Test',
+        questionIds: ['logic_q01'],
+        durationMinutes: 15,
+        assignedTo: [student.id],
+        createdBy: 'user_admin',
+      });
+      const examId = examRes.exam.id;
+
+      const quizView = new QuizView({ container });
+      quizView.setTab('myExams');
+      window.confirm = () => true;
+
+      container.querySelector(`.btn-start-exam[data-exam-id="${examId}"]`).click();
+      const session = quizView.activeExamSession;
+
+      // Mobile swipe to home / app switch triggers pagehide
+      window.dispatchEvent(new window.Event('pagehide'));
+      expect(session.isAway).toBe(true);
+      expect(session.awayReason).toBe('pagehide');
+
+      // Away on mobile for 32 seconds (switched to chat app)
+      vi.advanceTimersByTime(32000);
+
+      // Exam must be banned and auto-submitted with 0 points
+      expect(quizView.activeExamSession).toBeNull();
+      const sub = examManager.getSubmission(examId, student.id);
+      expect(sub).not.toBeNull();
+      expect(sub.score).toBe(0);
+      expect(sub.integrityBan).toBe(true);
+    });
+  });
 });

@@ -7110,6 +7110,11 @@ body.theme-light .btn-close-modal:hover {
   padding: 24px;
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.18);
   margin-bottom: 24px;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+  -webkit-touch-callout: none !important;
 }
 
 .active-exam-topbar {
