@@ -644,4 +644,82 @@ describe('Security & Admin Authentication Hardening', () => {
       if (idx !== -1) serverUsers.splice(idx, 1);
     });
   });
+
+  describe('Database Backup & Restore Endpoints', () => {
+    it('blocks unauthenticated and non-admin requests from accessing backup or restore', async () => {
+      // 1. Unauthenticated backup
+      const unauthBackup = createMockHttp({ method: 'GET', url: '/api/admin/database/backup' });
+      await handleRequest(unauthBackup.req, unauthBackup.res);
+      expect(unauthBackup.res.statusCode).toBe(403);
+
+      // 2. Student backup
+      const studentToken = createSessionToken({ id: 'student_1', username: 'student_1', role: 'student' });
+      const studentBackup = createMockHttp({
+        method: 'GET',
+        url: '/api/admin/database/backup',
+        headers: { authorization: `Bearer ${studentToken}` },
+      });
+      await handleRequest(studentBackup.req, studentBackup.res);
+      expect(studentBackup.res.statusCode).toBe(403);
+
+      // 3. Unauthenticated restore
+      const unauthRestore = createMockHttp({
+        method: 'POST',
+        url: '/api/admin/database/restore',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ backupData: {} }),
+      });
+      await handleRequest(unauthRestore.req, unauthRestore.res);
+      expect(unauthRestore.res.statusCode).toBe(403);
+    });
+
+    it('allows verified admin to download backup and restore database', async () => {
+      const adminToken = createSessionToken({ id: 'user_admin', username: 'admin', role: 'admin' });
+
+      // 1. Download backup
+      const adminBackup = createMockHttp({
+        method: 'GET',
+        url: '/api/admin/database/backup',
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+      await handleRequest(adminBackup.req, adminBackup.res);
+      expect(adminBackup.res.statusCode).toBe(200);
+
+      const backupJson = JSON.parse(adminBackup.res.body);
+      expect(backupJson.version).toBe('2.0');
+      expect(Array.isArray(backupJson.users)).toBe(true);
+      expect(Array.isArray(backupJson.exams)).toBe(true);
+
+      // 2. Restore database
+      const testBackup = {
+        version: '2.0',
+        users: [
+          { id: 'sv_restore_1', username: 'sv_restore_1', fullName: 'Restore SV 1', className: 'K66-CNTT' },
+        ],
+        exams: [
+          { id: 'exam_restore_1', title: 'Restored Exam', questionIds: ['q1'], assignedTo: ['all'] },
+        ],
+        examSubmissions: [],
+      };
+
+      const adminRestore = createMockHttp({
+        method: 'POST',
+        url: '/api/admin/database/restore',
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ backupData: testBackup }),
+      });
+      await handleRequest(adminRestore.req, adminRestore.res);
+      expect(adminRestore.res.statusCode).toBe(200);
+      const restoreRes = JSON.parse(adminRestore.res.body);
+      expect(restoreRes.success).toBe(true);
+      expect(restoreRes.userCount).toBe(1);
+      expect(restoreRes.examCount).toBe(1);
+
+      // Verify serverUsers has the restored user
+      expect(serverUsers.some(u => u.username === 'sv_restore_1')).toBe(true);
+    });
+  });
 });

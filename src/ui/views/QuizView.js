@@ -1541,6 +1541,7 @@ export class QuizView {
     const exam = this._getStudioPrintExam();
 
     const allStudents = authManager.getUsers().filter(u => u.role !== 'admin');
+    const distinctClasses = Array.from(new Set(allStudents.map(s => (s.className || 'Sinh viên').trim()))).filter(Boolean).sort();
     const assignedExamsList = examManager.getExams();
 
     let currentPool = this.importedQuestions;
@@ -1885,9 +1886,24 @@ export class QuizView {
                   <strong>Giao cho toàn thể sinh viên</strong> (Tất cả sinh viên trong hệ thống)
                 </label>
                 <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:var(--text);">
+                  <input type="radio" name="assignTarget" value="class" id="radAssignClass" />
+                  <strong>Giao theo Lớp học cụ thể</strong>
+                </label>
+                <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:var(--text);">
                   <input type="radio" name="assignTarget" value="custom" id="radAssignCustom" />
                   <strong>Chọn danh sách sinh viên cụ thể</strong>
                 </label>
+              </div>
+
+              <!-- Class Selection Dropdown (hidden by default) -->
+              <div id="assignClassWrap" style="display:none;margin-top:12px;padding-top:12px;border-top:1px dashed var(--line);">
+                <div style="font-size:12px;color:var(--dim);margin-bottom:6px;">Chọn lớp học nhận đề thi này:</div>
+                <select id="selAssignClass" style="padding:8px 12px;font-size:13px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--text);min-width:260px;">
+                  ${distinctClasses.length > 0 ? distinctClasses.map(c => {
+                    const countInClass = allStudents.filter(s => (s.className || 'Sinh viên').trim() === c).length;
+                    return `<option value="${this._escapeHtml(c)}">🏫 Lớp: ${this._escapeHtml(c)} (${countInClass} sinh viên)</option>`;
+                  }).join('') : '<option value="Sinh viên">🏫 Lớp: Sinh viên</option>'}
+                </select>
               </div>
 
               <!-- Custom Student Checklist (hidden by default) -->
@@ -3889,24 +3905,19 @@ export class QuizView {
 
     // Radio assign target toggle
     const radAssignAll = this.container.querySelector('#radAssignAll');
+    const radAssignClass = this.container.querySelector('#radAssignClass');
     const radAssignCustom = this.container.querySelector('#radAssignCustom');
     const customStudentListWrap = this.container.querySelector('#customStudentListWrap');
+    const assignClassWrap = this.container.querySelector('#assignClassWrap');
 
-    if (radAssignAll && customStudentListWrap) {
-      radAssignAll.addEventListener('change', () => {
-        if (radAssignAll.checked) {
-          customStudentListWrap.style.display = 'none';
-        }
-      });
-    }
+    const updateAssignTargetUI = () => {
+      if (customStudentListWrap) customStudentListWrap.style.display = radAssignCustom?.checked ? 'block' : 'none';
+      if (assignClassWrap) assignClassWrap.style.display = radAssignClass?.checked ? 'block' : 'none';
+    };
 
-    if (radAssignCustom && customStudentListWrap) {
-      radAssignCustom.addEventListener('change', () => {
-        if (radAssignCustom.checked) {
-          customStudentListWrap.style.display = 'block';
-        }
-      });
-    }
+    if (radAssignAll) radAssignAll.addEventListener('change', updateAssignTargetUI);
+    if (radAssignClass) radAssignClass.addEventListener('change', updateAssignTargetUI);
+    if (radAssignCustom) radAssignCustom.addEventListener('change', updateAssignTargetUI);
 
     // Track custom exam title input
     const txtAssignTitle = this.container.querySelector('#txtAssignTitle');
@@ -3999,7 +4010,16 @@ export class QuizView {
 
           // Determine assignedTo target
           let assignedTo = ['all'];
-          if (radAssignCustom && radAssignCustom.checked) {
+          if (radAssignClass && radAssignClass.checked) {
+            const selClass = this.container.querySelector('#selAssignClass')?.value;
+            if (!selClass) {
+              this._showAlert('Vui lòng chọn một lớp học để phân đề!');
+              btnCreateAndAssign.disabled = false;
+              btnCreateAndAssign.innerHTML = originalBtnHtml;
+              return;
+            }
+            assignedTo = [`class:${selClass}`];
+          } else if (radAssignCustom && radAssignCustom.checked) {
             const selectedStudents = [];
             this.container.querySelectorAll('.chk-assign-student:checked').forEach(chk => {
               selectedStudents.push(chk.value);
@@ -4090,10 +4110,18 @@ export class QuizView {
               fileExportError = expErr.message;
             }
 
+            let targetLabel = 'Toàn bộ sinh viên';
+            if (assignedTo.some(a => (a || '').startsWith('class:'))) {
+              const cls = assignedTo.find(a => (a || '').startsWith('class:')).replace('class:', '');
+              targetLabel = `Lớp ${cls}`;
+            } else if (!assignedTo.includes('all')) {
+              targetLabel = `${assignedTo.length} sinh viên`;
+            }
+
             if (fileExportSuccess) {
-              this._showAlert(`🎉 Tạo & phát đề thi thành công và đã xuất File Đáp Án!\n\nĐề thi: "${title}" (Mã: ${result.exam.examCode || 'N/A'})\nSố câu: ${questionIds.length} câu\nThời lượng: ${durationMinutes} phút\nĐối tượng: ${assignedTo.includes('all') ? 'Toàn bộ sinh viên' : assignedTo.length + ' sinh viên'}\n\nĐề thi đã được chuyển vào mục "Quản Lý Đề Thi". File đáp án chi tiết đã được tự động tải về máy của bạn.`);
+              this._showAlert(`🎉 Tạo & phát đề thi thành công và đã xuất File Đáp Án!\n\nĐề thi: "${title}" (Mã: ${result.exam.examCode || 'N/A'})\nSố câu: ${questionIds.length} câu\nThời lượng: ${durationMinutes} phút\nĐối tượng: ${targetLabel}\n\nĐề thi đã được chuyển vào mục "Quản Lý Đề Thi". File đáp án chi tiết đã được tự động tải về máy của bạn.`);
             } else {
-              this._showAlert(`🎉 Đề thi đã phát thành công!\n\nĐề thi: "${title}" (Mã: ${result.exam.examCode || 'N/A'})\nSố câu: ${questionIds.length} câu\nThời lượng: ${durationMinutes} phút\nĐối tượng: ${assignedTo.includes('all') ? 'Toàn bộ sinh viên' : assignedTo.length + ' sinh viên'}\n\nĐề thi đã được chuyển vào mục "Quản Lý Đề Thi". (Lưu ý: Không thể tự động tải file đáp án: ${fileExportError || 'lỗi'}).`);
+              this._showAlert(`🎉 Đề thi đã phát thành công!\n\nĐề thi: "${title}" (Mã: ${result.exam.examCode || 'N/A'})\nSố câu: ${questionIds.length} câu\nThời lượng: ${durationMinutes} phút\nĐối tượng: ${targetLabel}\n\nĐề thi đã được chuyển vào mục "Quản Lý Đề Thi". (Lưu ý: Không thể tự động tải file đáp án: ${fileExportError || 'lỗi'}).`);
             }
 
             this.studioAssignTitle = null;

@@ -42,6 +42,8 @@ import {
   isImportedFileDeleted,
   recordImportedFilesReset,
   recordDbReset,
+  createDatabaseBackup,
+  restoreDatabaseBackup,
   saveDatabase, 
   fetchFromPostgres,
   saveToPostgres,
@@ -1275,6 +1277,54 @@ export async function handleRequest(req, res) {
         ]
       }
     });
+    return;
+  }
+
+  // Route: GET /api/admin/database/backup (Admin downloads full JSON database backup)
+  if (req.method === 'GET' && pathname === '/api/admin/database/backup') {
+    if (!isRequestFromAdmin(req)) {
+      sendJson(res, 403, {
+        success: false,
+        error: 'FORBIDDEN',
+        message: 'Chỉ Quản trị viên mới có quyền tải file sao lưu database.'
+      });
+      return;
+    }
+    try {
+      const backupData = await createDatabaseBackup();
+      const dateStr = new Date().toISOString().slice(0, 10);
+      res.writeHead(200, {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Content-Disposition': `attachment; filename="toanrr_backup_${dateStr}.json"`,
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-user-id',
+      });
+      res.end(JSON.stringify(backupData, null, 2));
+    } catch (err) {
+      sendJson(res, 500, { success: false, error: 'Lỗi tạo file sao lưu: ' + err.message });
+    }
+    return;
+  }
+
+  // Route: POST /api/admin/database/restore (Admin restores database from JSON backup)
+  if (req.method === 'POST' && pathname === '/api/admin/database/restore') {
+    if (!isRequestFromAdmin(req)) {
+      sendJson(res, 403, {
+        success: false,
+        error: 'FORBIDDEN',
+        message: 'Chỉ Quản trị viên mới có quyền phục hồi dữ liệu.'
+      });
+      return;
+    }
+    try {
+      const bodyBuffer = await readRequestBody(req);
+      const body = JSON.parse(bodyBuffer.toString('utf8') || '{}');
+      const dataToRestore = body?.backupData || body;
+      const result = await restoreDatabaseBackup(dataToRestore);
+      sendJson(res, 200, { success: true, ...result });
+    } catch (err) {
+      sendJson(res, 400, { success: false, error: 'Lỗi phục hồi dữ liệu: ' + err.message });
+    }
     return;
   }
 

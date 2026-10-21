@@ -327,7 +327,7 @@ describe('AdminView (Dedicated Database & Student Management Tab)', () => {
 
     // Check filter indicator appears
     const banner = container.querySelector('#adminActiveFilterIndicatorWrap');
-    expect(banner.textContent).toContain('Đang lọc theo từ khóa: "admin"');
+    expect(banner.textContent).toContain('Từ khóa: "admin"');
 
     const rowsBefore = container.querySelectorAll('.admin-user-row');
     expect(rowsBefore.length).toBe(1); // Only admin is visible
@@ -341,5 +341,48 @@ describe('AdminView (Dedicated Database & Student Management Tab)', () => {
     expect(searchInput.value).toBe('');
     const rowsAfter = container.querySelectorAll('.admin-user-row');
     expect(rowsAfter.length).toBeGreaterThan(1);
+  });
+
+  it('filters students by class using class dropdown', async () => {
+    authManager.quickLogin('user_admin');
+    authManager.adminCreateUser({ username: 'sv_cntt1', fullName: 'SV CNTT', className: 'K66-CNTT', password: '123' });
+    authManager.adminCreateUser({ username: 'sv_ktpm1', fullName: 'SV KTPM', className: 'K67-KTPM', password: '123' });
+
+    await adminView.render();
+
+    const classFilter = container.querySelector('#adminUserClassFilter');
+    expect(classFilter).not.toBeNull();
+
+    // Select K66-CNTT
+    classFilter.value = 'K66-CNTT';
+    classFilter.dispatchEvent(new window.Event('change'));
+
+    const tbody = container.querySelector('#adminUsersTbody');
+    expect(tbody.textContent).toContain('SV CNTT');
+    expect(tbody.textContent).not.toContain('SV KTPM');
+
+    // Reset to all
+    classFilter.value = 'all';
+    classFilter.dispatchEvent(new window.Event('change'));
+    expect(tbody.textContent).toContain('SV CNTT');
+    expect(tbody.textContent).toContain('SV KTPM');
+  });
+
+  it('provides 1-click database backup and restore triggers', async () => {
+    authManager.quickLogin('user_admin');
+    await adminView.render();
+
+    const btnBackup = container.querySelector('#btnAdminBackupDb');
+    const btnRestore = container.querySelector('#btnAdminTriggerRestoreDb');
+    const fileInputRestore = container.querySelector('#adminFileInputRestoreDb');
+
+    expect(btnBackup).not.toBeNull();
+    expect(btnRestore).not.toBeNull();
+    expect(fileInputRestore).not.toBeNull();
+
+    const backupSpy = vi.spyOn(cloudSyncManager, 'downloadDatabaseBackup').mockResolvedValue({ success: true, count: 5 });
+    btnBackup.click();
+    expect(backupSpy).toHaveBeenCalled();
+    backupSpy.mockRestore();
   });
 });

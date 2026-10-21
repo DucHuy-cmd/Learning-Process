@@ -27,6 +27,7 @@ export class AdminView {
     this.container = container;
     this.onNavigate = onNavigate || (() => {});
     this.searchQuery = '';
+    this.selectedClass = 'all';
     this.isServerConnected = false;
     this.isSyncing = false;
     this._syncCounter = 0;
@@ -83,6 +84,8 @@ export class AdminView {
   _renderDashboardLayout() {
     const allUsers = authManager.getUsers();
     const studentCount = allUsers.filter(u => u.username !== 'admin' && u.id !== 'user_admin').length;
+    const distinctClasses = this._getDistinctClasses(allUsers);
+    const classCounts = this._getClassCounts(allUsers);
 
     this.container.innerHTML = `
       <div class="admin-dashboard-wrap" style="max-width:1200px;margin:0 auto;padding:24px 20px;font-family:inherit;">
@@ -163,6 +166,31 @@ export class AdminView {
               <span style="font-size:20px;">👑</span>
             </div>
             <div style="font-size:18px;font-weight:800;color:#f59e0b;">@admin</div>
+          </div>
+        </div>
+
+        <!-- Database Backup & Disaster Recovery Section -->
+        <div style="background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 18px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <span style="font-size:24px;">💾</span>
+            <div>
+              <div style="font-size:13.5px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:6px;">
+                <span>Sao Lưu &amp; Phục Hồi Dữ Liệu 1-Chạm</span>
+                <span style="font-size:10.5px;padding:1px 6px;border-radius:4px;background:rgba(16,185,129,0.15);color:#10b981;font-weight:700;">Disaster Recovery</span>
+              </div>
+              <div style="font-size:11.5px;color:var(--dim);margin-top:2px;">
+                Tải file sao lưu (.json) lưu trữ an toàn hoặc phục hồi dữ liệu tức thì khi chuyển đổi máy chủ.
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <button type="button" id="btnAdminBackupDb" class="btn-sm" style="padding:6px 14px;font-size:12px;font-weight:700;background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.3);color:#10b981;border-radius:6px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
+              <span>📥</span> Tải File Sao Lưu (.json)
+            </button>
+            <button type="button" id="btnAdminTriggerRestoreDb" class="btn-sm" style="padding:6px 14px;font-size:12px;font-weight:700;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);border-radius:6px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
+              <span>📤</span> Phục Hồi Dữ Liệu
+            </button>
+            <input type="file" id="adminFileInputRestoreDb" accept=".json" style="display:none;" />
           </div>
         </div>
 
@@ -249,8 +277,17 @@ export class AdminView {
               </div>
             </div>
 
-            <!-- Search and export -->
+            <!-- Search, Class Filter and export -->
             <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+              <select id="adminUserClassFilter" style="box-sizing:border-box;padding:7px 12px;font-size:12.5px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--text);cursor:pointer;">
+                <option value="all">🏫 Tất cả các lớp (${studentCount})</option>
+                ${distinctClasses.map(c => `
+                  <option value="${this._escapeHtml(c)}" ${this.selectedClass === c ? 'selected' : ''}>
+                    Lớp ${this._escapeHtml(c)} (${classCounts[c] || 0})
+                  </option>
+                `).join('')}
+              </select>
+
               <div id="adminSearchInputWrap" style="position:relative;display:inline-flex;align-items:center;">
                 <input type="search" id="adminUserSearchInput" name="search_students_query_filter" value="${this._escapeHtml(this.searchQuery)}" placeholder="🔍 Tìm theo tên, username, lớp..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" data-form-type="other" style="box-sizing:border-box;padding:7px 30px 7px 12px;font-size:12.5px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--text);min-width:240px;">
                 ${this.searchQuery ? `
@@ -289,16 +326,53 @@ export class AdminView {
   }
 
   /**
-   * Returns users matching current searchQuery.
+   * Retrieves unique class names among student accounts.
+   * @param {Array<Object>} allUsers
+   * @returns {Array<string>}
+   * @private
+   */
+  _getDistinctClasses(allUsers) {
+    if (!Array.isArray(allUsers)) return [];
+    const students = allUsers.filter(u => u.username !== 'admin' && u.id !== 'user_admin');
+    return Array.from(new Set(students.map(s => (s.className || 'Sinh viên').trim()))).filter(Boolean).sort();
+  }
+
+  /**
+   * Calculates student count grouped by class name.
+   * @param {Array<Object>} allUsers
+   * @returns {Object<string, number>}
+   * @private
+   */
+  _getClassCounts(allUsers) {
+    const counts = {};
+    if (!Array.isArray(allUsers)) return counts;
+    allUsers.filter(u => u.username !== 'admin' && u.id !== 'user_admin').forEach(s => {
+      const c = (s.className || 'Sinh viên').trim();
+      counts[c] = (counts[c] || 0) + 1;
+    });
+    return counts;
+  }
+
+  /**
+   * Returns users matching current searchQuery and selected class filter.
    * @param {Array<Object>} users
    * @returns {Array<Object>}
    * @private
    */
   _getFilteredUsers(users) {
     if (!Array.isArray(users)) return [];
+    let list = users;
+    if (this.selectedClass && this.selectedClass !== 'all') {
+      const cls = this.selectedClass.trim().toLowerCase();
+      list = list.filter(u => {
+        if (u.username === 'admin' || u.id === 'user_admin') return false;
+        return (u.className || '').trim().toLowerCase() === cls;
+      });
+    }
+
     const q = (this.searchQuery || '').trim().toLowerCase();
-    if (!q) return users;
-    return users.filter(u =>
+    if (!q) return list;
+    return list.filter(u =>
       (u.fullName || '').toLowerCase().includes(q) ||
       (u.username || '').toLowerCase().includes(q) ||
       (u.className || '').toLowerCase().includes(q) ||
@@ -307,21 +381,26 @@ export class AdminView {
   }
 
   /**
-   * Renders an interactive banner when accounts are filtered by search keyword.
+   * Renders an interactive banner when accounts are filtered by search keyword or class.
    * @param {Array<Object>} allUsers
    * @returns {string}
    * @private
    */
   _renderActiveFilterIndicator(allUsers) {
     const q = (this.searchQuery || '').trim();
-    if (!q) return '';
+    const hasClass = this.selectedClass && this.selectedClass !== 'all';
+    if (!q && !hasClass) return '';
     const filtered = this._getFilteredUsers(allUsers);
     const totalCount = Array.isArray(allUsers) ? allUsers.length : 0;
     const studentCount = allUsers.filter(u => u.username !== 'admin' && u.id !== 'user_admin').length;
 
+    const parts = [];
+    if (hasClass) parts.push(`Lớp: "${this.selectedClass}"`);
+    if (q) parts.push(`Từ khóa: "${q}"`);
+
     return `
       <div style="margin-top:8px;padding:6px 12px;background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.3);border-radius:6px;display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--text);flex-wrap:wrap;">
-        <span>🔍 Đang lọc theo từ khóa: <strong style="color:var(--accent);">"${this._escapeHtml(q)}"</strong> (${filtered.length} / ${totalCount} tài khoản)</span>
+        <span>🔍 Đang lọc (${this._escapeHtml(parts.join(' & '))}): <strong>${filtered.length}</strong> / ${totalCount} tài khoản</span>
         <button type="button" id="btnAdminResetFilterBanner" style="background:#ef4444;color:#fff;border:none;border-radius:4px;padding:3px 8px;font-size:11px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:4px;">
           ✕ Hiện lại tất cả ${studentCount} sinh viên
         </button>
@@ -337,8 +416,8 @@ export class AdminView {
    */
   _getUsersTableTitleText(allUsers) {
     const totalCount = Array.isArray(allUsers) ? allUsers.length : 0;
-    const q = (this.searchQuery || '').trim();
-    if (q) {
+    const isFiltered = (this.searchQuery && this.searchQuery.trim()) || (this.selectedClass && this.selectedClass !== 'all');
+    if (isFiltered) {
       const filtered = this._getFilteredUsers(allUsers);
       return `Danh Sách Cơ Sở Dữ Liệu Tài Khoản (${filtered.length} / ${totalCount} tài khoản)`;
     }
@@ -634,10 +713,31 @@ export class AdminView {
           const searchInput = this.container.querySelector('#adminUserSearchInput');
           if (searchInput) searchInput.value = '';
           this.searchQuery = '';
+          this.selectedClass = 'all';
+          const classFilter = this.container.querySelector('#adminUserClassFilter');
+          if (classFilter) classFilter.value = 'all';
           this._updateUserTableAndTitle();
           if (searchInput) searchInput.focus();
         });
       }
+    }
+
+    // 1.8 Update Class Filter Dropdown options dynamically
+    const classFilter = this.container.querySelector('#adminUserClassFilter');
+    if (classFilter) {
+      const distinctClasses = this._getDistinctClasses(allUsers);
+      const classCounts = this._getClassCounts(allUsers);
+      const studentCount = allUsers.filter(u => u.username !== 'admin' && u.id !== 'user_admin').length;
+      const currentSelected = this.selectedClass || 'all';
+
+      classFilter.innerHTML = `
+        <option value="all" ${currentSelected === 'all' ? 'selected' : ''}>🏫 Tất cả các lớp (${studentCount})</option>
+        ${distinctClasses.map(c => `
+          <option value="${this._escapeHtml(c)}" ${currentSelected === c ? 'selected' : ''}>
+            Lớp ${this._escapeHtml(c)} (${classCounts[c] || 0})
+          </option>
+        `).join('')}
+      `;
     }
 
     // 2. Update Search Clear Button visibility
@@ -873,8 +973,95 @@ export class AdminView {
       resetFilterBannerBtn.addEventListener('click', () => {
         if (searchInput) searchInput.value = '';
         this.searchQuery = '';
+        this.selectedClass = 'all';
+        const classFilter = this.container.querySelector('#adminUserClassFilter');
+        if (classFilter) classFilter.value = 'all';
         this._updateUserTableAndTitle();
         if (searchInput) searchInput.focus();
+      });
+    }
+
+    // Class Filter Dropdown change
+    const classFilter = this.container.querySelector('#adminUserClassFilter');
+    if (classFilter) {
+      classFilter.addEventListener('change', (e) => {
+        this.selectedClass = e.target.value;
+        this._updateUserTableAndTitle();
+      });
+    }
+
+    // Database 1-Click Backup
+    const btnBackup = this.container.querySelector('#btnAdminBackupDb');
+    if (btnBackup) {
+      btnBackup.addEventListener('click', async (e) => {
+        e.preventDefault();
+        const origText = btnBackup.innerHTML;
+        btnBackup.innerHTML = '<span>⏳</span> Đang tạo file sao lưu...';
+        btnBackup.disabled = true;
+        try {
+          const res = await cloudSyncManager.downloadDatabaseBackup();
+          if (res && res.success) {
+            this._showAlert(`✅ Đã xuất file sao lưu cơ sở dữ liệu thành công! (Số tài khoản: ${res.count || 0})`, 'success');
+          } else {
+            this._showAlert(`❌ Không thể tải file sao lưu: ${res?.error || 'Lỗi không xác định'}`, 'error');
+          }
+        } catch (err) {
+          this._showAlert(`❌ Lỗi sao lưu: ${err.message}`, 'error');
+        } finally {
+          btnBackup.innerHTML = origText;
+          btnBackup.disabled = false;
+        }
+      });
+    }
+
+    // Database 1-Click Restore
+    const btnTriggerRestore = this.container.querySelector('#btnAdminTriggerRestoreDb');
+    const fileInputRestore = this.container.querySelector('#adminFileInputRestoreDb');
+    if (btnTriggerRestore && fileInputRestore) {
+      btnTriggerRestore.addEventListener('click', () => {
+        fileInputRestore.click();
+      });
+    }
+
+    if (fileInputRestore) {
+      fileInputRestore.addEventListener('change', async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        try {
+          const text = await file.text();
+          const json = JSON.parse(text);
+          if (!json || typeof json !== 'object') {
+            this._showAlert('⚠️ File không đúng định dạng JSON sao lưu của hệ thống.', 'error');
+            return;
+          }
+          const userCount = Array.isArray(json.users) ? json.users.length : 0;
+          const examCount = Array.isArray(json.exams) ? json.exams.length : 0;
+          const submissionCount = Array.isArray(json.examSubmissions) ? json.examSubmissions.length : 0;
+
+          const confirmed = typeof window !== 'undefined' && typeof window.confirm === 'function'
+            ? window.confirm(
+                `⚠️ BẠN CÓ CHẮC CHẮN MUỐN PHỤC HỒI DỮ LIỆU?\n\n` +
+                `• File: "${file.name}"\n` +
+                `• Số tài khoản: ${userCount}\n` +
+                `• Số đề thi: ${examCount}\n` +
+                `• Số bài nộp: ${submissionCount}\n\n` +
+                `Dữ liệu máy chủ hiện tại sẽ được cập nhật và đồng bộ lại theo file sao lưu này!`
+              )
+            : true;
+          if (!confirmed) return;
+
+          const res = await cloudSyncManager.restoreDatabaseBackup(json);
+          if (res && res.success) {
+            this._showAlert(`✅ Phục hồi cơ sở dữ liệu thành công! (Đã nạp ${res.userCount || 0} tài khoản, ${res.examCount || 0} đề thi, ${res.submissionCount || 0} bài nộp)`, 'success');
+            await this._triggerBackgroundSync();
+          } else {
+            this._showAlert(`❌ Phục hồi thất bại: ${res?.error || 'Lỗi máy chủ'}`, 'error');
+          }
+        } catch (err) {
+          this._showAlert(`❌ Lỗi đọc file sao lưu: ${err.message}`, 'error');
+        } finally {
+          fileInputRestore.value = '';
+        }
       });
     }
 

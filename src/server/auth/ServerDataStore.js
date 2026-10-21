@@ -1110,6 +1110,97 @@ export function saveDatabase() {
   return Promise.resolve(true);
 }
 
+/**
+ * Creates an authoritative JSON database backup object containing all tables.
+ * @returns {Promise<Object>}
+ */
+export async function createDatabaseBackup() {
+  if (sqlDb.isCloudEnabled) {
+    try {
+      await fetchFromPostgres();
+    } catch {}
+  }
+  return {
+    version: '2.0',
+    exportDate: new Date().toISOString(),
+    system: 'ToanRR Platform - Enterprise Single-Admin Database',
+    users: serverUsers.filter(u => u.username !== 'admin' && u.id !== 'user_admin'),
+    exams: serverExams,
+    examSubmissions: serverExamSubmissions,
+    quizStats: serverQuizStats,
+    customQuestions: serverCustomQuestions,
+    importedFiles: serverImportedFiles,
+  };
+}
+
+/**
+ * Restores the complete database state from a backup JSON object.
+ * @param {Object} backupData
+ * @returns {Promise<{ success: boolean, userCount: number, examCount: number, submissionCount: number }>}
+ */
+export async function restoreDatabaseBackup(backupData) {
+  if (!backupData || typeof backupData !== 'object') {
+    throw new Error('Dữ liệu sao lưu không đúng định dạng JSON.');
+  }
+
+  let restoredUsers = 0;
+  let restoredExams = 0;
+  let restoredSubmissions = 0;
+
+  if (Array.isArray(backupData.users)) {
+    const admin = getServerAdminUser();
+    serverUsers.length = 0;
+    serverUsers.push(admin);
+    for (const u of backupData.users) {
+      if (u && u.username !== 'admin' && u.id !== 'user_admin') {
+        const cleanUser = { ...u };
+        delete cleanUser.password;
+        serverUsers.push(cleanUser);
+        restoredUsers++;
+      }
+    }
+  }
+
+  if (Array.isArray(backupData.exams)) {
+    serverExams.length = 0;
+    serverExams.push(...backupData.exams);
+    restoredExams = serverExams.length;
+  }
+
+  if (Array.isArray(backupData.examSubmissions)) {
+    serverExamSubmissions.length = 0;
+    serverExamSubmissions.push(...backupData.examSubmissions);
+    restoredSubmissions = serverExamSubmissions.length;
+  }
+
+  if (Array.isArray(backupData.quizStats)) {
+    serverQuizStats.length = 0;
+    serverQuizStats.push(...backupData.quizStats);
+  }
+
+  if (Array.isArray(backupData.customQuestions)) {
+    serverCustomQuestions.length = 0;
+    serverCustomQuestions.push(...backupData.customQuestions);
+  }
+
+  if (Array.isArray(backupData.importedFiles)) {
+    serverImportedFiles.length = 0;
+    serverImportedFiles.push(...backupData.importedFiles);
+  }
+
+  if (sqlDb.isCloudEnabled) {
+    await saveToPostgres().catch(() => {});
+  }
+  saveDatabase();
+
+  return {
+    success: true,
+    userCount: restoredUsers,
+    examCount: restoredExams,
+    submissionCount: restoredSubmissions,
+  };
+}
+
 // Initial load
 loadDatabase();
 if (sqlDb.isCloudEnabled) {

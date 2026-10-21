@@ -587,4 +587,46 @@ describe('Exam Lifecycle, Drafts, Idempotency & Persistence Test Suite', () => {
     // Exam must be marked deleted locally
     expect(manager._isExamDeletedLocally('exam_to_be_deleted')).toBe(true);
   });
+
+  // Scenario 13: Target exam assignment by class ('class:K66-CNTT')
+  it('Scenario 13: Target exam assignment by class - only students of that class receive the exam', async () => {
+    const storage = new MockStorage();
+    const manager = new ExamManager({ storage });
+
+    manager.createExam({
+      id: 'exam_class_cntt',
+      title: 'Đề Thi Riêng Cho Lớp CNTT',
+      durationMinutes: 45,
+      questionIds: ['dijkstra_q01'],
+      assignedTo: ['class:K66-CNTT'],
+    });
+
+    // Student A is in K66-CNTT
+    const userA = { id: 'sv_a', username: 'sv_a', className: 'K66-CNTT' };
+    const examsForA = manager.getAssignedExams('sv_a', userA);
+    expect(examsForA.some(e => e.id === 'exam_class_cntt')).toBe(true);
+
+    // Student B is in K67-KTPM
+    const userB = { id: 'sv_b', username: 'sv_b', className: 'K67-KTPM' };
+    const examsForB = manager.getAssignedExams('sv_b', userB);
+    expect(examsForB.some(e => e.id === 'exam_class_cntt')).toBe(false);
+
+    // Submitting exam session
+    const subResA = manager.submitExam({
+      examId: 'exam_class_cntt',
+      userId: 'sv_a',
+      userInfo: userA,
+      answers: { dijkstra_q01: 'A' },
+    });
+    expect(subResA.success).toBe(true);
+
+    const subResB = manager.submitExam({
+      examId: 'exam_class_cntt',
+      userId: 'sv_b',
+      userInfo: userB,
+      answers: { dijkstra_q01: 'A' },
+    });
+    expect(subResB.success).toBe(false);
+    expect(subResB.error).toContain('không được giao cho tài khoản hoặc lớp của bạn');
+  });
 });

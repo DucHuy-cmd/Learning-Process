@@ -795,6 +795,67 @@ export class CloudSyncManager {
   }
 
   /**
+   * Downloads a full JSON database backup file.
+   * @returns {Promise<{ success: boolean, error?: string, count?: number }>}
+   */
+  async downloadDatabaseBackup() {
+    if (typeof fetch === 'undefined') return { success: false, error: 'Môi trường ngoại tuyến' };
+    try {
+      const res = await this.fetchWithTimeout(`${this.baseUrl}/api/admin/database/backup`, {
+        headers: {
+          ...this._getAdminAuthHeaders(),
+        },
+      });
+      if (!res.ok) {
+        return { success: false, error: `Máy chủ trả mã HTTP ${res.status}` };
+      }
+      const data = await res.json();
+      const jsonStr = JSON.stringify(data, null, 2);
+      if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+        const blob = new Blob([jsonStr], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        const dateStr = new Date().toISOString().slice(0, 10);
+        a.href = url;
+        a.download = `toanrr_database_backup_${dateStr}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }
+      return { success: true, count: data.users?.length || 0, data };
+    } catch (err) {
+      return { success: false, error: err.message || 'Lỗi tải file sao lưu' };
+    }
+  }
+
+  /**
+   * Restores database from a backup JSON object.
+   * @param {Object} backupData
+   * @returns {Promise<Object>}
+   */
+  async restoreDatabaseBackup(backupData) {
+    if (typeof fetch === 'undefined') return { success: false, error: 'Môi trường ngoại tuyến' };
+    try {
+      const res = await this.fetchWithTimeout(`${this.baseUrl}/api/admin/database/restore`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...this._getAdminAuthHeaders(),
+        },
+        body: JSON.stringify({ backupData }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        return { success: false, error: data?.error || `Lỗi máy chủ (${res.status})` };
+      }
+      return data || { success: false, error: 'Phản hồi rỗng từ máy chủ' };
+    } catch (err) {
+      return { success: false, error: 'Lỗi mạng khi kết nối máy chủ: ' + err.message };
+    }
+  }
+
+  /**
    * Synchronizes exams from server to local ExamManager.
    * Protects against wiping local exams when server returns empty or encounters errors.
    * @param {Object} examManager

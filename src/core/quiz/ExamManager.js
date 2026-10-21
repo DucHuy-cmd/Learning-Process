@@ -226,11 +226,20 @@ export class ExamManager {
     }
 
     const username = (user && user.username ? user.username : userId).toLowerCase();
+    const userClass = (user && user.className ? user.className : '').trim().toLowerCase();
 
     return this.getExams().filter(exam => {
       if (!Array.isArray(exam.assignedTo)) return false;
       // If targeted specifically to this student ID or username, always include
       if (exam.assignedTo.includes(userId) || exam.assignedTo.some(a => (a || '').toLowerCase() === username)) {
+        return true;
+      }
+
+      // If targeted to a specific class (e.g. 'class:K66-CNTT' or 'K66-CNTT')
+      if (userClass && exam.assignedTo.some(a => {
+        const target = (a || '').trim().toLowerCase();
+        return target === `class:${userClass}` || target === userClass;
+      })) {
         return true;
       }
 
@@ -240,6 +249,16 @@ export class ExamManager {
       }
       return false;
     });
+  }
+
+  /**
+   * Alias for getExamsForUser.
+   * @param {string} userId
+   * @param {Object} [userContext]
+   * @returns {Array<Object>}
+   */
+  getAssignedExams(userId, userContext = null) {
+    return this.getExamsForUser(userId, userContext);
   }
 
   /**
@@ -522,8 +541,28 @@ export class ExamManager {
     if (!exam) {
       return { success: false, error: 'Đề thi không tồn tại hoặc đã bị xóa.' };
     }
-    if (!Array.isArray(exam.assignedTo) || (!exam.assignedTo.includes('all') && !exam.assignedTo.includes(userId))) {
-      return { success: false, error: 'Đề thi này không được giao cho tài khoản của bạn.' };
+    let userClass = (userInfo?.className || '').trim().toLowerCase();
+    if (!userClass && typeof localStorage !== 'undefined') {
+      try {
+        const currRaw = localStorage.getItem('trr_current_user');
+        if (currRaw) {
+          const curr = JSON.parse(currRaw);
+          if (curr && (curr.id === userId || curr.username === userId)) {
+            userClass = (curr.className || '').trim().toLowerCase();
+          }
+        }
+      } catch {}
+    }
+    const isTargeted = Array.isArray(exam.assignedTo) && (
+      exam.assignedTo.includes('all') ||
+      exam.assignedTo.includes(userId) ||
+      (userClass && exam.assignedTo.some(a => {
+        const target = (a || '').trim().toLowerCase();
+        return target === `class:${userClass}` || target === userClass;
+      }))
+    );
+    if (!isTargeted) {
+      return { success: false, error: 'Đề thi này không được giao cho tài khoản hoặc lớp của bạn.' };
     }
 
     // Strict 1-attempt rule
