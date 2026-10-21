@@ -202,17 +202,13 @@ export class CloudSyncManager {
           };
         });
 
-        // 5. Only push local accounts that are explicitly marked pendingSync AND not deleted
+        // 5. Preserve all valid local accounts (imported or created) that have not been explicitly deleted
         for (const lu of localUsers) {
-          if (lu.pendingSync === true) {
-            const isDel = authManager.isLocallyDeleted(lu.id) || authManager.isLocallyDeleted(lu.username);
-            if (!isDel && !mergedUsers.some(mu => mu.id === lu.id || mu.username.toLowerCase() === lu.username.toLowerCase())) {
-              mergedUsers.push(lu);
-              if (this.isConnected) {
-                this.pushRegister(lu).then(() => {
-                  delete lu.pendingSync;
-                }).catch(() => {});
-              }
+          const isDel = authManager.isLocallyDeleted(lu.id) || authManager.isLocallyDeleted(lu.username);
+          if (!isDel && !mergedUsers.some(mu => mu.id === lu.id || mu.username.toLowerCase() === lu.username.toLowerCase())) {
+            mergedUsers.push(lu);
+            if (this.isConnected && lu.username !== 'admin') {
+              this.adminCreateUser(lu).catch(() => {});
             }
           }
         }

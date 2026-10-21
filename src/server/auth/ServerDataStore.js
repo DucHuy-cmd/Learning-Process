@@ -203,8 +203,11 @@ export function getKVConfig() {
 }
 
 export function isKVConfigured() {
-  // Upstash KV is disconnected in favor of Relational SQL Engine (PostgreSQL)
-  return false;
+  // If Cloud PostgreSQL is configured, it takes full precedence
+  if (sqlDb.isCloudEnabled) return false;
+  // Fallback to existing cloud storage on Vercel during transition so data is never lost
+  const { url, token } = getKVConfig();
+  return Boolean(url && token);
 }
 
 export async function fetchFromKV() {
@@ -387,6 +390,10 @@ export function saveDatabase() {
     fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf8');
   } catch {
     // In-memory fallback for read-only filesystem
+  }
+
+  if (isKVConfigured()) {
+    return writeToKV().catch(() => {});
   }
 
   return Promise.resolve(true);
