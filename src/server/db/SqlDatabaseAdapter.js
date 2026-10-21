@@ -327,9 +327,7 @@ export class SqlDatabaseAdapter {
     try {
       const { neon } = await import('@neondatabase/serverless');
       const sql = neon(this.postgresUrl);
-      const res = params && params.length > 0 
-        ? await sql(sqlQuery, params)
-        : await sql(sqlQuery);
+      const res = await sql.query(sqlQuery, params || []);
       const rows = Array.isArray(res) ? res : (res?.rows || []);
       return {
         rows,

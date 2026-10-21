@@ -640,6 +640,21 @@ export async function handleRequest(req, res) {
     serverDeletedUsers.clear();
     serverDeletedExams.clear();
     serverDeletedImportedFiles.clear();
+
+    if (sqlDb.isCloudEnabled) {
+      try {
+        await sqlDb.executeRawPostgres('DELETE FROM exam_submissions;');
+        await sqlDb.executeRawPostgres('DELETE FROM quiz_stats;');
+        await sqlDb.executeRawPostgres('DELETE FROM ai_sessions;');
+        await sqlDb.executeRawPostgres('DELETE FROM custom_questions;');
+        await sqlDb.executeRawPostgres('DELETE FROM imported_files;');
+        await sqlDb.executeRawPostgres("DELETE FROM exams WHERE id NOT IN ('exam_intro_eval_2026');");
+        await sqlDb.executeRawPostgres("DELETE FROM users WHERE username != 'admin';");
+      } catch (err) {
+        console.warn('[app.js] Error cleaning Postgres on reset:', err.message);
+      }
+    }
+
     await saveDatabase();
     sendJson(res, 200, { success: true, message: 'Đã xóa toàn bộ database thành công.' });
     return;

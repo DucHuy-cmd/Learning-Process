@@ -56,11 +56,11 @@ describe('Admin Database Management & Smart Features', () => {
     delete global.Event;
   });
 
-  it('renders Database status indicator and ping button', async () => {
+  it('renders Database status indicator and verifies ping button is removed', async () => {
     await adminView.render();
     const btnPing = container.querySelector('#btnAdminPingDb');
-    expect(btnPing).not.toBeNull();
-    expect(container.textContent).toContain('Cấu Hình Database Cloud');
+    expect(btnPing).toBeNull();
+    expect(container.textContent).toContain('Cấu Hình Cơ Sở Dữ Liệu SQL');
   });
 
   it('provides 1-click password reset for student accounts', async () => {
@@ -99,16 +99,47 @@ describe('Admin Database Management & Smart Features', () => {
     expect(parsed2[0].password).toBe('123456');
   });
 
-  it('renders student exam submissions in the gradebook tab', async () => {
+  it('renders student exam submissions directly in the gradebook section', async () => {
     await adminView.render();
 
-    // Switch to gradebook tab
-    const tabGradebook = container.querySelector('.btn-admin-tab[data-tab="gradebook"]');
-    expect(tabGradebook).not.toBeNull();
-    tabGradebook.click();
-
-    expect(adminView.activeTab).toBe('gradebook');
+    const gradebookSection = container.querySelector('#tabContentGradebook');
+    expect(gradebookSection).not.toBeNull();
     const tbody = container.querySelector('#adminGradebookTbody');
     expect(tbody).not.toBeNull();
+  });
+
+  it('resets database cleanly, clears tombstones, and allows re-creating the same accounts', async () => {
+    // 1. Create a student account
+    authManager.adminCreateUser({
+      username: 'sv_reset_recreate',
+      fullName: 'Sinh Viên Test Reset',
+      password: '123',
+    });
+    expect(authManager.getUsers().some(u => u.username === 'sv_reset_recreate')).toBe(true);
+
+    // 2. Perform full database reset
+    window.confirm = () => true;
+    await adminView.render();
+    const btnReset = container.querySelector('#btnAdminFullDatabaseReset');
+    expect(btnReset).not.toBeNull();
+    btnReset.click();
+    await new Promise(r => setTimeout(r, 60));
+
+    // 3. Verify user is removed and tombstones are empty
+    expect(authManager.getUsers().some(u => u.username === 'sv_reset_recreate')).toBe(false);
+    expect(authManager.getDeletedUsers()).toEqual([]);
+
+    // 4. Re-create the same username
+    const reCreateRes = authManager.adminCreateUser({
+      username: 'sv_reset_recreate',
+      fullName: 'Sinh Viên Tái Tạo',
+      password: '123',
+    });
+    expect(reCreateRes.success).toBe(true);
+
+    // 5. User should be able to log in without "tài khoản đã bị xóa" error
+    const loginRes = authManager.login('sv_reset_recreate', '123');
+    expect(loginRes.success).toBe(true);
+    expect(loginRes.user.username).toBe('sv_reset_recreate');
   });
 });

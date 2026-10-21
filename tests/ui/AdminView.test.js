@@ -233,25 +233,26 @@ describe('AdminView (Dedicated Database & Student Management Tab)', () => {
     batchSpy.mockRestore();
   });
 
-  it('renders visible tabs and switches between Students, Gradebook, and Maintenance', async () => {
+  it('renders unified continuous dashboard without tabs and with ping button removed', async () => {
     authManager.quickLogin('user_admin');
     await adminView.render();
 
-    const tabsNav = container.querySelector('.admin-nav-tabs');
-    expect(tabsNav).not.toBeNull();
-    expect(tabsNav.style.display).not.toBe('none');
+    // 1. Navigation tabs and Ping button are removed as requested
+    expect(container.querySelector('.admin-nav-tabs')).toBeNull();
+    expect(container.querySelector('#btnAdminPingDb')).toBeNull();
 
-    // Switch to Gradebook tab
-    const gradebookTabBtn = container.querySelector('.btn-admin-tab[data-tab="gradebook"]');
-    expect(gradebookTabBtn).not.toBeNull();
-    gradebookTabBtn.click();
-    expect(adminView.activeTab).toBe('gradebook');
+    // 2. All 3 sections are rendered sequentially and visible together
+    const studentsSection = container.querySelector('#tabContentStudents');
+    const gradebookSection = container.querySelector('#tabContentGradebook');
+    const maintenanceSection = container.querySelector('#tabContentMaintenance');
 
-    // Switch to Maintenance tab
-    const maintenanceTabBtn = container.querySelector('.btn-admin-tab[data-tab="maintenance"]');
-    expect(maintenanceTabBtn).not.toBeNull();
-    maintenanceTabBtn.click();
-    expect(adminView.activeTab).toBe('maintenance');
+    expect(studentsSection).not.toBeNull();
+    expect(gradebookSection).not.toBeNull();
+    expect(maintenanceSection).not.toBeNull();
+
+    expect(studentsSection.style.display).not.toBe('none');
+    expect(gradebookSection.style.display).not.toBe('none');
+    expect(maintenanceSection.style.display).not.toBe('none');
   });
 
   it('provides student list export to CSV button', async () => {

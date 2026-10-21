@@ -301,9 +301,7 @@ export class AuthModal {
               return;
             } else if (remoteResult && remoteResult.error) {
               // Server rejected -> if user was deleted on server, purge locally as well
-              if (remoteResult.error.includes('không tồn tại')) {
-                authManager.deleteUser(username, username);
-              }
+              // Removed auto-delete on login error
               alertBox.textContent = remoteResult.error;
               alertBox.style.display = 'block';
               return;

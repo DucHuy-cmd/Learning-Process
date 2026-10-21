@@ -456,7 +456,15 @@ export async function saveToPostgres() {
   try {
     await sqlDb.initSchema();
 
-    // 1. Upsert users
+    // 1. Clean up users from postgres that are not in serverUsers (except admin)
+    if (serverUsers.length > 0) {
+      const activeUsernames = serverUsers.map(u => `'${(u.username || '').toLowerCase().replace(/'/g, "''")}'`).join(',');
+      await sqlDb.executeRawPostgres(`DELETE FROM users WHERE username != 'admin' AND username NOT IN (${activeUsernames});`);
+    } else {
+      await sqlDb.executeRawPostgres("DELETE FROM users WHERE username != 'admin';");
+    }
+
+    // Upsert active users (keyed on username to allow re-creation without conflicts)
     for (const u of serverUsers) {
       if (!u || !u.id) continue;
       const username = (u.username || '').toLowerCase();
@@ -471,8 +479,7 @@ export async function saveToPostgres() {
       await sqlDb.executeRawPostgres(`
         INSERT INTO users (id, username, full_name, class_name, email, password, avatar, role, created_at)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-        ON CONFLICT (id) DO UPDATE SET
-          username = EXCLUDED.username,
+        ON CONFLICT (username) DO UPDATE SET
           full_name = EXCLUDED.full_name,
           class_name = EXCLUDED.class_name,
           email = EXCLUDED.email,
@@ -482,13 +489,14 @@ export async function saveToPostgres() {
       `, [u.id, username, fullName, className, email, password, avatar, role, createdAt]);
     }
 
-    // If serverUsers has IDs, delete users from postgres that are not in serverUsers (except admin)
-    if (serverUsers.length > 0) {
-      const activeIds = serverUsers.map(u => `'${u.id}'`).join(',');
-      await sqlDb.executeRawPostgres(`DELETE FROM users WHERE id NOT IN (${activeIds}) AND username != 'admin';`);
+    // 2. Upsert exams
+    if (serverExams.length > 0) {
+      const activeExamIds = serverExams.map(e => `'${e.id}'`).join(',');
+      await sqlDb.executeRawPostgres(`DELETE FROM exams WHERE id NOT IN (${activeExamIds});`);
+    } else {
+      await sqlDb.executeRawPostgres('DELETE FROM exams;');
     }
 
-    // 2. Upsert exams
     for (const e of serverExams) {
       if (!e || !e.id) continue;
       await sqlDb.executeRawPostgres(`
@@ -516,17 +524,31 @@ export async function saveToPostgres() {
     }
 
     // 3. Exam submissions
-    for (const s of serverExamSubmissions) {
-      if (!s || !s.id) continue;
-      await sqlDb.executeRawPostgres(`
-        INSERT INTO exam_submissions (id, exam_id, user_id, exam_title, student_name, student_class, answers, score, max_score, total_questions, correct_count, time_spent_seconds, submitted_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10, $11, $12, $13)
-        ON CONFLICT (id) DO NOTHING;
-      `, [
-        s.id, s.examId, s.userId, s.examTitle || '', s.studentName || '', s.studentClass || '',
-        JSON.stringify(s.answers || {}), s.score || 0, s.maxScore || 10,
-        s.totalQuestions || 0, s.correctCount || 0, s.timeSpentSeconds || 0, s.submittedAt || new Date().toISOString()
-      ]);
+    if (serverExamSubmissions.length === 0) {
+      await sqlDb.executeRawPostgres('DELETE FROM exam_submissions;');
+    } else {
+      for (const s of serverExamSubmissions) {
+        if (!s || !s.id) continue;
+        await sqlDb.executeRawPostgres(`
+          INSERT INTO exam_submissions (id, exam_id, user_id, exam_title, student_name, student_class, answers, score, max_score, total_questions, correct_count, time_spent_seconds, submitted_at)
+          VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10, $11, $12, $13)
+          ON CONFLICT (id) DO NOTHING;
+        `, [
+          s.id, s.examId, s.userId, s.examTitle || '', s.studentName || '', s.studentClass || '',
+          JSON.stringify(s.answers || {}), s.score || 0, s.maxScore || 10,
+          s.totalQuestions || 0, s.correctCount || 0, s.timeSpentSeconds || 0, s.submittedAt || new Date().toISOString()
+        ]);
+      }
+    }
+
+    // 4. Quiz stats
+    if (Object.keys(serverQuizStats).length === 0) {
+      await sqlDb.executeRawPostgres('DELETE FROM quiz_stats;');
+    }
+
+    // 5. Imported files
+    if (serverImportedFiles.length === 0) {
+      await sqlDb.executeRawPostgres('DELETE FROM imported_files;');
     }
 
     return true;

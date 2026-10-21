@@ -98,10 +98,6 @@ export class AdminView {
           </div>
 
           <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-            <button type="button" class="btn-secondary" id="btnAdminPingDb" style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;font-size:12.5px;font-weight:600;border-radius:8px;cursor:pointer;">
-              <span>⚡</span>
-              <span>Kiểm tra Kết nối DB</span>
-            </button>
             <button type="button" class="btn-secondary" id="btnAdminManualSync" style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;font-size:12.5px;font-weight:600;border-radius:8px;cursor:pointer;">
               <span>🔄</span>
               <span>Đồng bộ Máy chủ</span>
@@ -167,20 +163,8 @@ export class AdminView {
           </div>
         </div>
 
-        <!-- Navigation Tabs -->
-        <div class="admin-nav-tabs" style="display:flex;gap:10px;border-bottom:1px solid var(--line);margin-bottom:24px;">
-          <button type="button" class="btn-admin-tab ${this.activeTab === 'students' ? 'active' : ''}" data-tab="students" style="padding:10px 18px;font-size:13.5px;font-weight:700;cursor:pointer;border:none;background:transparent;color:${this.activeTab === 'students' ? 'var(--accent)' : 'var(--dim)'};border-bottom:2px solid ${this.activeTab === 'students' ? 'var(--accent)' : 'transparent'};">
-            👥 Quản Lý Sinh Viên (${studentCount})
-          </button>
-          <button type="button" class="btn-admin-tab ${this.activeTab === 'gradebook' ? 'active' : ''}" data-tab="gradebook" style="padding:10px 18px;font-size:13.5px;font-weight:700;cursor:pointer;border:none;background:transparent;color:${this.activeTab === 'gradebook' ? 'var(--accent)' : 'var(--dim)'};border-bottom:2px solid ${this.activeTab === 'gradebook' ? 'var(--accent)' : 'transparent'};">
-            📊 Bảng Điểm &amp; Bài Nộp (${examManager.getSubmissions().length})
-          </button>
-          <button type="button" class="btn-admin-tab ${this.activeTab === 'maintenance' ? 'active' : ''}" data-tab="maintenance" style="padding:10px 18px;font-size:13.5px;font-weight:700;cursor:pointer;border:none;background:transparent;color:${this.activeTab === 'maintenance' ? 'var(--accent)' : 'var(--dim)'};border-bottom:2px solid ${this.activeTab === 'maintenance' ? 'var(--accent)' : 'transparent'};">
-            ⚙️ Cấu Hình Database Cloud
-          </button>
-        </div>
-
-        <div id="tabContentStudents" style="display:${this.activeTab === 'students' ? 'block' : 'none'};">
+        <!-- Tab Content 1: Students -->
+        <div id="tabContentStudents">
         <!-- Add Student Form Section (Collapsible/Accordion) -->
         <section class="admin-create-user-section" style="background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px 22px;margin-bottom:24px;">
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:12px;">
@@ -279,7 +263,7 @@ export class AdminView {
         </div>
 
         <!-- TAB 2: GRADEBOOK -->
-        <div id="tabContentGradebook" style="display:${this.activeTab === 'gradebook' ? 'block' : 'none'};">
+        <div id="tabContentGradebook">
           <section style="background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px 22px;margin-bottom:24px;">
             <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:16px;">
               <div>
@@ -321,7 +305,7 @@ export class AdminView {
         </div>
 
         <!-- TAB 3: MAINTENANCE -->
-        <div id="tabContentMaintenance" style="display:${this.activeTab === 'maintenance' ? 'block' : 'none'};">
+        <div id="tabContentMaintenance">
           <section style="background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:22px;margin-bottom:24px;">
             <h3 style="margin:0 0 12px;font-size:16px;color:var(--text);font-weight:700;display:flex;align-items:center;gap:8px;">
               <span>🏛️</span>
@@ -502,38 +486,6 @@ export class AdminView {
    * @private
    */
   _bindEvents() {
-    // Tabs
-    this.container.querySelectorAll('.btn-admin-tab').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const tab = btn.getAttribute('data-tab');
-        if (tab && tab !== this.activeTab) {
-          this.activeTab = tab;
-          this.render();
-        }
-      });
-    });
-
-    // Ping DB
-    const btnPing = this.container.querySelector('#btnAdminPingDb');
-    if (btnPing) {
-      btnPing.addEventListener('click', async () => {
-        btnPing.disabled = true;
-        btnPing.textContent = '⏳ Đang kiểm tra...';
-        const start = Date.now();
-        const status = await cloudSyncManager.getDatabaseStatus();
-        const latency = Date.now() - start;
-        btnPing.disabled = false;
-        btnPing.textContent = '⚡ Kiểm tra Kết nối DB';
-        if (status && status.connected) {
-          const type = status.databaseLabel || (status.kvConfigured ? 'Cloud KV (Upstash Redis)' : 'Local File Store');
-          const users = status.metrics?.usersCount || 0;
-          this._showAlert(`✓ Kết nối Database thành công! Loại DB: ${type} • Phản hồi: ${latency}ms • Dữ liệu: ${users} tài khoản.`, 'success');
-        } else {
-          this._showAlert('❌ Không thể kết nối tới cơ sở dữ liệu máy chủ. Đang ở chế độ Ngoại tuyến.', 'error');
-        }
-      });
-    }
-
     // Gradebook search
     const gradebookSearch = this.container.querySelector('#adminGradebookSearchInput');
     if (gradebookSearch) {
@@ -776,19 +728,27 @@ export class AdminView {
         }
 
         btnClearExams.disabled = true;
-        btnClearExams.textContent = '⏳ Đang xóa...';
-
-        examManager.clearAllExams();
-        quizHistoryManager.clearAllExamHistory();
+        const originalTextClear = btnClearExams.innerHTML;
+        btnClearExams.innerHTML = '<span>⏳</span> Đang xóa...';
 
         try {
-          await cloudSyncManager.serverClearAllExams();
-          await cloudSyncManager.syncExams(examManager);
-          await cloudSyncManager.syncExamSubmissions(examManager);
-        } catch {}
+          examManager.clearAllExams();
+          quizHistoryManager.clearAllExamHistory();
 
-        await this.render();
-        this._showAlert('✓ Đã xóa sạch toàn bộ đề thi và làm sạch dữ liệu bài làm trong tài khoản sinh viên!', 'success');
+          try {
+            await cloudSyncManager.serverClearAllExams();
+            await cloudSyncManager.syncExams(examManager);
+            await cloudSyncManager.syncExamSubmissions(examManager);
+          } catch {}
+
+          await this.render();
+          this._showAlert('✓ Đã xóa sạch toàn bộ đề thi và làm sạch dữ liệu bài làm trong tài khoản sinh viên!', 'success');
+        } catch (err) {
+          this._showAlert(`Lỗi khi xóa đề thi: ${err.message}`, 'error');
+        } finally {
+          btnClearExams.disabled = false;
+          btnClearExams.innerHTML = originalTextClear;
+        }
       });
     }
 
@@ -804,40 +764,49 @@ export class AdminView {
         }
 
         btnFullReset.disabled = true;
-        btnFullReset.textContent = '⏳ Đang xóa database...';
-
-        authManager.resetUsersToDefault();
-        quizHistoryManager.clearLeaderboard();
-        quizHistoryManager.clearAllExamHistory();
-        examManager.clearAllExams();
-        if (aiHistoryManager && typeof aiHistoryManager._writeAll === 'function') {
-          aiHistoryManager._writeAll({});
-        }
-
-        // Wipe clean all local deletion tombstones and imported questions
-        if (authManager.storage) {
-          try {
-            authManager.storage.setItem('trr_deleted_users_v1', JSON.stringify([]));
-            authManager.storage.setItem('toanrr_deleted_imported_files_v1', JSON.stringify([]));
-            authManager.storage.setItem('toanrr_custom_imported_files_v1', JSON.stringify([]));
-            authManager.storage.setItem('toanrr_custom_imported_questions_v1', JSON.stringify([]));
-            authManager.storage.removeItem('toanrr_custom_imported_raw_v1');
-          } catch {}
-        }
+        const originalTextReset = btnFullReset.innerHTML;
+        btnFullReset.innerHTML = '<span>⏳</span> Đang xóa database...';
 
         try {
-          await cloudSyncManager.adminResetDatabase();
-          if (typeof cloudSyncManager.pushClearAllImportedFiles === 'function') {
-            await cloudSyncManager.pushClearAllImportedFiles();
+          authManager.resetUsersToDefault({ force: true });
+          quizHistoryManager.clearLeaderboard();
+          quizHistoryManager.clearAllExamHistory();
+          examManager.clearAllExams();
+          if (aiHistoryManager && typeof aiHistoryManager._writeAll === 'function') {
+            aiHistoryManager._writeAll({});
           }
-          await cloudSyncManager.syncUsers(authManager);
-          await cloudSyncManager.syncQuizLeaderboard(quizHistoryManager);
-          await cloudSyncManager.syncExams(examManager);
-          await cloudSyncManager.syncExamSubmissions(examManager);
-        } catch {}
 
-        await this.render();
-        this._showAlert('✓ Toàn bộ Database đã được xóa sạch và khôi phục về trạng thái ban đầu!', 'success');
+          // Wipe clean all local deletion tombstones and imported questions
+          if (authManager.storage) {
+            try {
+              authManager.storage.setItem('trr_deleted_users_v1', JSON.stringify([]));
+              authManager.storage.setItem('toanrr_deleted_imported_files_v1', JSON.stringify([]));
+              authManager.storage.setItem('toanrr_custom_imported_files_v1', JSON.stringify([]));
+              authManager.storage.setItem('toanrr_custom_imported_questions_v1', JSON.stringify([]));
+              authManager.storage.removeItem('toanrr_custom_imported_raw_v1');
+              authManager.storage.setItem('trr_registered_users', JSON.stringify(authManager.getUsers()));
+            } catch {}
+          }
+
+          try {
+            await cloudSyncManager.adminResetDatabase();
+            if (typeof cloudSyncManager.pushClearAllImportedFiles === 'function') {
+              await cloudSyncManager.pushClearAllImportedFiles();
+            }
+            await cloudSyncManager.syncUsers(authManager);
+            await cloudSyncManager.syncQuizLeaderboard(quizHistoryManager);
+            await cloudSyncManager.syncExams(examManager);
+            await cloudSyncManager.syncExamSubmissions(examManager);
+          } catch {}
+
+          await this.render();
+          this._showAlert('✓ Toàn bộ Database đã được xóa sạch và khôi phục về trạng thái ban đầu!', 'success');
+        } catch (err) {
+          this._showAlert(`Lỗi khi reset database: ${err.message}`, 'error');
+        } finally {
+          btnFullReset.disabled = false;
+          btnFullReset.innerHTML = originalTextReset;
+        }
       });
     }
 
