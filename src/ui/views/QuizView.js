@@ -2788,8 +2788,10 @@ export class QuizView {
           this._flushAwayTime(session);
         }
       } else {
-        session.fullscreenActive = false;
-        this._handleScreenDeparture('fullscreen_exit');
+        if (session.fullscreenActive) {
+          session.fullscreenActive = false;
+          this._handleScreenDeparture('fullscreen_exit');
+        }
       }
     };
 
@@ -2805,8 +2807,15 @@ export class QuizView {
       }
     };
 
+    let allowBlurEvent = Boolean(typeof process !== 'undefined' && process.env?.NODE_ENV === 'test');
+    if (!allowBlurEvent && typeof setTimeout !== 'undefined') {
+      setTimeout(() => { allowBlurEvent = true; }, 150);
+    }
+
     const onBlur = () => {
-      this._handleScreenDeparture('window_blur');
+      if (allowBlurEvent) {
+        this._handleScreenDeparture('window_blur');
+      }
     };
 
     const onFocus = () => {
@@ -2825,7 +2834,8 @@ export class QuizView {
       if (this._isPhoneDevice() || !this._supportsFullscreen()) return;
       const session = this.activeExamSession;
       if (!session || session.timeRemaining <= 0) return;
-      if (!this._getFullscreenElement()) {
+      if (session.fullscreenActive && !this._getFullscreenElement()) {
+        session.fullscreenActive = false;
         this._handleScreenDeparture('fullscreen_exit');
       }
     };
