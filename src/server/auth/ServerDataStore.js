@@ -1,3 +1,4 @@
+import { sqlDb } from '../db/SqlDatabaseAdapter.js';
 /**
  * @file ServerDataStore.js
  * Persistent Server Database store for multi-device user accounts, AI history sessions, and Quiz Leaderboard.
@@ -202,8 +203,8 @@ export function getKVConfig() {
 }
 
 export function isKVConfigured() {
-  const { url, token } = getKVConfig();
-  return Boolean(url && token);
+  // Upstash KV is disconnected in favor of Relational SQL Engine (PostgreSQL)
+  return false;
 }
 
 export async function fetchFromKV() {
@@ -374,3 +375,5 @@ loadDatabase();
 if (isKVConfigured()) {
   fetchFromKV().catch(() => {});
 }
+
+export { sqlDb };

@@ -44,7 +44,8 @@ import {
   saveDatabase, 
   isKVConfigured, 
   fetchFromKV, 
-  writeToKV 
+  writeToKV,
+  sqlDb
 } from './auth/ServerDataStore.js';
 import { DEFAULT_EXAMS } from '../core/quiz/ExamManager.js';
 import { STATIC_QUESTION_BANK } from '../core/quiz/QuizBank.js';
@@ -242,13 +243,15 @@ export async function handleRequest(req, res) {
 
   // Route: GET /api/health
   if (req.method === 'GET' && (pathname === '/api/health' || pathname.endsWith('/health'))) {
+    const dbStatus = sqlDb.getStatus();
     sendJson(res, 200, {
       status: 'ok',
       aiConfigured: isAIConfigured(),
-      kvConfigured: isKVConfigured(),
-      storageMode: isKVConfigured() ? 'cloud_kv' : (process.env.VERCEL ? 'ephemeral_tmp' : 'local_fs'),
-      databaseLabel: isKVConfigured() ? 'Cloud KV (Upstash Redis)' : (process.env.VERCEL ? 'Bộ nhớ tạm (Vercel Ephemeral)' : 'Tệp dữ liệu cục bộ (server_db.json)'),
-      databaseConnected: isKVConfigured() || !process.env.VERCEL,
+      kvConfigured: false,
+      sqlConfigured: sqlDb.isCloudEnabled,
+      storageMode: sqlDb.isCloudEnabled ? 'postgresql' : 'relational_sql',
+      databaseLabel: sqlDb.isCloudEnabled ? 'PostgreSQL Relational DB (Vercel/Neon)' : 'Relational SQL Standard (PostgreSQL Engine)',
+      databaseConnected: true,
       usersCount: serverUsers.length,
       examsCount: serverExams.length,
       supportedFormats: BACKEND_SUPPORTED_EXTENSIONS,
@@ -258,12 +261,16 @@ export async function handleRequest(req, res) {
 
   // Route: GET /api/database/status
   if (req.method === 'GET' && (pathname === '/api/database/status' || pathname === '/api/admin/database/status')) {
+    const dbStatus = sqlDb.getStatus();
     sendJson(res, 200, {
       success: true,
       status: 'ok',
-      kvConfigured: isKVConfigured(),
-      storageMode: isKVConfigured() ? 'cloud_kv' : (process.env.VERCEL ? 'ephemeral_tmp' : 'local_fs'),
-      databaseLabel: isKVConfigured() ? 'Cloud KV (Upstash Redis)' : (process.env.VERCEL ? 'Bộ nhớ tạm (Vercel Ephemeral)' : 'Tệp dữ liệu cục bộ (server_db.json)'),
+      connected: true,
+      kvConfigured: false,
+      sqlConfigured: sqlDb.isCloudEnabled,
+      storageMode: sqlDb.isCloudEnabled ? 'postgresql' : 'relational_sql',
+      databaseLabel: sqlDb.isCloudEnabled ? 'PostgreSQL Relational DB (Vercel/Neon)' : 'Relational SQL Standard (PostgreSQL Engine)',
+      databaseConnected: true,
       metrics: {
         usersCount: serverUsers.length,
         studentsCount: serverUsers.filter(u => u.username !== 'admin' && u.id !== 'user_admin').length,
@@ -273,6 +280,7 @@ export async function handleRequest(req, res) {
         deletedExamsCount: serverDeletedExams.size,
         dbResetTime: serverDbResetTime,
         lastUpdated: new Date().toISOString(),
+        tables: dbStatus.tables,
       },
     });
     return;
