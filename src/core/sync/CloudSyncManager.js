@@ -23,7 +23,37 @@ export class CloudSyncManager {
     this.isSyncing = false;
     this.lastSyncTime = null;
     this.authToken = '';
+    this.dataSkewInfo = null;
     this.listeners = new Set();
+  }
+
+  /**
+   * Safe fetch with automatic AbortController timeout to prevent indefinite hanging.
+   * @param {string} url
+   * @param {Object} [options]
+   * @param {number} [timeoutMs]
+   * @returns {Promise<Response>}
+   */
+  async fetchWithTimeout(url, options = {}, timeoutMs = null) {
+    const ms = timeoutMs || this.timeoutMs || 8000;
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    let timer = null;
+
+    if (controller) {
+      timer = setTimeout(() => {
+        controller.abort(new Error(`TIMEOUT: Yêu cầu mạng quá thời gian (${ms}ms)`));
+      }, ms);
+    }
+
+    try {
+      const response = await fetch(url, {
+        ...options,
+        signal: controller ? controller.signal : options.signal,
+      });
+      return response;
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
   }
 
   /**
@@ -138,108 +168,169 @@ export class CloudSyncManager {
   }
 
   async syncUsers(authManager) {
-    if (!authManager || typeof fetch === 'undefined') return;
+    if (!authManager || typeof fetch === 'undefined') {
+      return { success: false, error: 'Môi trường ngoại tuyến hoặc thiếu authManager' };
+    }
 
     try {
-      const res = await fetch(`${this.baseUrl}/api/auth/users`);
-      if (!res.ok) return;
+      const res = await this.fetchWithTimeout(`${this.baseUrl}/api/auth/users`);
+      if (!res.ok) {
+        return { success: false, error: `Máy chủ trả mã HTTP ${res.status}` };
+      }
 
       const contentType = typeof res.headers?.get === 'function' ? (res.headers.get('content-type') || '') : '';
-      if (contentType && !contentType.includes('application/json')) return;
+      if (contentType && !contentType.includes('application/json')) {
+        return { success: false, error: 'Phản hồi không phải định dạng JSON' };
+      }
 
       const data = await res.json().catch(() => null);
-      if (data && data.success && Array.isArray(data.users)) {
-        // 1. Check for server database reset event
-        const serverDbResetTime = data.dbResetTime || 0;
-        const localDbResetTime = parseInt(authManager.storage?.getItem('trr_last_db_reset') || '0', 10);
-        if (serverDbResetTime > 0 && serverDbResetTime > localDbResetTime) {
-          console.info('[CloudSync] Server database reset detected. Purging local non-admin accounts and records.');
-          authManager.resetUsersToDefault({ force: true });
+      if (!data || !data.success || !Array.isArray(data.users)) {
+        return { success: false, error: data?.error || 'Dữ liệu tài khoản từ máy chủ không hợp lệ' };
+      }
+
+      // 1. Check for server database reset event
+      const serverDbResetTime = data.dbResetTime || 0;
+      const localDbResetTime = parseInt(authManager.storage?.getItem('trr_last_db_reset') || '0', 10);
+      if (serverDbResetTime > 0 && serverDbResetTime > localDbResetTime) {
+        console.info('[CloudSync] Server database reset detected. Purging local non-admin accounts and records.');
+        authManager.resetUsersToDefault({ force: true });
+        if (authManager.storage) {
+          try {
+            authManager.storage.setItem('trr_last_db_reset', String(serverDbResetTime));
+            authManager.storage.setItem('trr_exam_submissions_v1', JSON.stringify([]));
+            authManager.storage.setItem('trr_exam_violations_v1', JSON.stringify([]));
+            authManager.storage.setItem('trr_quiz_stats_map', JSON.stringify({}));
+            authManager.storage.setItem('trr_ai_sessions_v1', JSON.stringify({}));
+            authManager.storage.setItem('trr_deleted_users_v1', JSON.stringify([]));
+          } catch {}
+        }
+      }
+
+      // 2. Process tombstones of deleted accounts from server
+      if (Array.isArray(data.deletedUsers)) {
+        const activeUsernames = new Set((data.users || []).map(u => (u.username || '').toLowerCase()));
+        const activeIds = new Set((data.users || []).map(u => (u.id || '').toLowerCase()));
+        const activeEmails = new Set((data.users || []).map(u => (u.email || '').toLowerCase()).filter(Boolean));
+
+        for (const delId of data.deletedUsers) {
+          const cleanDel = String(delId).trim().toLowerCase();
+          if (activeUsernames.has(cleanDel) || activeIds.has(cleanDel) || activeEmails.has(cleanDel)) {
+            authManager.unmarkDeletedLocally(cleanDel);
+            continue;
+          }
+          authManager.markDeletedLocally(delId);
           if (authManager.storage) {
             try {
-              authManager.storage.setItem('trr_last_db_reset', String(serverDbResetTime));
-              authManager.storage.setItem('trr_exam_submissions_v1', JSON.stringify([]));
-              authManager.storage.setItem('trr_exam_violations_v1', JSON.stringify([]));
-              authManager.storage.setItem('trr_quiz_stats_map', JSON.stringify({}));
-              authManager.storage.setItem('trr_ai_sessions_v1', JSON.stringify({}));
-              authManager.storage.setItem('trr_deleted_users_v1', JSON.stringify([]));
+              const subs = JSON.parse(authManager.storage.getItem('trr_exam_submissions_v1') || '[]');
+              const clean = subs.filter(s => 
+                s.userId?.toLowerCase() !== delId.toLowerCase() && 
+                s.username?.toLowerCase() !== delId.toLowerCase()
+              );
+              if (clean.length !== subs.length) {
+                authManager.storage.setItem('trr_exam_submissions_v1', JSON.stringify(clean));
+              }
             } catch {}
           }
         }
+      }
 
-        // 2. Process tombstones of deleted accounts from server
-        if (Array.isArray(data.deletedUsers)) {
-          const activeUsernames = new Set((data.users || []).map(u => (u.username || '').toLowerCase()));
-          const activeIds = new Set((data.users || []).map(u => (u.id || '').toLowerCase()));
-          const activeEmails = new Set((data.users || []).map(u => (u.email || '').toLowerCase()).filter(Boolean));
+      // 3. Clear any stale deletion tombstones for active users returned by authoritative server
+      for (const su of (data.users || [])) {
+        if (su.username) authManager.unmarkDeletedLocally(su.username);
+        if (su.id) authManager.unmarkDeletedLocally(su.id);
+        if (su.email) authManager.unmarkDeletedLocally(su.email);
+      }
 
-          for (const delId of data.deletedUsers) {
-            const cleanDel = String(delId).trim().toLowerCase();
-            if (activeUsernames.has(cleanDel) || activeIds.has(cleanDel) || activeEmails.has(cleanDel)) {
-              authManager.unmarkDeletedLocally(cleanDel);
-              continue;
-            }
-            authManager.markDeletedLocally(delId);
-            if (authManager.storage) {
-              try {
-                const subs = JSON.parse(authManager.storage.getItem('trr_exam_submissions_v1') || '[]');
-                const clean = subs.filter(s => 
-                  s.userId?.toLowerCase() !== delId.toLowerCase() && 
-                  s.username?.toLowerCase() !== delId.toLowerCase()
-                );
-                if (clean.length !== subs.length) {
-                  authManager.storage.setItem('trr_exam_submissions_v1', JSON.stringify(clean));
-                }
-              } catch {}
-            }
-          }
-        }
+      const localUsers = authManager.getUsers();
 
-        // 3. Clear any stale deletion tombstones for active users returned by authoritative server
-        for (const su of (data.users || [])) {
-          if (su.username) authManager.unmarkDeletedLocally(su.username);
-          if (su.id) authManager.unmarkDeletedLocally(su.id);
-          if (su.email) authManager.unmarkDeletedLocally(su.email);
-        }
+      // 4. Server users are authoritative active accounts
+      const serverUsers = (data.users || []).filter(su => {
+        return !authManager.isLocallyDeleted(su.id) && !authManager.isLocallyDeleted(su.username);
+      });
 
-        const localUsers = authManager.getUsers();
+      // 5. Anti-Data-Loss Protection: Check for data skew before saving
+      // If server returns only admin, but local has student accounts, do NOT wipe local accounts!
+      const serverNonAdmin = serverUsers.filter(u => u.username !== 'admin' && u.id !== 'user_admin');
+      const localNonAdmin = localUsers.filter(u => u.username !== 'admin' && u.id !== 'user_admin');
 
-        // 4. Server users are authoritative active accounts
-        const serverUsers = (data.users || []).filter(su => {
-          return !authManager.isLocallyDeleted(su.id) && !authManager.isLocallyDeleted(su.username);
-        });
+      let mergedUsers = [];
+      if (serverNonAdmin.length === 0 && localNonAdmin.length > 0) {
+        // Skew detected: Server only returned admin, but local has student accounts.
+        // Protect local accounts from being wiped!
+        this.dataSkewInfo = {
+          hasSkew: true,
+          serverCount: serverUsers.length,
+          serverUserCount: serverUsers.length,
+          localCount: localUsers.length,
+          localStudentCount: localNonAdmin.length,
+          message: `Máy chủ hiện chỉ trả về ${serverUsers.length} tài khoản (Admin), trong khi thiết bị này đang lưu ${localUsers.length} tài khoản. Toàn bộ tài khoản cục bộ đã được bảo toàn an toàn.`
+        };
+        mergedUsers = localUsers.map(lu => ({ ...lu }));
+      } else {
+        // Standard merge: server accounts are primary
+        const serverUserIds = new Set(serverUsers.map(su => (su.id || '').toLowerCase()));
+        const serverUsernames = new Set(serverUsers.map(su => (su.username || '').toLowerCase()));
 
-        // 5. Server users are authoritative active accounts (no password guessing!)
-        const mergedUsers = serverUsers.map(su => {
+        mergedUsers = serverUsers.map(su => {
           const copy = { ...su };
           delete copy.password;
           return copy;
         });
 
-        if (authManager.storage) {
-          try {
-            authManager.storage.setItem('trr_registered_users', JSON.stringify(mergedUsers));
-          } catch {}
-        }
+        // Retain any valid local non-admin account not tombstoned
+        const localOnly = localNonAdmin.filter(lu =>
+          !serverUserIds.has((lu.id || '').toLowerCase()) &&
+          !serverUsernames.has((lu.username || '').toLowerCase()) &&
+          !authManager.isLocallyDeleted(lu.id) &&
+          !authManager.isLocallyDeleted(lu.username)
+        );
 
-        // 6. Verify if currently logged-in user still exists and wasn't deleted
-        const currentUser = authManager.getCurrentUser();
-        if (currentUser && currentUser.username !== 'admin' && currentUser.id !== 'user_admin') {
-          const isDel = authManager.isLocallyDeleted(currentUser.id) || authManager.isLocallyDeleted(currentUser.username);
-          const stillExists = !isDel && mergedUsers.some(u => u.id === currentUser.id || u.username === currentUser.username);
-          if (!stillExists) {
-            console.warn('[CloudSync] Current user was removed from server. Logging out immediately.');
-            authManager.logout();
-            if (typeof window !== 'undefined' && window.alert) {
-              window.alert('⚠️ Tài khoản của bạn đã bị Quản trị viên xóa khỏi hệ thống. Bạn đã được tự động chuyển về chế độ Khách.');
-            }
+        if (localOnly.length > 0) {
+          this.dataSkewInfo = {
+            hasSkew: true,
+            serverCount: serverUsers.length,
+            localCount: serverUsers.length + localOnly.length,
+            message: `Có ${localOnly.length} tài khoản sinh viên được lưu trên thiết bị nhưng chưa có trên máy chủ. Đã giữ nguyên các tài khoản này.`
+          };
+          mergedUsers.push(...localOnly.map(u => ({ ...u })));
+        } else {
+          this.dataSkewInfo = null;
+        }
+      }
+
+      if (authManager.storage) {
+        try {
+          authManager.storage.setItem('trr_registered_users', JSON.stringify(mergedUsers));
+        } catch {}
+      }
+
+      // 6. Verify if currently logged-in user still exists and wasn't deleted
+      const currentUser = authManager.getCurrentUser();
+      if (currentUser && currentUser.username !== 'admin' && currentUser.id !== 'user_admin') {
+        const isDel = authManager.isLocallyDeleted(currentUser.id) || authManager.isLocallyDeleted(currentUser.username);
+        const stillExists = !isDel && mergedUsers.some(u => u.id === currentUser.id || u.username === currentUser.username);
+        if (!stillExists) {
+          console.warn('[CloudSync] Current user was removed from server. Logging out immediately.');
+          authManager.logout();
+          if (typeof window !== 'undefined' && window.alert) {
+            window.alert('⚠️ Tài khoản của bạn đã bị Quản trị viên xóa khỏi hệ thống. Bạn đã được tự động chuyển về chế độ Khách.');
           }
         }
-        this.lastSyncTime = new Date().toISOString();
-        this._notify();
       }
-    } catch {
-      // offline fallback
+      this.lastSyncTime = new Date().toISOString();
+      this._notify();
+      return {
+        success: true,
+        count: mergedUsers.length,
+        serverCount: serverUsers.length,
+        dataSkewInfo: this.dataSkewInfo,
+      };
+    } catch (err) {
+      console.warn('[CloudSync] syncUsers error:', err.message || err);
+      return {
+        success: false,
+        error: err.message || 'Lỗi mạng khi đồng bộ tài khoản',
+      };
     }
   }
 
@@ -397,13 +488,17 @@ export class CloudSyncManager {
    * @param {Object} quizHistoryManager
    */
   async syncQuizLeaderboard(quizHistoryManager) {
-    if (!quizHistoryManager || typeof fetch === 'undefined') return;
+    if (!quizHistoryManager || typeof fetch === 'undefined') {
+      return { success: false, error: 'Môi trường ngoại tuyến' };
+    }
 
     try {
-      const res = await fetch(`${this.baseUrl}/api/quiz/leaderboard`);
-      if (!res.ok) return;
-      const data = await res.json();
-      if (data.success && Array.isArray(data.leaderboard)) {
+      const res = await this.fetchWithTimeout(`${this.baseUrl}/api/quiz/leaderboard`);
+      if (!res.ok) {
+        return { success: false, error: `HTTP ${res.status}` };
+      }
+      const data = await res.json().catch(() => null);
+      if (data && data.success && Array.isArray(data.leaderboard)) {
         const cleanMap = {};
         for (const item of data.leaderboard) {
           if (item && item.userId && item.userId !== 'user_admin' && item.username !== 'admin') {
@@ -413,9 +508,11 @@ export class CloudSyncManager {
         quizHistoryManager._writeMap(cleanMap);
         this.lastSyncTime = new Date().toISOString();
         this._notify();
+        return { success: true, count: Object.keys(cleanMap).length };
       }
-    } catch {
-      // offline fallback
+      return { success: false, error: data?.error || 'Dữ liệu bảng điểm không hợp lệ' };
+    } catch (err) {
+      return { success: false, error: err.message || 'Lỗi mạng' };
     }
   }
 
@@ -658,12 +755,16 @@ export class CloudSyncManager {
    * @param {Object} examManager
    */
   async syncExams(examManager) {
-    if (typeof fetch === 'undefined') return;
+    if (typeof fetch === 'undefined') {
+      return { success: false, error: 'Môi trường ngoại tuyến' };
+    }
     try {
-      const res = await fetch(`${this.baseUrl}/api/exams`);
-      if (!res.ok) return;
-      const data = await res.json();
-      if (data.success && Array.isArray(data.exams)) {
+      const res = await this.fetchWithTimeout(`${this.baseUrl}/api/exams`);
+      if (!res.ok) {
+        return { success: false, error: `HTTP ${res.status}` };
+      }
+      const data = await res.json().catch(() => null);
+      if (data && data.success && Array.isArray(data.exams)) {
         if (examManager) {
           examManager.memoryExams = [...data.exams];
           if (examManager.storage) {
@@ -671,8 +772,12 @@ export class CloudSyncManager {
           }
           examManager._notifyListeners('exams_synced', data.exams);
         }
+        return { success: true, count: data.exams.length };
       }
-    } catch {}
+      return { success: false, error: data?.error || 'Dữ liệu đề thi không hợp lệ' };
+    } catch (err) {
+      return { success: false, error: err.message || 'Lỗi mạng khi tải đề thi' };
+    }
   }
 
   /**
@@ -749,12 +854,16 @@ export class CloudSyncManager {
    * @param {Object} examManager
    */
   async syncExamSubmissions(examManager) {
-    if (typeof fetch === 'undefined') return;
+    if (typeof fetch === 'undefined') {
+      return { success: false, error: 'Môi trường ngoại tuyến' };
+    }
     try {
-      const res = await fetch(`${this.baseUrl}/api/exam-submissions`);
-      if (!res.ok) return;
-      const data = await res.json();
-      if (data.success && Array.isArray(data.submissions)) {
+      const res = await this.fetchWithTimeout(`${this.baseUrl}/api/exam-submissions`);
+      if (!res.ok) {
+        return { success: false, error: `HTTP ${res.status}` };
+      }
+      const data = await res.json().catch(() => null);
+      if (data && data.success && Array.isArray(data.submissions)) {
         if (examManager) {
           examManager.memorySubmissions = [...data.submissions];
           if (examManager.storage) {
@@ -762,8 +871,12 @@ export class CloudSyncManager {
           }
           examManager._notifyListeners('submissions_synced', data.submissions);
         }
+        return { success: true, count: data.submissions.length };
       }
-    } catch {}
+      return { success: false, error: data?.error || 'Dữ liệu bài nộp không hợp lệ' };
+    } catch (err) {
+      return { success: false, error: err.message || 'Lỗi mạng khi tải bài nộp' };
+    }
   }
 
   /**
@@ -1056,21 +1169,24 @@ export class CloudSyncManager {
 
     for (const ep of endpoints) {
       try {
-        const res = await fetch(ep);
-        if (res.ok) {
-          const data = await res.json();
-          if (ep.startsWith('https://mathplatform-ten.vercel.app')) {
-            this.baseUrl = 'https://mathplatform-ten.vercel.app';
+        const res = await this.fetchWithTimeout(ep, {}, 6000);
+        if (res && res.ok) {
+          const data = await res.json().catch(() => null);
+          if (data) {
+            if (ep.startsWith('https://mathplatform-ten.vercel.app')) {
+              this.baseUrl = 'https://mathplatform-ten.vercel.app';
+            }
+            return {
+              ...data,
+              success: true,
+              connected: true,
+              storageMode: data.storageMode || (data.kvConfigured ? 'cloud_kv' : 'local_file'),
+              databaseLabel: data.databaseLabel || (data.kvConfigured ? 'Cloud KV (Upstash Redis)' : 'Local File Store'),
+            };
           }
-          return {
-            ...data,
-            connected: true,
-            storageMode: data.storageMode || (data.kvConfigured ? 'cloud_kv' : 'local_file'),
-            databaseLabel: data.databaseLabel || (data.kvConfigured ? 'Cloud KV (Upstash Redis)' : 'Local File Store'),
-          };
         }
       } catch {
-        // Fallback
+        // Fallback to next endpoint
       }
     }
 

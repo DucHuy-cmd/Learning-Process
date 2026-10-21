@@ -143,4 +143,94 @@ describe('Admin Database Management & Smart Features', () => {
     expect(loginRes.success).toBe(true);
     expect(loginRes.user.username).toBe('sv_reset_recreate');
   });
+
+  it('filters account list by keyword, shows filtered count in title, and clears filter with ✕ button', async () => {
+    // Seed accounts: 1 admin + 3 students
+    authManager.adminCreateUser({ username: 'sv_cntt_01', fullName: 'Nguyễn Văn A', className: 'K66-CNTT', password: '123' });
+    authManager.adminCreateUser({ username: 'sv_cntt_02', fullName: 'Trần Thị B', className: 'K66-CNTT', password: '123' });
+    authManager.adminCreateUser({ username: 'sv_ktpm_01', fullName: 'Lê Hoàng C', className: 'K66-KTPM', password: '123' });
+
+    await adminView.render();
+
+    const titleEl = container.querySelector('#adminUsersTableTitle');
+    const searchInput = container.querySelector('#adminUserSearchInput');
+    const tbody = container.querySelector('#adminUsersTbody');
+
+    // Total accounts = 4 (1 admin + 3 students)
+    expect(titleEl.textContent).toBe('Danh Sách Cơ Sở Dữ Liệu Tài Khoản (4)');
+    expect(tbody.querySelectorAll('tr').length).toBe(4);
+
+    // 1. Filter by "admin"
+    searchInput.value = 'admin';
+    searchInput.dispatchEvent(new Event('input'));
+
+    expect(titleEl.textContent).toBe('Danh Sách Cơ Sở Dữ Liệu Tài Khoản (1 / 4 tài khoản)');
+    expect(tbody.querySelectorAll('tr').length).toBe(1);
+    expect(tbody.textContent).toContain('@admin');
+    expect(tbody.textContent).not.toContain('@sv_cntt_01');
+
+    // Clear button (✕) should be rendered
+    const clearBtn = container.querySelector('#btnAdminClearSearch');
+    expect(clearBtn).not.toBeNull();
+
+    // 2. Click Clear button (✕)
+    clearBtn.click();
+    expect(searchInput.value).toBe('');
+    expect(titleEl.textContent).toBe('Danh Sách Cơ Sở Dữ Liệu Tài Khoản (4)');
+    expect(tbody.querySelectorAll('tr').length).toBe(4);
+    expect(container.querySelector('#btnAdminClearSearch')).toBeNull();
+
+    // 3. Search non-matching keyword
+    searchInput.value = 'nonexistent_keyword_xyz';
+    searchInput.dispatchEvent(new Event('input'));
+    expect(titleEl.textContent).toBe('Danh Sách Cơ Sở Dữ Liệu Tài Khoản (0 / 4 tài khoản)');
+    expect(tbody.textContent).toContain('Không tìm thấy tài khoản nào phù hợp');
+
+    const emptyClearBtn = container.querySelector('#btnAdminClearEmptySearch');
+    expect(emptyClearBtn).not.toBeNull();
+    emptyClearBtn.click();
+
+    expect(searchInput.value).toBe('');
+    expect(titleEl.textContent).toBe('Danh Sách Cơ Sở Dữ Liệu Tài Khoản (4)');
+    expect(tbody.querySelectorAll('tr').length).toBe(4);
+  });
+
+  it('renders and dismisses data skew warning when cloudSyncManager flags data skew', async () => {
+    cloudSyncManager.dataSkewInfo = {
+      hasSkew: true,
+      serverUserCount: 1,
+      localStudentCount: 86,
+      message: 'Test Skew Warning',
+    };
+
+    await adminView.render();
+
+    const skewBanner = container.querySelector('.admin-data-skew-banner');
+    expect(skewBanner).not.toBeNull();
+    expect(skewBanner.textContent).toContain('Phát hiện chênh lệch dữ liệu giữa Máy chủ và Trình duyệt');
+    expect(skewBanner.textContent).toContain('86 tài khoản sinh viên');
+
+    const dismissBtn = container.querySelector('#btnAdminDismissSkewWarning');
+    expect(dismissBtn).not.toBeNull();
+    dismissBtn.click();
+
+    expect(container.querySelector('.admin-data-skew-banner')).toBeNull();
+    expect(cloudSyncManager.dataSkewInfo).toBeNull();
+  });
+
+  it('guarantees isSyncing is reset to false after sync completes or throws, updating server status badge', async () => {
+    vi.spyOn(cloudSyncManager, 'checkConnection').mockResolvedValue(true);
+    vi.spyOn(cloudSyncManager, 'getDatabaseStatus').mockResolvedValue({ storageMode: 'postgresql', databaseLabel: 'PostgreSQL Relational DB (SQL)', kvConfigured: true });
+    vi.spyOn(cloudSyncManager, 'syncUsers').mockResolvedValue({ success: true, count: 87 });
+    vi.spyOn(cloudSyncManager, 'syncQuizLeaderboard').mockResolvedValue({ success: true });
+    vi.spyOn(cloudSyncManager, 'syncExams').mockResolvedValue({ success: true, count: 0 });
+    vi.spyOn(cloudSyncManager, 'syncExamSubmissions').mockResolvedValue({ success: true, count: 0 });
+
+    await adminView.render();
+    expect(adminView.isSyncing).toBe(false);
+
+    const wrap = container.querySelector('#adminMetricServerStatusWrap');
+    expect(wrap.textContent).toContain('Đã kết nối & Đồng bộ hoàn tất');
+    expect(wrap.textContent).toContain('PostgreSQL Relational DB (SQL)');
+  });
 });

@@ -180,4 +180,61 @@ describe('CloudSyncManager (Multi-device Cloud Sync Service)', () => {
       expect.objectContaining({ method: 'POST' })
     );
   });
+
+  it('detects data skew when server returns only admin while local has multiple students, preserving local accounts', async () => {
+    const storage = new MockStorage();
+    const authManager = new AuthManager({ storage });
+    authManager.quickLogin('user_admin');
+
+    // Seed local accounts: 1 admin + 5 students
+    for (let i = 1; i <= 5; i++) {
+      authManager.adminCreateUser({
+        username: `sv_skew_${i}`,
+        fullName: `Sinh viên Skew ${i}`,
+        password: '123',
+      });
+    }
+    expect(authManager.getUsers().length).toBe(6);
+
+    // Mock server returning only admin
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        success: true,
+        users: [
+          { id: 'user_admin', username: 'admin', role: 'admin' },
+        ],
+      }),
+    });
+
+    const res = await sync.syncUsers(authManager);
+    expect(res.success).toBe(true);
+    expect(res.dataSkewInfo).not.toBeNull();
+    expect(res.dataSkewInfo.serverUserCount).toBe(1);
+    expect(res.dataSkewInfo.localStudentCount).toBe(5);
+
+    // CRITICAL: Local student accounts MUST be preserved!
+    const afterUsers = authManager.getUsers();
+    expect(afterUsers.length).toBe(6);
+    expect(afterUsers.some(u => u.username === 'sv_skew_1')).toBe(true);
+  });
+
+  it('uses fetchWithTimeout so stalled requests abort within timeoutMs', async () => {
+    sync.timeoutMs = 100;
+
+    // Simulate stalled fetch that hangs
+    globalThis.fetch = vi.fn().mockImplementation((url, opts) => {
+      return new Promise((resolve, reject) => {
+        if (opts && opts.signal) {
+          opts.signal.addEventListener('abort', () => {
+            const err = new Error('The operation was aborted');
+            err.name = 'AbortError';
+            reject(err);
+          });
+        }
+      });
+    });
+
+    await expect(sync.fetchWithTimeout('http://localhost:3000/api/test', {}, 80)).rejects.toThrow();
+  });
 });

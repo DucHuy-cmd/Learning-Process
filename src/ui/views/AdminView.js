@@ -33,6 +33,13 @@ export class AdminView {
     this._activeSyncId = 0;
     this.activeTab = 'students';
     this.dbStatus = { storageMode: 'unknown', databaseLabel: 'Đang kiểm tra...', kvConfigured: false };
+    this.syncTasks = {
+      dbStatus: { status: 'idle', label: 'Cơ sở dữ liệu', error: null },
+      users: { status: 'idle', label: 'Tài khoản', count: 0, error: null },
+      leaderboard: { status: 'idle', label: 'Bảng điểm & Thống kê', error: null },
+      exams: { status: 'idle', label: 'Đề thi đã giao', count: 0, error: null },
+      submissions: { status: 'idle', label: 'Bài nộp', count: 0, error: null },
+    };
 
     authManager.onAuthStateChanged(() => {
       if (this.container && this.container.classList.contains('active')) {
@@ -220,13 +227,18 @@ export class AdminView {
           </form>
         </section>
 
+        <!-- Data Skew Warning Banner -->
+        <div id="adminDataSkewWarningWrap">
+          ${this._renderDataSkewWarning()}
+        </div>
+
         <!-- User Accounts Table Section -->
         <section class="admin-users-table-section" style="background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px 22px;margin-bottom:24px;">
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:16px;">
             <div>
               <h3 style="margin:0 0 4px;font-size:16px;color:var(--text);font-weight:700;display:flex;align-items:center;gap:8px;">
                 <span>📋</span>
-                <span id="adminUsersTableTitle">Danh Sách Cơ Sở Dữ Liệu Tài Khoản (${allUsers.length})</span>
+                <span id="adminUsersTableTitle">${this._getUsersTableTitleText(allUsers)}</span>
               </h3>
               <p style="margin:0;font-size:12px;color:var(--dim);">
                 Quản trị viên có toàn quyền kiểm tra, xem thông tin và xóa bỏ các tài khoản kiểm thử hoặc sinh viên không hợp lệ.
@@ -235,7 +247,12 @@ export class AdminView {
 
             <!-- Search and export -->
             <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-              <input type="text" id="adminUserSearchInput" value="${this.searchQuery}" placeholder="🔍 Tìm theo tên, username, lớp..." style="box-sizing:border-box;padding:7px 12px;font-size:12.5px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--text);min-width:220px;">
+              <div id="adminSearchInputWrap" style="position:relative;display:inline-flex;align-items:center;">
+                <input type="text" id="adminUserSearchInput" value="${this._escapeHtml(this.searchQuery)}" placeholder="🔍 Tìm theo tên, username, lớp..." style="box-sizing:border-box;padding:7px 30px 7px 12px;font-size:12.5px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--text);min-width:240px;">
+                ${this.searchQuery ? `
+                  <button type="button" id="btnAdminClearSearch" title="Xóa bộ lọc tìm kiếm" style="position:absolute;right:8px;background:none;border:none;cursor:pointer;color:var(--dim);font-size:13px;padding:2px 4px;font-weight:bold;line-height:1;">✕</button>
+                ` : ''}
+              </div>
               <button type="button" id="btnAdminExportUsers" class="btn-sm" style="padding:7px 14px;font-size:12px;font-weight:600;background:var(--panel-alt);border:1px solid var(--line);border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:6px;color:var(--text);">
                 <span>📥</span> Xuất Danh Sách (.csv)
               </button>
@@ -268,7 +285,75 @@ export class AdminView {
   }
 
   /**
-   * Triggers parallel background sync with race condition protection.
+   * Returns users matching current searchQuery.
+   * @param {Array<Object>} users
+   * @returns {Array<Object>}
+   * @private
+   */
+  _getFilteredUsers(users) {
+    if (!Array.isArray(users)) return [];
+    const q = (this.searchQuery || '').trim().toLowerCase();
+    if (!q) return users;
+    return users.filter(u =>
+      (u.fullName || '').toLowerCase().includes(q) ||
+      (u.username || '').toLowerCase().includes(q) ||
+      (u.className || '').toLowerCase().includes(q) ||
+      (u.email || '').toLowerCase().includes(q)
+    );
+  }
+
+  /**
+   * Generates title text with clear count feedback (total and filtered).
+   * @param {Array<Object>} allUsers
+   * @returns {string}
+   * @private
+   */
+  _getUsersTableTitleText(allUsers) {
+    const totalCount = Array.isArray(allUsers) ? allUsers.length : 0;
+    const q = (this.searchQuery || '').trim();
+    if (q) {
+      const filtered = this._getFilteredUsers(allUsers);
+      return `Danh Sách Cơ Sở Dữ Liệu Tài Khoản (${filtered.length} / ${totalCount} tài khoản)`;
+    }
+    return `Danh Sách Cơ Sở Dữ Liệu Tài Khoản (${totalCount})`;
+  }
+
+  /**
+   * Renders warning banner when server accounts skew or mismatch local accounts (e.g. server only returns admin while local has students).
+   * @returns {string}
+   * @private
+   */
+  _renderDataSkewWarning() {
+    const skew = cloudSyncManager?.dataSkewInfo;
+    if (!skew) return '';
+
+    return `
+      <div class="admin-data-skew-banner" style="background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.4);border-radius:10px;padding:14px 18px;margin-bottom:20px;display:flex;align-items:flex-start;gap:12px;">
+        <span style="font-size:24px;line-height:1;">⚠️</span>
+        <div style="flex:1;">
+          <div style="font-size:14px;font-weight:700;color:#d97706;margin-bottom:4px;">
+            Phát hiện chênh lệch dữ liệu giữa Máy chủ và Trình duyệt
+          </div>
+          <div style="font-size:12.5px;color:var(--text);line-height:1.5;">
+            Trình duyệt đang lưu an toàn <strong>${skew.localStudentCount || 0} tài khoản sinh viên</strong>, trong khi kết nối máy chủ trả về <strong>${skew.serverUserCount || 0} tài khoản</strong>.
+            Hệ thống đã <strong>tự động bảo toàn dữ liệu sinh viên tại máy cục bộ</strong> và ngăn chặn việc bị ghi đè dữ liệu.
+          </div>
+          <div style="margin-top:8px;display:flex;gap:10px;align-items:center;">
+            <button type="button" id="btnAdminDismissSkewWarning" class="btn-sm" style="padding:4px 10px;font-size:11.5px;border-radius:4px;background:var(--panel);border:1px solid var(--line);cursor:pointer;color:var(--text);">
+              Đã hiểu &amp; Đóng thông báo
+            </button>
+            <button type="button" id="btnAdminRecheckSync" class="btn-sm" style="padding:4px 10px;font-size:11.5px;border-radius:4px;background:rgba(245,158,11,0.2);border:1px solid rgba(245,158,11,0.5);cursor:pointer;color:#d97706;font-weight:600;">
+              🔄 Kiểm tra lại đồng bộ
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  /**
+   * Triggers parallel background sync with race condition protection,
+   * guaranteed finally cleanup, individual task tracking, and data skew protection.
    * @private
    */
   async _triggerBackgroundSync() {
@@ -276,6 +361,14 @@ export class AdminView {
     const currentSyncId = ++this._syncCounter;
     this._activeSyncId = currentSyncId;
     this.isSyncing = true;
+
+    // Reset task statuses
+    this.syncTasks.dbStatus = { status: 'loading', label: 'Cơ sở dữ liệu', error: null };
+    this.syncTasks.users = { status: 'loading', label: 'Tài khoản', count: 0, error: null };
+    this.syncTasks.leaderboard = { status: 'loading', label: 'Bảng điểm & Thống kê', error: null };
+    this.syncTasks.exams = { status: 'loading', label: 'Đề thi đã giao', count: 0, error: null };
+    this.syncTasks.submissions = { status: 'loading', label: 'Bài nộp', count: 0, error: null };
+
     this._updateSyncIndicatorUI(true);
 
     try {
@@ -283,8 +376,8 @@ export class AdminView {
       if (currentSyncId !== this._activeSyncId) return;
 
       if (this.isServerConnected) {
-        // Run independent read-only syncs concurrently
-        const [statusRes] = await Promise.allSettled([
+        // Run independent read-only syncs concurrently with isolated error handling
+        const [statusRes, usersRes, lbRes, examsRes, subsRes] = await Promise.allSettled([
           cloudSyncManager.getDatabaseStatus(),
           cloudSyncManager.syncUsers(authManager),
           cloudSyncManager.syncQuizLeaderboard(quizHistoryManager),
@@ -294,48 +387,111 @@ export class AdminView {
 
         if (currentSyncId !== this._activeSyncId) return;
 
+        // DB Status
         if (statusRes.status === 'fulfilled' && statusRes.value) {
           this.dbStatus = statusRes.value;
+          this.syncTasks.dbStatus = { status: 'success', label: 'Cơ sở dữ liệu', error: null };
+        } else {
+          this.syncTasks.dbStatus = { status: 'error', label: 'Cơ sở dữ liệu', error: statusRes.reason?.message || 'Lỗi kết nối' };
+        }
+
+        // Users
+        if (usersRes.status === 'fulfilled' && usersRes.value && usersRes.value.success) {
+          this.syncTasks.users = { status: 'success', label: 'Tài khoản', count: usersRes.value.count || authManager.getUsers().length, error: null };
+        } else {
+          this.syncTasks.users = { status: 'error', label: 'Tài khoản', count: authManager.getUsers().length, error: usersRes.reason?.message || usersRes.value?.error || 'Lỗi tải tài khoản' };
+        }
+
+        // Leaderboard
+        if (lbRes.status === 'fulfilled' && lbRes.value && lbRes.value.success) {
+          this.syncTasks.leaderboard = { status: 'success', label: 'Bảng điểm & Thống kê', error: null };
+        } else {
+          this.syncTasks.leaderboard = { status: 'error', label: 'Bảng điểm & Thống kê', error: lbRes.reason?.message || lbRes.value?.error || 'Lỗi đồng bộ điểm' };
+        }
+
+        // Exams
+        if (examsRes.status === 'fulfilled' && examsRes.value && examsRes.value.success) {
+          this.syncTasks.exams = { status: 'success', label: 'Đề thi đã giao', count: examsRes.value.count || 0, error: null };
+        } else {
+          this.syncTasks.exams = { status: 'error', label: 'Đề thi đã giao', count: 0, error: examsRes.reason?.message || examsRes.value?.error || 'Lỗi đồng bộ đề thi' };
+        }
+
+        // Submissions
+        if (subsRes.status === 'fulfilled' && subsRes.value && subsRes.value.success) {
+          this.syncTasks.submissions = { status: 'success', label: 'Bài nộp', count: subsRes.value.count || 0, error: null };
+        } else {
+          this.syncTasks.submissions = { status: 'error', label: 'Bài nộp', count: 0, error: subsRes.reason?.message || subsRes.value?.error || 'Lỗi đồng bộ bài nộp' };
         }
       } else {
         this.dbStatus = { storageMode: 'offline', databaseLabel: 'Chế độ Ngoại tuyến', kvConfigured: false };
+        Object.keys(this.syncTasks).forEach(k => {
+          this.syncTasks[k].status = 'offline';
+        });
       }
     } catch {
       this.isServerConnected = false;
       this.dbStatus = { storageMode: 'offline', databaseLabel: 'Chế độ Ngoại tuyến', kvConfigured: false };
+      Object.keys(this.syncTasks).forEach(k => {
+        this.syncTasks[k].status = 'error';
+      });
     } finally {
+      // Guaranteed cleanup: isSyncing is ALWAYS reset so UI never freezes
+      this.isSyncing = false;
       if (currentSyncId === this._activeSyncId) {
-        this.isSyncing = false;
         this._updateDashboardDataInPlace();
       }
     }
   }
 
   /**
-   * Updates sync status badge while syncing is in progress.
+   * Updates sync status badge while syncing is in progress or completed.
    * @param {boolean} isSyncing
    * @private
    */
   _updateSyncIndicatorUI(isSyncing) {
     if (!this.container) return;
     const wrap = this.container.querySelector('#adminMetricServerStatusWrap');
-    if (wrap) {
-      wrap.innerHTML = `
-        <div style="font-size:16px;font-weight:800;color:${isSyncing ? '#3b82f6' : (this.isServerConnected ? '#10b981' : '#f59e0b')};display:flex;align-items:center;gap:6px;margin-bottom:6px;">
-          <span>${isSyncing ? '🔄 Đang đồng bộ máy chủ...' : (this.isServerConnected ? '● Đã kết nối' : '○ Chế độ Ngoại tuyến')}</span>
-          ${!this.isServerConnected && !isSyncing ? `<button type="button" id="btnAdminRetrySync" style="font-size:11px;padding:2px 8px;border-radius:4px;cursor:pointer;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);margin-left:6px;">🔄 Thử lại</button>` : ''}
-        </div>
-        <div style="font-size:11.5px;font-weight:700;color:#10b981;">
-          🏛️ ${this.dbStatus.databaseLabel || 'PostgreSQL Relational DB (SQL)'}
-        </div>
-      `;
-      const retryBtn = wrap.querySelector('#btnAdminRetrySync');
-      if (retryBtn) {
-        retryBtn.addEventListener('click', (e) => {
-          e.preventDefault();
-          this._triggerBackgroundSync();
-        });
+    if (!wrap) return;
+
+    let statusText = '';
+    let statusColor = '#10b981';
+    let showRetry = false;
+
+    if (isSyncing) {
+      statusText = '🔄 Đang đồng bộ máy chủ...';
+      statusColor = '#3b82f6';
+    } else if (this.isServerConnected) {
+      const failedTasks = Object.values(this.syncTasks).filter(t => t.status === 'error');
+      if (failedTasks.length > 0) {
+        statusText = `⚠️ Kết nối một phần (${failedTasks.length} tác vụ lỗi)`;
+        statusColor = '#f59e0b';
+        showRetry = true;
+      } else {
+        statusText = '● Đã kết nối & Đồng bộ hoàn tất';
+        statusColor = '#10b981';
       }
+    } else {
+      statusText = '○ Chế độ Ngoại tuyến';
+      statusColor = '#f59e0b';
+      showRetry = true;
+    }
+
+    wrap.innerHTML = `
+      <div style="font-size:16px;font-weight:800;color:${statusColor};display:flex;align-items:center;gap:6px;margin-bottom:6px;flex-wrap:wrap;">
+        <span>${statusText}</span>
+        ${showRetry ? `<button type="button" id="btnAdminRetrySync" style="font-size:11px;padding:2px 8px;border-radius:4px;cursor:pointer;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);margin-left:6px;">🔄 Thử lại</button>` : ''}
+      </div>
+      <div style="font-size:11.5px;font-weight:700;color:#10b981;">
+        🏛️ ${this.dbStatus.databaseLabel || 'PostgreSQL Relational DB (SQL)'}
+      </div>
+    `;
+
+    const retryBtn = wrap.querySelector('#btnAdminRetrySync');
+    if (retryBtn) {
+      retryBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        this._triggerBackgroundSync();
+      });
     }
   }
 
@@ -352,18 +508,74 @@ export class AdminView {
     const countEl = this.container.querySelector('#adminMetricStudentCount');
     if (countEl) countEl.textContent = String(studentCount);
 
-    // 2. Update Table Title Count
-    const titleCountEl = this.container.querySelector('#adminUsersTableTitle');
-    if (titleCountEl) titleCountEl.textContent = `Danh Sách Cơ Sở Dữ Liệu Tài Khoản (${allUsers.length})`;
-
-    // 3. Update Server Status Badge
+    // 2. Update Server Status Badge
     this._updateSyncIndicatorUI(false);
 
-    // 4. Update Table Rows preserving search filter & focus
+    // 3. Update Data Skew Warning if any
+    const skewWrap = this.container.querySelector('#adminDataSkewWarningWrap');
+    if (skewWrap) {
+      skewWrap.innerHTML = this._renderDataSkewWarning();
+      this._bindSkewWarningEvents();
+    }
+
+    // 4. Update Table Rows and Title with count feedback
+    this._updateUserTableAndTitle();
+  }
+
+  /**
+   * Updates users table, title, and clear button without losing search input focus.
+   * @private
+   */
+  _updateUserTableAndTitle() {
+    if (!this.container) return;
+    const allUsers = authManager.getUsers();
+
+    // 1. Update Title with count feedback
+    const titleEl = this.container.querySelector('#adminUsersTableTitle');
+    if (titleEl) {
+      titleEl.textContent = this._getUsersTableTitleText(allUsers);
+    }
+
+    // 2. Update Search Clear Button visibility
+    const searchWrap = this.container.querySelector('#adminSearchInputWrap');
+    let clearBtn = this.container.querySelector('#btnAdminClearSearch');
+    if (this.searchQuery) {
+      if (!clearBtn && searchWrap) {
+        clearBtn = document.createElement('button');
+        clearBtn.type = 'button';
+        clearBtn.id = 'btnAdminClearSearch';
+        clearBtn.title = 'Xóa bộ lọc tìm kiếm';
+        clearBtn.textContent = '✕';
+        clearBtn.setAttribute('style', 'position:absolute;right:8px;background:none;border:none;cursor:pointer;color:var(--dim);font-size:13px;padding:2px 4px;font-weight:bold;line-height:1;');
+        searchWrap.appendChild(clearBtn);
+        clearBtn.addEventListener('click', () => {
+          const searchInput = this.container.querySelector('#adminUserSearchInput');
+          if (searchInput) searchInput.value = '';
+          this.searchQuery = '';
+          this._updateUserTableAndTitle();
+          if (searchInput) searchInput.focus();
+        });
+      }
+    } else {
+      if (clearBtn) clearBtn.remove();
+    }
+
+    // 3. Render Table rows
     const tbody = this.container.querySelector('#adminUsersTbody');
     if (tbody) {
       tbody.innerHTML = this._renderUserTableRows(allUsers);
       this._bindTableActionButtons();
+
+      const btnClearEmpty = this.container.querySelector('#btnAdminClearEmptySearch');
+      if (btnClearEmpty) {
+        btnClearEmpty.addEventListener('click', () => {
+          const searchInput = this.container.querySelector('#adminUserSearchInput');
+          if (searchInput) searchInput.value = '';
+          this.searchQuery = '';
+          this._updateUserTableAndTitle();
+          if (searchInput) searchInput.focus();
+        });
+      }
     }
   }
 
@@ -374,21 +586,25 @@ export class AdminView {
    * @private
    */
   _renderUserTableRows(users) {
-    const q = this.searchQuery.trim().toLowerCase();
-    const filtered = q
-      ? users.filter(u =>
-          (u.fullName || '').toLowerCase().includes(q) ||
-          (u.username || '').toLowerCase().includes(q) ||
-          (u.className || '').toLowerCase().includes(q) ||
-          (u.email || '').toLowerCase().includes(q)
-        )
-      : users;
+    const filtered = this._getFilteredUsers(users);
 
     if (filtered.length === 0) {
+      const q = (this.searchQuery || '').trim();
       return `
         <tr>
-          <td colspan="5" style="text-align:center;padding:24px;color:var(--dim);">
-            Không tìm thấy tài khoản nào phù hợp với từ khóa "${this.searchQuery}".
+          <td colspan="5" style="text-align:center;padding:28px 16px;color:var(--dim);">
+            <div style="font-size:28px;margin-bottom:8px;">🔍</div>
+            <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:4px;">
+              Không tìm thấy tài khoản nào phù hợp
+            </div>
+            <div style="font-size:12.5px;color:var(--dim);margin-bottom:12px;">
+              ${q ? `Không có kết quả nào khớp với từ khóa "<strong>${this._escapeHtml(q)}</strong>".` : 'Chưa có tài khoản nào trong hệ thống.'}
+            </div>
+            ${q ? `
+              <button type="button" id="btnAdminClearEmptySearch" class="btn-sm" style="padding:6px 14px;font-size:12px;font-weight:600;border-radius:6px;background:var(--panel-alt);border:1px solid var(--line);color:var(--accent);cursor:pointer;">
+                ✕ Xóa bộ lọc tìm kiếm
+              </button>
+            ` : ''}
           </td>
         </tr>
       `;
@@ -479,20 +695,62 @@ export class AdminView {
   }
 
   /**
+   * Binds data skew warning buttons (dismiss and recheck).
+   * @private
+   */
+  _bindSkewWarningEvents() {
+    const dismissBtn = this.container?.querySelector('#btnAdminDismissSkewWarning');
+    if (dismissBtn) {
+      dismissBtn.addEventListener('click', () => {
+        if (cloudSyncManager) {
+          cloudSyncManager.dataSkewInfo = null;
+        }
+        const wrap = this.container?.querySelector('#adminDataSkewWarningWrap');
+        if (wrap) wrap.innerHTML = '';
+      });
+    }
+    const recheckBtn = this.container?.querySelector('#btnAdminRecheckSync');
+    if (recheckBtn) {
+      recheckBtn.addEventListener('click', () => {
+        this._triggerBackgroundSync();
+      });
+    }
+  }
+
+  /**
    * Binds interaction events.
    * @private
    */
   _bindEvents() {
-    // 1. Search box filtering
+    // 0. Data Skew Banner events
+    this._bindSkewWarningEvents();
+
+    // 1. Search box filtering & Clear Search button
     const searchInput = this.container.querySelector('#adminUserSearchInput');
     if (searchInput) {
       searchInput.addEventListener('input', (e) => {
         this.searchQuery = e.target.value;
-        const tbody = this.container.querySelector('#adminUsersTbody');
-        if (tbody) {
-          tbody.innerHTML = this._renderUserTableRows(authManager.getUsers());
-          this._bindTableActionButtons();
-        }
+        this._updateUserTableAndTitle();
+      });
+    }
+
+    const clearBtn = this.container.querySelector('#btnAdminClearSearch');
+    if (clearBtn) {
+      clearBtn.addEventListener('click', () => {
+        if (searchInput) searchInput.value = '';
+        this.searchQuery = '';
+        this._updateUserTableAndTitle();
+        if (searchInput) searchInput.focus();
+      });
+    }
+
+    const btnClearEmpty = this.container.querySelector('#btnAdminClearEmptySearch');
+    if (btnClearEmpty) {
+      btnClearEmpty.addEventListener('click', () => {
+        if (searchInput) searchInput.value = '';
+        this.searchQuery = '';
+        this._updateUserTableAndTitle();
+        if (searchInput) searchInput.focus();
       });
     }
 
