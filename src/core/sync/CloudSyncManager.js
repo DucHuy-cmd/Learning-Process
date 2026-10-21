@@ -927,6 +927,18 @@ export class CloudSyncManager {
             }
           }
 
+          // Backfill profile details if any were present locally
+          for (const s of merged) {
+            const localMatch = localSubmissions.find(ls => ls && ls.examId === s.examId && ls.userId === s.userId);
+            if (localMatch) {
+              if (!s.fullName && (localMatch.fullName || localMatch.studentName)) s.fullName = localMatch.fullName || localMatch.studentName;
+              if (!s.studentName && (localMatch.studentName || localMatch.fullName)) s.studentName = localMatch.studentName || localMatch.fullName;
+              if (!s.username && localMatch.username) s.username = localMatch.username;
+              if ((!s.className || s.className === 'Sinh viên') && localMatch.className) s.className = localMatch.className;
+              if ((!s.avatar || s.avatar === '👤') && localMatch.avatar) s.avatar = localMatch.avatar;
+            }
+          }
+
           examManager.memorySubmissions = merged;
           if (examManager.storage) {
             examManager.storage.setItem('trr_exam_submissions_v1', JSON.stringify(merged));

@@ -1565,6 +1565,18 @@ export async function handleRequest(req, res) {
         return;
       }
 
+      // Check recent duplicate by title, duration, and questions to prevent rapid multi-click duplicates
+      const recentDuplicate = serverExams.find(e =>
+        e.title === title &&
+        e.durationMinutes === durationMinutes &&
+        JSON.stringify(e.questionIds) === JSON.stringify(questionIds) &&
+        (Date.now() - new Date(e.createdAt).getTime()) < 60000
+      );
+      if (recentDuplicate) {
+        sendJson(res, 200, { success: true, exam: recentDuplicate, duplicate: true });
+        return;
+      }
+
       const exam = {
         id: examId,
         title,
@@ -1712,7 +1724,25 @@ export async function handleRequest(req, res) {
     let list = [...serverExamSubmissions];
     if (examId) list = list.filter(s => s.examId === examId);
     if (userId) list = list.filter(s => s.userId === userId);
-    sendJson(res, 200, { success: true, submissions: list });
+
+    const enrichedList = list.map(s => {
+      const user = serverUsers.find(u => u.id === s.userId || (u.username && u.username.toLowerCase() === (s.userId || '').toLowerCase()));
+      const username = s.username || user?.username || s.userId || '';
+      const fullName = s.fullName || s.studentName || user?.fullName || (username ? `@${username}` : s.userId);
+      const className = s.className || s.studentClass || user?.className || 'Sinh viên';
+      const avatar = s.avatar || user?.avatar || '👤';
+      return {
+        ...s,
+        username,
+        fullName,
+        studentName: fullName,
+        className,
+        studentClass: className,
+        avatar,
+      };
+    });
+
+    sendJson(res, 200, { success: true, submissions: enrichedList });
     return;
   }
 
@@ -1733,13 +1763,17 @@ export async function handleRequest(req, res) {
       }
 
       // Verify student identity via session token if present
+      let sessionUser = null;
       const authHeader = req.headers['authorization'] || req.headers['Authorization'] || '';
       let tokenCandidate = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : authHeader.trim();
       if (tokenCandidate) {
         const session = verifySessionToken(tokenCandidate);
-        if (session && session.role !== 'admin' && session.id !== userId && session.username !== userId) {
-          sendJson(res, 403, { success: false, error: 'Tài khoản nộp bài không khớp với phiên đăng nhập.' });
-          return;
+        if (session) {
+          sessionUser = session;
+          if (session.role !== 'admin' && session.id !== userId && session.username !== userId) {
+            sendJson(res, 403, { success: false, error: 'Tài khoản nộp bài không khớp với phiên đăng nhập.' });
+            return;
+          }
         }
       }
 
@@ -1823,15 +1857,24 @@ export async function handleRequest(req, res) {
         return;
       }
 
+      // Resolve student identity reliably from serverUsers and verified session
+      const studentUser = serverUsers.find(u => u.id === userId || (u.username && u.username.toLowerCase() === (userId || '').toLowerCase()));
+      const verifiedUsername = studentUser?.username || sessionUser?.username || userInfo.username || data.username || userId;
+      const verifiedFullName = studentUser?.fullName || sessionUser?.fullName || userInfo.fullName || data.fullName || (verifiedUsername ? `@${verifiedUsername}` : userId);
+      const verifiedClass = studentUser?.className || sessionUser?.className || userInfo.className || data.className || 'Sinh viên';
+      const verifiedAvatar = studentUser?.avatar || sessionUser?.avatar || userInfo.avatar || data.avatar || '👤';
+
       const submission = {
         id: `sub_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
         examId,
         examTitle: exam.title,
         userId,
-        username: userInfo.username || data.username || userId,
-        fullName: userInfo.fullName || data.fullName || userInfo.username || userId,
-        className: userInfo.className || data.className || 'Sinh viên',
-        avatar: userInfo.avatar || data.avatar || '👤',
+        username: verifiedUsername,
+        fullName: verifiedFullName,
+        studentName: verifiedFullName,
+        className: verifiedClass,
+        studentClass: verifiedClass,
+        avatar: verifiedAvatar,
         answers: { ...answers },
         optionOrder: normalizedOptionOrder,
         score,

@@ -253,7 +253,41 @@ describe('QuizView UI Component', () => {
     authManager.logout();
   });
 
-  it('repeats the 10-second lockdown countdown until the third violation bans the exam without requesting fullscreen', () => {
+  it('starts a 10-second countdown on departure and records no violation if returning within 10s', () => {
+    vi.useFakeTimers();
+    authManager.register({ username: 'sv_lockdown_return_intime', fullName: 'Thí Sinh Kịp Giờ', email: 'tskg@toanrr.edu.vn', password: '123456' });
+    examManager.clearAllData();
+    const quizView = new QuizView({ container });
+    quizView.setTab('myExams');
+    window.confirm = () => true;
+    container.querySelector('.btn-start-exam').click();
+
+    const session = quizView.activeExamSession;
+    expect(session.violationCount).toBe(0);
+
+    // Student leaves screen (e.g. switches tab)
+    quizView._handleScreenDeparture('tab_hidden');
+    expect(session.isAway).toBe(true);
+    expect(session.lockdownPending).toBe(true);
+    expect(session.lockdownCountdown).toBe(10);
+    expect(container.querySelector('#examLockdownCountdown').textContent).toBe('10');
+
+    // 5 seconds elapse
+    vi.advanceTimersByTime(5000);
+    expect(session.lockdownCountdown).toBe(5);
+    expect(session.violationCount).toBe(0);
+
+    // Student returns in time (after 5 seconds, before 10 seconds expire)
+    container.querySelector('#btnResumeExamLockdown').click();
+    expect(session.isAway).toBe(false);
+    expect(session.lockdownPending).toBe(false);
+    expect(session.lockdownCountdown).toBeNull();
+    expect(session.violationCount).toBe(0); // NO violation recorded
+
+    authManager.logout();
+  });
+
+  it('records exactly 1 violation when 10s countdown expires and does not increment repeatedly', () => {
     vi.useFakeTimers();
     authManager.register({ username: 'sv_lockdown_timeout', fullName: 'Thí Sinh C', email: 'tsc@toanrr.edu.vn', password: '123456' });
     examManager.clearAllData();
@@ -263,72 +297,50 @@ describe('QuizView UI Component', () => {
     container.querySelector('.btn-start-exam').click();
 
     const session = quizView.activeExamSession;
-    const requestFullscreen = vi.fn();
-    Object.defineProperty(document.documentElement, 'requestFullscreen', {
-      configurable: true,
-      value: requestFullscreen,
-    });
 
-    quizView._recordExamLockdownViolation();
-    expect(session.violationCount).toBe(1);
-    expect(session.lockdownCountdown).toBe(35);
-    expect(container.querySelector('#examLockdownCountdown').textContent).toBe('35');
+    // Student leaves screen
+    quizView._handleScreenDeparture('tab_hidden');
+    expect(session.violationCount).toBe(0);
+    expect(session.lockdownCountdown).toBe(10);
+    expect(container.querySelector('#examLockdownCountdown').textContent).toBe('10');
 
-    vi.advanceTimersByTime(34000);
-    expect(session.violationCount).toBe(1);
+    // 9 seconds elapse: still 0 violations
+    vi.advanceTimersByTime(9000);
+    expect(session.violationCount).toBe(0);
     expect(session.lockdownCountdown).toBe(1);
 
+    // 10th second expires: exactly 1 violation recorded
     vi.advanceTimersByTime(1000);
-    expect(session.violationCount).toBe(2);
-    expect(container.querySelector('.exam-lockdown-warning').textContent).toContain('CẢNH BÁO');
-    expect(container.querySelector('.exam-lockdown-warning').textContent).toContain('cộng thêm 1 vi phạm');
-    expect(session.lockdownCountdown).toBe(35);
-    expect(container.querySelector('#examLockdownCountdown').textContent).toBe('35');
-    expect(session.lockdownTimerId).not.toBeNull();
-    expect(requestFullscreen).not.toHaveBeenCalled();
+    expect(session.violationCount).toBe(1);
+    expect(session.awayViolationRecorded).toBe(true);
+    expect(container.querySelector('.exam-lockdown-warning').textContent).toContain('Đã hết 10 giây');
 
-    session.answers[session.questions[0].id] = session.questions[0].correctId;
-    vi.advanceTimersByTime(35000);
-    expect(session.violationCount).toBe(3);
-    expect(session.lockdownTimerId).toBeNull();
-    expect(quizView.activeExamSession).toBeNull();
-    expect(examManager.getExamViolationRecord(session.exam.id, authManager.getCurrentUser().id))
-      .toMatchObject({ count: 3, banned: true });
-    expect(examManager.getSubmission(session.exam.id, authManager.getCurrentUser().id).score).toBe(0);
-    authManager.logout();
-  });
+    // Staying away for another 15 seconds: violation count must NOT increment repeatedly
+    vi.advanceTimersByTime(15000);
+    expect(session.violationCount).toBe(1);
 
-  it('cancels repeated lockdown countdowns when the student manually continues', async () => {
-    vi.useFakeTimers();
-    authManager.register({ username: 'sv_lockdown_resume', fullName: 'Thí Sinh D', email: 'tsd@toanrr.edu.vn', password: '123456' });
-    examManager.clearAllData();
-    const quizView = new QuizView({ container });
-    quizView.setTab('myExams');
-    window.confirm = () => true;
-    container.querySelector('.btn-start-exam').click();
-
-    const session = quizView.activeExamSession;
-    const requestFullscreen = vi.fn().mockResolvedValue();
-    Object.defineProperty(document.documentElement, 'requestFullscreen', {
-      configurable: true,
-      value: requestFullscreen,
-    });
-
-    quizView._recordExamLockdownViolation();
-    vi.advanceTimersByTime(35000);
-    expect(session.violationCount).toBe(2);
-    expect(session.lockdownTimerId).not.toBeNull();
+    // Student returns
     container.querySelector('#btnResumeExamLockdown').click();
+    expect(session.isAway).toBe(false);
 
-    expect(session.lockdownTimerId).toBeNull();
-    expect(session.lockdownCountdown).toBeNull();
-    expect(session.lockdownPending).toBe(false);
-    expect(requestFullscreen).toHaveBeenCalledTimes(1);
-    vi.advanceTimersByTime(40000);
+    // Student leaves screen a 2nd time: fresh 10s cycle
+    quizView._handleScreenDeparture('tab_hidden');
+    expect(session.lockdownCountdown).toBe(10);
+    vi.advanceTimersByTime(10000);
     expect(session.violationCount).toBe(2);
 
-    await Promise.resolve();
-    quizView._submitActiveExam();
+    // Student returns, then leaves a 3rd time: 3rd violation triggers ban & 0 points
+    container.querySelector('#btnResumeExamLockdown').click();
+    quizView._handleScreenDeparture('fullscreen_exit');
+    vi.advanceTimersByTime(10000);
+    expect(session.violationCount).toBe(3);
+    expect(quizView.activeExamSession).toBeNull();
+
+    const sub = examManager.getSubmission(session.exam.id, authManager.getCurrentUser().id);
+    expect(sub).not.toBeNull();
+    expect(sub.score).toBe(0);
+    expect(sub.integrityBan).toBe(true);
+
     authManager.logout();
   });
 

@@ -1172,23 +1172,30 @@ export class QuizView {
     const isUrgent = session.timeRemaining <= 120;
     const lockdownCountdown = session.lockdownCountdown;
     const lockdownOverlay = session.lockdownPending ? `
-      <div class="exam-lockdown-overlay" role="dialog" aria-modal="true" aria-labelledby="examLockdownTitle">
-        <div class="exam-lockdown-dialog">
-          <div class="exam-lockdown-icon">🔒</div>
-          <h2 id="examLockdownTitle">Phòng thi đã bị thoát toàn màn hình</h2>
-          <p>Vi phạm ${session.violationCount}/3. <strong style="color:#ef4444;">VI PHẠM</strong> đủ 3 lần sẽ bị 0đ và cấm thi lại đề này.</p>
-          ${session.lockdownWarning ? `
-            <p class="exam-lockdown-warning" role="alert">
-              CẢNH BÁO: Bạn đã bị cộng thêm 1 vi phạm do không quay lại toàn màn hình trong thời gian quy định.
-              Tổng số vi phạm: ${session.violationCount}/3.
-            </p>
-          ` : ''}
-          ${lockdownCountdown !== null ? `
-            <p class="exam-lockdown-countdown" role="status">
-              Quay lại toàn màn hình trong <strong id="examLockdownCountdown">${lockdownCountdown}</strong> giây để tránh bị cộng thêm 1 vi phạm.
-            </p>
-          ` : ''}
-          <button type="button" class="btn-primary" id="btnResumeExamLockdown">Quay lại phòng thi toàn màn hình</button>
+      <div class="exam-lockdown-overlay" role="dialog" aria-modal="true" aria-labelledby="examLockdownTitle"
+        style="position:fixed;inset:0;background:rgba(0,0,0,0.85);backdrop-filter:blur(6px);z-index:999999;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;">
+        <div class="exam-lockdown-dialog" style="background:var(--panel,#1e2130);border:2px solid ${session.awayViolationRecorded ? '#ef4444' : '#f59e0b'};border-radius:16px;padding:32px 28px;max-width:480px;width:100%;box-shadow:0 20px 50px rgba(0,0,0,0.7);text-align:center;box-sizing:border-box;">
+          <div class="exam-lockdown-icon" style="font-size:46px;margin-bottom:12px;">${session.awayViolationRecorded ? '❌' : '⚠️'}</div>
+          <h2 id="examLockdownTitle" style="font-size:20px;font-weight:800;color:${session.awayViolationRecorded ? '#ef4444' : '#fbbf24'};margin:0 0 10px;">
+            ${session.awayViolationRecorded ? 'Đã Ghi Nhận Vi Phạm Quy Chế' : 'Cảnh Báo: Rời Màn Hình Làm Bài!'}
+          </h2>
+          <p style="font-size:14px;color:var(--text,#e2e8f0);line-height:1.5;margin:0 0 14px;">
+            Hệ thống phát hiện bạn vừa chuyển tab, rời cửa sổ làm bài hoặc thoát toàn màn hình.
+          </p>
+          ${session.awayViolationRecorded ? `
+            <div class="exam-lockdown-warning" role="alert" style="background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.4);border-radius:8px;padding:12px;color:#f87171;font-weight:700;font-size:13.5px;margin-bottom:18px;">
+              Đã hết 10 giây! Bạn bị cộng 1 lần vi phạm.<br>
+              Tổng số vi phạm: <strong style="font-size:16px;color:#ef4444;">${session.violationCount}/3</strong> (Đủ 3 lần sẽ bị 0đ và dừng bài thi).
+            </div>
+          ` : `
+            <div class="exam-lockdown-countdown" role="status" style="background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.35);border-radius:8px;padding:14px;color:#fbbf24;font-size:14.5px;margin-bottom:18px;">
+              Quay lại trong <strong id="examLockdownCountdown" style="font-size:26px;color:#f59e0b;margin:0 4px;">${lockdownCountdown !== null ? lockdownCountdown : 10}</strong> giây để tránh bị cộng thêm 1 vi phạm.<br>
+              <span style="font-size:12px;color:var(--dim,#94a3b8);margin-top:4px;display:block;">(Số vi phạm hiện tại: ${session.violationCount}/3)</span>
+            </div>
+          `}
+          <button type="button" class="btn-primary" id="btnResumeExamLockdown" style="width:100%;padding:12px 20px;font-size:15px;font-weight:700;border-radius:8px;background:var(--accent,#38bdf8);color:#000;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">
+            <span>🔄</span> Quay trở lại bài thi
+          </button>
         </div>
       </div>
     ` : '';
@@ -1273,7 +1280,7 @@ export class QuizView {
           </div>
 
           <div style="font-size:16.5px;font-weight:600;color:var(--text);line-height:1.6;margin-bottom:24px;border-left:4px solid var(--accent);padding-left:14px;word-break:break-word;overflow-wrap:break-word;">
-            ${currentQ.question}
+            ${this._formatExamContent(currentQ.question)}
           </div>
 
           <!-- Options -->
@@ -1294,7 +1301,7 @@ export class QuizView {
                   <span class="opt-badge" style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;font-size:13px;font-weight:700;flex-shrink:0;margin-top:2px;${badgeStyle}">
                     ${displayLabel}
                   </span>
-                  <span class="opt-text" style="flex:1;min-width:0;font-weight:500;white-space:normal !important;word-break:break-word !important;overflow-wrap:anywhere !important;line-height:1.5;">${opt.text}</span>
+                  <span class="opt-text" style="flex:1;min-width:0;font-weight:500;white-space:normal !important;word-break:break-word !important;overflow-wrap:anywhere !important;line-height:1.5;">${this._formatExamContent(opt.text)}</span>
                   ${isSelected ? '<span class="opt-selected-tag" style="color:var(--accent);font-weight:bold;font-size:12.5px;flex-shrink:0;white-space:nowrap;margin-left:8px;margin-top:2px;">● Đã chọn</span>' : ''}
                 </button>
               `;
@@ -2197,14 +2204,24 @@ export class QuizView {
                   </tr>
                 </thead>
                 <tbody>
-                  ${submissions.map(sub => `
+                  ${submissions.map(sub => {
+                    const allUsers = (typeof authManager !== 'undefined' && typeof authManager.getUsers === 'function')
+                      ? authManager.getUsers()
+                      : ((typeof authManager !== 'undefined' && typeof authManager.getAllUsers === 'function') ? authManager.getAllUsers() : []);
+                    const user = allUsers.find(u => u.id === sub.userId || (u.username && u.username.toLowerCase() === (sub.userId || '').toLowerCase()));
+                    const username = sub.username || user?.username || (sub.userId && !sub.userId.startsWith('user_') ? sub.userId : '');
+                    const displayName = sub.fullName || sub.studentName || user?.fullName || (username ? `@${username}` : (sub.userId || 'Sinh viên'));
+                    const displayClass = sub.className || sub.studentClass || user?.className || 'Sinh viên';
+                    const displayAvatar = sub.avatar || user?.avatar || '👤';
+
+                    return `
                     <tr>
                       <td>
                         <div class="table-user-cell">
-                          <span class="cell-avatar">${sub.avatar || '👤'}</span>
+                          <span class="cell-avatar">${displayAvatar}</span>
                           <div>
-                            <span class="cell-name">${this._escapeHtml(sub.fullName)}</span>
-                            <span class="cell-class">${this._escapeHtml(sub.className || 'Sinh viên')} • @${this._escapeHtml(sub.username)}</span>
+                            <span class="cell-name">${this._escapeHtml(displayName)}</span>
+                            <span class="cell-class">${this._escapeHtml(displayClass)}${username ? ` • @${this._escapeHtml(username)}` : ''}</span>
                           </div>
                         </div>
                       </td>
@@ -2221,7 +2238,8 @@ export class QuizView {
                         ${new Date(sub.submittedAt).toLocaleString('vi-VN')}
                       </td>
                     </tr>
-                  `).join('')}
+                    `;
+                  }).join('')}
                 </tbody>
               </table>
             `}
@@ -2428,6 +2446,45 @@ export class QuizView {
       .replace(/'/g, '&#39;');
   }
 
+  _formatExamContent(raw) {
+    if (!raw || typeof raw !== 'string') return '';
+    let text = String(raw);
+
+    // KaTeX formula rendering if window.katex exists
+    if (typeof window !== 'undefined' && window.katex && typeof window.katex.renderToString === 'function') {
+      try {
+        // Block math: $$ ... $$ or \[ ... \]
+        text = text.replace(/\$\$([\s\S]+?)\$\$/g, (m, expr) => {
+          try {
+            return window.katex.renderToString(expr.trim(), { displayMode: true, throwOnError: false });
+          } catch { return m; }
+        });
+        text = text.replace(/\\\[([\s\S]+?)\\\]/g, (m, expr) => {
+          try {
+            return window.katex.renderToString(expr.trim(), { displayMode: true, throwOnError: false });
+          } catch { return m; }
+        });
+        // Inline math: $ ... $ or \( ... \)
+        text = text.replace(/\$([^\$\n]+?)\$/g, (m, expr) => {
+          try {
+            return window.katex.renderToString(expr.trim(), { displayMode: false, throwOnError: false });
+          } catch { return m; }
+        });
+        text = text.replace(/\\\(([^\n]+?)\\\)/g, (m, expr) => {
+          try {
+            return window.katex.renderToString(expr.trim(), { displayMode: false, throwOnError: false });
+          } catch { return m; }
+        });
+      } catch {}
+    }
+
+    // Preserve newlines if not already containing block html
+    if (!text.includes('<p>') && !text.includes('<div>') && !text.includes('<br')) {
+      text = text.replace(/\n/g, '<br/>');
+    }
+    return text;
+  }
+
   _showAlert(msg) {
     if (typeof window !== 'undefined' && typeof window.alert === 'function') {
       window.alert(msg);
@@ -2450,6 +2507,14 @@ export class QuizView {
     let csv = '\uFEFF"STT","Họ và Tên","Tài Khoản (Username)","Lớp / Đơn Vị","Điểm (Thang 10)","Số Câu Đúng","Tổng Số Câu","Thời Gian Làm","Thời Điểm Nộp","Xếp Loại"\r\n';
 
     subs.forEach((s, idx) => {
+      const allUsers = (typeof authManager !== 'undefined' && typeof authManager.getUsers === 'function')
+        ? authManager.getUsers()
+        : ((typeof authManager !== 'undefined' && typeof authManager.getAllUsers === 'function') ? authManager.getAllUsers() : []);
+      const user = allUsers.find(u => u.id === s.userId || (u.username && u.username.toLowerCase() === (s.userId || '').toLowerCase()));
+      const username = s.username || user?.username || (s.userId && !s.userId.startsWith('user_') ? s.userId : '');
+      const fullName = s.fullName || s.studentName || user?.fullName || (username ? `@${username}` : s.userId);
+      const className = s.className || s.studentClass || user?.className || 'Sinh viên';
+
       const minutes = Math.floor(s.timeSpentSeconds / 60);
       const seconds = s.timeSpentSeconds % 60;
       const durationStr = `${minutes}p ${seconds}s`;
@@ -2464,9 +2529,9 @@ export class QuizView {
 
       const row = [
         idx + 1,
-        `"${(s.fullName || '').replace(/"/g, '""')}"`,
-        `"${(s.username || '').replace(/"/g, '""')}"`,
-        `"${(s.className || 'Sinh viên').replace(/"/g, '""')}"`,
+        `"${(fullName || '').replace(/"/g, '""')}"`,
+        `"${(username || '').replace(/"/g, '""')}"`,
+        `"${(className || 'Sinh viên').replace(/"/g, '""')}"`,
         `"${s.score}"`,
         `"${s.correctCount}"`,
         `"${s.totalQuestions}"`,
@@ -2666,104 +2731,151 @@ export class QuizView {
     if (typeof document === 'undefined' || this._examLockdownHandlers) return;
     const isMobile = typeof navigator !== 'undefined' && (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (typeof window !== 'undefined' && window.innerWidth < 768));
 
-    // Grace period ngẫu nhiên 3–5 giây, chỉ tính tối đa 1 vi phạm mỗi lần ẩn tab
-    const GRACE_MIN_MS = 3000;
-    const GRACE_MAX_MS = 5000;
-    const _randomGrace = () => Math.floor(Math.random() * (GRACE_MAX_MS - GRACE_MIN_MS + 1)) + GRACE_MIN_MS;
-
     this._examLockdownHandlers = {
       fullscreenchange: () => {
-        // Trên mobile không dùng fullscreen API
         if (isMobile) return;
         const session = this.activeExamSession;
         if (!session) return;
         const isFullscreen = document.fullscreenElement === document.documentElement;
         if (isFullscreen) {
           session.fullscreenActive = true;
-          // Hủy grace timer nếu người dùng quay lại kịp
-          if (this._desktopGraceTimer) {
-            clearTimeout(this._desktopGraceTimer);
-            this._desktopGraceTimer = null;
-          }
-          session._graceViolationIssued = false; // Reset để lần sau có thể tính
-          if (session.lockdownPending) {
-            this._cancelExamLockdownCountdown(session);
-            session.lockdownPending = false;
-            session.lockdownWarning = false;
-            this.render();
-          }
+          this._handleScreenReturn();
         } else if (session.fullscreenActive) {
           session.fullscreenActive = false;
-          // Desktop grace period 3-5 giây trước khi phạt, chỉ 1 lần/phiên
-          if (this._desktopGraceTimer) clearTimeout(this._desktopGraceTimer);
-          if (!session._graceViolationIssued) {
-            this._desktopGraceTimer = setTimeout(() => {
-              this._desktopGraceTimer = null;
-              if (document.fullscreenElement !== document.documentElement && !session._graceViolationIssued) {
-                session._graceViolationIssued = true;
-                this._recordExamLockdownViolation();
-              }
-            }, _randomGrace());
-          }
+          this._handleScreenDeparture('fullscreen_exit');
         }
       },
       visibilitychange: () => {
         if (document.visibilityState === 'hidden') {
-          if (isMobile) {
-            // Mobile: grace period 3-5 giây, chỉ 1 vi phạm mỗi phiên ẩn tab
-            if (this._mobileVisibilityTimer) clearTimeout(this._mobileVisibilityTimer);
-            if (this._mobileViolationIssued) return;
-            this._mobileVisibilityTimer = setTimeout(() => {
-              this._mobileVisibilityTimer = null;
-              if (document.visibilityState === 'hidden' && !this._mobileViolationIssued) {
-                this._mobileViolationIssued = true;
-                this._recordExamLockdownViolation();
-              }
-            }, _randomGrace());
-          }
-          // Desktop: không phạt qua visibilitychange (đã xử lý qua fullscreenchange)
+          this._handleScreenDeparture('visibility_hidden');
         } else if (document.visibilityState === 'visible') {
-          // Người dùng quay lại → reset tất cả grace timer và cờ vi phạm phiên nền
-          if (isMobile) {
-            if (this._mobileVisibilityTimer) {
-              clearTimeout(this._mobileVisibilityTimer);
-              this._mobileVisibilityTimer = null;
-            }
-            this._mobileViolationIssued = false;
-          } else {
-            if (this._desktopGraceTimer) {
-              clearTimeout(this._desktopGraceTimer);
-              this._desktopGraceTimer = null;
-            }
-            if (this.activeExamSession) {
-              this.activeExamSession._graceViolationIssued = false;
-            }
+          if (typeof document.hasFocus === 'function' && document.hasFocus()) {
+            this._handleScreenReturn();
           }
         }
       },
+      blur: () => {
+        this._handleScreenDeparture('window_blur');
+      },
+      focus: () => {
+        if (document.visibilityState === 'visible') {
+          this._handleScreenReturn();
+        }
+      },
     };
+
     document.addEventListener('fullscreenchange', this._examLockdownHandlers.fullscreenchange);
     document.addEventListener('visibilitychange', this._examLockdownHandlers.visibilitychange);
+    if (typeof window !== 'undefined') {
+      window.addEventListener('blur', this._examLockdownHandlers.blur);
+      window.addEventListener('focus', this._examLockdownHandlers.focus);
+    }
   }
 
   _detachExamLockdownListeners() {
-    if (this._mobileVisibilityTimer) {
-      clearTimeout(this._mobileVisibilityTimer);
-      this._mobileVisibilityTimer = null;
-    }
-    if (this._desktopGraceTimer) {
-      clearTimeout(this._desktopGraceTimer);
-      this._desktopGraceTimer = null;
-    }
-    this._mobileViolationIssued = false;
     if (this.activeExamSession) {
-      this.activeExamSession._graceViolationIssued = false;
+      this._cancelExamLockdownCountdown(this.activeExamSession);
     }
     if (typeof document !== 'undefined' && this._examLockdownHandlers) {
       document.removeEventListener('fullscreenchange', this._examLockdownHandlers.fullscreenchange);
       document.removeEventListener('visibilitychange', this._examLockdownHandlers.visibilitychange);
     }
+    if (typeof window !== 'undefined' && this._examLockdownHandlers) {
+      window.removeEventListener('blur', this._examLockdownHandlers.blur);
+      window.removeEventListener('focus', this._examLockdownHandlers.focus);
+    }
     this._examLockdownHandlers = null;
+  }
+
+  _handleScreenDeparture(reason) {
+    const session = this.activeExamSession;
+    if (!session || session.timeRemaining <= 0) return;
+    if (session.isAway) return; // Already tracking an ongoing departure episode
+
+    session.isAway = true;
+    session.awayReason = reason;
+    session.lockdownPending = true;
+    session.awayViolationRecorded = false;
+    session.lockdownWarning = false;
+    session.lockdownCountdown = 10; // Exactly 10 seconds per requirements
+
+    this._startExamLockdownCountdown(session);
+    this.render();
+  }
+
+  _handleScreenReturn() {
+    const session = this.activeExamSession;
+    if (!session || !session.isAway) return;
+
+    this._cancelExamLockdownCountdown(session);
+    session.isAway = false;
+    session.lockdownPending = false;
+    session.lockdownCountdown = null;
+    session.awayViolationRecorded = false;
+
+    this._requestExamFullscreen({ preserveLockdownState: false });
+    this.render();
+  }
+
+  _startExamLockdownCountdown(session) {
+    this._cancelExamLockdownCountdown(session);
+    session.lockdownCountdown = 10;
+    session.lockdownTimerId = setInterval(() => {
+      if (this.activeExamSession !== session || !session.isAway || session.timeRemaining <= 0) {
+        this._cancelExamLockdownCountdown(session);
+        return;
+      }
+
+      session.lockdownCountdown--;
+      const countdownEl = this.container?.querySelector('#examLockdownCountdown');
+      if (countdownEl) countdownEl.textContent = String(Math.max(0, session.lockdownCountdown));
+
+      if (session.lockdownCountdown <= 0) {
+        this._cancelExamLockdownCountdown(session);
+        if (!session.awayViolationRecorded) {
+          session.awayViolationRecorded = true;
+          this._recordExamLockdownTimeoutViolation(session);
+        }
+      }
+    }, 1000);
+  }
+
+  _cancelExamLockdownCountdown(session) {
+    if (session && session.lockdownTimerId !== null) {
+      clearInterval(session.lockdownTimerId);
+      session.lockdownTimerId = null;
+    }
+    if (session) {
+      session.lockdownCountdown = null;
+    }
+  }
+
+  _recordExamLockdownViolation() {
+    const session = this.activeExamSession;
+    if (!session) return;
+    this._recordExamLockdownTimeoutViolation(session);
+  }
+
+  _recordExamLockdownTimeoutViolation(session) {
+    if (this.activeExamSession !== session || session.timeRemaining <= 0) return;
+    const currentUser = authManager.getCurrentUser();
+    if (!currentUser) return;
+
+    const result = examManager.recordExamViolation(session.exam.id, currentUser.id);
+    if (!result.success) {
+      this._showAlert(`Không thể lưu vi phạm thi: ${result.error}`);
+      return;
+    }
+
+    session.violationCount = result.record.count;
+    session.awayViolationRecorded = true;
+    if (session.violationCount >= 3) {
+      this._finishExamForViolationBan();
+      return;
+    }
+
+    session.lockdownWarning = true;
+    this.render();
   }
 
   _requestExamFullscreen({ preserveLockdownState = false } = {}) {
@@ -2783,95 +2895,12 @@ export class QuizView {
     try {
       Promise.resolve(document.documentElement.requestFullscreen()).then(() => {
         if (this.activeExamSession !== session) return;
-        this._cancelExamLockdownCountdown(session);
         session.fullscreenActive = true;
-        session.lockdownPending = false;
-        session.lockdownWarning = false;
-        this.render();
-      }).catch(() => {
-        if (this.activeExamSession !== session || preserveLockdownState) return;
-        session.lockdownPending = true;
-        this.render();
-      });
-    } catch {
-      if (this.activeExamSession === session && !preserveLockdownState) {
-        session.lockdownPending = true;
-        this.render();
-      }
-    }
-  }
-
-  _recordExamLockdownViolation() {
-    const session = this.activeExamSession;
-    if (!session || session.lockdownPending) return;
-    const currentUser = authManager.getCurrentUser();
-    if (!currentUser) return;
-
-    const result = examManager.recordExamViolation(session.exam.id, currentUser.id);
-    if (!result.success) {
-      this._showAlert(`Không thể lưu vi phạm thi: ${result.error}`);
-      return;
-    }
-    session.violationCount = result.record.count;
-    session.lockdownPending = true;
-    session.lockdownWarning = false;
-
-    if (session.violationCount >= 3) {
-      this._finishExamForViolationBan();
-      return;
-    }
-    this._startExamLockdownCountdown(session);
-    this.render();
-  }
-
-  _startExamLockdownCountdown(session) {
-    this._cancelExamLockdownCountdown(session);
-    session.lockdownCountdown = 35; // Tăng lên 35 giây để thí sinh kịp quay lại
-    session.lockdownTimerId = setInterval(() => {
-      if (this.activeExamSession !== session || !session.lockdownPending || session.timeRemaining <= 0) {
-        this._cancelExamLockdownCountdown(session);
-        return;
-      }
-
-      session.lockdownCountdown--;
-      const countdownEl = this.container?.querySelector('#examLockdownCountdown');
-      if (countdownEl) countdownEl.textContent = String(session.lockdownCountdown);
-
-      if (session.lockdownCountdown <= 0) {
-        this._cancelExamLockdownCountdown(session);
-        this._recordExamLockdownTimeoutViolation(session);
-      }
-    }, 1000);
-  }
-
-  _cancelExamLockdownCountdown(session) {
-    if (session.lockdownTimerId !== null) {
-      clearInterval(session.lockdownTimerId);
-      session.lockdownTimerId = null;
-    }
-    session.lockdownCountdown = null;
-  }
-
-  _recordExamLockdownTimeoutViolation(session) {
-    if (this.activeExamSession !== session || !session.lockdownPending || session.timeRemaining <= 0) return;
-    const currentUser = authManager.getCurrentUser();
-    if (!currentUser) return;
-
-    const result = examManager.recordExamViolation(session.exam.id, currentUser.id);
-    if (!result.success) {
-      this._showAlert(`Không thể lưu vi phạm thi: ${result.error}`);
-      return;
-    }
-
-    session.violationCount = result.record.count;
-    if (session.violationCount >= 3) {
-      this._finishExamForViolationBan();
-      return;
-    }
-
-    session.lockdownWarning = true;
-    this._startExamLockdownCountdown(session);
-    this.render();
+        if (!preserveLockdownState) {
+          session.lockdownPending = false;
+        }
+      }).catch(() => {});
+    } catch {}
   }
 
   _finishExamForViolationBan() {
@@ -2926,6 +2955,7 @@ export class QuizView {
     }
     // ── End Offline Queue ─────────────────────────────────────────────────────
 
+    this.activeExamSession = null;
     const result = examManager.submitExam(submissionPayload);
 
     let serverConfirmed = false;
@@ -2933,7 +2963,17 @@ export class QuizView {
 
     if (result.success && cloudSyncManager) {
       try {
-        const isOnline = Boolean(cloudSyncManager && (cloudSyncManager.isConnected || (typeof navigator !== 'undefined' && navigator.onLine !== false)));
+        const isOnline = Boolean(
+          cloudSyncManager &&
+          (cloudSyncManager.isConnected || (
+            typeof window !== 'undefined' &&
+            window.location &&
+            window.location.protocol.startsWith('http') &&
+            window.location.hostname !== 'localhost' &&
+            window.location.hostname !== '127.0.0.1' &&
+            navigator.onLine !== false
+          ))
+        );
         if (isOnline) {
           const serverRes = await cloudSyncManager.serverSubmitExam(result.submission);
           if (serverRes && serverRes.success) {
@@ -2958,8 +2998,6 @@ export class QuizView {
       examManager.clearDraft(session.exam.id, currentUser.id);
     }
     // ─────────────────────────────────────────────────────────────────────────
-
-    this.activeExamSession = null;
 
     if (result.success) {
       if (serverConfirmed) {
@@ -3100,13 +3138,7 @@ export class QuizView {
       const btnResumeExamLockdown = this.container.querySelector('#btnResumeExamLockdown');
       if (btnResumeExamLockdown) {
         btnResumeExamLockdown.addEventListener('click', () => {
-          const session = this.activeExamSession;
-          if (!session) return;
-          this._cancelExamLockdownCountdown(session);
-          session.lockdownPending = false;
-          session.lockdownWarning = false;
-          this.render();
-          this._requestExamFullscreen({ preserveLockdownState: true });
+          this._handleScreenReturn();
         });
       }
 
@@ -3691,6 +3723,9 @@ export class QuizView {
     const btnCreateAndAssign = this.container.querySelector('#btnCreateAndAssignExam');
     if (btnCreateAndAssign) {
       btnCreateAndAssign.addEventListener('click', async () => {
+        if (this._isCreatingExam) return;
+        this._isCreatingExam = true;
+
         const titleInput = this.container.querySelector('#txtAssignTitle');
         const durationInput = this.container.querySelector('#numAssignDuration');
         const examCodeInput = this.container.querySelector('#txtAssignExamCode');
@@ -3703,6 +3738,7 @@ export class QuizView {
 
         if (!title) {
           this._showAlert('Vui lòng nhập tiêu đề đề thi!');
+          this._isCreatingExam = false;
           return;
         }
 
@@ -3711,6 +3747,7 @@ export class QuizView {
         if (distSummary && distSummary.hasExceeded && distSummary.exceededFiles && distSummary.exceededFiles.length > 0) {
           const details = distSummary.exceededFiles.map(e => `• "${e.fileName}": chọn ${e.selectedCount} câu (chỉ có ${e.availableCount} câu sẵn có)`).join('\n');
           this._showAlert(`⚠️ Không thể tạo đề thi: Số câu chọn bốc vượt quá số lượng câu sẵn có trong file:\n\n${details}\n\nVui lòng điều chỉnh lại số câu chọn bốc không vượt quá số câu sẵn có trước khi phát đề!`);
+          this._isCreatingExam = false;
           return;
         }
 
@@ -3723,6 +3760,7 @@ export class QuizView {
           });
           if (selectedStudents.length === 0) {
             this._showAlert('Vui lòng chọn ít nhất 1 sinh viên để phân đề!');
+            this._isCreatingExam = false;
             return;
           }
           assignedTo = selectedStudents;
@@ -3733,6 +3771,7 @@ export class QuizView {
 
         if (questionsToAssign.length === 0) {
           this._showAlert('⚠️ Vui lòng chọn ít nhất 1 câu hỏi từ các bộ đề ở tab Phân Phối Đề trước khi phát đề!');
+          this._isCreatingExam = false;
           return;
         }
 
@@ -3760,7 +3799,17 @@ export class QuizView {
           };
 
           let serverConfirmedExam = null;
-          const isOnline = Boolean(cloudSyncManager && (cloudSyncManager.isConnected || (typeof navigator !== 'undefined' && navigator.onLine !== false)));
+          const isOnline = Boolean(
+            cloudSyncManager &&
+            (cloudSyncManager.isConnected || (
+              typeof window !== 'undefined' &&
+              window.location &&
+              window.location.protocol.startsWith('http') &&
+              window.location.hostname !== 'localhost' &&
+              window.location.hostname !== '127.0.0.1' &&
+              navigator.onLine !== false
+            ))
+          );
 
           if (isOnline) {
             const serverRes = await cloudSyncManager.serverCreateExam(examPayload);
@@ -3778,11 +3827,27 @@ export class QuizView {
           if (result.success) {
             this.gradebookExamId = null;
             this.adminAnswerKeyExamId = result.exam.id;
-            this._showAlert(`🎉 Tạo và phát đề thi thành công!\n\nĐề thi: "${title}" (Mã: ${result.exam.examCode})\nSố câu: ${questionIds.length} câu\nThời lượng: ${durationMinutes} phút\nĐối tượng: ${assignedTo.includes('all') ? 'Toàn bộ sinh viên' : assignedTo.length + ' sinh viên'}\n\nĐề thi đã được chuyển vào mục "Quản Lý Đề Thi". Hệ thống đã chuẩn bị sẵn File Đáp Án dành riêng cho Quản trị viên.`);
+
+            // Automatically export answer key file as indicated on the button
+            let fileExportSuccess = false;
+            let fileExportError = null;
+            try {
+              this._exportAdminAnswerKeyToCsv(result.exam.id);
+              fileExportSuccess = true;
+            } catch (expErr) {
+              fileExportError = expErr.message;
+            }
+
+            if (fileExportSuccess) {
+              this._showAlert(`🎉 Tạo & phát đề thi thành công và đã xuất File Đáp Án!\n\nĐề thi: "${title}" (Mã: ${result.exam.examCode || 'N/A'})\nSố câu: ${questionIds.length} câu\nThời lượng: ${durationMinutes} phút\nĐối tượng: ${assignedTo.includes('all') ? 'Toàn bộ sinh viên' : assignedTo.length + ' sinh viên'}\n\nĐề thi đã được chuyển vào mục "Quản Lý Đề Thi". File đáp án chi tiết đã được tự động tải về máy của bạn.`);
+            } else {
+              this._showAlert(`🎉 Đề thi đã phát thành công!\n\nĐề thi: "${title}" (Mã: ${result.exam.examCode || 'N/A'})\nSố câu: ${questionIds.length} câu\nThời lượng: ${durationMinutes} phút\nĐối tượng: ${assignedTo.includes('all') ? 'Toàn bộ sinh viên' : assignedTo.length + ' sinh viên'}\n\nĐề thi đã được chuyển vào mục "Quản Lý Đề Thi". (Lưu ý: Không thể tự động tải file đáp án: ${fileExportError || 'lỗi'}).`);
+            }
+
             this.studioAssignTitle = null;
             this.studioAssignExamCode = null;
             this.studioAssignDuration = null;
-            await this.render();
+            this.render();
           } else {
             this._showAlert(result.error || result.message || 'Có lỗi xảy ra khi lưu đề thi.');
             btnCreateAndAssign.disabled = false;
@@ -3792,6 +3857,8 @@ export class QuizView {
           this._showAlert(`❌ Lỗi phát đề thi: ${err.message}`);
           btnCreateAndAssign.disabled = false;
           btnCreateAndAssign.innerHTML = originalBtnHtml;
+        } finally {
+          this._isCreatingExam = false;
         }
       });
     }

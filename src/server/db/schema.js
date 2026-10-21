@@ -69,6 +69,9 @@ export const SCHEMA_STATEMENTS = [
   `CREATE INDEX IF NOT EXISTS idx_submissions_user_id ON exam_submissions(user_id)`,
   `CREATE INDEX IF NOT EXISTS idx_submissions_submitted_at ON exam_submissions(submitted_at)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS idx_submissions_exam_user_unique ON exam_submissions(exam_id, user_id)`,
+  `ALTER TABLE exam_submissions ADD COLUMN IF NOT EXISTS username VARCHAR(64) DEFAULT ''`,
+  `ALTER TABLE exam_submissions ADD COLUMN IF NOT EXISTS full_name VARCHAR(128) DEFAULT ''`,
+  `ALTER TABLE exam_submissions ADD COLUMN IF NOT EXISTS avatar VARCHAR(32) DEFAULT '👤'`,
 
   // 4. quiz_stats
   `CREATE TABLE IF NOT EXISTS quiz_stats (

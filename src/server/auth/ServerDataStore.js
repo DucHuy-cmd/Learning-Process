@@ -444,13 +444,22 @@ export async function fetchFromPostgres(options = {}) {
             serverExamSubmissions.length = 0;
             for (const r of subRes.rows) {
               if (isExamDeleted(r.exam_id)) continue;
+              const resolvedUsername = r.username || '';
+              const resolvedFullName = r.full_name || r.student_name || (resolvedUsername ? `@${resolvedUsername}` : r.user_id);
+              const resolvedClass = r.student_class || r.class_name || 'Sinh viên';
+              const resolvedAvatar = r.avatar || '👤';
+
               serverExamSubmissions.push({
                 id: r.id,
                 examId: r.exam_id,
                 userId: r.user_id,
                 examTitle: r.exam_title,
-                studentName: r.student_name,
-                studentClass: r.student_class,
+                studentName: resolvedFullName,
+                fullName: resolvedFullName,
+                username: resolvedUsername,
+                studentClass: resolvedClass,
+                className: resolvedClass,
+                avatar: resolvedAvatar,
                 answers: typeof r.answers === 'string' ? JSON.parse(r.answers) : (r.answers || {}),
                 score: parseFloat(r.score) || 0,
                 maxScore: parseFloat(r.max_score) || 10,
@@ -536,6 +545,25 @@ export async function fetchFromPostgres(options = {}) {
         } catch {}
       })(),
     ]);
+
+    // Second-pass enrichment: link user profile details to submissions
+    for (const s of serverExamSubmissions) {
+      const user = serverUsers.find(u => u.id === s.userId || (u.username && u.username.toLowerCase() === (s.userId || '').toLowerCase()));
+      if (!s.username || s.username === s.userId) {
+        if (user?.username) s.username = user.username;
+      }
+      if (!s.fullName || s.fullName === s.userId) {
+        if (user?.fullName) s.fullName = user.fullName;
+      }
+      if (!s.studentName) s.studentName = s.fullName;
+      if (!s.className || s.className === 'Sinh viên') {
+        if (user?.className) s.className = user.className;
+      }
+      if (!s.studentClass) s.studentClass = s.className;
+      if (!s.avatar || s.avatar === '👤') {
+        if (user?.avatar) s.avatar = user.avatar;
+      }
+    }
 
     lastPostgresFetchTime = Date.now();
     return true;
@@ -677,21 +705,36 @@ export async function saveSubmissionToPostgres(submission) {
   if (sqlDb.isCloudEnabled) {
     try {
       await sqlDb.initSchema();
+      const user = serverUsers.find(u => u.id === submission.userId || (u.username && u.username.toLowerCase() === (submission.userId || '').toLowerCase()));
+      const studentName = submission.fullName || submission.studentName || user?.fullName || (submission.username ? `@${submission.username}` : submission.userId);
+      const studentClass = submission.className || submission.studentClass || user?.className || 'Sinh viên';
+      const username = submission.username || user?.username || submission.userId || '';
+      const avatar = submission.avatar || user?.avatar || '👤';
+
       await sqlDb.executeRawPostgres(`
         INSERT INTO exam_submissions (
           id, exam_id, user_id, exam_title, student_name, student_class,
+          full_name, username, avatar,
           answers, score, max_score, total_questions, correct_count,
           time_spent_seconds, submitted_at
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10, $11, $12, $13)
-        ON CONFLICT (id) DO NOTHING;
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11, $12, $13, $14, $15, $16)
+        ON CONFLICT (id) DO UPDATE SET
+          student_name = EXCLUDED.student_name,
+          student_class = EXCLUDED.student_class,
+          full_name = EXCLUDED.full_name,
+          username = EXCLUDED.username,
+          avatar = EXCLUDED.avatar;
       `, [
         submission.id,
         submission.examId,
         submission.userId,
         submission.examTitle || '',
-        submission.studentName || '',
-        submission.studentClass || '',
+        studentName,
+        studentClass,
+        studentName,
+        username,
+        avatar,
         JSON.stringify(submission.answers || {}),
         submission.score || 0,
         submission.maxScore || 10,
@@ -832,24 +875,37 @@ export async function saveToPostgres() {
           let pIdx = 1;
 
           for (const s of chunk) {
-            valueClauses.push(`($${pIdx}, $${pIdx+1}, $${pIdx+2}, $${pIdx+3}, $${pIdx+4}, $${pIdx+5}, $${pIdx+6}::jsonb, $${pIdx+7}, $${pIdx+8}, $${pIdx+9}, $${pIdx+10}, $${pIdx+11}, $${pIdx+12})`);
+            const user = serverUsers.find(u => u.id === s.userId || (u.username && u.username.toLowerCase() === (s.userId || '').toLowerCase()));
+            const studentName = s.fullName || s.studentName || user?.fullName || (s.username ? `@${s.username}` : s.userId);
+            const studentClass = s.className || s.studentClass || user?.className || 'Sinh viên';
+            const username = s.username || user?.username || s.userId || '';
+            const avatar = s.avatar || user?.avatar || '👤';
+
+            valueClauses.push(`($${pIdx}, $${pIdx+1}, $${pIdx+2}, $${pIdx+3}, $${pIdx+4}, $${pIdx+5}, $${pIdx+6}, $${pIdx+7}, $${pIdx+8}, $${pIdx+9}::jsonb, $${pIdx+10}, $${pIdx+11}, $${pIdx+12}, $${pIdx+13}, $${pIdx+14}, $${pIdx+15})`);
             params.push(
-              s.id, s.examId, s.userId, s.examTitle || '', s.studentName || '', s.studentClass || '',
+              s.id, s.examId, s.userId, s.examTitle || '', studentName, studentClass,
+              studentName, username, avatar,
               JSON.stringify(s.answers || {}), s.score || 0, s.maxScore || 10,
               s.totalQuestions || 0, s.correctCount || 0, s.timeSpentSeconds || 0, s.submittedAt || new Date().toISOString()
             );
-            pIdx += 13;
+            pIdx += 16;
           }
 
           if (valueClauses.length > 0) {
             const sql = `
               INSERT INTO exam_submissions (
                 id, exam_id, user_id, exam_title, student_name, student_class,
+                full_name, username, avatar,
                 answers, score, max_score, total_questions, correct_count,
                 time_spent_seconds, submitted_at
               )
               VALUES ${valueClauses.join(', ')}
-              ON CONFLICT (id) DO NOTHING;
+              ON CONFLICT (id) DO UPDATE SET
+                student_name = EXCLUDED.student_name,
+                student_class = EXCLUDED.student_class,
+                full_name = EXCLUDED.full_name,
+                username = EXCLUDED.username,
+                avatar = EXCLUDED.avatar;
             `;
             await sqlDb.executeRawPostgres(sql, params);
           }
