@@ -815,22 +815,32 @@ export class ExamManager {
   /**
    * Saves the current exam session state as a draft into localStorage.
    * Called after every answer selection so no progress is ever lost.
+   * Stores absolute deadline to prevent client-side time manipulation.
    *
    * @param {string} examId
    * @param {string} userId
-   * @param {Object} draftData - { examId, answers, startedAt, timeRemaining, currentQIndex, questionIds, optionOrder }
+   * @param {Object} draftData - { examId, answers, startedAt, deadline, durationMinutes, timeRemaining, currentQIndex, questionIds, optionOrder }
    */
   saveDraft(examId, userId, draftData) {
     if (!this.storage || !examId || !userId) return;
     try {
+      const exam = this.getExamById(examId);
+      const durationMin = draftData.durationMinutes || exam?.durationMinutes || 15;
+      const startedAt = draftData.startedAt || Date.now();
+      const deadline = draftData.deadline || (startedAt + durationMin * 60 * 1000);
+
       const payload = {
         examId,
+        userId,
         answers:       draftData.answers       || {},
-        startedAt:     draftData.startedAt     || Date.now(),
-        timeRemaining: draftData.timeRemaining != null ? draftData.timeRemaining : 0,
+        startedAt,
+        deadline,
+        durationMinutes: durationMin,
+        timeRemaining: draftData.timeRemaining != null ? draftData.timeRemaining : Math.max(0, Math.floor((deadline - Date.now()) / 1000)),
         currentQIndex: draftData.currentQIndex != null ? draftData.currentQIndex : 0,
         questionIds:   draftData.questionIds   || [],
         optionOrder:   draftData.optionOrder   || {},
+        updatedAt:     Date.now(),
       };
       this.storage.setItem(this._draftKey(examId, userId), JSON.stringify(payload));
     } catch {
@@ -839,14 +849,17 @@ export class ExamManager {
   }
 
   /**
-   * Loads a valid (non-expired) draft for the given exam and user.
-   * A draft is considered valid when: Date.now() - startedAt < durationMinutes * 60 * 1000
+   * Loads a valid draft for the given exam and user.
+   * Evaluates against absolute deadline (startedAt + durationMinutes) so closing tab cannot pause time.
+   * If deadline has passed, marks draft as expired (timeRemaining: 0) for auto-submission.
    *
    * @param {string} examId
    * @param {string} userId
-   * @returns {Object|null} Draft data or null if absent / expired / corrupt
+   * @param {Object} [options]
+   * @param {boolean} [options.includeExpired=true] - Whether to return expired draft with expired: true flag
+   * @returns {Object|null} Draft data or null if absent / corrupt
    */
-  loadDraft(examId, userId) {
+  loadDraft(examId, userId, { includeExpired = true } = {}) {
     if (!this.storage || !examId || !userId) return null;
     try {
       const raw = this.storage.getItem(this._draftKey(examId, userId));
@@ -857,19 +870,108 @@ export class ExamManager {
       // Validate required fields
       if (!draft.examId || !draft.startedAt) return null;
 
-      // Check expiry against the exam's durationMinutes
       const exam = this.getExamById(examId);
-      if (!exam) return null;
-      const durationMs = (exam.durationMinutes || 15) * 60 * 1000;
-      if (Date.now() - draft.startedAt >= durationMs) {
-        // Draft has expired — clean it up
-        this.clearDraft(examId, userId);
-        return null;
+      const durationMs = (draft.durationMinutes || exam?.durationMinutes || 15) * 60 * 1000;
+      const deadline = draft.deadline || (draft.startedAt + durationMs);
+
+      // Check if real-world time has expired
+      if (Date.now() >= deadline) {
+        if (!includeExpired) {
+          return null;
+        }
+        return {
+          ...draft,
+          deadline,
+          expired: true,
+          timeRemaining: 0,
+        };
       }
 
-      return draft;
+      // Compute actual real-time remaining (guards against tab pausing)
+      const actualRemainingSeconds = Math.max(0, Math.floor((deadline - Date.now()) / 1000));
+      return {
+        ...draft,
+        deadline,
+        expired: false,
+        timeRemaining: (draft.timeRemaining != null && Math.abs(draft.timeRemaining - actualRemainingSeconds) <= 1)
+          ? draft.timeRemaining
+          : actualRemainingSeconds,
+      };
     } catch {
       return null;
+    }
+  }
+
+  /**
+   * Scans storage for any active, unexpired draft for the user.
+   * Useful to proactively resume ongoing exams when the student refreshes or reopens the page.
+   *
+   * @param {string} userId
+   * @returns {Object|null}
+   */
+  findActiveDraft(userId) {
+    if (!this.storage || !userId) return null;
+    try {
+      const prefix = `trr_active_exam_`;
+      const suffix = `_${userId}`;
+      // In Web Storage
+      if (typeof window !== 'undefined' && window.localStorage) {
+        for (let i = 0; i < window.localStorage.length; i++) {
+          const key = window.localStorage.key(i);
+          if (key && key.startsWith(prefix) && key.endsWith(suffix)) {
+            const raw = window.localStorage.getItem(key);
+            if (!raw) continue;
+            const draft = JSON.parse(raw);
+            if (draft && draft.examId) {
+              const loaded = this.loadDraft(draft.examId, userId);
+              if (loaded && !loaded.expired) return loaded;
+            }
+          }
+        }
+      }
+    } catch {}
+    return null;
+  }
+
+  /**
+   * Generates a downloadable Emergency Backup Slip (.json) for students.
+   * Gives students 100% peace of mind if school Wi-Fi or cellular network drops.
+   *
+   * @param {Object} submissionPayload
+   * @returns {boolean}
+   */
+  downloadEmergencyBackupSlip(submissionPayload) {
+    if (!submissionPayload || typeof window === 'undefined' || typeof document === 'undefined') return false;
+    try {
+      const slipData = {
+        title: 'PHIẾU BÀI LÀM DỰ PHÒNG KHẨN CẤP (EMERGENCY EXAM SLIP)',
+        system: 'ToanRR - Discrete Mathematics Platform',
+        timestamp: new Date().toISOString(),
+        examId: submissionPayload.examId,
+        userId: submissionPayload.userId,
+        userInfo: submissionPayload.userInfo || {},
+        timeSpentSeconds: submissionPayload.timeSpentSeconds,
+        answersCount: Object.keys(submissionPayload.answers || {}).length,
+        answers: submissionPayload.answers || {},
+        integrityBan: Boolean(submissionPayload.integrityBan),
+        signature: `TRR-VERIFY-${Date.now().toString(36).toUpperCase()}`,
+      };
+
+      const jsonStr = JSON.stringify(slipData, null, 2);
+      const blob = new Blob([jsonStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const dateStr = new Date().toISOString().slice(0, 10);
+      a.href = url;
+      a.download = `toanrr_bai_thi_du_phong_${submissionPayload.examId}_${dateStr}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      return true;
+    } catch (err) {
+      console.warn('[ExamManager] Failed downloading emergency slip:', err);
+      return false;
     }
   }
 

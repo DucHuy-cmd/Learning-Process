@@ -1113,13 +1113,14 @@ export class QuizView {
             const isCompleted = Boolean(sub);
             const violationRecord = examManager.getExamViolationRecord(exam.id, currentUser.id);
             const isBanned = Boolean(violationRecord.banned);
+            const activeDraft = (!isCompleted && !isBanned) ? examManager.loadDraft(exam.id, currentUser.id, { includeExpired: false }) : null;
 
             return `
               <div class="exam-card">
                 <div>
                   <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:10px;">
-                    <span class="exam-status-badge ${isBanned ? 'banned' : (isCompleted ? 'completed' : 'pending')}">
-                      ${isBanned ? `🚫 VI PHẠM (3/3): ${sub ? sub.score : 0} / 10 ĐIỂM (BỊ CẤM THI LẠI ĐỀ NÀY)` : (isCompleted ? `✅ ĐÃ HOÀN THÀNH: ${sub.score} / 10` : '⏳ CHƯA LÀM (Chỉ 1 lượt)')}
+                    <span class="exam-status-badge ${isBanned ? 'banned' : (isCompleted ? 'completed' : (activeDraft ? 'in-progress' : 'pending'))}" style="${activeDraft ? 'background:rgba(245,158,11,0.18);border:1px solid rgba(245,158,11,0.5);color:#f59e0b;font-weight:700;' : ''}">
+                      ${isBanned ? `🚫 VI PHẠM (3/3): ${sub ? sub.score : 0} / 10 ĐIỂM (BỊ CẤM THI LẠI ĐỀ NÀY)` : (isCompleted ? `✅ ĐÃ HOÀN THÀNH: ${sub.score} / 10` : (activeDraft ? `🔄 ĐANG LÀM DỞ DANG (~${Math.ceil(activeDraft.timeRemaining / 60)} phút còn lại)` : '⏳ CHƯA LÀM (Chỉ 1 lượt)'))}
                     </span>
                     <span style="font-size:11px;color:var(--dim);">
                       ${new Date(exam.createdAt).toLocaleDateString('vi-VN')}
@@ -1149,10 +1150,10 @@ export class QuizView {
                     </div>
                   ` : `
                     <div style="font-size:12px;color:#f59e0b;font-weight:600;">
-                      ⚠️ Duy nhất 1 lượt làm • <strong style="color:#ef4444;">VI PHẠM</strong> 3 lần sẽ bị 0đ
+                      ${activeDraft ? '💡 Bài làm đã được tự động lưu an toàn trên máy' : '⚠️ Duy nhất 1 lượt làm • <strong style="color:#ef4444;">VI PHẠM</strong> 3 lần sẽ bị 0đ'}
                     </div>
-                    <button type="button" class="btn-primary btn-start-exam" data-exam-id="${exam.id}" style="font-size:13px;font-weight:700;padding:8px 18px;border-radius:6px;">
-                      ▶️ Bắt Đầu Làm Bài
+                    <button type="button" class="btn-primary btn-start-exam" data-exam-id="${exam.id}" style="font-size:13px;font-weight:700;padding:8px 18px;border-radius:6px;${activeDraft ? 'background:#f59e0b;border-color:#f59e0b;color:#000;' : ''}">
+                      ${activeDraft ? '🔄 Tiếp Tục Làm Bài' : '▶️ Bắt Đầu Làm Bài'}
                     </button>
                   `}
                 </div>
@@ -1455,9 +1456,14 @@ export class QuizView {
                 ? 'Hệ thống ghi nhận bạn đã vi phạm quy chế thi cử quá 3 lần (thoát toàn màn hình hoặc chuyển tab/cửa sổ thi). Bài thi đã tự động nộp với mức điểm phạt là <strong>0 điểm</strong>.'
                 : 'Theo quy chế khảo thí và bảo mật đề thi trực tuyến, hệ thống <strong>chỉ công bố điểm số chính thức và số câu đúng</strong>, không hiển thị lại bộ câu hỏi và đáp án chi tiết.'}
             </p>
-            <button type="button" class="btn-primary" id="btnBackToExamsFromScore" style="padding:10px 24px;font-weight:700;font-size:13.5px;">
-              📋 Quay Về Danh Sách Đề Thi
-            </button>
+            <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+              <button type="button" class="btn-primary" id="btnBackToExamsFromScore" style="padding:10px 24px;font-weight:700;font-size:13.5px;">
+                📋 Quay Về Danh Sách Đề Thi
+              </button>
+              <button type="button" class="btn-sm" id="btnDownloadMySlip" style="padding:10px 18px;font-size:13px;font-weight:700;background:var(--panel);border:1px solid var(--line);border-radius:6px;color:var(--text);cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
+                <span>📥</span> Tải Phiếu Dự Phòng (.json)
+              </button>
+            </div>
           </div>
         ` : `
           <!-- Questions Review List (Admin only) -->
@@ -2624,9 +2630,33 @@ export class QuizView {
       return;
     }
 
-    // ── Zero Data Loss: Check for a saved draft and offer to resume ───────────
-    const existingDraft = examManager.loadDraft(examId, currentUser.id);
+    // ── Zero Data Loss: Check for a saved draft and auto-resume ───────────────
+    const existingDraft = examManager.loadDraft(examId, currentUser.id, { includeExpired: true });
     if (existingDraft) {
+      // 1. If draft expired while student was away -> auto-submit immediately
+      if (existingDraft.expired) {
+        this._showAlert('⏰ Đã hết thời gian làm bài trong lúc bạn rời phòng thi!\nHệ thống tự động nộp bài và chấm điểm theo các câu bạn đã làm.');
+        const submissionPayload = {
+          examId: existingDraft.examId,
+          userId: currentUser.id,
+          userInfo: currentUser || {},
+          answers: existingDraft.answers || {},
+          timeSpentSeconds: (exam.durationMinutes || 15) * 60,
+          optionOrder: existingDraft.optionOrder || {},
+          integrityBan: false,
+        };
+        examManager.clearDraft(examId, currentUser.id);
+        const res = examManager.submitExam(submissionPayload);
+        if (cloudSyncManager) {
+          cloudSyncManager.serverSubmitExam(res.submission || submissionPayload).catch(() => {
+            examManager.enqueueOfflineSubmission(submissionPayload);
+          });
+        }
+        this.reviewSubmission = res.submission;
+        this.render();
+        return;
+      }
+
       const timeLeftMin = Math.ceil((existingDraft.timeRemaining || 0) / 60);
       const wantResume = typeof window !== 'undefined' && window.confirm
         ? window.confirm(
@@ -2666,16 +2696,22 @@ export class QuizView {
           Math.max(0, restoredQuestions.length - 1)
         );
 
+        const startedAt = existingDraft.startedAt || Date.now();
+        const durationMin = existingDraft.durationMinutes || exam.durationMinutes || 15;
+        const deadline = existingDraft.deadline || (startedAt + durationMin * 60 * 1000);
+        const actualRemaining = Math.max(0, Math.floor((deadline - Date.now()) / 1000));
+
         this.activeExamSession = {
           exam,
-          questions:      restoredQuestions,
-          optionOrder:    restoredOptionOrder,
-          answers:        { ...(existingDraft.answers || {}) },
-          currentQIndex:  restoredIdx,
-          timeRemaining:  Math.max(0, existingDraft.timeRemaining || 0),
-          timerId:        null,
-          startedAt:      existingDraft.startedAt || Date.now(),
-          violationCount: violationRecord.count || 0,
+          questions:         restoredQuestions,
+          optionOrder:       restoredOptionOrder,
+          answers:           { ...(existingDraft.answers || {}) },
+          currentQIndex:     restoredIdx,
+          timeRemaining:     existingDraft.timeRemaining != null ? existingDraft.timeRemaining : actualRemaining,
+          startedAt,
+          deadline,
+          timerId:           null,
+          violationCount:    violationRecord.count || 0,
           lockdownPending:   false,
           lockdownCountdown: null,
           lockdownTimerId:   null,
@@ -2716,15 +2752,20 @@ export class QuizView {
       return [question.id, exam.shuffleOptions ? shuffle(optionIds) : optionIds];
     }));
 
+    const startedAt = Date.now();
+    const durationMinutes = exam.durationMinutes || 15;
+    const deadline = startedAt + durationMinutes * 60 * 1000;
+
     this.activeExamSession = {
       exam,
       questions,
       optionOrder,
       answers: {},
       currentQIndex: 0,
-      timeRemaining: exam.durationMinutes * 60,
+      timeRemaining: durationMinutes * 60,
+      startedAt,
+      deadline,
       timerId: null,
-      startedAt: Date.now(),
       violationCount: violationRecord.count || 0,
       lockdownPending: false,
       lockdownCountdown: null,
@@ -2733,6 +2774,19 @@ export class QuizView {
       fullscreenActive: false,
       _showSubmitConfirm: false,
     };
+
+    // Save initial draft immediately so early refresh never loses session
+    examManager.saveDraft(exam.id, currentUser.id, {
+      examId: exam.id,
+      answers: {},
+      startedAt,
+      deadline,
+      durationMinutes,
+      timeRemaining: durationMinutes * 60,
+      currentQIndex: 0,
+      questionIds: questions.map(q => q.id),
+      optionOrder,
+    });
 
     this.render();
     this._attachExamLockdownListeners();
@@ -2785,9 +2839,24 @@ export class QuizView {
     );
   }
 
+  /**
+   * Identifies whether the current client is a Mobile device (smartphone, tablet, small touch screen).
+   * Used to isolate mobile behaviour from desktop Fullscreen APIs.
+   * @returns {boolean}
+   * @private
+   */
+  _isMobileDevice() {
+    const nav = (typeof window !== 'undefined' && window.navigator) ? window.navigator : (typeof navigator !== 'undefined' ? navigator : null);
+    if (!nav) return false;
+    const ua = nav.userAgent || '';
+    const isMobileUA = /Android|iPhone|iPad|iPod|Mobile|Silk/i.test(ua);
+    const win = typeof window !== 'undefined' ? window : null;
+    const isSmallScreen = win && typeof win.innerWidth === 'number' && win.innerWidth > 0 && win.innerWidth < 768;
+    return Boolean(isMobileUA || isSmallScreen);
+  }
+
   _isPhoneDevice() {
-    if (typeof navigator === 'undefined') return false;
-    return /iPhone|iPod/i.test(navigator.userAgent);
+    return this._isMobileDevice();
   }
 
   _attachExamLockdownListeners() {
@@ -2829,6 +2898,8 @@ export class QuizView {
     }
 
     const onBlur = () => {
+      // On mobile, rely strictly on visibilitychange and pagehide to avoid virtual keyboard / scroll blur glitches
+      if (this._isMobileDevice()) return;
       if (allowBlurEvent) {
         this._handleScreenDeparture('window_blur');
       }
@@ -3387,6 +3458,14 @@ export class QuizView {
       });
     }
 
+    const btnDownloadMySlip = this.container.querySelector('#btnDownloadMySlip');
+    if (btnDownloadMySlip && this.reviewSubmission) {
+      btnDownloadMySlip.addEventListener('click', () => {
+        examManager.downloadEmergencyBackupSlip(this.reviewSubmission);
+        this._showAlert('📥 Đã tải file phiếu làm bài dự phòng (.json) về máy tính thành công!');
+      });
+    }
+
     // In Active Exam Room Events
     if (this.activeExamSession) {
       const btnResumeExamLockdown = this.container.querySelector('#btnResumeExamLockdown');
@@ -3463,6 +3542,8 @@ export class QuizView {
                 examId:        session.exam.id,
                 answers:       session.answers,
                 startedAt:     session.startedAt,
+                deadline:      session.deadline,
+                durationMinutes: session.exam.durationMinutes,
                 timeRemaining: session.timeRemaining,
                 currentQIndex: session.currentQIndex,
                 questionIds:   session.questions.map(q => q.id),
@@ -3470,6 +3551,17 @@ export class QuizView {
               });
             }
             // ── End Auto-save ─────────────────────────────────────────────
+
+            // Update Autosave Badge visual indicator
+            const autosaveBadge = this.container ? this.container.querySelector('#examAutosaveBadge') : null;
+            if (autosaveBadge) {
+              autosaveBadge.innerHTML = '<span class="autosave-dot saving" style="background:#f59e0b;box-shadow:0 0 6px #f59e0b;"></span><span>💾 Đang lưu...</span>';
+              setTimeout(() => {
+                if (autosaveBadge) {
+                  autosaveBadge.innerHTML = '<span class="autosave-dot"></span><span>🟢 Đã tự động lưu bài</span>';
+                }
+              }, 250);
+            }
 
             this.render();
           }
