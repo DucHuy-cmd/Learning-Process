@@ -214,6 +214,12 @@ describe('Assigned exam API', () => {
     });
 
     it('successfully provisions multiple users in a single batch call', async () => {
+      // Clean any existing test users to ensure test isolation
+      for (let i = serverUsers.length - 1; i >= 0; i--) {
+        if (serverUsers[i].username === 'sv_batch_01' || serverUsers[i].username === 'sv_batch_02') {
+          serverUsers.splice(i, 1);
+        }
+      }
       const initialCount = serverUsers.length;
       const batchData = [
         { username: 'sv_batch_01', fullName: 'SV Batch 1', className: 'K66-CNTT' },

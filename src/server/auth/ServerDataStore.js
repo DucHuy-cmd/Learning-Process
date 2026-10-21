@@ -87,12 +87,13 @@ export function isExamDeleted(examId) {
   return serverDeletedExams.has(String(examId).trim());
 }
 
-export function recordDbReset() {
-  serverDbResetTime = Date.now();
+export function recordDbReset(customTimestamp) {
+  serverDbResetTime = customTimestamp || Date.now();
   // On full database reset, clear all tombstone sets so clean data can be imported without ghost bans
   serverDeletedUsers.clear();
   serverDeletedExams.clear();
   serverDeletedImportedFiles.clear();
+  return serverDbResetTime;
 }
 
 export function loadDatabase() {
@@ -446,6 +447,28 @@ export async function fetchFromPostgres() {
         });
       }
     }
+
+    // 6. Load durable system metadata (e.g. durable dbResetTime, exams_cleared_by_admin)
+    try {
+      const metaRes = await sqlDb.executeRawPostgres('SELECT key, value FROM system_metadata;');
+      if (Array.isArray(metaRes.rows)) {
+        for (const m of metaRes.rows) {
+          if (m.key === 'db_reset_time') {
+            const val = typeof m.value === 'string' ? JSON.parse(m.value) : m.value;
+            const ts = val?.timestamp || Number(val);
+            if (ts && !isNaN(ts)) {
+              serverDbResetTime = ts;
+            }
+          }
+          if (m.key === 'exams_cleared_by_admin') {
+            const isCleared = m.value === true || m.value?.cleared === true || String(m.value) === 'true';
+            if (isCleared) {
+              serverExams.length = 0;
+            }
+          }
+        }
+      }
+    } catch {}
 
     return true;
   } catch (err) {

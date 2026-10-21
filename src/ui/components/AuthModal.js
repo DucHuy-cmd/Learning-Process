@@ -282,27 +282,28 @@ export class AuthModal {
               if (remoteResult.user.username) authManager.unmarkDeletedLocally(remoteResult.user.username);
               if (remoteResult.user.id) authManager.unmarkDeletedLocally(remoteResult.user.id);
               if (remoteResult.user.email) authManager.unmarkDeletedLocally(remoteResult.user.email);
+              const cleanUser = { ...remoteResult.user };
+              delete cleanUser.password;
               const users = authManager.getUsers();
-              const idx = users.findIndex(u => u.id === remoteResult.user.id || u.username.toLowerCase() === username.toLowerCase());
+              const idx = users.findIndex(u => u.id === cleanUser.id || (u.username && u.username.toLowerCase() === username.toLowerCase()));
               if (idx === -1) {
-                users.push({ ...remoteResult.user, password });
+                users.push(cleanUser);
               } else {
-                users[idx] = { ...users[idx], ...remoteResult.user, password };
+                users[idx] = { ...users[idx], ...cleanUser };
+                delete users[idx].password;
               }
               if (authManager.storage) {
                 try {
                   authManager.storage.setItem('trr_registered_users', JSON.stringify(users));
                 } catch {}
               }
-              authManager.currentUser = { ...remoteResult.user };
+              authManager.currentUser = cleanUser;
               authManager._persistCurrent();
               authManager._notifyListeners('login', authManager.currentUser);
               this.close();
               return;
-            } else if (remoteResult && remoteResult.error) {
-              // Server rejected -> if user was deleted on server, purge locally as well
-              // Removed auto-delete on login error
-              alertBox.textContent = remoteResult.error;
+            } else if (remoteResult && !remoteResult.success) {
+              alertBox.textContent = remoteResult.error || 'Tên đăng nhập hoặc mật khẩu không chính xác.';
               alertBox.style.display = 'block';
               return;
             }

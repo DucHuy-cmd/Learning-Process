@@ -112,3 +112,12 @@ CREATE TABLE IF NOT EXISTS imported_files (
 );
 
 CREATE INDEX IF NOT EXISTS idx_imported_files_uploaded_at ON imported_files(uploaded_at);
+
+-- 8. BẢNG METADATA HỆ THỐNG & RESET DATABASE (SYSTEM_METADATA)
+CREATE TABLE IF NOT EXISTS system_metadata (
+    key VARCHAR(64) PRIMARY KEY,
+    value JSONB NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_system_metadata_key ON system_metadata(key);

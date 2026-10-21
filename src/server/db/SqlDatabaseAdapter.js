@@ -35,6 +35,7 @@ export class SqlDatabaseAdapter {
       ai_sessions: new Map(),
       custom_questions: new Map(),
       imported_files: new Map(),
+      system_metadata: new Map(),
     };
 
     this.schemaInitialized = false;
@@ -152,6 +153,63 @@ export class SqlDatabaseAdapter {
     }
 
     return { rows: [], rowCount: 0 };
+  }
+
+  /**
+   * Executes multiple queries within an atomic transaction.
+   * If any query fails, the entire transaction rolls back.
+   * @param {Array<{ sql: string, params?: Array } | string>} queries
+   * @returns {Promise<{ success: boolean, results?: Array }>}
+   */
+  async executeTransaction(queries = []) {
+    if (!Array.isArray(queries) || queries.length === 0) return { success: true };
+    await this.initSchema();
+
+    if (this.isCloudEnabled) {
+      const fullSql = 'BEGIN;\n' + queries.map(q => {
+        if (typeof q === 'string') return q.trim().replace(/;+$/, '') + ';';
+        let s = q.sql.trim().replace(/;+$/, '');
+        if (Array.isArray(q.params) && q.params.length > 0) {
+          q.params.forEach((val, idx) => {
+            const placeholder = new RegExp(`\\$${idx + 1}(?![0-9])`, 'g');
+            let formattedVal = 'NULL';
+            if (val !== null && val !== undefined) {
+              if (typeof val === 'number' || typeof val === 'boolean') {
+                formattedVal = String(val);
+              } else {
+                formattedVal = `'${String(val).replace(/'/g, "''")}'`;
+              }
+            }
+            s = s.replace(placeholder, formattedVal);
+          });
+        }
+        return s + ';';
+      }).join('\n') + '\nCOMMIT;';
+
+      const res = await this.executeRawPostgres(fullSql);
+      return { success: true, res };
+    }
+
+    // In-memory Relational Engine: snapshot rollback on error
+    const snapshot = {};
+    for (const [tName, tMap] of Object.entries(this.tables)) {
+      snapshot[tName] = new Map(tMap);
+    }
+
+    try {
+      for (const q of queries) {
+        const sqlStr = typeof q === 'string' ? q : q.sql;
+        const params = typeof q === 'string' ? [] : (q.params || []);
+        await this.query(sqlStr, params);
+      }
+      return { success: true };
+    } catch (err) {
+      // Rollback to snapshot
+      for (const [tName, mapSnap] of Object.entries(snapshot)) {
+        this.tables[tName] = mapSnap;
+      }
+      throw err;
+    }
   }
 
   /**

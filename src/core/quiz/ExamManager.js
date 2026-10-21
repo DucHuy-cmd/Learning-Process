@@ -16,6 +16,8 @@ import { STATIC_QUESTION_BANK, getAllQuestions } from './QuizBank.js';
 export const STORAGE_KEY_EXAMS = 'trr_assigned_exams_v1';
 export const STORAGE_KEY_SUBMISSIONS = 'trr_exam_submissions_v1';
 export const STORAGE_KEY_EXAM_VIOLATIONS = 'trr_exam_violations_v1';
+export const STORAGE_KEY_DELETED_EXAMS = 'trr_deleted_exams_v1';
+export const STORAGE_KEY_EXAMS_CLEARED = 'trr_exams_cleared_by_admin';
 
 // ── Zero Data Loss ────────────────────────────────────────────────────────────
 // Active exam draft key pattern : trr_active_exam_${examId}_${userId}
@@ -59,6 +61,7 @@ export class ExamManager {
     this.memoryExams = [...DEFAULT_EXAMS];
     this.memorySubmissions = [];
     this.memoryExamViolations = [];
+    this._memoryDeletedExams = [];
     this._initStorage();
   }
 
@@ -74,6 +77,9 @@ export class ExamManager {
       }
       if (!this.storage.getItem(STORAGE_KEY_EXAM_VIOLATIONS)) {
         this.storage.setItem(STORAGE_KEY_EXAM_VIOLATIONS, JSON.stringify([]));
+      }
+      if (!this.storage.getItem(STORAGE_KEY_DELETED_EXAMS)) {
+        this.storage.setItem(STORAGE_KEY_DELETED_EXAMS, JSON.stringify([]));
       }
     } catch {}
   }
@@ -98,18 +104,74 @@ export class ExamManager {
     });
   }
 
+  _getDeletedExamIds() {
+    if (!this.storage) return this._memoryDeletedExams || [];
+    try {
+      const raw = this.storage.getItem(STORAGE_KEY_DELETED_EXAMS);
+      return raw ? JSON.parse(raw) : (this._memoryDeletedExams || []);
+    } catch {
+      return this._memoryDeletedExams || [];
+    }
+  }
+
+  _markExamDeletedLocally(examId) {
+    if (!examId) return;
+    const strId = String(examId).trim();
+    if (!this._memoryDeletedExams) this._memoryDeletedExams = [];
+    if (!this._memoryDeletedExams.includes(strId)) {
+      this._memoryDeletedExams.push(strId);
+    }
+    if (this.storage) {
+      try {
+        const list = this._getDeletedExamIds();
+        if (!list.includes(strId)) {
+          list.push(strId);
+          this.storage.setItem(STORAGE_KEY_DELETED_EXAMS, JSON.stringify(list));
+        }
+      } catch {}
+    }
+  }
+
+  _unmarkExamDeletedLocally(examId) {
+    if (!examId) return;
+    const strId = String(examId).trim();
+    if (this._memoryDeletedExams) {
+      this._memoryDeletedExams = this._memoryDeletedExams.filter(id => id !== strId);
+    }
+    if (this.storage) {
+      try {
+        const list = this._getDeletedExamIds().filter(id => id !== strId);
+        this.storage.setItem(STORAGE_KEY_DELETED_EXAMS, JSON.stringify(list));
+      } catch {}
+    }
+  }
+
+  _isExamDeletedLocally(examId) {
+    if (!examId) return false;
+    const strId = String(examId).trim();
+    if (this._memoryDeletedExams && this._memoryDeletedExams.includes(strId)) return true;
+    return this._getDeletedExamIds().includes(strId);
+  }
+
   /**
    * Retrieves all exams.
    * @returns {Array<Object>}
    */
   getExams() {
-    if (!this.storage) return this.memoryExams.map(exam => ({ ...exam }));
-    try {
-      const raw = this.storage.getItem(STORAGE_KEY_EXAMS);
-      return raw ? JSON.parse(raw) : this.memoryExams.map(exam => ({ ...exam }));
-    } catch {
-      return this.memoryExams.map(exam => ({ ...exam }));
+    const isCleared = this.storage ? this.storage.getItem(STORAGE_KEY_EXAMS_CLEARED) === 'true' : false;
+    let list = [];
+    if (!this.storage) {
+      list = this.memoryExams.map(exam => ({ ...exam }));
+    } else {
+      try {
+        const raw = this.storage.getItem(STORAGE_KEY_EXAMS);
+        list = raw ? JSON.parse(raw) : (isCleared ? [] : this.memoryExams.map(exam => ({ ...exam })));
+      } catch {
+        list = isCleared ? [] : this.memoryExams.map(exam => ({ ...exam }));
+      }
     }
+    if (!Array.isArray(list)) list = [];
+    return list.filter(e => e && e.id && !this._isExamDeletedLocally(e.id));
   }
 
   /**
@@ -294,9 +356,16 @@ export class ExamManager {
    * @returns {{ success: boolean }}
    */
   deleteExam(examId) {
+    if (!examId) return { success: false };
+    this._markExamDeletedLocally(examId);
+
     const exams = this.getExams().filter(e => e.id !== examId);
     const submissions = this.getSubmissions().filter(s => s.examId !== examId);
     const violations = this.getExamViolationRecords().filter(record => record.examId !== examId);
+
+    this.memoryExams = exams;
+    this.memorySubmissions = submissions;
+    this.memoryExamViolations = violations;
 
     if (this.storage) {
       try {
@@ -304,10 +373,6 @@ export class ExamManager {
         this.storage.setItem(STORAGE_KEY_SUBMISSIONS, JSON.stringify(submissions));
         this.storage.setItem(STORAGE_KEY_EXAM_VIOLATIONS, JSON.stringify(violations));
       } catch {}
-    } else {
-      this.memoryExams = exams;
-      this.memorySubmissions = submissions;
-      this.memoryExamViolations = violations;
     }
 
     this._notifyListeners('exam_deleted', { examId });
@@ -627,12 +692,20 @@ export class ExamManager {
     this.memoryExams = [];
     this.memorySubmissions = [];
     this.memoryExamViolations = [];
+    this._markExamDeletedLocally('exam_intro_eval_2026');
+
     if (this.storage) {
       try {
-        this.storage.setItem('trr_exams_cleared_by_admin', 'true');
+        this.storage.setItem(STORAGE_KEY_EXAMS_CLEARED, 'true');
+        this.storage.setItem('trr_exams_cleared_at', String(Date.now()));
         this.storage.setItem(STORAGE_KEY_EXAMS, JSON.stringify([]));
         this.storage.setItem(STORAGE_KEY_SUBMISSIONS, JSON.stringify([]));
         this.storage.setItem(STORAGE_KEY_EXAM_VIOLATIONS, JSON.stringify([]));
+        const list = this._getDeletedExamIds();
+        if (!list.includes('exam_intro_eval_2026')) {
+          list.push('exam_intro_eval_2026');
+          this.storage.setItem(STORAGE_KEY_DELETED_EXAMS, JSON.stringify(list));
+        }
       } catch {}
     }
     this._notifyListeners('exams_cleared', []);

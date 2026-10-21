@@ -208,15 +208,11 @@ export class CloudSyncManager {
           return !authManager.isLocallyDeleted(su.id) && !authManager.isLocallyDeleted(su.username);
         });
 
-        // 5. Merge server authoritative users with local users, preserving passwords
+        // 5. Server users are authoritative active accounts (no password guessing!)
         const mergedUsers = serverUsers.map(su => {
-          const matchingLocal = localUsers.find(
-            lu => lu.id === su.id || lu.username.toLowerCase() === su.username.toLowerCase()
-          );
-          return {
-            ...su,
-            password: matchingLocal?.password || su.password || '123456',
-          };
+          const copy = { ...su };
+          delete copy.password;
+          return copy;
         });
 
         if (authManager.storage) {
@@ -478,8 +474,8 @@ export class CloudSyncManager {
    * @returns {Promise<{ success: boolean, addedCount: number, skippedCount: number, createdUsers: Array } | null>}
    */
   async adminBatchCreateUsers(usersArray) {
-    if (typeof fetch === 'undefined') return null;
-    if (!Array.isArray(usersArray) || usersArray.length === 0) return null;
+    if (typeof fetch === 'undefined') return { success: false, error: 'Không có kết nối mạng.' };
+    if (!Array.isArray(usersArray) || usersArray.length === 0) return { success: false, error: 'Danh sách rỗng.' };
     try {
       const res = await fetch(`${this.baseUrl}/api/admin/users/batch`, {
         method: 'POST',
@@ -489,10 +485,13 @@ export class CloudSyncManager {
         },
         body: JSON.stringify({ users: usersArray }),
       });
-      if (!res.ok) return null;
-      return await res.json();
-    } catch {
-      return null;
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        return { success: false, error: data?.error || `Lỗi máy chủ (${res.status})` };
+      }
+      return data || { success: false, error: 'Phản hồi rỗng từ máy chủ' };
+    } catch (err) {
+      return { success: false, error: 'Lỗi mạng khi kết nối máy chủ: ' + err.message };
     }
   }
 
@@ -501,7 +500,7 @@ export class CloudSyncManager {
    * @param {Object} userData
    */
   async adminCreateUser(userData) {
-    if (typeof fetch === 'undefined') return null;
+    if (typeof fetch === 'undefined') return { success: false, error: 'Không có kết nối mạng.' };
     try {
       const res = await fetch(`${this.baseUrl}/api/admin/users`, {
         method: 'POST',
@@ -511,10 +510,13 @@ export class CloudSyncManager {
         },
         body: JSON.stringify(userData),
       });
-      if (!res.ok) return null;
-      return await res.json();
-    } catch {
-      return null;
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        return { success: false, error: data?.error || `Lỗi máy chủ (${res.status})` };
+      }
+      return data || { success: false, error: 'Phản hồi rỗng từ máy chủ' };
+    } catch (err) {
+      return { success: false, error: 'Lỗi mạng khi kết nối máy chủ: ' + err.message };
     }
   }
 
@@ -524,7 +526,7 @@ export class CloudSyncManager {
    * @param {string} [username]
    */
   async adminDeleteUser(userId, username = '') {
-    if (typeof fetch === 'undefined') return null;
+    if (typeof fetch === 'undefined') return { success: false, error: 'Không có kết nối mạng.' };
     try {
       const q = username ? `?username=${encodeURIComponent(username)}` : '';
       const res = await fetch(`${this.baseUrl}/api/admin/users/${encodeURIComponent(userId)}${q}`, {
@@ -533,10 +535,13 @@ export class CloudSyncManager {
           ...this._getAdminAuthHeaders(),
         },
       });
-      if (!res.ok) return null;
-      return await res.json();
-    } catch {
-      return null;
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        return { success: false, error: data?.error || `Lỗi máy chủ (${res.status})` };
+      }
+      return data || { success: false, error: 'Phản hồi rỗng từ máy chủ' };
+    } catch (err) {
+      return { success: false, error: 'Lỗi mạng khi kết nối máy chủ: ' + err.message };
     }
   }
 
@@ -583,7 +588,7 @@ export class CloudSyncManager {
    * Admin resets entire database on server (keeps only admin).
    */
   async adminResetDatabase() {
-    if (typeof fetch === 'undefined') return null;
+    if (typeof fetch === 'undefined') return { success: false, error: 'Không có kết nối mạng.' };
     try {
       const res = await fetch(`${this.baseUrl}/api/admin/database/reset`, {
         method: 'POST',
@@ -591,10 +596,13 @@ export class CloudSyncManager {
           ...this._getAdminAuthHeaders(),
         },
       });
-      if (!res.ok) return null;
-      return await res.json();
-    } catch {
-      return null;
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        return { success: false, error: data?.error || `Lỗi máy chủ (${res.status})` };
+      }
+      return data || { success: false, error: 'Phản hồi rỗng từ máy chủ' };
+    } catch (err) {
+      return { success: false, error: 'Lỗi mạng khi kết nối máy chủ: ' + err.message };
     }
   }
 
@@ -647,7 +655,7 @@ export class CloudSyncManager {
    * @param {string} examId
    */
   async serverDeleteExam(examId) {
-    if (typeof fetch === 'undefined') return null;
+    if (typeof fetch === 'undefined') return { success: false, error: 'Không có kết nối mạng.' };
     try {
       const res = await fetch(`${this.baseUrl}/api/exams/${encodeURIComponent(examId)}`, {
         method: 'DELETE',
@@ -655,19 +663,22 @@ export class CloudSyncManager {
           ...this._getAdminAuthHeaders(),
         },
       });
-      if (!res.ok) return null;
-      return await res.json();
-    } catch {
-      return null;
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        return { success: false, error: data?.error || `Lỗi máy chủ (${res.status})` };
+      }
+      return data || { success: false, error: 'Phản hồi rỗng từ máy chủ' };
+    } catch (err) {
+      return { success: false, error: 'Lỗi mạng khi kết nối máy chủ: ' + err.message };
     }
   }
 
   /**
    * Requests server to clear all exams, submissions, and student exam records.
-   * @returns {Promise<Object|null>}
+   * @returns {Promise<Object>}
    */
   async serverClearAllExams() {
-    if (typeof fetch === 'undefined') return null;
+    if (typeof fetch === 'undefined') return { success: false, error: 'Không có kết nối mạng.' };
     try {
       const res = await fetch(`${this.baseUrl}/api/exams/clear-all`, {
         method: 'POST',
@@ -676,10 +687,13 @@ export class CloudSyncManager {
           ...this._getAdminAuthHeaders(),
         },
       });
-      if (!res.ok) return null;
-      return await res.json();
-    } catch {
-      return null;
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        return { success: false, error: data?.error || `Lỗi máy chủ (${res.status})` };
+      }
+      return data || { success: false, error: 'Phản hồi rỗng từ máy chủ' };
+    } catch (err) {
+      return { success: false, error: 'Lỗi mạng khi kết nối máy chủ: ' + err.message };
     }
   }
 
@@ -928,7 +942,7 @@ export class CloudSyncManager {
    * @returns {Promise<Object|null>}
    */
   async pushDeleteImportedFile(fileId) {
-    if (typeof fetch === 'undefined') return null;
+    if (typeof fetch === 'undefined') return { success: false, error: 'Không có kết nối mạng.' };
     try {
       const res = await fetch(`${this.baseUrl}/api/quiz/imported-files/${encodeURIComponent(fileId)}`, {
         method: 'DELETE',
@@ -936,19 +950,22 @@ export class CloudSyncManager {
           ...this._getAdminAuthHeaders(),
         },
       });
-      if (!res.ok) return null;
-      return await res.json();
-    } catch {
-      return null;
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        return { success: false, error: data?.error || `Lỗi máy chủ (${res.status})` };
+      }
+      return data || { success: false, error: 'Phản hồi rỗng từ máy chủ' };
+    } catch (err) {
+      return { success: false, error: 'Lỗi mạng khi kết nối máy chủ: ' + err.message };
     }
   }
 
   /**
    * Clears all imported files from the backend server.
-   * @returns {Promise<Object|null>}
+   * @returns {Promise<Object>}
    */
   async pushClearAllImportedFiles() {
-    if (typeof fetch === 'undefined') return null;
+    if (typeof fetch === 'undefined') return { success: false, error: 'Không có kết nối mạng.' };
     try {
       const res = await fetch(`${this.baseUrl}/api/quiz/imported-files/clear-all`, {
         method: 'POST',
@@ -957,10 +974,13 @@ export class CloudSyncManager {
           ...this._getAdminAuthHeaders(),
         },
       });
-      if (!res.ok) return null;
-      return await res.json();
-    } catch {
-      return null;
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        return { success: false, error: data?.error || `Lỗi máy chủ (${res.status})` };
+      }
+      return data || { success: false, error: 'Phản hồi rỗng từ máy chủ' };
+    } catch (err) {
+      return { success: false, error: 'Lỗi mạng khi kết nối máy chủ: ' + err.message };
     }
   }
 

@@ -323,9 +323,41 @@ export async function handleRequest(req, res) {
     try {
       const bodyBuffer = await readRequestBody(req);
       const { username, password } = JSON.parse(bodyBuffer.toString('utf8') || '{}');
-      const found = serverUsers.find(
-        u => u.username.toLowerCase() === (username || '').toLowerCase() || u.email.toLowerCase() === (username || '').toLowerCase()
-      );
+      if (!username || !password) {
+        sendJson(res, 400, { success: false, error: 'Vui lòng nhập đầy đủ tên đăng nhập và mật khẩu.' });
+        return;
+      }
+      const q = String(username).trim().toLowerCase();
+      let found = null;
+      if (sqlDb.isCloudEnabled) {
+        try {
+          const dbRes = await sqlDb.executeRawPostgres(
+            'SELECT * FROM users WHERE LOWER(username) = $1 OR LOWER(email) = $1 LIMIT 1;',
+            [q]
+          );
+          if (dbRes.rows && dbRes.rows.length > 0) {
+            const r = dbRes.rows[0];
+            found = {
+              id: r.id,
+              username: r.username,
+              fullName: r.full_name || r.fullName || r.username,
+              className: r.class_name || r.className || 'Sinh viên',
+              email: r.email || '',
+              password: r.password || '123456',
+              avatar: r.avatar || '👨‍🎓',
+              role: r.role || 'student',
+              createdAt: r.created_at || r.createdAt || new Date().toISOString(),
+            };
+          }
+        } catch (err) {
+          console.warn('[app.js] Error querying user in Postgres on login:', err.message);
+        }
+      }
+      if (!found) {
+        found = serverUsers.find(
+          u => u.username.toLowerCase() === q || (u.email && u.email.toLowerCase() === q)
+        );
+      }
       if (!found) {
         sendJson(res, 401, { success: false, error: 'Tài khoản không tồn tại.' });
         return;
@@ -336,11 +368,18 @@ export async function handleRequest(req, res) {
           return;
         }
       } else {
-        if (found.password && found.password !== password) {
+        const expected = found.password || '123456';
+        if (expected !== password) {
           sendJson(res, 401, { success: false, error: 'Mật khẩu không chính xác.' });
           return;
         }
       }
+
+      // Sync into memory if not present
+      if (!serverUsers.some(u => u.id === found.id)) {
+        serverUsers.push(found);
+      }
+
       const user = { ...found };
       delete user.password;
       sendJson(res, 200, { success: true, user });
@@ -432,11 +471,27 @@ export async function handleRequest(req, res) {
         role: 'student',
         createdAt: new Date().toISOString(),
       };
+
+      if (sqlDb.isCloudEnabled) {
+        try {
+          await sqlDb.executeRawPostgres(`
+            INSERT INTO users (id, username, full_name, class_name, email, password, avatar, role, created_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9);
+          `, [newUser.id, newUser.username, newUser.fullName, newUser.className, newUser.email, newUser.password, newUser.avatar, newUser.role, newUser.createdAt]);
+        } catch (dbErr) {
+          sendJson(res, 500, { success: false, error: 'Lỗi cơ sở dữ liệu khi tạo tài khoản: ' + dbErr.message });
+          return;
+        }
+      }
+
       unmarkUserDeleted(cleanUsername);
       if (newUser.email) unmarkUserDeleted(newUser.email);
       if (newUser.id) unmarkUserDeleted(newUser.id);
       serverUsers.push(newUser);
-      await saveDatabase();
+      if (sqlDb.tables.users) {
+        sqlDb.tables.users.set(newUser.id, { ...newUser });
+      }
+
       const publicUser = { ...newUser };
       delete publicUser.password;
       sendJson(res, 200, { success: true, user: publicUser });
@@ -462,56 +517,105 @@ export async function handleRequest(req, res) {
         return;
       }
 
-      const existingUsernames = new Set(serverUsers.map(u => u.username.toLowerCase()));
-      const createdUsers = [];
-      const skippedCount = { value: 0 };
+      // Check existing accounts in database and memory
+      const existingUsernames = new Set(serverUsers.map(u => (u.username || '').toLowerCase()));
+      if (sqlDb.isCloudEnabled) {
+        try {
+          const dbUsersRes = await sqlDb.executeRawPostgres('SELECT username FROM users;');
+          if (Array.isArray(dbUsersRes.rows)) {
+            dbUsersRes.rows.forEach(r => {
+              if (r.username) existingUsernames.add(r.username.toLowerCase());
+            });
+          }
+        } catch {}
+      }
+
+      const toInsert = [];
+      const lineResults = [];
+      let skippedCount = 0;
+      let errorCount = 0;
       const nowTs = Date.now();
 
       for (let i = 0; i < usersInput.length; i++) {
         const data = usersInput[i];
         const cleanUsername = (data.username || '').trim().toLowerCase();
-        if (!cleanUsername || !data.fullName) {
-          skippedCount.value++;
+        const fullName = (data.fullName || '').trim();
+
+        if (!cleanUsername) {
+          errorCount++;
+          lineResults.push({ line: i + 1, username: '', status: 'error', reason: 'Thiếu tên đăng nhập' });
+          continue;
+        }
+        if (!fullName) {
+          errorCount++;
+          lineResults.push({ line: i + 1, username: cleanUsername, status: 'error', reason: 'Thiếu họ và tên' });
           continue;
         }
         if (existingUsernames.has(cleanUsername)) {
-          skippedCount.value++;
+          skippedCount++;
+          lineResults.push({ line: i + 1, username: cleanUsername, status: 'skipped', reason: 'Tài khoản đã tồn tại' });
           continue;
         }
+
         const newUser = {
           id: data.id || `user_${nowTs}_${Math.random().toString(36).slice(2, 6)}_${i}`,
           username: cleanUsername,
-          fullName: data.fullName,
-          className: data.className || 'Sinh viên',
-          email: data.email || `${cleanUsername}@toanrr.edu.vn`,
-          password: data.password || '123456',
+          fullName: fullName,
+          className: (data.className || 'Sinh viên').trim(),
+          email: (data.email || `${cleanUsername}@toanrr.edu.vn`).trim(),
+          password: String(data.password || '123456').trim(),
           avatar: data.avatar || '👨‍🎓',
           role: 'student',
           createdAt: new Date().toISOString(),
         };
+
         existingUsernames.add(cleanUsername);
-        unmarkUserDeleted(cleanUsername);
-        if (newUser.email) unmarkUserDeleted(newUser.email);
-        if (newUser.id) unmarkUserDeleted(newUser.id);
-        serverUsers.push(newUser);
-        createdUsers.push(newUser);
+        toInsert.push(newUser);
+        lineResults.push({ line: i + 1, username: cleanUsername, fullName: newUser.fullName, status: 'success' });
       }
 
-      // Ghi database 1 lần duy nhất sau khi thêm toàn bộ
-      if (createdUsers.length > 0) {
-        await saveDatabase();
+      // Atomic database transaction if cloud enabled
+      if (toInsert.length > 0 && sqlDb.isCloudEnabled) {
+        try {
+          const insertQueries = toInsert.map(u => ({
+            sql: `INSERT INTO users (id, username, full_name, class_name, email, password, avatar, role, created_at)
+                  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                  ON CONFLICT (username) DO NOTHING;`,
+            params: [u.id, u.username, u.fullName, u.className, u.email, u.password, u.avatar, u.role, u.createdAt]
+          }));
+          await sqlDb.executeTransaction(insertQueries);
+        } catch (dbErr) {
+          sendJson(res, 500, {
+            success: false,
+            error: 'Lỗi cơ sở dữ liệu khi lưu tài khoản: ' + dbErr.message,
+          });
+          return;
+        }
       }
 
-      const publicUsers = createdUsers.map(u => { const p = { ...u }; delete p.password; return p; });
+      // Commit to in-memory state only after database commits
+      for (const u of toInsert) {
+        unmarkUserDeleted(u.username);
+        if (u.email) unmarkUserDeleted(u.email);
+        if (u.id) unmarkUserDeleted(u.id);
+        serverUsers.push(u);
+        if (sqlDb.tables.users) {
+          sqlDb.tables.users.set(u.id, { ...u });
+        }
+      }
+
+      const publicUsers = toInsert.map(u => { const p = { ...u }; delete p.password; return p; });
       sendJson(res, 200, {
         success: true,
-        addedCount: createdUsers.length,
-        skippedCount: skippedCount.value,
+        addedCount: toInsert.length,
+        skippedCount,
+        errorCount,
+        results: lineResults,
         createdUsers: publicUsers,
       });
       return;
-    } catch {
-      sendJson(res, 400, { success: false, error: 'Dữ liệu không hợp lệ.' });
+    } catch (err) {
+      sendJson(res, 400, { success: false, error: 'Dữ liệu không hợp lệ: ' + err.message });
       return;
     }
   }
@@ -564,6 +668,17 @@ export async function handleRequest(req, res) {
     );
 
     if (toDelete.length > 0) {
+      if (sqlDb.isCloudEnabled) {
+        try {
+          for (const del of toDelete) {
+            await sqlDb.executeRawPostgres('DELETE FROM users WHERE id = $1 OR LOWER(username) = $2;', [del.id, del.username.toLowerCase()]);
+          }
+        } catch (dbErr) {
+          sendJson(res, 500, { success: false, error: 'Lỗi cơ sở dữ liệu khi xóa tài khoản: ' + dbErr.message });
+          return;
+        }
+      }
+
       for (const del of toDelete) {
         const i = serverUsers.indexOf(del);
         if (i !== -1) serverUsers.splice(i, 1);
@@ -574,10 +689,12 @@ export async function handleRequest(req, res) {
         delete serverQuizStats[del.username];
         if (serverAiSessions[del.id]) delete serverAiSessions[del.id];
         if (serverAiSessions[del.username]) delete serverAiSessions[del.username];
+        if (sqlDb.tables.users) {
+          sqlDb.tables.users.delete(del.id);
+        }
       }
       delete serverQuizStats[rawTarget];
       if (queryUsername) delete serverQuizStats[queryUsername];
-      await saveDatabase();
       sendJson(res, 200, { success: true, deletedUsers: toDelete });
     } else {
       sendJson(res, 404, { success: false, error: 'Không tìm thấy tài khoản.' });
@@ -620,6 +737,45 @@ export async function handleRequest(req, res) {
       });
       return;
     }
+
+    const resetTimestamp = Date.now();
+
+    // 1. Execute atomic transaction in PostgreSQL (if cloud enabled)
+    if (sqlDb.isCloudEnabled) {
+      try {
+        await sqlDb.executeTransaction([
+          'DELETE FROM exam_submissions;',
+          'DELETE FROM quiz_stats;',
+          'DELETE FROM ai_sessions;',
+          'DELETE FROM custom_questions;',
+          'DELETE FROM imported_files;',
+          'DELETE FROM exams;',
+          "DELETE FROM users WHERE username != 'admin';",
+          {
+            sql: `INSERT INTO system_metadata (key, value, updated_at)
+                  VALUES ('db_reset_time', $1::jsonb, CURRENT_TIMESTAMP)
+                  ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = EXCLUDED.updated_at;`,
+            params: [JSON.stringify({ timestamp: resetTimestamp })]
+          },
+          {
+            sql: `INSERT INTO system_metadata (key, value, updated_at)
+                  VALUES ('exams_cleared_by_admin', 'true'::jsonb, CURRENT_TIMESTAMP)
+                  ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = EXCLUDED.updated_at;`,
+            params: []
+          }
+        ]);
+      } catch (err) {
+        sendJson(res, 500, {
+          success: false,
+          error: 'Lỗi thực thi giao dịch cơ sở dữ liệu khi reset: ' + err.message,
+        });
+        return;
+      }
+    }
+
+    // 2. Update memory state only after DB commits
+    recordDbReset(resetTimestamp);
+
     const adminUser = serverUsers.find(u => u.username === 'admin' || u.id === 'user_admin') || {
       id: 'user_admin',
       username: 'admin',
@@ -631,7 +787,6 @@ export async function handleRequest(req, res) {
       role: 'admin',
       bio: 'Quản trị viên hệ thống',
     };
-    recordDbReset();
     serverUsers.length = 0;
     serverUsers.push({
       ...adminUser,
@@ -641,10 +796,10 @@ export async function handleRequest(req, res) {
       role: 'admin',
       password: DEMO_USERS[0].password,
     });
+
     for (const k of Object.keys(serverQuizStats)) delete serverQuizStats[k];
     for (const k of Object.keys(serverAiSessions)) delete serverAiSessions[k];
     serverExams.length = 0;
-    serverExams.push(...DEFAULT_EXAMS);
     serverExamSubmissions.length = 0;
     serverCustomQuestions.length = 0;
     serverImportedFiles.length = 0;
@@ -652,22 +807,34 @@ export async function handleRequest(req, res) {
     serverDeletedExams.clear();
     serverDeletedImportedFiles.clear();
 
-    if (sqlDb.isCloudEnabled) {
-      try {
-        await sqlDb.executeRawPostgres('DELETE FROM exam_submissions;');
-        await sqlDb.executeRawPostgres('DELETE FROM quiz_stats;');
-        await sqlDb.executeRawPostgres('DELETE FROM ai_sessions;');
-        await sqlDb.executeRawPostgres('DELETE FROM custom_questions;');
-        await sqlDb.executeRawPostgres('DELETE FROM imported_files;');
-        await sqlDb.executeRawPostgres("DELETE FROM exams WHERE id NOT IN ('exam_intro_eval_2026');");
-        await sqlDb.executeRawPostgres("DELETE FROM users WHERE username != 'admin';");
-      } catch (err) {
-        console.warn('[app.js] Error cleaning Postgres on reset:', err.message);
-      }
+    // Update relational engine tables
+    sqlDb.tables.exam_submissions.clear();
+    sqlDb.tables.quiz_stats.clear();
+    sqlDb.tables.ai_sessions.clear();
+    sqlDb.tables.custom_questions.clear();
+    sqlDb.tables.imported_files.clear();
+    sqlDb.tables.exams.clear();
+    for (const [id, u] of sqlDb.tables.users.entries()) {
+      if (u.username !== 'admin') sqlDb.tables.users.delete(id);
     }
+    sqlDb.tables.system_metadata.set('db_reset_time', { key: 'db_reset_time', value: { timestamp: resetTimestamp } });
 
-    await saveDatabase();
-    sendJson(res, 200, { success: true, message: 'Đã xóa toàn bộ database thành công.', dbResetTime: serverDbResetTime });
+    sendJson(res, 200, {
+      success: true,
+      message: 'Đã xóa toàn bộ database thành công.',
+      dbResetTime: resetTimestamp,
+      details: {
+        retained: ['Tài khoản quản trị viên: @admin'],
+        cleared: [
+          'Tài khoản sinh viên',
+          'Toàn bộ đề thi và bài nộp',
+          'Bảng điểm và lịch sử luyện tập',
+          'Phiên hội thoại AI trợ giảng',
+          'Ngân hàng câu hỏi tùy chỉnh',
+          'Tệp đề thi Word/CSV'
+        ]
+      }
+    });
     return;
   }
 
@@ -1092,13 +1259,25 @@ export async function handleRequest(req, res) {
       });
       return;
     }
+
+    if (sqlDb && sqlDb.isCloudEnabled) {
+      try {
+        await sqlDb.executeRawPostgres('DELETE FROM imported_files;');
+      } catch (err) {
+        sendJson(res, 500, {
+          success: false,
+          error: 'Lỗi cơ sở dữ liệu khi xóa toàn bộ file nạp: ' + err.message,
+        });
+        return;
+      }
+    }
+
     recordImportedFilesReset();
     serverImportedFiles.length = 0;
     serverCustomQuestions.length = 0;
-    if (sqlDb && sqlDb.isCloudEnabled) {
-      await sqlDb.executeRawPostgres('DELETE FROM imported_files;').catch(() => {});
+    if (sqlDb.tables.imported_files) {
+      sqlDb.tables.imported_files.clear();
     }
-    await saveDatabase();
     sendJson(res, 200, {
       success: true,
       message: 'Đã xóa toàn bộ file nạp trên máy chủ.',
@@ -1211,10 +1390,23 @@ export async function handleRequest(req, res) {
     if (idx !== -1) {
       const deleted = serverImportedFiles.splice(idx, 1)[0];
       markImportedFileDeleted(targetId);
+
       if (sqlDb && sqlDb.isCloudEnabled) {
-        await sqlDb.executeRawPostgres('DELETE FROM imported_files WHERE id = $1;', [targetId]).catch(() => {});
+        try {
+          await sqlDb.executeRawPostgres('DELETE FROM imported_files WHERE id = $1;', [targetId]);
+        } catch (err) {
+          sendJson(res, 500, {
+            success: false,
+            error: 'Lỗi cơ sở dữ liệu khi xóa file: ' + err.message,
+          });
+          return;
+        }
       }
-      await saveDatabase();
+
+      if (sqlDb.tables.imported_files) {
+        sqlDb.tables.imported_files.delete(targetId);
+      }
+
       sendJson(res, 200, {
         success: true,
         message: `Đã xóa file "${deleted.name}" thành công.`,
@@ -1318,6 +1510,27 @@ export async function handleRequest(req, res) {
       return;
     }
 
+    if (sqlDb && sqlDb.isCloudEnabled) {
+      try {
+        await sqlDb.executeTransaction([
+          'DELETE FROM exam_submissions;',
+          'DELETE FROM exams;',
+          {
+            sql: `INSERT INTO system_metadata (key, value, updated_at)
+                  VALUES ('exams_cleared_by_admin', 'true'::jsonb, CURRENT_TIMESTAMP)
+                  ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = EXCLUDED.updated_at;`,
+            params: []
+          }
+        ]);
+      } catch (err) {
+        sendJson(res, 500, {
+          success: false,
+          error: 'Lỗi cơ sở dữ liệu khi xóa toàn bộ đề thi: ' + err.message,
+        });
+        return;
+      }
+    }
+
     for (const ex of serverExams) {
       if (ex && ex.id) markExamDeleted(ex.id);
     }
@@ -1330,11 +1543,10 @@ export async function handleRequest(req, res) {
         serverQuizStats[k].history = [];
       }
     }
-    if (sqlDb && sqlDb.isCloudEnabled) {
-      await sqlDb.executeRawPostgres('DELETE FROM exams;').catch(() => {});
-      await sqlDb.executeRawPostgres('DELETE FROM exam_submissions;').catch(() => {});
-    }
-    await saveDatabase();
+    sqlDb.tables.exams.clear();
+    sqlDb.tables.exam_submissions.clear();
+    sqlDb.tables.system_metadata.set('exams_cleared_by_admin', { key: 'exams_cleared_by_admin', value: true });
+
     sendJson(res, 200, { success: true, message: 'Đã xóa toàn bộ đề thi và làm sạch dữ liệu bài làm của sinh viên thành công.' });
     return;
   }
@@ -1351,6 +1563,32 @@ export async function handleRequest(req, res) {
     }
 
     const examId = pathname.replace('/api/exams/', '').trim();
+    if (!examId) {
+      sendJson(res, 400, { success: false, error: 'Thiếu mã đề thi cần xóa.' });
+      return;
+    }
+
+    if (sqlDb && sqlDb.isCloudEnabled) {
+      try {
+        await sqlDb.executeTransaction([
+          {
+            sql: 'DELETE FROM exam_submissions WHERE exam_id = $1;',
+            params: [examId]
+          },
+          {
+            sql: 'DELETE FROM exams WHERE id = $1;',
+            params: [examId]
+          }
+        ]);
+      } catch (err) {
+        sendJson(res, 500, {
+          success: false,
+          error: 'Lỗi cơ sở dữ liệu khi xóa đề thi: ' + err.message,
+        });
+        return;
+      }
+    }
+
     const idx = serverExams.findIndex(e => e.id === examId);
     if (idx !== -1) {
       serverExams.splice(idx, 1);
@@ -1359,12 +1597,12 @@ export async function handleRequest(req, res) {
     serverExamSubmissions.length = 0;
     serverExamSubmissions.push(...remainingSubs);
     markExamDeleted(examId);
-    if (sqlDb && sqlDb.isCloudEnabled) {
-      await sqlDb.executeRawPostgres('DELETE FROM exams WHERE id = $1;', [examId]).catch(() => {});
-      await sqlDb.executeRawPostgres('DELETE FROM exam_submissions WHERE exam_id = $1;', [examId]).catch(() => {});
+
+    if (sqlDb.tables.exams) {
+      sqlDb.tables.exams.delete(examId);
     }
-    await saveDatabase();
-    sendJson(res, 200, { success: true });
+
+    sendJson(res, 200, { success: true, message: 'Đã xóa đề thi thành công.' });
     return;
   }
 

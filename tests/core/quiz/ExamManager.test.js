@@ -210,4 +210,37 @@ describe('ExamManager Core Module', () => {
     expect(leaderboard[1].averageScore).toBe(5);
     expect(leaderboard[1].rankBadge).toBe('🥈');
   });
+  it('permanently marks deleted exams in tombstone storage and never returns them', () => {
+    const exam = manager.createExam({
+      title: 'Đề thi cần xóa vĩnh viễn',
+      questionIds: ['logic_q01'],
+    }).exam;
+
+    expect(manager.getExamById(exam.id)).not.toBeNull();
+    expect(manager._isExamDeletedLocally(exam.id)).toBe(false);
+
+    // Delete the exam
+    manager.deleteExam(exam.id);
+
+    expect(manager._isExamDeletedLocally(exam.id)).toBe(true);
+    expect(manager.getExamById(exam.id)).toBeNull();
+    expect(manager.getExams().some(e => e.id === exam.id)).toBe(false);
+
+    // Even if storage raw item has old data simulated from a stale sync, getExams filters it out
+    storage.setItem('trr_assigned_exams_v1', JSON.stringify([exam]));
+    expect(manager.getExams().some(e => e.id === exam.id)).toBe(false);
+  });
+
+  it('completely clears all exams including default seed and prevents resurrection', () => {
+    expect(manager.getExams().length).toBeGreaterThan(0);
+
+    manager.clearAllExams();
+
+    expect(manager.getExams().length).toBe(0);
+    expect(manager._isExamDeletedLocally('exam_intro_eval_2026')).toBe(true);
+
+    // Simulate stale server sync returning default seed exam
+    storage.setItem('trr_assigned_exams_v1', JSON.stringify(DEFAULT_EXAMS));
+    expect(manager.getExams().length).toBe(0);
+  });
 });

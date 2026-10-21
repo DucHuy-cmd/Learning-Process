@@ -432,11 +432,28 @@ export class AdminView {
         const className = this.container.querySelector('#adminInpClass').value || 'Sinh viên';
         const email = this.container.querySelector('#adminInpEmail').value;
 
-        const res = authManager.adminCreateUser({ username, fullName, className, email, password });
-        if (res.success) {
+        let cloudRes = null;
+        if (cloudSyncManager && cloudSyncManager.isConnected && typeof cloudSyncManager.adminCreateUser === 'function') {
           try {
-            await cloudSyncManager.adminCreateUser({ id: res.user?.id, username, fullName, className, email, password });
-          } catch {}
+            cloudRes = await cloudSyncManager.adminCreateUser({ username, fullName, className, email, password });
+          } catch (err) {
+            cloudRes = { success: false, error: err.message };
+          }
+          if (!cloudRes || !cloudRes.success) {
+            this._showAlert(`❌ Lỗi máy chủ khi tạo tài khoản: ${cloudRes?.error || 'Thất bại'}`, 'error');
+            return;
+          }
+        }
+
+        const res = authManager.adminCreateUser({
+          id: cloudRes?.user?.id,
+          username,
+          fullName,
+          className,
+          email,
+          password
+        });
+        if (res.success) {
           formAdd.reset();
           await this.render();
           this._showAlert(`✓ Đã cấp tài khoản thành công cho sinh viên "${fullName}" (@${username.trim().toLowerCase()}).`, 'success');
@@ -510,37 +527,53 @@ export class AdminView {
           // Yield thread briefly so browser renders loading state
           await new Promise(r => setTimeout(r, 10));
 
-          const res = authManager.batchImportUsers(records);
-          if (res.success) {
-            if (res.createdUsers && res.createdUsers.length > 0) {
-              if (btnTriggerImport) {
-                btnTriggerImport.innerHTML = `<span>⏳</span> Đang đồng bộ máy chủ (${res.createdUsers.length})...`;
-              }
-              this._showAlert(`Đang đồng bộ ${res.createdUsers.length} tài khoản lên máy chủ...`, 'info');
+          if (btnTriggerImport) {
+            btnTriggerImport.innerHTML = `<span>⏳</span> Đang gửi máy chủ xử lý (${records.length} tài khoản)...`;
+          }
+          this._showAlert(`Đang gửi máy chủ xử lý lô ${records.length} tài khoản...`, 'info');
 
-              // 1. Fast batch HTTP request in 1 round-trip
-              let batchRes = null;
-              try {
-                batchRes = await cloudSyncManager.adminBatchCreateUsers(res.createdUsers);
-              } catch {}
-
-              // 2. Fallback: chunked parallel requests (10 at a time) if batch endpoint failed
-              if (!batchRes || !batchRes.success) {
-                const CHUNK_SIZE = 10;
-                for (let i = 0; i < res.createdUsers.length; i += CHUNK_SIZE) {
-                  const chunk = res.createdUsers.slice(i, i + CHUNK_SIZE);
-                  await Promise.all(chunk.map(u => cloudSyncManager.adminCreateUser(u).catch(() => null)));
-                }
-              }
+          let batchRes = null;
+          if (cloudSyncManager && typeof cloudSyncManager.adminBatchCreateUsers === 'function') {
+            try {
+              batchRes = await cloudSyncManager.adminBatchCreateUsers(records);
+            } catch (err) {
+              batchRes = { success: false, error: err.message };
             }
+          }
+
+          if (batchRes && batchRes.success) {
+            // Sync newly created users into local authManager state
+            if (Array.isArray(batchRes.createdUsers) && batchRes.createdUsers.length > 0) {
+              authManager.batchImportUsers(batchRes.createdUsers);
+            }
+            try {
+              await cloudSyncManager.syncUsers(authManager);
+            } catch {}
             await this.render();
-            let msg = `✓ Đã nhập thành công ${res.addedCount} tài khoản mới!`;
-            if (res.skippedCount > 0) {
-              msg += ` (Bỏ qua ${res.skippedCount} tài khoản do đã tồn tại hoặc không hợp lệ)`;
+
+            let msg = `✓ Đã nhập thành công ${batchRes.addedCount} tài khoản mới!`;
+            if (batchRes.skippedCount > 0) {
+              msg += ` (Bỏ qua ${batchRes.skippedCount} tài khoản do đã tồn tại hoặc trùng)`;
+            }
+            if (batchRes.errorCount > 0) {
+              msg += ` (Lỗi ${batchRes.errorCount} dòng)`;
             }
             this._showAlert(msg, 'success');
+          } else if (batchRes && !batchRes.success) {
+            this._showAlert(`❌ Lỗi từ máy chủ khi nhập tài khoản: ${batchRes.error || 'Thao tác thất bại.'}`, 'error');
           } else {
-            this._showAlert(res.error || 'Lỗi khi nhập tài khoản hàng loạt.', 'error');
+            // Fallback when cloudSyncManager is not available
+            const res = authManager.batchImportUsers(records);
+            if (res.success) {
+              await this.render();
+              let msg = `✓ Đã nhập thành công ${res.addedCount} tài khoản mới!`;
+              if (res.skippedCount > 0) {
+                msg += ` (Bỏ qua ${res.skippedCount} tài khoản do đã tồn tại)`;
+              }
+              this._showAlert(msg, 'success');
+            } else {
+              this._showAlert(res.error || 'Lỗi khi nhập tài khoản.', 'error');
+            }
           }
         } catch (err) {
           this._showAlert(`Lỗi đọc file: ${err.message}`, 'error');
@@ -591,14 +624,28 @@ export class AdminView {
         btnClearExams.innerHTML = '<span>⏳</span> Đang xóa...';
 
         try {
+          let isOnline = false;
+          try {
+            isOnline = await cloudSyncManager.checkConnection();
+          } catch {}
+
+          if (isOnline) {
+            const serverRes = await cloudSyncManager.serverClearAllExams();
+            if (!serverRes || !serverRes.success) {
+              this._showAlert(`❌ Lỗi máy chủ khi xóa đề thi: ${serverRes?.error || 'Thất bại'}. Thao tác đã bị hủy.`, 'error');
+              return;
+            }
+          }
+
           examManager.clearAllExams();
           quizHistoryManager.clearAllExamHistory();
 
-          try {
-            await cloudSyncManager.serverClearAllExams();
-            await cloudSyncManager.syncExams(examManager);
-            await cloudSyncManager.syncExamSubmissions(examManager);
-          } catch {}
+          if (isOnline) {
+            try {
+              await cloudSyncManager.syncExams(examManager);
+              await cloudSyncManager.syncExamSubmissions(examManager);
+            } catch {}
+          }
 
           await this.render();
           this._showAlert('✓ Đã xóa sạch toàn bộ đề thi và làm sạch dữ liệu bài làm trong tài khoản sinh viên!', 'success');
@@ -627,6 +674,20 @@ export class AdminView {
         btnFullReset.innerHTML = '<span>⏳</span> Đang xóa database...';
 
         try {
+          let isOnline = false;
+          try {
+            isOnline = await cloudSyncManager.checkConnection();
+          } catch {}
+
+          let resetRes = null;
+          if (isOnline) {
+            resetRes = await cloudSyncManager.adminResetDatabase();
+            if (!resetRes || !resetRes.success) {
+              this._showAlert(`❌ Lỗi máy chủ khi reset database: ${resetRes?.error || 'Thất bại'}. Dữ liệu chưa bị xóa.`, 'error');
+              return;
+            }
+          }
+
           authManager.resetUsersToDefault({ force: true });
           quizHistoryManager.clearLeaderboard();
           quizHistoryManager.clearAllExamHistory();
@@ -650,26 +711,28 @@ export class AdminView {
                 className: 'Quản trị viên',
                 role: 'admin',
               }]));
-              authManager.storage.setItem('trr_last_db_reset', String(Date.now()));
+              if (resetRes && resetRes.dbResetTime) {
+                authManager.storage.setItem('trr_last_db_reset', String(resetRes.dbResetTime));
+              } else {
+                authManager.storage.setItem('trr_last_db_reset', String(Date.now()));
+              }
             } catch {}
           }
 
-          try {
-            const resetRes = await cloudSyncManager.adminResetDatabase();
-            if (resetRes && resetRes.dbResetTime && authManager.storage) {
-              authManager.storage.setItem('trr_last_db_reset', String(resetRes.dbResetTime));
-            }
-            if (typeof cloudSyncManager.pushClearAllImportedFiles === 'function') {
-              await cloudSyncManager.pushClearAllImportedFiles();
-            }
-            await cloudSyncManager.syncUsers(authManager);
-            await cloudSyncManager.syncQuizLeaderboard(quizHistoryManager);
-            await cloudSyncManager.syncExams(examManager);
-            await cloudSyncManager.syncExamSubmissions(examManager);
-          } catch {}
+          if (isOnline) {
+            try {
+              if (typeof cloudSyncManager.pushClearAllImportedFiles === 'function') {
+                await cloudSyncManager.pushClearAllImportedFiles();
+              }
+              await cloudSyncManager.syncUsers(authManager);
+              await cloudSyncManager.syncQuizLeaderboard(quizHistoryManager);
+              await cloudSyncManager.syncExams(examManager);
+              await cloudSyncManager.syncExamSubmissions(examManager);
+            } catch {}
+          }
 
           await this.render();
-          this._showAlert('✓ Toàn bộ Database đã được xóa sạch và khôi phục về trạng thái ban đầu!', 'success');
+          this._showAlert('✓ Toàn bộ Database đã được xóa sạch và khôi phục về trạng thái ban đầu! (Chỉ giữ lại admin)', 'success');
         } catch (err) {
           this._showAlert(`Lỗi khi reset database: ${err.message}`, 'error');
         } finally {
@@ -720,10 +783,22 @@ export class AdminView {
           return;
         }
 
+        if (cloudSyncManager && cloudSyncManager.isConnected) {
+          try {
+            const delRes = await cloudSyncManager.adminDeleteUser(targetId, targetUsername);
+            if (delRes && !delRes.success) {
+              this._showAlert(`❌ Lỗi máy chủ khi xóa tài khoản: ${delRes.error || 'Thất bại'}`, 'error');
+              return;
+            }
+          } catch (err) {
+            this._showAlert(`❌ Lỗi kết nối khi xóa tài khoản: ${err.message}`, 'error');
+            return;
+          }
+        }
+
         const res = authManager.deleteUser(targetId, targetUsername);
         if (res.success) {
           try {
-            await cloudSyncManager.adminDeleteUser(targetId, targetUsername);
             await cloudSyncManager.syncUsers(authManager);
             // Also clean from local leaderboard
             quizHistoryManager.removeUserStats(targetId);

@@ -249,7 +249,7 @@ export class QuizView {
     }
   }
 
-  async _deleteImportedFile(fileId) {
+  _deleteImportedFile(fileId) {
     const file = this.importedFiles.find(f => f.id === fileId);
     if (!file) return;
 
@@ -270,13 +270,11 @@ export class QuizView {
     }
     this._markFileDeletedLocally(fileId);
     this._saveWordFiles(updated, true);
-    if (cloudSyncManager && typeof cloudSyncManager.pushDeleteImportedFile === 'function') {
-      try {
-        await cloudSyncManager.pushDeleteImportedFile(fileId);
-      } catch {}
+    if (cloudSyncManager && cloudSyncManager.isConnected && typeof cloudSyncManager.pushDeleteImportedFile === 'function') {
+      cloudSyncManager.pushDeleteImportedFile(fileId).catch(() => {});
     }
     this._showAlert(`🗑️ Đã xóa dữ liệu file "${file.name}" thành công!`);
-    await this.render();
+    this.render();
   }
 
   _getDeletedFileIds() {
@@ -333,7 +331,7 @@ export class QuizView {
         setCustomQuestionBank([]);
       } catch {}
     }
-    if (cloudSyncManager && typeof cloudSyncManager.pushClearAllImportedFiles === 'function') {
+    if (cloudSyncManager && cloudSyncManager.isConnected && typeof cloudSyncManager.pushClearAllImportedFiles === 'function') {
       cloudSyncManager.pushClearAllImportedFiles().catch(err => {
         console.warn('[QuizView] pushClearAllImportedFiles error:', err);
       });
@@ -3790,14 +3788,25 @@ export class QuizView {
           return;
         }
 
-        examManager.deleteExam(examId);
-        if (cloudSyncManager && cloudSyncManager.isConnected) {
-          try {
-            await cloudSyncManager.serverDeleteExam(examId);
-          } catch {}
-        }
+        btn.disabled = true;
+        try {
+          if (cloudSyncManager && cloudSyncManager.isConnected) {
+            const serverRes = await cloudSyncManager.serverDeleteExam(examId);
+            if (serverRes && !serverRes.success) {
+              this._showAlert(`❌ Lỗi máy chủ khi xóa đề thi: ${serverRes.error || 'Thất bại'}`);
+              btn.disabled = false;
+              return;
+            }
+          }
 
-        this.render();
+          examManager.deleteExam(examId);
+          this._showAlert(`🗑️ Đã xóa vĩnh viễn đề thi "${examTitle}".`);
+          await this.render();
+        } catch (err) {
+          this._showAlert(`❌ Lỗi khi xóa đề thi: ${err.message}`);
+        } finally {
+          btn.disabled = false;
+        }
       });
     });
 
@@ -3815,17 +3824,27 @@ export class QuizView {
         const origText = btnClearAllExams.innerHTML;
         btnClearAllExams.innerHTML = '<span>⏳ Đang xóa toàn bộ đề...</span>';
 
-        examManager.clearAllExams();
-        quizHistoryManager.clearAllExamHistory();
-        if (cloudSyncManager && cloudSyncManager.isConnected) {
-          try {
-            await cloudSyncManager.serverClearAllExams();
-          } catch {}
-        }
+        try {
+          if (cloudSyncManager && cloudSyncManager.isConnected) {
+            const serverRes = await cloudSyncManager.serverClearAllExams();
+            if (serverRes && !serverRes.success) {
+              this._showAlert(`❌ Lỗi máy chủ khi xóa đề thi: ${serverRes.error || 'Thất bại'}`);
+              return;
+            }
+          }
 
-        this._showAlert('✅ Đã xóa toàn bộ đề thi và làm sạch dữ liệu bài làm của sinh viên thành công!');
-        this.studioAssignTitle = null;
-        await this.render();
+          examManager.clearAllExams();
+          quizHistoryManager.clearAllExamHistory();
+
+          this._showAlert('✅ Đã xóa toàn bộ đề thi và làm sạch dữ liệu bài làm của sinh viên thành công!');
+          this.studioAssignTitle = null;
+          await this.render();
+        } catch (err) {
+          this._showAlert(`❌ Lỗi khi xóa toàn bộ đề thi: ${err.message}`);
+        } finally {
+          btnClearAllExams.disabled = false;
+          btnClearAllExams.innerHTML = origText;
+        }
       });
     }
 
