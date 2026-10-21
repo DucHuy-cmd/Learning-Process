@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SqlDatabaseAdapter } from '../../src/server/db/SqlDatabaseAdapter.js';
+import { SCHEMA_STATEMENTS, SCHEMA_DDL } from '../../src/server/db/schema.js';
 
 describe('SqlDatabaseAdapter (Relational SQL Engine)', () => {
   let db;
@@ -7,6 +8,15 @@ describe('SqlDatabaseAdapter (Relational SQL Engine)', () => {
   beforeEach(async () => {
     db = new SqlDatabaseAdapter();
     await db.initSchema();
+  });
+
+  it('contains all required tables in embedded SCHEMA_STATEMENTS for serverless bundle', () => {
+    expect(SCHEMA_STATEMENTS.length).toBeGreaterThan(0);
+    expect(SCHEMA_DDL).toContain('CREATE TABLE IF NOT EXISTS exam_submissions');
+    expect(SCHEMA_DDL).toContain('CREATE TABLE IF NOT EXISTS system_metadata');
+    expect(SCHEMA_DDL).toContain('CREATE TABLE IF NOT EXISTS exams');
+    expect(SCHEMA_DDL).toContain('CREATE TABLE IF NOT EXISTS users');
+    expect(SCHEMA_DDL).toContain('CREATE TABLE IF NOT EXISTS quiz_stats');
   });
 
   it('initializes schema and tables successfully', () => {

@@ -10,6 +10,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { SCHEMA_STATEMENTS, SCHEMA_DDL } from './schema.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -43,37 +44,42 @@ export class SqlDatabaseAdapter {
 
   /**
    * Reads and initializes schema DDL.
+   * Uses embedded SCHEMA_STATEMENTS to ensure bundling in Vercel Serverless environment.
    */
   async initSchema() {
     if (this.schemaInitialized) return true;
-    try {
-      const schemaPath = path.resolve(__dirname, 'schema.sql');
-      if (fs.existsSync(schemaPath)) {
-        this.rawDdl = fs.readFileSync(schemaPath, 'utf8');
-      }
-    } catch {
-      // In-memory fallback
-    }
+    this.rawDdl = SCHEMA_DDL;
 
-    if (this.isCloudEnabled && this.rawDdl) {
+    if (this.isCloudEnabled) {
       try {
-        const statements = this.rawDdl
-          .split(';')
-          .map(s => s.trim())
-          .filter(s => s.length > 0 && !s.startsWith('--'));
-        for (const stmt of statements) {
-          try {
-            await this.executeRawPostgres(stmt);
-          } catch (err) {
-            // Ignore if relation or index already exists
+        let batchSucceeded = false;
+        try {
+          const { neon } = await import('@neondatabase/serverless');
+          const sql = neon(this.postgresUrl);
+          const neonDdl = SCHEMA_STATEMENTS.map(s => sql.query(s));
+          await sql.transaction(neonDdl);
+          batchSucceeded = true;
+        } catch {
+          // If batch transaction fails (e.g. index exists notice treated as error), fall back to individual statements
+        }
+
+        if (!batchSucceeded) {
+          for (const stmt of SCHEMA_STATEMENTS) {
+            try {
+              await this.executeRawPostgres(stmt);
+            } catch {
+              // Ignore if relation or index already exists
+            }
           }
         }
+        this.schemaInitialized = true;
       } catch (err) {
-        console.warn('[SqlDatabaseAdapter] Cloud Postgres init error, falling back to relational engine:', err.message);
+        console.warn('[SqlDatabaseAdapter] Cloud Postgres init error:', err.message);
       }
+    } else {
+      this.schemaInitialized = true;
     }
 
-    this.schemaInitialized = true;
     return true;
   }
 
@@ -159,9 +165,10 @@ export class SqlDatabaseAdapter {
    * Executes multiple queries within an atomic transaction.
    * If any query fails, the entire transaction rolls back.
    * @param {Array<{ sql: string, params?: Array } | string>} queries
+   * @param {boolean} [isRetry=false]
    * @returns {Promise<{ success: boolean, results?: Array }>}
    */
-  async executeTransaction(queries = []) {
+  async executeTransaction(queries = [], isRetry = false) {
     if (!Array.isArray(queries) || queries.length === 0) return { success: true };
     await this.initSchema();
 
@@ -215,7 +222,15 @@ export class SqlDatabaseAdapter {
           const data = await res.json().catch(() => ({}));
           return { success: true, results: data.results || [] };
         } catch (fetchErr) {
-          throw new Error(`Lỗi giao dịch PostgreSQL: ${neonErr.message || fetchErr.message}`);
+          const rawErr = neonErr.message || fetchErr.message;
+          // Auto-heal: If relation does not exist, re-initialize schema and retry once
+          if (!isRetry && /relation ".*" does not exist/i.test(rawErr)) {
+            console.warn('[SqlDatabaseAdapter] Missing relation in transaction, initializing schema and retrying...', rawErr);
+            this.schemaInitialized = false;
+            await this.initSchema();
+            return this.executeTransaction(queries, true);
+          }
+          throw new Error(`Lỗi giao dịch PostgreSQL: ${rawErr}`);
         }
       }
     }

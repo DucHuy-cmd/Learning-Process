@@ -345,107 +345,127 @@ export async function fetchFromPostgres() {
     await sqlDb.initSchema();
 
     // 1. Load users
-    const usersRes = await sqlDb.executeRawPostgres('SELECT * FROM users ORDER BY created_at ASC;');
-    if (Array.isArray(usersRes.rows)) {
-      serverUsers.length = 0;
-      for (const row of usersRes.rows) {
-        serverUsers.push({
-          id: row.id,
-          username: row.username,
-          fullName: row.full_name || row.fullName || row.username,
-          className: row.class_name || row.className || 'Sinh viên',
-          email: row.email || '',
-          password: row.password || '123456',
-          avatar: row.avatar || '👨‍🎓',
-          role: row.role || 'student',
-          createdAt: row.created_at || row.createdAt || new Date().toISOString(),
-        });
+    try {
+      const usersRes = await sqlDb.executeRawPostgres('SELECT * FROM users ORDER BY created_at ASC;');
+      if (Array.isArray(usersRes.rows)) {
+        serverUsers.length = 0;
+        for (const row of usersRes.rows) {
+          serverUsers.push({
+            id: row.id,
+            username: row.username,
+            fullName: row.full_name || row.fullName || row.username,
+            className: row.class_name || row.className || 'Sinh viên',
+            email: row.email || '',
+            password: row.password || '123456',
+            avatar: row.avatar || '👨‍🎓',
+            role: row.role || 'student',
+            createdAt: row.created_at || row.createdAt || new Date().toISOString(),
+          });
+        }
+        const adminIdx = serverUsers.findIndex(u => u.username === 'admin' || u.id === 'user_admin' || u.role === 'admin');
+        if (adminIdx === -1) {
+          serverUsers.unshift({ ...DEMO_USERS[0] });
+        }
       }
-      const adminIdx = serverUsers.findIndex(u => u.username === 'admin' || u.id === 'user_admin' || u.role === 'admin');
-      if (adminIdx === -1) {
-        serverUsers.unshift({ ...DEMO_USERS[0] });
-      }
+    } catch (usersErr) {
+      console.warn('[ServerDataStore] Error loading users from Postgres:', usersErr.message);
     }
 
     // 2. Load exams
-    const examsRes = await sqlDb.executeRawPostgres('SELECT * FROM exams ORDER BY created_at DESC;');
-    if (Array.isArray(examsRes.rows)) {
-      serverExams.length = 0;
-      for (const r of examsRes.rows) {
-        if (isExamDeleted(r.id)) continue;
-        serverExams.push({
-          id: r.id,
-          title: r.title,
-          durationMinutes: r.duration_minutes || r.durationMinutes || 30,
-          createdBy: r.created_by || r.createdBy || 'user_admin',
-          questions: typeof r.questions === 'string' ? JSON.parse(r.questions) : (r.questions || []),
-          shuffleQuestions: Boolean(r.shuffle_questions),
-          shuffleOptions: Boolean(r.shuffle_options),
-          maxAttempts: r.max_attempts || 1,
-          isPublished: r.is_published !== false,
-          allowReview: r.allow_review !== false,
-          showAnswersOnComplete: r.show_answers_on_complete !== false,
-          createdAt: r.created_at || new Date().toISOString(),
-        });
+    try {
+      const examsRes = await sqlDb.executeRawPostgres('SELECT * FROM exams ORDER BY created_at DESC;');
+      if (Array.isArray(examsRes.rows)) {
+        serverExams.length = 0;
+        for (const r of examsRes.rows) {
+          if (isExamDeleted(r.id)) continue;
+          serverExams.push({
+            id: r.id,
+            title: r.title,
+            durationMinutes: r.duration_minutes || r.durationMinutes || 30,
+            createdBy: r.created_by || r.createdBy || 'user_admin',
+            questions: typeof r.questions === 'string' ? JSON.parse(r.questions) : (r.questions || []),
+            shuffleQuestions: Boolean(r.shuffle_questions),
+            shuffleOptions: Boolean(r.shuffle_options),
+            maxAttempts: r.max_attempts || 1,
+            isPublished: r.is_published !== false,
+            allowReview: r.allow_review !== false,
+            showAnswersOnComplete: r.show_answers_on_complete !== false,
+            createdAt: r.created_at || new Date().toISOString(),
+          });
+        }
       }
+    } catch (examsErr) {
+      console.warn('[ServerDataStore] Error loading exams from Postgres:', examsErr.message);
     }
 
     // 3. Load exam_submissions
-    const subRes = await sqlDb.executeRawPostgres('SELECT * FROM exam_submissions ORDER BY submitted_at DESC;');
-    if (Array.isArray(subRes.rows)) {
-      serverExamSubmissions.length = 0;
-      for (const r of subRes.rows) {
-        if (isExamDeleted(r.exam_id)) continue;
-        serverExamSubmissions.push({
-          id: r.id,
-          examId: r.exam_id,
-          userId: r.user_id,
-          examTitle: r.exam_title,
-          studentName: r.student_name,
-          studentClass: r.student_class,
-          answers: typeof r.answers === 'string' ? JSON.parse(r.answers) : (r.answers || {}),
-          score: parseFloat(r.score) || 0,
-          maxScore: parseFloat(r.max_score) || 10,
-          totalQuestions: r.total_questions || 0,
-          correctCount: r.correct_count || 0,
-          timeSpentSeconds: r.time_spent_seconds || 0,
-          submittedAt: r.submitted_at || new Date().toISOString(),
-        });
+    try {
+      const subRes = await sqlDb.executeRawPostgres('SELECT * FROM exam_submissions ORDER BY submitted_at DESC;');
+      if (Array.isArray(subRes.rows)) {
+        serverExamSubmissions.length = 0;
+        for (const r of subRes.rows) {
+          if (isExamDeleted(r.exam_id)) continue;
+          serverExamSubmissions.push({
+            id: r.id,
+            examId: r.exam_id,
+            userId: r.user_id,
+            examTitle: r.exam_title,
+            studentName: r.student_name,
+            studentClass: r.student_class,
+            answers: typeof r.answers === 'string' ? JSON.parse(r.answers) : (r.answers || {}),
+            score: parseFloat(r.score) || 0,
+            maxScore: parseFloat(r.max_score) || 10,
+            totalQuestions: r.total_questions || 0,
+            correctCount: r.correct_count || 0,
+            timeSpentSeconds: r.time_spent_seconds || 0,
+            submittedAt: r.submitted_at || new Date().toISOString(),
+          });
+        }
       }
+    } catch (subErr) {
+      console.warn('[ServerDataStore] Notice loading exam_submissions from Postgres:', subErr.message);
     }
 
     // 4. Load quiz_stats
-    const qsRes = await sqlDb.executeRawPostgres('SELECT * FROM quiz_stats;');
-    if (Array.isArray(qsRes.rows)) {
-      for (const k of Object.keys(serverQuizStats)) delete serverQuizStats[k];
-      for (const r of qsRes.rows) {
-        serverQuizStats[r.user_id] = {
-          fullName: r.full_name,
-          score: r.score,
-          accuracy: r.accuracy,
-          totalAnswered: r.total_answered,
-          correctCount: r.correct_count,
-          maxStreak: r.max_streak,
-          lastPlayed: r.last_played,
-        };
+    try {
+      const qsRes = await sqlDb.executeRawPostgres('SELECT * FROM quiz_stats;');
+      if (Array.isArray(qsRes.rows)) {
+        for (const k of Object.keys(serverQuizStats)) delete serverQuizStats[k];
+        for (const r of qsRes.rows) {
+          serverQuizStats[r.user_id] = {
+            fullName: r.full_name,
+            score: r.score,
+            accuracy: r.accuracy,
+            totalAnswered: r.total_answered,
+            correctCount: r.correct_count,
+            maxStreak: r.max_streak,
+            lastPlayed: r.last_played,
+          };
+        }
       }
+    } catch (qsErr) {
+      console.warn('[ServerDataStore] Notice loading quiz_stats from Postgres:', qsErr.message);
     }
 
     // 5. Load imported_files
-    const ifRes = await sqlDb.executeRawPostgres('SELECT * FROM imported_files ORDER BY uploaded_at DESC;');
-    if (Array.isArray(ifRes.rows)) {
-      serverImportedFiles.length = 0;
-      for (const r of ifRes.rows) {
-        if (isImportedFileDeleted(r.id)) continue;
-        serverImportedFiles.push({
-          id: r.id,
-          name: r.filename,
-          questionCount: r.question_count,
-          examTitle: r.exam_title,
-          questions: typeof r.questions === 'string' ? JSON.parse(r.questions) : (r.questions || []),
-          uploadedAt: r.uploaded_at,
-        });
+    try {
+      const ifRes = await sqlDb.executeRawPostgres('SELECT * FROM imported_files ORDER BY uploaded_at DESC;');
+      if (Array.isArray(ifRes.rows)) {
+        serverImportedFiles.length = 0;
+        for (const r of ifRes.rows) {
+          if (isImportedFileDeleted(r.id)) continue;
+          serverImportedFiles.push({
+            id: r.id,
+            name: r.filename,
+            questionCount: r.question_count,
+            examTitle: r.exam_title,
+            questions: typeof r.questions === 'string' ? JSON.parse(r.questions) : (r.questions || []),
+            uploadedAt: r.uploaded_at,
+          });
+        }
       }
+    } catch (ifErr) {
+      console.warn('[ServerDataStore] Notice loading imported_files from Postgres:', ifErr.message);
     }
 
     // 6. Load durable system metadata (e.g. durable dbResetTime, exams_cleared_by_admin)
@@ -550,26 +570,34 @@ export async function saveToPostgres() {
     }
 
     // 3. Exam submissions
-    if (serverExamSubmissions.length === 0) {
-      await sqlDb.executeRawPostgres('DELETE FROM exam_submissions;');
-    } else {
-      for (const s of serverExamSubmissions) {
-        if (!s || !s.id) continue;
-        await sqlDb.executeRawPostgres(`
-          INSERT INTO exam_submissions (id, exam_id, user_id, exam_title, student_name, student_class, answers, score, max_score, total_questions, correct_count, time_spent_seconds, submitted_at)
-          VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10, $11, $12, $13)
-          ON CONFLICT (id) DO NOTHING;
-        `, [
-          s.id, s.examId, s.userId, s.examTitle || '', s.studentName || '', s.studentClass || '',
-          JSON.stringify(s.answers || {}), s.score || 0, s.maxScore || 10,
-          s.totalQuestions || 0, s.correctCount || 0, s.timeSpentSeconds || 0, s.submittedAt || new Date().toISOString()
-        ]);
+    try {
+      if (serverExamSubmissions.length === 0) {
+        await sqlDb.executeRawPostgres('DELETE FROM exam_submissions;');
+      } else {
+        for (const s of serverExamSubmissions) {
+          if (!s || !s.id) continue;
+          await sqlDb.executeRawPostgres(`
+            INSERT INTO exam_submissions (id, exam_id, user_id, exam_title, student_name, student_class, answers, score, max_score, total_questions, correct_count, time_spent_seconds, submitted_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10, $11, $12, $13)
+            ON CONFLICT (id) DO NOTHING;
+          `, [
+            s.id, s.examId, s.userId, s.examTitle || '', s.studentName || '', s.studentClass || '',
+            JSON.stringify(s.answers || {}), s.score || 0, s.maxScore || 10,
+            s.totalQuestions || 0, s.correctCount || 0, s.timeSpentSeconds || 0, s.submittedAt || new Date().toISOString()
+          ]);
+        }
       }
+    } catch (subErr) {
+      console.warn('[ServerDataStore] Notice saving exam_submissions to Postgres:', subErr.message);
     }
 
     // 4. Quiz stats
-    if (Object.keys(serverQuizStats).length === 0) {
-      await sqlDb.executeRawPostgres('DELETE FROM quiz_stats;');
+    try {
+      if (Object.keys(serverQuizStats).length === 0) {
+        await sqlDb.executeRawPostgres('DELETE FROM quiz_stats;');
+      }
+    } catch (qsErr) {
+      console.warn('[ServerDataStore] Notice saving quiz_stats to Postgres:', qsErr.message);
     }
 
     // 5. Imported files
