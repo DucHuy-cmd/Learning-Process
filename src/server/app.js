@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file app.js
  * Backend HTTP Request Handler and API Router
  * 
@@ -417,6 +417,7 @@ export async function handleRequest(req, res) {
       };
       unmarkUserDeleted(cleanUsername);
       if (newUser.email) unmarkUserDeleted(newUser.email);
+      if (newUser.id) unmarkUserDeleted(newUser.id);
       serverUsers.push(newUser);
       await saveDatabase();
       const publicUser = { ...newUser };
@@ -474,6 +475,7 @@ export async function handleRequest(req, res) {
         existingUsernames.add(cleanUsername);
         unmarkUserDeleted(cleanUsername);
         if (newUser.email) unmarkUserDeleted(newUser.email);
+        if (newUser.id) unmarkUserDeleted(newUser.id);
         serverUsers.push(newUser);
         createdUsers.push(newUser);
       }
@@ -612,8 +614,7 @@ export async function handleRequest(req, res) {
       role: 'admin',
       bio: 'Quản trị viên hệ thống',
     };
-    const previousStudents = serverUsers.filter(u => u.username !== 'admin' && u.id !== 'user_admin');
-    recordDbReset(previousStudents);
+    recordDbReset();
     serverUsers.length = 0;
     serverUsers.push({
       ...adminUser,
@@ -629,6 +630,10 @@ export async function handleRequest(req, res) {
     serverExams.push(...DEFAULT_EXAMS);
     serverExamSubmissions.length = 0;
     serverCustomQuestions.length = 0;
+    serverImportedFiles.length = 0;
+    serverDeletedUsers.clear();
+    serverDeletedExams.clear();
+    serverDeletedImportedFiles.clear();
     await saveDatabase();
     sendJson(res, 200, { success: true, message: 'Đã xóa toàn bộ database thành công.' });
     return;
@@ -1082,6 +1087,7 @@ export async function handleRequest(req, res) {
           } else {
             serverImportedFiles.unshift(entry);
           }
+          unmarkImportedFileDeleted(fileId);
         }
         await saveDatabase();
         sendJson(res, 200, { success: true, files: serverImportedFiles });
@@ -1215,6 +1221,7 @@ export async function handleRequest(req, res) {
         shuffleQuestions: Boolean(data.shuffleQuestions),
         shuffleOptions: Boolean(data.shuffleOptions),
       };
+      unmarkExamDeleted(examId);
       serverExams.unshift(exam);
       saveDatabase();
       sendJson(res, 201, { success: true, exam });

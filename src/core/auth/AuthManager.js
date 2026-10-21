@@ -421,13 +421,11 @@ export class AuthManager {
       return { success: false, error: 'Chỉ có Quản trị viên mới có quyền reset dữ liệu tài khoản.' };
     }
     const currentUsers = this.getUsers();
-    // Tombstone all non-admin users
-    for (const u of currentUsers) {
-      if (u.username !== 'admin' && u.id !== 'user_admin' && u.role !== 'admin') {
-        if (u.id) this.markDeletedLocally(u.id);
-        if (u.username) this.markDeletedLocally(u.username);
-        if (u.email) this.markDeletedLocally(u.email);
-      }
+    // On a full reset to default, clear deletion tombstones so clean new accounts can be added
+    if (this.storage) {
+      try {
+        this.storage.setItem(STORAGE_KEY_DELETED, JSON.stringify([]));
+      } catch {}
     }
 
     const admin = currentUsers.find(u => u.username === 'admin' || u.id === 'user_admin') || DEMO_USERS[0];
@@ -456,7 +454,7 @@ export class AuthManager {
    * @param {Object} data
    * @returns {{ success: boolean, error?: string, user?: Object }}
    */
-  adminCreateUser({ username, fullName, className = 'Sinh viên', email, password = '123', avatar = '👤' }) {
+  adminCreateUser({ id, username, fullName, className = 'Sinh viên', email, password = '123', avatar = '👤' } = {}) {
     if (!this.isAdmin()) {
       return { success: false, error: 'Chỉ có Quản trị viên (admin) mới có quyền cấp tài khoản.' };
     }
@@ -474,6 +472,7 @@ export class AuthManager {
     // Clear any previous deletion tombstone
     this.unmarkDeletedLocally(cleanUsername);
     if (cleanEmail) this.unmarkDeletedLocally(cleanEmail);
+    if (id) this.unmarkDeletedLocally(id);
 
     const users = this.getUsers();
 
@@ -552,6 +551,7 @@ export class AuthManager {
       // Clear any previous deletion tombstone when admin intentionally imports
       this.unmarkDeletedLocally(cleanUsername);
       if (cleanEmail) this.unmarkDeletedLocally(cleanEmail);
+      if (rec.id) this.unmarkDeletedLocally(rec.id);
 
       const newUser = {
         id: `user_${Date.now()}_${Math.random().toString(36).slice(2, 7)}_${index}`,
@@ -608,16 +608,22 @@ export class AuthManager {
     }
 
     const query = usernameOrEmail.trim().toLowerCase();
-    if (this.isLocallyDeleted(query)) {
-      return { success: false, error: 'Tài khoản này đã bị Quản trị viên xóa khỏi hệ thống.' };
-    }
-
     const users = this.getUsers();
     const found = users.find(
       u => (u.username && u.username.toLowerCase() === query) || (u.email && u.email.toLowerCase() === query)
     );
 
-    if (!found) {
+    if (found) {
+      // User actively exists in database -> clear any stale deletion tombstones
+      this.unmarkDeletedLocally(query);
+      if (found.username) this.unmarkDeletedLocally(found.username);
+      if (found.email) this.unmarkDeletedLocally(found.email);
+      if (found.id) this.unmarkDeletedLocally(found.id);
+    } else {
+      // User is not in active users list. Check if they were deleted by admin
+      if (this.isLocallyDeleted(query)) {
+        return { success: false, error: 'Tài khoản này đã bị Quản trị viên xóa khỏi hệ thống.' };
+      }
       return { success: false, error: 'Tài khoản không tồn tại. Vui lòng kiểm tra lại hoặc Đăng ký mới.' };
     }
 

@@ -87,15 +87,12 @@ export function isExamDeleted(examId) {
   return serverDeletedExams.has(String(examId).trim());
 }
 
-export function recordDbReset(studentList = []) {
+export function recordDbReset() {
   serverDbResetTime = Date.now();
-  if (Array.isArray(studentList)) {
-    for (const u of studentList) {
-      if (u.id) markUserDeleted(u.id);
-      if (u.username) markUserDeleted(u.username);
-      if (u.email) markUserDeleted(u.email);
-    }
-  }
+  // On full database reset, clear all tombstone sets so clean data can be imported without ghost bans
+  serverDeletedUsers.clear();
+  serverDeletedExams.clear();
+  serverDeletedImportedFiles.clear();
 }
 
 export function loadDatabase() {

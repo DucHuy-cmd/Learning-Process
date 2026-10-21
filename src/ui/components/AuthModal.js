@@ -277,7 +277,11 @@ export class AuthModal {
           if (isOnline) {
             const remoteResult = await cloudSyncManager.login(username, password);
             if (remoteResult && remoteResult.success && remoteResult.user) {
-              // Verified active user on server -> sync into local
+              // Verified active user on server -> clear any stale local tombstones and sync into local
+              authManager.unmarkDeletedLocally(username);
+              if (remoteResult.user.username) authManager.unmarkDeletedLocally(remoteResult.user.username);
+              if (remoteResult.user.id) authManager.unmarkDeletedLocally(remoteResult.user.id);
+              if (remoteResult.user.email) authManager.unmarkDeletedLocally(remoteResult.user.email);
               const users = authManager.getUsers();
               const idx = users.findIndex(u => u.id === remoteResult.user.id || u.username.toLowerCase() === username.toLowerCase());
               if (idx === -1) {

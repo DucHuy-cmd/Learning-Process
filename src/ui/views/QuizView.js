@@ -367,12 +367,16 @@ export class QuizView {
           storage.removeItem('toanrr_custom_imported_questions_v1');
           storage.removeItem('toanrr_custom_imported_raw_v1');
           storage.setItem('toanrr_last_imported_files_clear', String(serverResetTime));
+          storage.setItem('toanrr_deleted_imported_files_v1', JSON.stringify([]));
         }
       }
 
-      // 2. Mark any server-deleted files locally
+      // 2. Mark any server-deleted files locally (skipping files actively present on server)
+      const activeRemoteFileIds = new Set(remoteFiles.map(rf => rf?.id).filter(Boolean));
       for (const delId of serverDeleted) {
-        this._markFileDeletedLocally(delId);
+        if (!activeRemoteFileIds.has(delId)) {
+          this._markFileDeletedLocally(delId);
+        }
       }
 
       // 3. Filter remote files using local and server tombstones

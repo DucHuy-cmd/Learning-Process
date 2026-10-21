@@ -178,6 +178,61 @@ describe('AuthManager & User Accounts', () => {
     const guestRes = auth.batchImportUsers(records);
     expect(guestRes.success).toBe(false);
   });
+
+  it('allows re-uploading or re-creating accounts after resetUsersToDefault or deletion without ghost bans', () => {
+    // 1. Admin creates student sv_reborn
+    auth.quickLogin('user_admin');
+    const c1 = auth.adminCreateUser({
+      username: 'sv_reborn',
+      fullName: 'Sinh Viên Tái Sinh',
+      password: 'mypassword123',
+    });
+    expect(c1.success).toBe(true);
+
+    // 2. Admin performs full reset to default
+    const resetRes = auth.resetUsersToDefault();
+    expect(resetRes.success).toBe(true);
+    expect(auth.getUsers().some(u => u.username === 'sv_reborn')).toBe(false);
+
+    // 3. Admin re-imports/re-creates the same username
+    const c2 = auth.batchImportUsers([
+      { username: 'sv_reborn', fullName: 'Sinh Viên Tái Sinh Mới', password: 'mypassword123' }
+    ]);
+    expect(c2.success).toBe(true);
+    expect(c2.addedCount).toBe(1);
+
+    // 4. Student logs in with sv_reborn -> MUST SUCCEED and NOT report deleted by admin
+    auth.logout();
+    const loginRes = auth.login('sv_reborn', 'mypassword123');
+    expect(loginRes.success).toBe(true);
+    expect(loginRes.user.username).toBe('sv_reborn');
+
+    // 5. Test individual delete and re-import
+    auth.quickLogin('user_admin');
+    const delRes = auth.deleteUser(null, 'sv_reborn');
+    expect(delRes.success).toBe(true);
+
+    // Before re-creating: attempting to login reports deleted by admin
+    auth.logout();
+    const loginFailDeleted = auth.login('sv_reborn', 'mypassword123');
+    expect(loginFailDeleted.success).toBe(false);
+    expect(loginFailDeleted.error).toContain('đã bị Quản trị viên xóa khỏi hệ thống');
+
+    // Admin re-imports the account again
+    auth.quickLogin('user_admin');
+    const c3 = auth.adminCreateUser({
+      username: 'sv_reborn',
+      fullName: 'Sinh Viên Tái Sinh Lần 2',
+      password: 'mypassword123',
+    });
+    expect(c3.success).toBe(true);
+
+    // Login must succeed again!
+    auth.logout();
+    const loginSuccessAgain = auth.login('sv_reborn', 'mypassword123');
+    expect(loginSuccessAgain.success).toBe(true);
+    expect(loginSuccessAgain.user.username).toBe('sv_reborn');
+  });
 });
 
 describe('AiHistoryManager', () => {

@@ -161,13 +161,23 @@ export class CloudSyncManager {
               authManager.storage.setItem('trr_exam_violations_v1', JSON.stringify([]));
               authManager.storage.setItem('trr_quiz_stats_map', JSON.stringify({}));
               authManager.storage.setItem('trr_ai_sessions_v1', JSON.stringify({}));
+              authManager.storage.setItem('trr_deleted_users_v1', JSON.stringify([]));
             } catch {}
           }
         }
 
         // 2. Process tombstones of deleted accounts from server
         if (Array.isArray(data.deletedUsers)) {
+          const activeUsernames = new Set((data.users || []).map(u => (u.username || '').toLowerCase()));
+          const activeIds = new Set((data.users || []).map(u => (u.id || '').toLowerCase()));
+          const activeEmails = new Set((data.users || []).map(u => (u.email || '').toLowerCase()).filter(Boolean));
+
           for (const delId of data.deletedUsers) {
+            const cleanDel = String(delId).trim().toLowerCase();
+            if (activeUsernames.has(cleanDel) || activeIds.has(cleanDel) || activeEmails.has(cleanDel)) {
+              authManager.unmarkDeletedLocally(cleanDel);
+              continue;
+            }
             authManager.markDeletedLocally(delId);
             if (authManager.storage) {
               try {
@@ -184,14 +194,21 @@ export class CloudSyncManager {
           }
         }
 
+        // 3. Clear any stale deletion tombstones for active users returned by authoritative server
+        for (const su of (data.users || [])) {
+          if (su.username) authManager.unmarkDeletedLocally(su.username);
+          if (su.id) authManager.unmarkDeletedLocally(su.id);
+          if (su.email) authManager.unmarkDeletedLocally(su.email);
+        }
+
         const localUsers = authManager.getUsers();
 
-        // 3. Filter server users to ensure no deleted user leaks in
-        const serverUsers = data.users.filter(su => {
+        // 4. Server users are authoritative active accounts
+        const serverUsers = (data.users || []).filter(su => {
           return !authManager.isLocallyDeleted(su.id) && !authManager.isLocallyDeleted(su.username);
         });
 
-        // 4. Merge server users with local users, preserving local passwords
+        // 5. Merge server users with local users, preserving local passwords
         const mergedUsers = serverUsers.map(su => {
           const matchingLocal = localUsers.find(
             lu => lu.id === su.id || lu.username.toLowerCase() === su.username.toLowerCase()

@@ -779,8 +779,22 @@ export class AdminView {
           aiHistoryManager._writeAll({});
         }
 
+        // Wipe clean all local deletion tombstones and imported questions
+        if (authManager.storage) {
+          try {
+            authManager.storage.setItem('trr_deleted_users_v1', JSON.stringify([]));
+            authManager.storage.setItem('toanrr_deleted_imported_files_v1', JSON.stringify([]));
+            authManager.storage.setItem('toanrr_custom_imported_files_v1', JSON.stringify([]));
+            authManager.storage.setItem('toanrr_custom_imported_questions_v1', JSON.stringify([]));
+            authManager.storage.removeItem('toanrr_custom_imported_raw_v1');
+          } catch {}
+        }
+
         try {
           await cloudSyncManager.adminResetDatabase();
+          if (typeof cloudSyncManager.pushClearAllImportedFiles === 'function') {
+            await cloudSyncManager.pushClearAllImportedFiles();
+          }
           await cloudSyncManager.syncUsers(authManager);
           await cloudSyncManager.syncQuizLeaderboard(quizHistoryManager);
           await cloudSyncManager.syncExams(examManager);
