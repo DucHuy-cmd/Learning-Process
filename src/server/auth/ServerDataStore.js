@@ -339,6 +339,32 @@ export async function writeToKV() {
 }
 
 export function saveDatabase() {
+  // Sync in-memory states with Relational SQL Database tables
+  try {
+    sqlDb.tables.users.clear();
+    for (const u of serverUsers) {
+      if (u && u.id) sqlDb.tables.users.set(u.id, { ...u });
+    }
+    sqlDb.tables.exams.clear();
+    for (const e of serverExams) {
+      if (e && e.id) sqlDb.tables.exams.set(e.id, { ...e });
+    }
+    sqlDb.tables.exam_submissions.clear();
+    for (const s of serverExamSubmissions) {
+      if (s && s.id) sqlDb.tables.exam_submissions.set(s.id, { ...s });
+    }
+    sqlDb.tables.custom_questions.clear();
+    for (const q of serverCustomQuestions) {
+      if (q && q.id) sqlDb.tables.custom_questions.set(q.id, { ...q });
+    }
+    sqlDb.tables.imported_files.clear();
+    for (const f of serverImportedFiles) {
+      if (f && f.id) sqlDb.tables.imported_files.set(f.id, { ...f });
+    }
+  } catch {
+    // Graceful fallback
+  }
+
   try {
     if (!fs.existsSync(DB_DIR)) {
       fs.mkdirSync(DB_DIR, { recursive: true });
@@ -363,10 +389,6 @@ export function saveDatabase() {
     // In-memory fallback for read-only filesystem
   }
 
-  // Also write to Cloud KV if configured
-  if (isKVConfigured()) {
-    return writeToKV().catch(() => {});
-  }
   return Promise.resolve(true);
 }
 

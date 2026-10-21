@@ -558,10 +558,7 @@ export async function handleRequest(req, res) {
       }
       delete serverQuizStats[rawTarget];
       if (queryUsername) delete serverQuizStats[queryUsername];
-      saveDatabase();
-      if (isKVConfigured()) {
-        writeToKV().catch(() => {});
-      }
+      await saveDatabase();
       sendJson(res, 200, { success: true, deletedUsers: toDelete });
     } else {
       sendJson(res, 404, { success: false, error: 'Không tìm thấy tài khoản.' });
@@ -589,10 +586,7 @@ export async function handleRequest(req, res) {
       return;
     }
     found.password = newPassword;
-    saveDatabase();
-    if (isKVConfigured()) {
-      writeToKV().catch(() => {});
-    }
+    await saveDatabase();
     sendJson(res, 200, { success: true, message: `Mật khẩu của sinh viên @${found.username} đã được đặt lại thành ${newPassword}.` });
     return;
   }
@@ -635,10 +629,7 @@ export async function handleRequest(req, res) {
     serverExams.push(...DEFAULT_EXAMS);
     serverExamSubmissions.length = 0;
     serverCustomQuestions.length = 0;
-    saveDatabase();
-    if (isKVConfigured()) {
-      writeToKV().catch(() => {});
-    }
+    await saveDatabase();
     sendJson(res, 200, { success: true, message: 'Đã xóa toàn bộ database thành công.' });
     return;
   }
@@ -782,10 +773,7 @@ export async function handleRequest(req, res) {
     for (const k of Object.keys(serverQuizStats)) {
       delete serverQuizStats[k];
     }
-    saveDatabase();
-    if (isKVConfigured()) {
-      writeToKV().catch(() => {});
-    }
+    await saveDatabase();
     sendJson(res, 200, { success: true, message: 'Bảng xếp hạng đã được làm sạch.' });
     return;
   }
@@ -804,10 +792,7 @@ export async function handleRequest(req, res) {
     const targetUserId = pathname.replace('/api/quiz/leaderboard/', '').trim();
     if (serverQuizStats[targetUserId]) {
       delete serverQuizStats[targetUserId];
-      saveDatabase();
-      if (isKVConfigured()) {
-        writeToKV().catch(() => {});
-      }
+      await saveDatabase();
       sendJson(res, 200, { success: true });
     } else {
       sendJson(res, 404, { success: false, error: 'Không tìm thấy người dùng trong bảng xếp hạng.' });

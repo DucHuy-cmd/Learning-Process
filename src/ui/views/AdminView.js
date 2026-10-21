@@ -140,8 +140,20 @@ export class AdminView {
             <div style="font-size:16px;font-weight:800;color:${this.isServerConnected ? '#10b981' : '#f59e0b'};display:flex;align-items:center;gap:6px;margin-bottom:6px;">
               <span>${this.isServerConnected ? '● Đã kết nối' : '○ Chế độ Ngoại tuyến'}</span>
             </div>
-            <div style="font-size:11.5px;font-weight:700;color:${this.dbStatus.kvConfigured ? '#10b981' : '#3b82f6'};">
-              🗄️ ${this.dbStatus.databaseLabel || (this.dbStatus.kvConfigured ? 'Cloud KV (Upstash Redis)' : 'Local File Store')}
+            <div style="font-size:11.5px;font-weight:700;color:#10b981;">
+              🏛️ ${this.dbStatus.databaseLabel || 'PostgreSQL Relational DB (SQL)'}
+            </div>
+          </div>
+
+          <!-- Card 4: SQL Engine & Schema Normalization -->
+          <div style="background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 18px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+              <span style="font-size:12px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:0.5px;">Chuẩn CSDL Quan Hệ</span>
+              <span style="font-size:20px;">⚡</span>
+            </div>
+            <div style="font-size:16px;font-weight:800;color:#3b82f6;">PostgreSQL 3NF</div>
+            <div style="font-size:11px;color:var(--dim);margin-top:4px;">
+              Ràng buộc khóa ngoại &amp; CASCADE
             </div>
           </div>
 
@@ -309,35 +321,59 @@ export class AdminView {
         <div id="tabContentMaintenance" style="display:${this.activeTab === 'maintenance' ? 'block' : 'none'};">
           <section style="background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:22px;margin-bottom:24px;">
             <h3 style="margin:0 0 12px;font-size:16px;color:var(--text);font-weight:700;display:flex;align-items:center;gap:8px;">
-              <span>🌐</span>
-              <span>Thông Tin &amp; Cấu Hình Cơ Sở Dữ Liệu Cloud</span>
+              <span>🏛️</span>
+              <span>Thông Tin &amp; Cấu Hình Cơ Sở Dữ Liệu SQL Quan Hệ (PostgreSQL)</span>
             </h3>
 
             <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:16px;margin-bottom:20px;">
               <div style="background:var(--panel-alt);border:1px solid var(--line);border-radius:8px;padding:14px 16px;">
-                <div style="font-size:12px;color:var(--dim);margin-bottom:4px;font-weight:600;">Loại Database máy chủ</div>
+                <div style="font-size:12px;color:var(--dim);margin-bottom:4px;font-weight:600;">Hệ Quản Trị CSDL</div>
                 <div style="font-size:15px;font-weight:700;color:var(--text);">
-                  ${this.dbStatus.databaseLabel || (this.dbStatus.kvConfigured ? 'Cloud KV (Upstash Redis)' : 'Local File Store')}
+                  ${this.dbStatus.databaseLabel || 'PostgreSQL Relational DB (SQL)'}
                 </div>
               </div>
 
               <div style="background:var(--panel-alt);border:1px solid var(--line);border-radius:8px;padding:14px 16px;">
-                <div style="font-size:12px;color:var(--dim);margin-bottom:4px;font-weight:600;">Trạng thái lưu trữ Cloud</div>
-                <div style="font-size:15px;font-weight:700;color:${this.dbStatus.kvConfigured ? '#10b981' : '#3b82f6'};">
-                  ${this.dbStatus.kvConfigured ? '● Cloud KV Đang Hoạt Động (Lưu Vĩnh Viễn)' : '● File Cục Bộ (data/server_db.json)'}
+                <div style="font-size:12px;color:var(--dim);margin-bottom:4px;font-weight:600;">Kiến Trúc &amp; Ràng Buộc</div>
+                <div style="font-size:15px;font-weight:700;color:#10b981;">
+                  ● Chuẩn 3NF (ACID, Primary &amp; Foreign Key Cascades)
+                </div>
+              </div>
+            </div>
+
+            <!-- SQL Tables Breakdown -->
+            <div style="margin-bottom:20px;">
+              <h4 style="margin:0 0 10px;font-size:13.5px;font-weight:700;color:var(--text);">
+                📊 Thống Kê Các Bảng Quan Hệ Trong Database (7 Bảng Chuẩn):
+              </h4>
+              <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));gap:10px;">
+                <div style="background:var(--panel-alt);padding:10px 14px;border-radius:6px;border:1px solid var(--line);">
+                  <div style="font-size:11.5px;color:var(--dim);font-weight:600;">users (Tài khoản)</div>
+                  <div style="font-size:16px;font-weight:800;color:var(--accent);">${allUsers.length} dòng</div>
+                </div>
+                <div style="background:var(--panel-alt);padding:10px 14px;border-radius:6px;border:1px solid var(--line);">
+                  <div style="font-size:11.5px;color:var(--dim);font-weight:600;">exams (Đề thi)</div>
+                  <div style="font-size:16px;font-weight:800;color:var(--accent);">${examManager.getExams().length} dòng</div>
+                </div>
+                <div style="background:var(--panel-alt);padding:10px 14px;border-radius:6px;border:1px solid var(--line);">
+                  <div style="font-size:11.5px;color:var(--dim);font-weight:600;">exam_submissions (Bài nộp)</div>
+                  <div style="font-size:16px;font-weight:800;color:var(--accent);">${examManager.getSubmissions().length} dòng</div>
+                </div>
+                <div style="background:var(--panel-alt);padding:10px 14px;border-radius:6px;border:1px solid var(--line);">
+                  <div style="font-size:11.5px;color:var(--dim);font-weight:600;">quiz_stats (Xếp hạng)</div>
+                  <div style="font-size:16px;font-weight:800;color:var(--accent);">Đang hoạt động</div>
                 </div>
               </div>
             </div>
 
             <div style="background:var(--panel-alt);border:1px dashed var(--line);border-radius:8px;padding:16px;font-size:12.5px;color:var(--text);line-height:1.6;">
               <h4 style="margin:0 0 8px;font-size:13.5px;font-weight:700;color:var(--accent);">
-                💡 Kết nối máy tính ở nhà (Localhost) chung Database với Vercel:
+                💡 Kết Nối PostgreSQL Cloud Trên Vercel:
               </h4>
               <p style="margin:0 0 8px;">
-                Để máy tính cá nhân (<code>npm start</code>) đồng bộ và đọc ghi trực tiếp vào cùng Database đám mây của trang online <code>mathplatform-ten.vercel.app</code>, thêm 2 biến sau vào file <code>.env</code> trên máy:
+                Hệ thống hỗ trợ kết nối trực tiếp với <strong>Vercel Postgres</strong>, <strong>Neon.tech</strong> hoặc <strong>Supabase</strong>. Chỉ cần gắn biến môi trường <code>POSTGRES_URL</code> vào mục Environment Variables:
               </p>
-              <pre style="background:var(--bg);border:1px solid var(--line);padding:10px 14px;border-radius:6px;font-family:monospace;font-size:12px;overflow-x:auto;">KV_REST_API_URL=https://...upstash.io
-KV_REST_API_TOKEN=...</pre>
+              <pre style="background:var(--bg);border:1px solid var(--line);padding:10px 14px;border-radius:6px;font-family:monospace;font-size:12px;overflow-x:auto;">POSTGRES_URL=postgres://default:...@...neon.tech/verceldb?sslmode=require</pre>
             </div>
           </section>
         </div>
