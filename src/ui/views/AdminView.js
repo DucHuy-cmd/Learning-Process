@@ -44,11 +44,6 @@ export class AdminView {
 
     authManager.onAuthStateChanged((event, user) => {
       const isLogin = event === 'login' || Boolean(user && (user.role === 'admin' || user.username === 'admin'));
-      if (isLogin) {
-        Object.values(this.syncTasks).forEach(t => {
-          t.needsReauth = false;
-        });
-      }
       if (this.container && this.container.classList.contains('active')) {
         this.render(null, { forceSync: isLogin });
       }
@@ -200,11 +195,6 @@ export class AdminView {
             </button>
             <input type="file" id="adminFileInputRestoreDb" accept=".json" style="display:none;" />
           </div>
-        </div>
-
-        <!-- Admin Session Reauth Warning Banner -->
-        <div id="adminReauthWarningWrap">
-          ${this._renderReauthWarning()}
         </div>
 
         <!-- Tab Content 1: Students -->
@@ -433,35 +423,6 @@ export class AdminView {
   }
 
   /**
-   * Renders a prominent notice if the admin session expired due to password change.
-   * @returns {string}
-   * @private
-   */
-  _renderReauthWarning() {
-    const hasReauth = Object.values(this.syncTasks).some(t => t.needsReauth);
-    if (!hasReauth) return '';
-
-    return `
-      <div class="admin-reauth-banner" style="background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.4);border-radius:10px;padding:14px 18px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;">
-        <div style="display:flex;align-items:center;gap:12px;">
-          <span style="font-size:24px;line-height:1;">🛡️</span>
-          <div>
-            <div style="font-size:14px;font-weight:700;color:#d97706;margin-bottom:2px;">
-              Phiên quản trị viên cũ đã được hủy tự động sau khi đổi mật khẩu để bảo vệ hệ thống
-            </div>
-            <div style="font-size:12.5px;color:var(--text);line-height:1.5;">
-              Máy chủ yêu cầu xác thực lại để đồng bộ danh sách tài khoản sinh viên. Vui lòng bấm nút bên cạnh và đăng nhập lại bằng mật khẩu mới (<code>2HV0789@@</code>).
-            </div>
-          </div>
-        </div>
-        <button type="button" id="btnAdminBannerReLogin" class="btn-primary" style="padding:8px 16px;font-size:13px;font-weight:700;border-radius:6px;cursor:pointer;background:#f59e0b;color:#000;border:none;display:inline-flex;align-items:center;gap:6px;">
-          <span>🔑</span> Đăng nhập lại với mật khẩu mới
-        </button>
-      </div>
-    `;
-  }
-
-  /**
    * Renders warning banner when server accounts skew or mismatch local accounts (e.g. server only returns admin while local has students).
    * @returns {string}
    * @private
@@ -508,11 +469,11 @@ export class AdminView {
     this.isSyncing = true;
 
     // Reset task statuses
-    this.syncTasks.dbStatus = { status: 'loading', label: 'Cơ sở dữ liệu', error: null, needsReauth: false };
-    this.syncTasks.users = { status: 'loading', label: 'Tài khoản', count: 0, error: null, needsReauth: false };
-    this.syncTasks.leaderboard = { status: 'loading', label: 'Bảng điểm & Thống kê', error: null, needsReauth: false };
-    this.syncTasks.exams = { status: 'loading', label: 'Đề thi đã giao', count: 0, error: null, needsReauth: false };
-    this.syncTasks.submissions = { status: 'loading', label: 'Bài nộp', count: 0, error: null, needsReauth: false };
+    this.syncTasks.dbStatus = { status: 'loading', label: 'Cơ sở dữ liệu', error: null };
+    this.syncTasks.users = { status: 'loading', label: 'Tài khoản', count: 0, error: null };
+    this.syncTasks.leaderboard = { status: 'loading', label: 'Bảng điểm & Thống kê', error: null };
+    this.syncTasks.exams = { status: 'loading', label: 'Đề thi đã giao', count: 0, error: null };
+    this.syncTasks.submissions = { status: 'loading', label: 'Bài nộp', count: 0, error: null };
 
     this._updateSyncIndicatorUI(true);
 
@@ -542,15 +503,13 @@ export class AdminView {
 
         // Users
         if (usersRes.status === 'fulfilled' && usersRes.value && usersRes.value.success) {
-          this.syncTasks.users = { status: 'success', label: 'Tài khoản', count: usersRes.value.count || authManager.getUsers().length, error: null, needsReauth: false };
+          this.syncTasks.users = { status: 'success', label: 'Tài khoản', count: usersRes.value.count || authManager.getUsers().length, error: null };
         } else {
-          const isReauth = (usersRes.status === 'fulfilled' && usersRes.value?.needsReauth) || false;
           this.syncTasks.users = {
             status: 'error',
             label: 'Tài khoản',
             count: authManager.getUsers().length,
             error: usersRes.reason?.message || usersRes.value?.error || 'Lỗi tải tài khoản',
-            needsReauth: isReauth,
           };
         }
 
@@ -596,7 +555,8 @@ export class AdminView {
   }
 
   /**
-   * Updates sync status badge while syncing is in progress or completed.
+   * Updates only the Server Status card UI in-place.
+   * Strictly maintains 2 states: '● Đã kết nối' and '○ Chế độ Ngoại tuyến'.
    * @param {boolean} isSyncing
    * @private
    */
@@ -608,25 +568,13 @@ export class AdminView {
     let statusText = '';
     let statusColor = '#10b981';
     let showRetry = false;
-    const hasReauth = Object.values(this.syncTasks).some(t => t.needsReauth);
 
     if (isSyncing) {
       statusText = '🔄 Đang đồng bộ máy chủ...';
       statusColor = '#3b82f6';
     } else if (this.isServerConnected) {
-      const failedTasks = Object.values(this.syncTasks).filter(t => t.status === 'error');
-      if (hasReauth) {
-        statusText = '⚠️ Cần đăng nhập lại: Phiên Admin đã hết hạn do đổi mật khẩu';
-        statusColor = '#f59e0b';
-      } else if (failedTasks.length > 0) {
-        const labels = failedTasks.map(t => t.label).join(', ');
-        statusText = `⚠️ Kết nối một phần (${failedTasks.length} tác vụ lỗi: ${labels})`;
-        statusColor = '#f59e0b';
-        showRetry = true;
-      } else {
-        statusText = '● Đã kết nối & Đồng bộ hoàn tất';
-        statusColor = '#10b981';
-      }
+      statusText = '● Đã kết nối';
+      statusColor = '#10b981';
     } else {
       statusText = '○ Chế độ Ngoại tuyến';
       statusColor = '#f59e0b';
@@ -636,25 +584,12 @@ export class AdminView {
     wrap.innerHTML = `
       <div style="font-size:15px;font-weight:800;color:${statusColor};display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap;">
         <span>${statusText}</span>
-        ${hasReauth ? `
-          <button type="button" id="btnAdminReLogin" style="font-size:12px;padding:3px 10px;border-radius:6px;cursor:pointer;background:#f59e0b;color:#000;font-weight:700;border:none;box-shadow:0 1px 3px rgba(0,0,0,0.2);display:inline-flex;align-items:center;gap:4px;">
-            <span>🔑</span> Đăng nhập lại với mật khẩu mới
-          </button>
-        ` : ''}
         ${showRetry ? `<button type="button" id="btnAdminRetrySync" style="font-size:11px;padding:2px 8px;border-radius:4px;cursor:pointer;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);margin-left:4px;">🔄 Thử lại</button>` : ''}
       </div>
       <div style="font-size:11.5px;font-weight:700;color:#10b981;">
         🏛️ ${this.dbStatus.databaseLabel || 'PostgreSQL Relational DB (SQL)'}
       </div>
     `;
-
-    const reLoginBtn = wrap.querySelector('#btnAdminReLogin');
-    if (reLoginBtn) {
-      reLoginBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        window.dispatchEvent(new CustomEvent('open-auth-modal', { detail: { tab: 'login', username: 'admin' } }));
-      });
-    }
 
     const retryBtn = wrap.querySelector('#btnAdminRetrySync');
     if (retryBtn) {
@@ -680,13 +615,6 @@ export class AdminView {
 
     // 2. Update Server Status Badge
     this._updateSyncIndicatorUI(false);
-
-    // 2.5 Update Reauth Warning if any
-    const reauthWrap = this.container.querySelector('#adminReauthWarningWrap');
-    if (reauthWrap) {
-      reauthWrap.innerHTML = this._renderReauthWarning();
-      this._bindReauthWarningEvents();
-    }
 
     // 3. Update Data Skew Warning if any
     const skewWrap = this.container.querySelector('#adminDataSkewWarningWrap');
@@ -934,26 +862,11 @@ export class AdminView {
   }
 
   /**
-   * Binds re-auth warning action button.
-   * @private
-   */
-  _bindReauthWarningEvents() {
-    const bannerBtn = this.container?.querySelector('#btnAdminBannerReLogin');
-    if (bannerBtn) {
-      bannerBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        window.dispatchEvent(new CustomEvent('open-auth-modal', { detail: { tab: 'login', username: 'admin' } }));
-      });
-    }
-  }
-
-  /**
    * Binds interaction events.
    * @private
    */
   _bindEvents() {
-    // 0. Reauth & Data Skew Banner events
-    this._bindReauthWarningEvents();
+    // 0. Data Skew Banner events
     this._bindSkewWarningEvents();
 
     // 1. Search box filtering & Clear Search button

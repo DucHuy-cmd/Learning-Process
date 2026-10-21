@@ -237,4 +237,53 @@ describe('CloudSyncManager (Multi-device Cloud Sync Service)', () => {
 
     await expect(sync.fetchWithTimeout('http://localhost:3000/api/test', {}, 80)).rejects.toThrow();
   });
+
+  it('downloadDatabaseBackup() pulls authoritative cloud database when available', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        version: '1.0.0',
+        users: [{ id: 'user_admin', username: 'admin' }, { id: 'u1', username: 'student_1' }],
+        exams: [{ id: 'ex1' }],
+      }),
+    });
+
+    const res = await sync.downloadDatabaseBackup();
+    expect(res.success).toBe(true);
+    expect(res.count).toBe(2);
+    expect(res.isServerExport).toBe(true);
+  });
+
+  it('downloadDatabaseBackup() seamlessly falls back to local snapshot when server is offline', async () => {
+    globalThis.fetch = vi.fn().mockRejectedValue(new Error('Network error'));
+
+    const res = await sync.downloadDatabaseBackup();
+    expect(res.success).toBe(true);
+    expect(res.isServerExport).toBe(false);
+    expect(res.data).not.toBeNull();
+    expect(res.data.source).toBe('local_storage_backup');
+  });
+
+  it('restoreDatabaseBackup() immediately syncs to LocalStorage and pushes to server', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true, userCount: 3, examCount: 1, submissionCount: 0 }),
+    });
+
+    const backupPayload = {
+      version: '1.0.0',
+      users: [
+        { id: 'u1', username: 'sv1', fullName: 'SV 1' },
+        { id: 'u2', username: 'sv2', fullName: 'SV 2' },
+        { id: 'u3', username: 'sv3', fullName: 'SV 3' },
+      ],
+      exams: [{ id: 'exam_demo' }],
+      examSubmissions: [],
+      quizStats: {},
+    };
+
+    const res = await sync.restoreDatabaseBackup(backupPayload);
+    expect(res.success).toBe(true);
+    expect(res.userCount).toBe(3);
+  });
 });

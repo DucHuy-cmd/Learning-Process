@@ -230,7 +230,7 @@ describe('Admin Database Management & Smart Features', () => {
     expect(adminView.isSyncing).toBe(false);
 
     const wrap = container.querySelector('#adminMetricServerStatusWrap');
-    expect(wrap.textContent).toContain('Đã kết nối & Đồng bộ hoàn tất');
+    expect(wrap.textContent).toContain('● Đã kết nối');
     expect(wrap.textContent).toContain('PostgreSQL Relational DB (SQL)');
   });
 });
