@@ -54,9 +54,19 @@ export class SqlDatabaseAdapter {
       // In-memory fallback
     }
 
-    if (this.isCloudEnabled) {
+    if (this.isCloudEnabled && this.rawDdl) {
       try {
-        await this.executeRawPostgres(this.rawDdl);
+        const statements = this.rawDdl
+          .split(';')
+          .map(s => s.trim())
+          .filter(s => s.length > 0 && !s.startsWith('--'));
+        for (const stmt of statements) {
+          try {
+            await this.executeRawPostgres(stmt);
+          } catch (err) {
+            // Ignore if relation or index already exists
+          }
+        }
       } catch (err) {
         console.warn('[SqlDatabaseAdapter] Cloud Postgres init error, falling back to relational engine:', err.message);
       }
@@ -309,33 +319,50 @@ export class SqlDatabaseAdapter {
   /**
    * Executes query against cloud Postgres HTTP endpoint (e.g. Neon serverless).
    */
-  async executeRawPostgres(sql, params = []) {
-    if (!this.postgresUrl || typeof fetch === 'undefined') {
-      throw new Error('Postgres URL not configured or fetch unavailable');
+  async executeRawPostgres(sqlQuery, params = []) {
+    if (!this.postgresUrl) {
+      throw new Error('Postgres URL not configured');
     }
-    // Neon / Vercel Postgres HTTP query endpoint execution
-    const parsed = new URL(this.postgresUrl);
-    const host = parsed.hostname;
-    const queryUrl = `https://${host}/sql`;
+    // Attempt 1: @neondatabase/serverless official driver
+    try {
+      const { neon } = await import('@neondatabase/serverless');
+      const sql = neon(this.postgresUrl);
+      const res = params && params.length > 0 
+        ? await sql(sqlQuery, params)
+        : await sql(sqlQuery);
+      const rows = Array.isArray(res) ? res : (res?.rows || []);
+      return {
+        rows,
+        rowCount: rows.length,
+      };
+    } catch (neonErr) {
+      // Attempt 2: Direct HTTP Neon endpoint with Neon-Connection-String
+      try {
+        const parsed = new URL(this.postgresUrl);
+        const host = parsed.hostname;
+        const queryUrl = `https://${host}/sql`;
 
-    const res = await fetch(queryUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${parsed.password || parsed.username}`,
-      },
-      body: JSON.stringify({ query: sql, params }),
-    });
+        const res = await fetch(queryUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Neon-Connection-String': this.postgresUrl,
+            Authorization: `Bearer ${parsed.password || parsed.username}`,
+          },
+          body: JSON.stringify({ query: sqlQuery, params }),
+        });
 
-    if (!res.ok) {
-      throw new Error(`Postgres query failed with status ${res.status}`);
+        if (res.ok) {
+          const data = await res.json();
+          const rows = Array.isArray(data) ? data : (data.rows || []);
+          return {
+            rows,
+            rowCount: rows.length,
+          };
+        }
+      } catch {}
+      throw neonErr;
     }
-
-    const data = await res.json();
-    return {
-      rows: data.rows || [],
-      rowCount: (data.rows || []).length,
-    };
   }
 
   // SQL Internal parsing helpers

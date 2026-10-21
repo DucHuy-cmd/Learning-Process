@@ -168,7 +168,7 @@ export class AdminView {
         </div>
 
         <!-- Navigation Tabs -->
-        <div class="admin-nav-tabs" style="display:none;">
+        <div class="admin-nav-tabs" style="display:flex;gap:10px;border-bottom:1px solid var(--line);margin-bottom:24px;">
           <button type="button" class="btn-admin-tab ${this.activeTab === 'students' ? 'active' : ''}" data-tab="students" style="padding:10px 18px;font-size:13.5px;font-weight:700;cursor:pointer;border:none;background:transparent;color:${this.activeTab === 'students' ? 'var(--accent)' : 'var(--dim)'};border-bottom:2px solid ${this.activeTab === 'students' ? 'var(--accent)' : 'transparent'};">
             👥 Quản Lý Sinh Viên (${studentCount})
           </button>
@@ -249,9 +249,12 @@ export class AdminView {
               </p>
             </div>
 
-            <!-- Search box -->
-            <div style="position:relative;min-width:240px;">
-              <input type="text" id="adminUserSearchInput" value="${this.searchQuery}" placeholder="🔍 Tìm theo tên, username, lớp..." style="width:100%;box-sizing:border-box;padding:7px 12px;font-size:12.5px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--text);">
+            <!-- Search and export -->
+            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+              <input type="text" id="adminUserSearchInput" value="${this.searchQuery}" placeholder="🔍 Tìm theo tên, username, lớp..." style="box-sizing:border-box;padding:7px 12px;font-size:12.5px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--text);min-width:220px;">
+              <button type="button" id="btnAdminExportUsers" class="btn-sm" style="padding:7px 14px;font-size:12px;font-weight:600;background:var(--panel-alt);border:1px solid var(--line);border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:6px;color:var(--text);">
+                <span>📥</span> Xuất Danh Sách (.csv)
+              </button>
             </div>
           </div>
 
@@ -581,6 +584,32 @@ export class AdminView {
       });
     }
 
+    // Export Users CSV
+    const btnExportUsers = this.container.querySelector('#btnAdminExportUsers');
+    if (btnExportUsers) {
+      btnExportUsers.addEventListener('click', () => {
+        const users = authManager.getUsers().filter(u => u.username !== 'admin' && u.id !== 'user_admin');
+        if (users.length === 0) {
+          this._showAlert('Chưa có tài khoản sinh viên nào để xuất file!', 'error');
+          return;
+        }
+        let csv = '\uFEFFusername,password,fullName,className,email\r\n';
+        for (const u of users) {
+          csv += `"${u.username || ''}","${u.password || '123456'}","${u.fullName || ''}","${u.className || 'Sinh viên'}","${u.email || ''}"\r\n`;
+        }
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Danh_Sach_Sinh_Vien_${new Date().toISOString().slice(0, 10)}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        this._showAlert(`✓ Đã xuất danh sách ${users.length} sinh viên thành công!`, 'success');
+      });
+    }
+
     // 2. Add student account form
     const formAdd = this.container.querySelector('#adminViewAddUserForm');
     if (formAdd) {
@@ -639,6 +668,12 @@ export class AdminView {
       fileInputUsers.addEventListener('change', async (e) => {
         const file = e.target.files && e.target.files[0];
         if (!file) return;
+
+        if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+          this._showAlert('⚠️ File bạn chọn là file Excel (.xlsx). Vui lòng mở file bằng Excel -> Chọn "Save As" -> Chọn định dạng "CSV (Comma delimited) (*.csv)" hoặc tải "File Mẫu (.csv)" để nạp tài khoản nhé!', 'error');
+          fileInputUsers.value = '';
+          return;
+        }
 
         const originalBtnText = btnTriggerImport ? btnTriggerImport.innerHTML : '';
         if (btnTriggerImport) {
@@ -1030,12 +1065,13 @@ export class AdminView {
     normHeaders.forEach((h, idx) => {
       if (colUsername === -1 && (
         h === 'username' || h === 'user' || h === 'account' || h === 'tendangnhap' ||
-        h === 'taikhoan' || h === 'mssv' || h === 'masv' || h === 'masinhvien' || h === 'id'
+        h === 'taikhoan' || h === 'mssv' || h === 'masv' || h === 'masinhvien' ||
+        h === 'masosinhvien' || h === 'ma' || h === 'id'
       )) {
         colUsername = idx;
       } else if (colFullName === -1 && (
         h === 'fullname' || h === 'hovaten' || h === 'hoten' || h === 'tensinhvien' ||
-        h === 'name' || h === 'hovatensinhvien' || h === 'ten'
+        h === 'name' || h === 'hovatensinhvien' || h === 'ten' || h === 'sinhvien'
       )) {
         colFullName = idx;
       } else if (colPassword === -1 && (
@@ -1043,7 +1079,7 @@ export class AdminView {
       )) {
         colPassword = idx;
       } else if (colClass === -1 && (
-        h === 'class' || h === 'classname' || h === 'lop' || h === 'donvi' || h === 'lopdonvi'
+        h === 'class' || h === 'classname' || h === 'lop' || h === 'lophoc' || h === 'donvi' || h === 'lopdonvi'
       )) {
         colClass = idx;
       } else if (colEmail === -1 && (

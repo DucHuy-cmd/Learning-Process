@@ -232,4 +232,33 @@ describe('AdminView (Dedicated Database & Student Management Tab)', () => {
     expect(batchSpy).toHaveBeenCalled();
     batchSpy.mockRestore();
   });
+
+  it('renders visible tabs and switches between Students, Gradebook, and Maintenance', async () => {
+    authManager.quickLogin('user_admin');
+    await adminView.render();
+
+    const tabsNav = container.querySelector('.admin-nav-tabs');
+    expect(tabsNav).not.toBeNull();
+    expect(tabsNav.style.display).not.toBe('none');
+
+    // Switch to Gradebook tab
+    const gradebookTabBtn = container.querySelector('.btn-admin-tab[data-tab="gradebook"]');
+    expect(gradebookTabBtn).not.toBeNull();
+    gradebookTabBtn.click();
+    expect(adminView.activeTab).toBe('gradebook');
+
+    // Switch to Maintenance tab
+    const maintenanceTabBtn = container.querySelector('.btn-admin-tab[data-tab="maintenance"]');
+    expect(maintenanceTabBtn).not.toBeNull();
+    maintenanceTabBtn.click();
+    expect(adminView.activeTab).toBe('maintenance');
+  });
+
+  it('provides student list export to CSV button', async () => {
+    authManager.quickLogin('user_admin');
+    await adminView.render();
+
+    const btnExport = container.querySelector('#btnAdminExportUsers');
+    expect(btnExport).not.toBeNull();
+  });
 });

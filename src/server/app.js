@@ -42,6 +42,8 @@ import {
   recordImportedFilesReset,
   recordDbReset,
   saveDatabase, 
+  fetchFromPostgres,
+  saveToPostgres,
   isKVConfigured, 
   fetchFromKV, 
   writeToKV,
@@ -234,8 +236,12 @@ export async function handleRequest(req, res) {
     return;
   }
 
-  // Sync latest data from Vercel KV for Serverless execution
-  if (isKVConfigured()) {
+  // Sync latest data from PostgreSQL (Neon) or Vercel KV for Serverless execution
+  if (sqlDb.isCloudEnabled) {
+    try {
+      await fetchFromPostgres();
+    } catch {}
+  } else if (isKVConfigured()) {
     try {
       await fetchFromKV();
     } catch {}
