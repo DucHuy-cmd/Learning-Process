@@ -310,4 +310,36 @@ describe('AdminView (Dedicated Database & Student Management Tab)', () => {
     expect(container.querySelector('#btnAdminReLogin')).toBeNull();
     expect(container.querySelector('#adminReauthWarningWrap').textContent.trim()).toBe('');
   });
+
+  it('renders filter indicator banner when search is active and resets cleanly when clicked', async () => {
+    authManager.quickLogin('user_admin');
+    authManager.adminCreateUser({ username: 'sv_alice', fullName: 'Alice Student', email: 'alice@test.com', password: '123' });
+    authManager.adminCreateUser({ username: 'sv_bob', fullName: 'Bob Student', email: 'bob@test.com', password: '123' });
+
+    await adminView.render();
+
+    const searchInput = container.querySelector('#adminUserSearchInput');
+    expect(searchInput).not.toBeNull();
+
+    // Type 'admin' into search filter
+    searchInput.value = 'admin';
+    searchInput.dispatchEvent(new window.Event('input'));
+
+    // Check filter indicator appears
+    const banner = container.querySelector('#adminActiveFilterIndicatorWrap');
+    expect(banner.textContent).toContain('Đang lọc theo từ khóa: "admin"');
+
+    const rowsBefore = container.querySelectorAll('.admin-user-row');
+    expect(rowsBefore.length).toBe(1); // Only admin is visible
+
+    // Click reset filter button on banner
+    const resetBtn = container.querySelector('#btnAdminResetFilterBanner');
+    expect(resetBtn).not.toBeNull();
+    resetBtn.click();
+
+    // Search query is reset and all students are visible again
+    expect(searchInput.value).toBe('');
+    const rowsAfter = container.querySelectorAll('.admin-user-row');
+    expect(rowsAfter.length).toBeGreaterThan(1);
+  });
 });

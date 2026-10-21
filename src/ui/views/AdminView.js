@@ -244,12 +244,15 @@ export class AdminView {
               <p style="margin:0;font-size:12px;color:var(--dim);">
                 Quản trị viên có toàn quyền kiểm tra, xem thông tin và xóa bỏ các tài khoản kiểm thử hoặc sinh viên không hợp lệ.
               </p>
+              <div id="adminActiveFilterIndicatorWrap">
+                ${this._renderActiveFilterIndicator(allUsers)}
+              </div>
             </div>
 
             <!-- Search and export -->
             <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
               <div id="adminSearchInputWrap" style="position:relative;display:inline-flex;align-items:center;">
-                <input type="text" id="adminUserSearchInput" value="${this._escapeHtml(this.searchQuery)}" placeholder="🔍 Tìm theo tên, username, lớp..." style="box-sizing:border-box;padding:7px 30px 7px 12px;font-size:12.5px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--text);min-width:240px;">
+                <input type="search" id="adminUserSearchInput" name="search_students_query_filter" value="${this._escapeHtml(this.searchQuery)}" placeholder="🔍 Tìm theo tên, username, lớp..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" data-form-type="other" style="box-sizing:border-box;padding:7px 30px 7px 12px;font-size:12.5px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--text);min-width:240px;">
                 ${this.searchQuery ? `
                   <button type="button" id="btnAdminClearSearch" title="Xóa bộ lọc tìm kiếm" style="position:absolute;right:8px;background:none;border:none;cursor:pointer;color:var(--dim);font-size:13px;padding:2px 4px;font-weight:bold;line-height:1;">✕</button>
                 ` : ''}
@@ -301,6 +304,29 @@ export class AdminView {
       (u.className || '').toLowerCase().includes(q) ||
       (u.email || '').toLowerCase().includes(q)
     );
+  }
+
+  /**
+   * Renders an interactive banner when accounts are filtered by search keyword.
+   * @param {Array<Object>} allUsers
+   * @returns {string}
+   * @private
+   */
+  _renderActiveFilterIndicator(allUsers) {
+    const q = (this.searchQuery || '').trim();
+    if (!q) return '';
+    const filtered = this._getFilteredUsers(allUsers);
+    const totalCount = Array.isArray(allUsers) ? allUsers.length : 0;
+    const studentCount = allUsers.filter(u => u.username !== 'admin' && u.id !== 'user_admin').length;
+
+    return `
+      <div style="margin-top:8px;padding:6px 12px;background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.3);border-radius:6px;display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--text);flex-wrap:wrap;">
+        <span>🔍 Đang lọc theo từ khóa: <strong style="color:var(--accent);">"${this._escapeHtml(q)}"</strong> (${filtered.length} / ${totalCount} tài khoản)</span>
+        <button type="button" id="btnAdminResetFilterBanner" style="background:#ef4444;color:#fff;border:none;border-radius:4px;padding:3px 8px;font-size:11px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:4px;">
+          ✕ Hiện lại tất cả ${studentCount} sinh viên
+        </button>
+      </div>
+    `;
   }
 
   /**
@@ -598,6 +624,22 @@ export class AdminView {
       titleEl.textContent = this._getUsersTableTitleText(allUsers);
     }
 
+    // 1.5 Update Active Filter Indicator Banner
+    const filterIndicatorWrap = this.container.querySelector('#adminActiveFilterIndicatorWrap');
+    if (filterIndicatorWrap) {
+      filterIndicatorWrap.innerHTML = this._renderActiveFilterIndicator(allUsers);
+      const resetBtn = filterIndicatorWrap.querySelector('#btnAdminResetFilterBanner');
+      if (resetBtn) {
+        resetBtn.addEventListener('click', () => {
+          const searchInput = this.container.querySelector('#adminUserSearchInput');
+          if (searchInput) searchInput.value = '';
+          this.searchQuery = '';
+          this._updateUserTableAndTitle();
+          if (searchInput) searchInput.focus();
+        });
+      }
+    }
+
     // 2. Update Search Clear Button visibility
     const searchWrap = this.container.querySelector('#adminSearchInputWrap');
     let clearBtn = this.container.querySelector('#btnAdminClearSearch');
@@ -807,9 +849,32 @@ export class AdminView {
     // 1. Search box filtering & Clear Search button
     const searchInput = this.container.querySelector('#adminUserSearchInput');
     if (searchInput) {
+      // Clear autofill if browser mistakenly dumped credentials into search filter
+      if (!this.searchQuery && searchInput.value) {
+        searchInput.value = '';
+      }
+
+      // Check again after short delay for delayed password manager autofill
+      setTimeout(() => {
+        if (!this.searchQuery && searchInput && searchInput.value) {
+          searchInput.value = '';
+          this._updateUserTableAndTitle();
+        }
+      }, 200);
+
       searchInput.addEventListener('input', (e) => {
         this.searchQuery = e.target.value;
         this._updateUserTableAndTitle();
+      });
+    }
+
+    const resetFilterBannerBtn = this.container.querySelector('#btnAdminResetFilterBanner');
+    if (resetFilterBannerBtn) {
+      resetFilterBannerBtn.addEventListener('click', () => {
+        if (searchInput) searchInput.value = '';
+        this.searchQuery = '';
+        this._updateUserTableAndTitle();
+        if (searchInput) searchInput.focus();
       });
     }
 
