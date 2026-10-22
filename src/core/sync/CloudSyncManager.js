@@ -377,16 +377,21 @@ export class CloudSyncManager {
     if (!authManager || typeof fetch === 'undefined') return true;
     const currentUser = authManager.getCurrentUser();
     if (!currentUser) return true;
-    if (currentUser.id === 'user_admin' || currentUser.username === 'admin') return true;
 
     try {
       const url = `${this.baseUrl}/api/auth/verify?userId=${encodeURIComponent(currentUser.id)}&username=${encodeURIComponent(currentUser.username)}`;
-      const res = await fetch(url);
-      if (res.status === 404 || res.status === 401) {
-        console.warn('[CloudSync] Session verification failed. User does not exist on server. Logging out.');
+      const isAdmin = Boolean(currentUser.role === 'admin' || currentUser.username === 'admin' || currentUser.id === 'user_admin');
+      const headers = isAdmin ? this._getAdminAuthHeaders() : this._getStudentAuthHeaders();
+      const res = await this.fetchWithTimeout(url, { headers });
+      if (res.status === 404 || res.status === 401 || res.status === 403) {
+        console.warn('[CloudSync] Session verification failed or revoked. Logging out.');
         authManager.logout();
+        this.clearAuthToken();
         if (typeof window !== 'undefined' && window.alert) {
-          window.alert('⚠️ Tài khoản của bạn đã bị Quản trị viên xóa khỏi hệ thống. Bạn đã được tự động chuyển về chế độ Khách.');
+          window.alert(isAdmin
+            ? '🔒 Toàn bộ phiên đăng nhập Quản trị viên đã được đăng xuất trên hệ thống. Vui lòng đăng nhập lại.'
+            : '⚠️ Tài khoản của bạn đã bị Quản trị viên xóa khỏi hệ thống. Bạn đã được tự động chuyển về chế độ Khách.'
+          );
         }
         return false;
       }
@@ -394,8 +399,12 @@ export class CloudSyncManager {
         const data = await res.json();
         if (data && data.valid === false) {
           authManager.logout();
+          this.clearAuthToken();
           if (typeof window !== 'undefined' && window.alert) {
-            window.alert('⚠️ Tài khoản của bạn đã bị Quản trị viên xóa khỏi hệ thống. Bạn đã được tự động chuyển về chế độ Khách.');
+            window.alert(isAdmin
+              ? '🔒 Phiên đăng nhập Quản trị viên không hợp lệ hoặc đã bị thu hồi. Vui lòng đăng nhập lại.'
+              : '⚠️ Tài khoản của bạn đã bị Quản trị viên xóa khỏi hệ thống. Bạn đã được tự động chuyển về chế độ Khách.'
+            );
           }
           return false;
         }
@@ -649,15 +658,6 @@ export class CloudSyncManager {
       return token;
     }
 
-    try {
-      const res = await this.login('admin', '2HV0789@@');
-      if (res && res.success && res.token) {
-        this.setAuthToken(res.token);
-        return res.token;
-      }
-    } catch {
-      // Ignore network errors here; caller will handle
-    }
     return this.getAuthToken();
   }
 

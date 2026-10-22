@@ -149,27 +149,6 @@ export class AdminView {
               </div>
             </div>
           </div>
-
-          <!-- Card 4: SQL Engine & Schema Normalization -->
-          <div style="background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 18px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-              <span style="font-size:12px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:0.5px;">Chuẩn CSDL Quan Hệ</span>
-              <span style="font-size:20px;">⚡</span>
-            </div>
-            <div style="font-size:16px;font-weight:800;color:#3b82f6;">PostgreSQL 3NF</div>
-            <div style="font-size:11px;color:var(--dim);margin-top:4px;">
-              Ràng buộc khóa ngoại &amp; CASCADE
-            </div>
-          </div>
-
-          <!-- Card 3: System Admin -->
-          <div style="background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 18px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-              <span style="font-size:12px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:0.5px;">Quản Trị Hệ Thống</span>
-              <span style="font-size:20px;">👑</span>
-            </div>
-            <div style="font-size:18px;font-weight:800;color:#f59e0b;">@admin</div>
-          </div>
         </div>
 
         <!-- Database Backup & Disaster Recovery Section -->

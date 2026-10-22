@@ -162,7 +162,7 @@ describe('Admin Exam Import & Dedicated Answer Key Test Suite', () => {
     expect(container.textContent).toContain('Chưa có câu hỏi tự soạn nào');
   });
 
-  it('creates an exam from imported custom questions and automatically opens Admin Answer Key modal', () => {
+  it('creates an exam from imported custom questions without automatically opening Admin Answer Key modal (teacher opens on demand)', () => {
     const quizView = new QuizView({ container });
     quizView.setTab('studio');
     quizView.studioSubTab = 'assign';
@@ -197,8 +197,13 @@ describe('Admin Exam Import & Dedicated Answer Key Test Suite', () => {
     expect(createdExam.examCode).toBe('TRR-GK-2026');
     expect(createdExam.customQuestions.length).toBe(5);
 
-    // Verify Admin Answer Key modal popped up immediately
-    expect(quizView.adminAnswerKeyExamId).toBe(createdExam.id);
+    // Verify Admin Answer Key modal does NOT pop up automatically upon assign
+    expect(quizView.adminAnswerKeyExamId).toBeNull();
+    expect(container.querySelector('.gradebook-modal-card')).toBeNull();
+
+    // Teacher can open Answer Key modal anytime from Assigned Exams table via "File Đáp Án" button
+    quizView.adminAnswerKeyExamId = createdExam.id;
+    quizView.render();
     const modal = container.querySelector('.gradebook-modal-card');
     expect(modal).not.toBeNull();
     expect(modal.textContent).toContain('HỒ SƠ ĐÁP ÁN & BAREM CHẤM DÀNH CHO ADMIN');
@@ -426,8 +431,8 @@ describe('Admin Exam Import & Dedicated Answer Key Test Suite', () => {
     const assignBtn = container.querySelector('#btnCreateAndAssignExam');
     assignBtn.click();
 
-    expect(quizView.adminAnswerKeyExamId).not.toBeNull();
-    const createdExam = examManager.getExamById(quizView.adminAnswerKeyExamId);
+    expect(quizView.adminAnswerKeyExamId).toBeNull();
+    const createdExam = examManager.getExams().find(e => e.title === 'Đề Thi 10 Câu Ngẫu Nhiên');
     expect(createdExam).not.toBeNull();
     expect(createdExam.questionIds.length).toBe(10);
   });
@@ -530,8 +535,8 @@ describe('Admin Exam Import & Dedicated Answer Key Test Suite', () => {
     const assignBtn = container.querySelector('#btnCreateAndAssignExam');
     assignBtn.click();
 
-    expect(quizView.adminAnswerKeyExamId).not.toBeNull();
-    const createdExam = examManager.getExamById(quizView.adminAnswerKeyExamId);
+    expect(quizView.adminAnswerKeyExamId).toBeNull();
+    const createdExam = examManager.getExams().find(e => e.title === 'Đề Thi Điền Số Câu 12');
     expect(createdExam).not.toBeNull();
     expect(createdExam.questionIds.length).toBe(12);
 
@@ -605,8 +610,8 @@ describe('Admin Exam Import & Dedicated Answer Key Test Suite', () => {
     const btnAssign = container.querySelector('#btnCreateAndAssignExam');
     btnAssign.click();
 
-    expect(quizView.adminAnswerKeyExamId).not.toBeNull();
-    const combinedExam = examManager.getExamById(quizView.adminAnswerKeyExamId);
+    expect(quizView.adminAnswerKeyExamId).toBeNull();
+    const combinedExam = examManager.getExams().find(e => e.title === 'Đề Thi Kết Hợp Bộ A (10 câu) và Bộ B (10 câu)');
     expect(combinedExam).not.toBeNull();
     expect(combinedExam.questionIds.length).toBe(20);
 
@@ -793,8 +798,8 @@ describe('Admin Exam Import & Dedicated Answer Key Test Suite', () => {
     // Create Đề 1
     const btnCreate1 = container.querySelector('#btnCreateAndAssignExam');
     btnCreate1.click();
-    expect(quizView.adminAnswerKeyExamId).not.toBeNull();
-    const exam1 = examManager.getExamById(quizView.adminAnswerKeyExamId);
+    const exam1 = examManager.getExams().find(e => e.title === 'Đề 1');
+    expect(exam1).toBeDefined();
     expect(exam1.title).toBe('Đề 1');
 
     // Verify alert message contains only title, question count, duration, target, and closing line (NO "Nguồn:")
@@ -805,8 +810,7 @@ describe('Admin Exam Import & Dedicated Answer Key Test Suite', () => {
     expect(alertSpy).toHaveBeenCalledWith(expect.stringContaining('Đề thi đã được chuyển vào mục "Quản Lý Đề Thi"'));
     expect(alertSpy).not.toHaveBeenCalledWith(expect.stringContaining('Nguồn:'));
 
-    // 4. Close key modal, next exam defaults to "Đề 2"
-    quizView.adminAnswerKeyExamId = null;
+    // 4. Next exam defaults to "Đề 2"
     quizView.render();
 
     const titleInput2 = container.querySelector('#txtAssignTitle');
@@ -815,11 +819,11 @@ describe('Admin Exam Import & Dedicated Answer Key Test Suite', () => {
     // Create Đề 2
     const btnCreate2 = container.querySelector('#btnCreateAndAssignExam');
     btnCreate2.click();
-    const exam2 = examManager.getExamById(quizView.adminAnswerKeyExamId);
+    const exam2 = examManager.getExams().find(e => e.title === 'Đề 2');
+    expect(exam2).toBeDefined();
     expect(exam2.title).toBe('Đề 2');
 
     // 5. Next defaults to "Đề 3"
-    quizView.adminAnswerKeyExamId = null;
     quizView.render();
     const titleInput3 = container.querySelector('#txtAssignTitle');
     expect(titleInput3.value).toBe('Đề 3');

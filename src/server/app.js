@@ -56,6 +56,7 @@ import {
   getServerAdminUser,
   getAdminPassword,
   setAdminPassword,
+  invalidateAllAdminSessions,
   getAdminTokenVersion,
   getAdminPasswordChangedAt,
   resetAdminSessionState,
@@ -362,13 +363,13 @@ export function getRequestAuth(req) {
         session.id === 'user_admin'
       );
 
-      // Enforce global session invalidation on password change
+      // Enforce global session invalidation on password change or admin revocation
       if (isAdmin) {
         const curVer = getAdminTokenVersion();
         const curChangedAt = getAdminPasswordChangedAt();
         if (
-          (curVer > 1 && session.tokenVersion && session.tokenVersion < curVer) ||
-          (curChangedAt > 0 && session.pwdChangedAt && session.pwdChangedAt < curChangedAt)
+          (curVer > 1 && (!session.tokenVersion || session.tokenVersion < curVer)) ||
+          (curChangedAt > 0 && (!session.pwdChangedAt || session.pwdChangedAt < curChangedAt))
         ) {
           return { authenticated: false, user: null, isAdmin: false, hasToken: true, revoked: true };
         }
@@ -1063,21 +1064,52 @@ export async function handleRequest(req, res) {
 
   // Route: GET /api/auth/verify
   if (req.method === 'GET' && pathname === '/api/auth/verify') {
+    const auth = getRequestAuth(req);
     const userId = parsedUrl.searchParams.get('userId');
-    const username = parsedUrl.searchParams.get('username');
+    const username = (parsedUrl.searchParams.get('username') || '').toLowerCase();
+    const isAdminTarget = (userId === 'user_admin' || username === 'admin');
+
+    if (auth.hasToken && auth.revoked) {
+      sendJson(res, 401, { valid: false, error: 'SESSION_REVOKED', message: 'Phiên làm việc đã bị thu hồi hoặc đăng xuất.' });
+      return;
+    }
+
+    if (isAdminTarget) {
+      if (process.env.NODE_ENV !== 'test' || auth.hasToken) {
+        if (!auth.authenticated || !auth.isAdmin) {
+          sendJson(res, 401, { valid: false, error: 'SESSION_REVOKED', message: 'Phiên làm việc Quản trị viên đã hết hạn hoặc bị thu hồi.' });
+          return;
+        }
+      }
+      sendJson(res, 200, { valid: true });
+      return;
+    }
+
     if (!userId && !username) {
       sendJson(res, 400, { valid: false, error: 'Thiếu thông tin người dùng.' });
       return;
     }
     const exists = serverUsers.some(u =>
       (userId && u.id === userId) ||
-      (username && u.username.toLowerCase() === username.toLowerCase())
+      (username && u.username.toLowerCase() === username)
     );
     if (!exists) {
       sendJson(res, 404, { valid: false, error: 'Tài khoản không tồn tại trên hệ thống.' });
     } else {
       sendJson(res, 200, { valid: true });
     }
+    return;
+  }
+
+  // Route: POST /api/admin/revoke-all-sessions (Quản trị viên thu hồi toàn bộ phiên đăng nhập trên mọi thiết bị)
+  if (req.method === 'POST' && pathname === '/api/admin/revoke-all-sessions') {
+    if (!isRequestFromAdmin(req)) {
+      sendJson(res, 403, { success: false, error: 'Chỉ Quản trị viên mới có quyền thực hiện thao tác này.' });
+      return;
+    }
+    invalidateAllAdminSessions();
+    await saveDatabase();
+    sendJson(res, 200, { success: true, message: 'Đã đăng xuất toàn bộ tài khoản Quản trị viên trên mọi thiết bị.' });
     return;
   }
 

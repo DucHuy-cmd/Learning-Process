@@ -26,6 +26,7 @@ export const STORAGE_KEY_CURRENT = 'trr_current_user';
 export const STORAGE_KEY_USERS = 'trr_registered_users';
 export const STORAGE_KEY_DELETED = 'trr_deleted_users_v1';
 export const STORAGE_KEY_DB_RESET = 'trr_last_db_reset';
+export const ADMIN_GLOBAL_LOGOUT_BEFORE = 1792637050000;
 
 export class AuthManager {
   /**
@@ -237,10 +238,17 @@ export class AuthManager {
       if (activeUser) {
         try {
           const parsed = JSON.parse(activeUser);
-          if (parsed && (parsed.id === 'user_admin' || parsed.username === 'admin')) {
-            this.currentUser = { ...parsed, ...DEMO_USERS[0], role: 'admin', username: 'admin' };
-            delete this.currentUser.password;
-            this.storage.setItem(STORAGE_KEY_CURRENT, JSON.stringify(this.currentUser));
+          if (parsed && (parsed.id === 'user_admin' || parsed.username === 'admin' || parsed.role === 'admin')) {
+            const loggedInAt = Number(parsed.loggedInAt || 0);
+            if (!loggedInAt || loggedInAt < ADMIN_GLOBAL_LOGOUT_BEFORE) {
+              this.currentUser = null;
+              this.storage.removeItem(STORAGE_KEY_CURRENT);
+              this.storage.removeItem('trr_auth_token');
+            } else {
+              this.currentUser = { ...parsed, ...DEMO_USERS[0], role: 'admin', username: 'admin' };
+              delete this.currentUser.password;
+              this.storage.setItem(STORAGE_KEY_CURRENT, JSON.stringify(this.currentUser));
+            }
           } else if (parsed && parsed.id) {
             // Check if user still exists in registered list and is not deleted
             const isDel = this.isLocallyDeleted(parsed.id) || this.isLocallyDeleted(parsed.username);
@@ -342,6 +350,9 @@ export class AuthManager {
     }
 
     this.currentUser = { ...target };
+    if (target.role === 'admin' || target.username === 'admin' || target.id === 'user_admin') {
+      this.currentUser.loggedInAt = Date.now();
+    }
     this._persistCurrent();
     this._notifyListeners('login', this.currentUser);
     return { success: true, user: this.currentUser };
@@ -649,6 +660,9 @@ export class AuthManager {
 
     this.currentUser = { ...found };
     delete this.currentUser.password; // Do not expose password hash in memory
+    if (found.role === 'admin' || found.username === 'admin' || found.id === 'user_admin') {
+      this.currentUser.loggedInAt = Date.now();
+    }
 
     this._persistCurrent();
     this._notifyListeners('login', this.currentUser);
@@ -741,6 +755,15 @@ export class AuthManager {
       }
     }
     this._notifyListeners('logout', null);
+  }
+
+  /**
+   * Immediately invalidates and logs out any local admin session.
+   */
+  logoutAdminGlobally() {
+    if (this.currentUser && (this.currentUser.role === 'admin' || this.currentUser.username === 'admin' || this.currentUser.id === 'user_admin')) {
+      this.logout();
+    }
   }
 
   /**

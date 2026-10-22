@@ -1670,7 +1670,7 @@ export class QuizView {
 
     return `
       <!-- Studio Subtab Navigation (3 Tabs) -->
-      <div style="display:flex;gap:10px;margin-bottom:20px;border-bottom:1px solid var(--line);padding-bottom:10px;flex-wrap:wrap;">
+      <div class="studio-subtabs-nav no-print" style="display:flex;gap:10px;margin-bottom:20px;border-bottom:1px solid var(--line);padding-bottom:10px;flex-wrap:wrap;">
         <button type="button" class="btn-tab ${(this.studioSubTab === 'distribute' || (this.studioSubTab !== 'publish' && this.studioSubTab !== 'print' && this.studioSubTab !== 'assign')) ? 'active' : ''}" id="tabStudioDistribute" style="padding:8px 18px;font-size:13.5px;font-weight:700;border-radius:6px;cursor:pointer;">
           📁 1. Nạp File Word Đề Thi
         </button>
@@ -2028,7 +2028,7 @@ export class QuizView {
               </div>
               <button type="button" class="btn-primary btn-studio-assign" id="btnCreateAndAssignExam" style="cursor:pointer;">
                 <span class="btn-assign-icon">🚀</span>
-                <span class="btn-assign-text">Phát Đề Cho Sinh Viên &amp; Xuất File Đáp Án</span>
+                <span class="btn-assign-text">Phát Đề Cho Sinh Viên</span>
               </button>
             </div>
           </div>
@@ -4551,25 +4551,10 @@ export class QuizView {
 
           if (result.success) {
             this.gradebookExamId = null;
-            this.adminAnswerKeyExamId = result.exam.id;
-
-            // Automatically export answer key file as indicated on the button
-            let fileExportSuccess = false;
-            let fileExportError = null;
-            try {
-              this._exportAdminAnswerKeyToCsv(result.exam.id);
-              fileExportSuccess = true;
-            } catch (expErr) {
-              fileExportError = expErr.message;
-            }
+            this.adminAnswerKeyExamId = null;
 
             const targetLabel = this._formatExamTarget(assignedTo);
-
-            if (fileExportSuccess) {
-              this._showAlert(`🎉 Tạo & phát đề thi thành công và đã xuất File Đáp Án!\n\nĐề thi: "${title}" (Mã: ${result.exam.examCode || 'N/A'})\nSố câu: ${questionIds.length} câu\nThời lượng: ${durationMinutes} phút\nĐối tượng: ${targetLabel}\n\nĐề thi đã được chuyển vào mục "Quản Lý Đề Thi". File đáp án chi tiết đã được tự động tải về máy của bạn.`);
-            } else {
-              this._showAlert(`🎉 Đề thi đã phát thành công!\n\nĐề thi: "${title}" (Mã: ${result.exam.examCode || 'N/A'})\nSố câu: ${questionIds.length} câu\nThời lượng: ${durationMinutes} phút\nĐối tượng: ${targetLabel}\n\nĐề thi đã được chuyển vào mục "Quản Lý Đề Thi". (Lưu ý: Không thể tự động tải file đáp án: ${fileExportError || 'lỗi'}).`);
-            }
+            this._showAlert(`🎉 Phát đề thi thành công!\n\nĐề thi: "${title}" (Mã: ${result.exam.examCode || 'N/A'})\nSố câu: ${questionIds.length} câu\nThời lượng: ${durationMinutes} phút\nĐối tượng: ${targetLabel}\n\nĐề thi đã được chuyển vào mục "Quản Lý Đề Thi". Bạn có thể bấm nút "🔑 File Đáp Án" trong bảng bất kỳ lúc nào để xem hoặc tải đáp án.`);
 
             this.studioAssignTitle = null;
             this.studioAssignExamCode = null;

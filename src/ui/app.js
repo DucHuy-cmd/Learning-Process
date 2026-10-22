@@ -510,7 +510,7 @@ export class App {
       // Heartbeat session check: periodically checks if user account was deleted on server
       if (this._syncHeartbeatTimer) clearInterval(this._syncHeartbeatTimer);
       this._syncHeartbeatTimer = setInterval(() => {
-        if (authManager.isLoggedIn() && !authManager.isAdmin()) {
+        if (authManager.isLoggedIn()) {
           cloudSyncManager.verifyCurrentUser(authManager);
         }
       }, 12000);
@@ -808,7 +808,7 @@ export class App {
     }
 
     // Verify session validity when navigating between views
-    if (authManager.isLoggedIn() && !authManager.isAdmin()) {
+    if (authManager.isLoggedIn()) {
       try {
         cloudSyncManager.verifyCurrentUser(authManager);
       } catch {}

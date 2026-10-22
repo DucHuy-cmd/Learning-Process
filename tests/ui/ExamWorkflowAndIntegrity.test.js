@@ -145,7 +145,7 @@ describe('Exam Workflow, Student Identity Resolution & Lockdown Integrity Tests'
       expect(createExamSpy).toHaveBeenCalledTimes(1);
     });
 
-    it('automatically triggers answer key CSV export upon successful exam creation', () => {
+    it('does not automatically trigger answer key CSV export upon exam distribution (teacher exports on demand)', () => {
       authManager.login('admin', '2HV0789@@');
       const quizView = new QuizView({ container });
       quizView.setTab('studio');
@@ -164,7 +164,7 @@ describe('Exam Workflow, Student Identity Resolution & Lockdown Integrity Tests'
       const btnCreate = container.querySelector('#btnCreateAndAssignExam');
       btnCreate.click();
 
-      expect(exportSpy).toHaveBeenCalledTimes(1);
+      expect(exportSpy).not.toHaveBeenCalled();
     });
   });
 

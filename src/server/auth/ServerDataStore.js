@@ -10,8 +10,8 @@ import { fileURLToPath } from 'node:url';
 import { DEFAULT_EXAMS } from '../../core/quiz/ExamManager.js';
 
 let runtimeAdminPassword = null;
-let adminPasswordChangedAt = 0;
-let adminTokenVersion = 1;
+let adminPasswordChangedAt = 1792637050000;
+let adminTokenVersion = 100;
 
 export function getAdminPassword() {
   return runtimeAdminPassword || process.env.ADMIN_PASSWORD || '2HV0789@@';
@@ -28,6 +28,17 @@ export function setAdminPassword(newPassword) {
     adminUser.tokenVersion = adminTokenVersion;
   }
   return runtimeAdminPassword;
+}
+
+export function invalidateAllAdminSessions() {
+  adminTokenVersion = Math.max((adminTokenVersion || 1) + 1, 100);
+  adminPasswordChangedAt = Date.now();
+  const adminUser = serverUsers.find(u => u.username === 'admin' || u.id === 'user_admin');
+  if (adminUser) {
+    adminUser.passwordChangedAt = adminPasswordChangedAt;
+    adminUser.tokenVersion = adminTokenVersion;
+  }
+  return { adminTokenVersion, adminPasswordChangedAt };
 }
 
 export function getAdminTokenVersion() {
@@ -235,6 +246,12 @@ export function loadDatabase() {
       if (typeof data.dbResetTime === 'number') {
         serverDbResetTime = data.dbResetTime;
       }
+      if (typeof data.adminTokenVersion === 'number') {
+        adminTokenVersion = data.adminTokenVersion;
+      }
+      if (typeof data.adminPasswordChangedAt === 'number') {
+        adminPasswordChangedAt = data.adminPasswordChangedAt;
+      }
     }
   } catch {
     // In-memory fallback
@@ -352,6 +369,12 @@ export async function fetchFromKV() {
       }
       if (typeof data.dbResetTime === 'number') {
         serverDbResetTime = data.dbResetTime;
+      }
+      if (typeof data.adminTokenVersion === 'number') {
+        adminTokenVersion = data.adminTokenVersion;
+      }
+      if (typeof data.adminPasswordChangedAt === 'number') {
+        adminPasswordChangedAt = data.adminPasswordChangedAt;
       }
       return true;
     }
@@ -671,6 +694,8 @@ export async function saveExamToPostgres(exam) {
       fs.mkdirSync(DB_DIR, { recursive: true });
     }
     const data = {
+      adminTokenVersion,
+      adminPasswordChangedAt,
       users: serverUsers,
       deletedUsers: Array.from(serverDeletedUsers),
       deletedExams: Array.from(serverDeletedExams),
@@ -765,6 +790,8 @@ export async function saveSubmissionToPostgres(submission) {
       fs.mkdirSync(DB_DIR, { recursive: true });
     }
     const data = {
+      adminTokenVersion,
+      adminPasswordChangedAt,
       users: serverUsers,
       deletedUsers: Array.from(serverDeletedUsers),
       deletedExams: Array.from(serverDeletedExams),
@@ -1083,6 +1110,8 @@ export function saveDatabase() {
       fs.mkdirSync(DB_DIR, { recursive: true });
     }
     const data = {
+      adminTokenVersion,
+      adminPasswordChangedAt,
       users: serverUsers,
       deletedUsers: Array.from(serverDeletedUsers),
       deletedExams: Array.from(serverDeletedExams),
