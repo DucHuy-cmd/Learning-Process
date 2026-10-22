@@ -7650,20 +7650,6 @@ body.in-active-exam .active-exam-room,
   background-size: 16px 16px !important;
 }
 
-.active-exam-mic-box {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: rgba(16, 185, 129, 0.12);
-  border: 1px solid rgba(16, 185, 129, 0.35);
-  color: #10b981;
-  font-size: 11.5px;
-  font-weight: 700;
-  padding: 3px 10px;
-  border-radius: 8px;
-  user-select: none;
-}
-
 /* Teacher's Studio Exam Assignment Button */
 .btn-studio-assign {
   padding: 10px 24px;

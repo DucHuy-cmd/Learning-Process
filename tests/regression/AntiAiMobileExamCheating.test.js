@@ -229,11 +229,6 @@ describe('Anti-AI Mobile Screen & Voice Cheating Defenses (Phase 1 & Phase 2)', 
     expect(qWrap).not.toBeNull();
     expect(qWrap.getAttribute('data-anti-ai')).toBe('protected');
     expect(qWrap.textContent).toContain('\u200B');
-
-    // Verify microphone proctoring badge is displayed on topbar
-    const micBadge = container.querySelector('#examMicBadge');
-    expect(micBadge).not.toBeNull();
-    expect(micBadge.textContent).toContain('Chống AI giọng nói');
   });
 
   it('6. Intercepts touchcancel event when Android system assistant overlay steals touch, blacks out screen and records violation', async () => {
@@ -268,40 +263,7 @@ describe('Anti-AI Mobile Screen & Voice Cheating Defenses (Phase 1 & Phase 2)', 
     expect(title.textContent).toContain('Trợ Lý Hệ Thống Chiếm Quyền Màn Hình');
   });
 
-  it('7. Handles real-time voice speech cheating detection, triggers screen blackout and records violation', async () => {
-    const examRes = examManager.createExam({
-      title: 'Đề Thi Chống Gemini Voice Nói Chuyện',
-      questionIds: ['logic_q01'],
-      durationMinutes: 15,
-      assignedTo: [testStudent.id],
-      createdBy: 'user_admin',
-    });
-    const examId = examRes.exam.id;
-
-    const quizView = new QuizView({ container });
-    quizView.setTab('myExams');
-
-    container.querySelector(`.btn-start-exam[data-exam-id="${examId}"]`).click();
-    await Promise.resolve();
-
-    const session = quizView.activeExamSession;
-    expect(session).not.toBeNull();
-    expect(session.violationCount).toBe(0);
-
-    // Simulate voice proctoring detecting speech
-    quizView._applyScreenGuard(true);
-    quizView._handleScreenDeparture('voice_cheating_detected');
-    quizView._recordExamLockdownTimeoutViolation(session);
-
-    expect(session.violationCount).toBe(1);
-    expect(session.awayViolationRecorded).toBe(true);
-    expect(session.awayReason).toBe('voice_cheating_detected');
-
-    const title = container.querySelector('#examLockdownTitle');
-    expect(title.textContent).toContain('Phát Hiện Nói Chuyện / Trợ Lý Giọng Nói AI');
-  });
-
-  it('8. Traps long-press touch gesture (>450ms) to block Circle to Search / context menu and records violation', async () => {
+  it('7. Traps long-press touch gesture (>450ms) to block Circle to Search / context menu and records violation', async () => {
     vi.useFakeTimers();
 
     const examRes = examManager.createExam({

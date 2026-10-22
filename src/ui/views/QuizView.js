@@ -1342,10 +1342,6 @@ export class QuizView {
       overlayTitle = 'Cảnh Báo: Kích Hoạt Trợ Lý Ảo / Quét Màn Hình Nhanh!';
       overlayIcon = '🤖';
       violationDetailMessage = 'Hệ thống phát hiện thao tác <strong>chớp màn hình / gọi Trợ lý AI (Google Assistant, Circle to Search, Gemini, Siri)</strong>! Toàn bộ nội dung đề thi đã bị che đen chống quét và tính 1 lần vi phạm.';
-    } else if (session.awayReason === 'voice_cheating_detected') {
-      overlayTitle = 'Cảnh Báo: Phát Hiện Nói Chuyện / Trợ Lý Giọng Nói AI!';
-      overlayIcon = '🎙️';
-      violationDetailMessage = 'Hệ thống phát hiện có <strong>tiếng người nói chuyện hoặc ra lệnh bằng giọng nói (Gemini Voice, Google Assistant, Siri)</strong> trong phòng thi! Đề thi đã bị che đen bảo mật và tính <strong>1 lần vi phạm quy chế</strong>.';
     } else if (session.awayReason === 'assistant_overlay_intercept') {
       overlayTitle = 'Cảnh Báo: Trợ Lý Hệ Thống Chiếm Quyền Màn Hình!';
       overlayIcon = '🤖';
@@ -1446,10 +1442,6 @@ export class QuizView {
               <span class="active-exam-grace-box ${graceClass}" id="examGraceBadge" title="Quỹ thời gian mất mạng hoặc rời phòng thi cho phép (Tối đa tích lũy 2 phút cho cả ca thi)">
                 <span>📶 Quỹ vắng mặt:</span>
                 <span id="examGraceTimeText" style="font-family:monospace;font-size:12.5px;">${graceFormatted}</span>
-              </span>
-              <!-- Anti-Voice / Real-time Microphone Audio Proctoring Indicator -->
-              <span class="active-exam-mic-box" id="examMicBadge" title="Giám sát âm thanh phòng thi: Nghiêm cấm nói chuyện hoặc ra lệnh cho trợ lý AI">
-                <span>🎙️ Chống AI giọng nói: Đang bật</span>
               </span>
             </div>
             <h2 style="font-size:19px;font-weight:700;color:var(--text);margin:0;line-height:1.3;word-break:break-word;">
@@ -2942,115 +2934,6 @@ export class QuizView {
     }
   }
 
-  /**
-   * Initializes real-time background microphone proctoring to detect and prevent
-   * students talking to Gemini Live / Google Assistant / Siri / phone calls.
-   * Instantly covers the screen with a blackout shield upon detecting human speech.
-   * @param {Object} session
-   */
-  _initVoiceProctoring(session) {
-    if (!session) return;
-    if (typeof window === 'undefined') return;
-    const nav = window.navigator || (typeof navigator !== 'undefined' ? navigator : null);
-    if (!nav || !nav.mediaDevices || typeof nav.mediaDevices.getUserMedia !== 'function') return;
-
-    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-    if (!AudioContextClass) return;
-
-    try {
-      nav.mediaDevices.getUserMedia({ audio: true, video: false })
-        .then((stream) => {
-          if (this.activeExamSession !== session) {
-            try { stream.getTracks().forEach(t => t.stop()); } catch (e) {}
-            return;
-          }
-          session._audioStream = stream;
-          let audioCtx;
-          try {
-            audioCtx = new AudioContextClass();
-          } catch (e) {
-            return;
-          }
-          session._audioCtx = audioCtx;
-
-          if (typeof audioCtx.createAnalyser !== 'function') return;
-
-          const analyser = audioCtx.createAnalyser();
-          analyser.fftSize = 512;
-          analyser.smoothingTimeConstant = 0.4;
-          const source = audioCtx.createMediaStreamSource(stream);
-          source.connect(analyser);
-
-          const bufferLength = analyser.frequencyBinCount;
-          const dataArray = new Uint8Array(bufferLength);
-
-          session._voiceViolationTimer = setInterval(() => {
-            if (this.activeExamSession !== session || session.timeRemaining <= 0) {
-              this._stopVoiceProctoring(session);
-              return;
-            }
-
-            try {
-              analyser.getByteFrequencyData(dataArray);
-            } catch (e) {
-              return;
-            }
-
-            // Human speech range ~85Hz - 3000Hz (bins 1 to 35)
-            let speechEnergy = 0;
-            let count = 0;
-            for (let i = 1; i < Math.min(36, bufferLength); i++) {
-              speechEnergy += dataArray[i];
-              count++;
-            }
-            const avgEnergy = count > 0 ? speechEnergy / count : 0;
-
-            // If speaking / voice talking detected (> 38 avg energy)
-            if (avgEnergy > 38) {
-              session._speechSpikeCount = (session._speechSpikeCount || 0) + 1;
-              if (session._speechSpikeCount >= 2 && !session.awayViolationRecorded) {
-                session._speechSpikeCount = 0;
-                this._applyScreenGuard(true);
-                this._handleScreenDeparture('voice_cheating_detected');
-                this._recordExamLockdownTimeoutViolation(session);
-              }
-            } else {
-              session._speechSpikeCount = Math.max(0, (session._speechSpikeCount || 0) - 1);
-            }
-          }, 400);
-        })
-        .catch(() => {
-          // Microphone not available or denied by student
-        });
-    } catch (e) {}
-  }
-
-  /**
-   * Safely stops voice proctoring, releases microphone hardware, and closes audio context.
-   * @param {Object} session
-   */
-  _stopVoiceProctoring(session) {
-    if (!session) return;
-    if (session._voiceViolationTimer) {
-      clearInterval(session._voiceViolationTimer);
-      session._voiceViolationTimer = null;
-    }
-    if (session._audioStream) {
-      try {
-        session._audioStream.getTracks().forEach(t => t.stop());
-      } catch (e) {}
-      session._audioStream = null;
-    }
-    if (session._audioCtx) {
-      try {
-        if (typeof session._audioCtx.close === 'function') {
-          session._audioCtx.close();
-        }
-      } catch (e) {}
-      session._audioCtx = null;
-    }
-  }
-
   _showAlert(msg) {
     if (typeof window !== 'undefined' && typeof window.alert === 'function') {
       window.alert(msg);
@@ -3887,18 +3770,12 @@ export class QuizView {
       window.addEventListener('online', onOnline);
       window.addEventListener('beforeunload', onBeforeUnload);
     }
-
-    // Initialize real-time background voice proctoring
-    if (this.activeExamSession) {
-      this._initVoiceProctoring(this.activeExamSession);
-    }
   }
 
   _detachExamLockdownListeners() {
     this._allowExamBlurEvent = false;
     if (this.activeExamSession) {
       this._cancelExamLockdownCountdown(this.activeExamSession);
-      this._stopVoiceProctoring(this.activeExamSession);
     }
     if (typeof document !== 'undefined' && this._examLockdownHandlers) {
       const h = this._examLockdownHandlers;
