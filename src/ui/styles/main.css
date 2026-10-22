@@ -7281,8 +7281,11 @@ body.in-active-exam .active-exam-room,
 
 .exam-q-jump-grid {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: auto;
+  gap: 8px;
   margin-bottom: 20px;
   padding: 12px;
   background: var(--panel-alt);
@@ -7291,9 +7294,12 @@ body.in-active-exam .active-exam-room,
 }
 
 .exam-q-jump-btn {
-  width: 34px;
-  height: 34px;
-  border-radius: 6px;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  min-height: 40px;
+  border-radius: 8px;
   border: 1px solid var(--line);
   background: var(--panel);
   color: var(--text);
@@ -8142,7 +8148,7 @@ body.in-active-exam .active-exam-room,
     flex-wrap: nowrap !important;
     overflow-x: auto !important;
     -webkit-overflow-scrolling: touch !important;
-    scroll-behavior: smooth !important;
+    scroll-behavior: auto !important;
     gap: 8px !important;
     padding: 8px 4px 12px !important;
     margin-bottom: 16px !important;

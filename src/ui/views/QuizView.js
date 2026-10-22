@@ -878,6 +878,10 @@ export class QuizView {
       ).length
       : 0;
 
+    // Capture scroll position of horizontal question jump grid if active so it NEVER resets to 0
+    const prevJumpGrid = this.container ? this.container.querySelector('.exam-q-jump-grid') : null;
+    const savedJumpScrollLeft = prevJumpGrid ? prevJumpGrid.scrollLeft : null;
+
     this.container.innerHTML = `
       <div class="quiz-view-container" style="max-width:1300px;margin:0 auto;padding:${this.activeExamSession ? '12px 16px 40px' : '20px 24px 60px'};">
         
@@ -925,7 +929,38 @@ export class QuizView {
       </div>
     `;
 
+    // Instantly restore question jump grid scroll position without resetting to 0
+    if (savedJumpScrollLeft !== null) {
+      const newJumpGrid = this.container ? this.container.querySelector('.exam-q-jump-grid') : null;
+      if (newJumpGrid) {
+        newJumpGrid.scrollLeft = savedJumpScrollLeft;
+      }
+    }
+
     this._bindEvents();
+  }
+
+  _formatExamTarget(assignedTo) {
+    if (!Array.isArray(assignedTo) || assignedTo.length === 0 || assignedTo.includes('all')) {
+      return 'Toàn bộ sinh viên';
+    }
+
+    const allUsers = (typeof authManager !== 'undefined' && authManager.getUsers) ? authManager.getUsers() : [];
+    const classItems = assignedTo.filter(a => typeof a === 'string' && a.startsWith('class:'));
+    const directStudents = assignedTo.filter(a => typeof a === 'string' && !a.startsWith('class:') && a !== 'all');
+
+    if (classItems.length > 0) {
+      const classNames = classItems.map(c => c.replace('class:', '').trim());
+      const classStudents = allUsers.filter(u => {
+        if (u.role === 'admin' || u.username === 'admin') return false;
+        const uClass = (u.className || u.studentClass || '').trim().toLowerCase();
+        return classNames.some(cn => cn.toLowerCase() === uClass);
+      });
+      const totalCount = classStudents.length + directStudents.length;
+      return totalCount > 0 ? `Lớp ${classNames.join(', ')} (${totalCount} sinh viên)` : `Lớp ${classNames.join(', ')}`;
+    }
+
+    return `${directStudents.length} sinh viên`;
   }
 
   _renderPracticeView() {
@@ -1053,8 +1088,7 @@ export class QuizView {
                   </tr>
                 ` : assignedExams.map(item => {
                   const subs = examManager.getSubmissionsForExam(item.id);
-                  const isAll = Array.isArray(item.assignedTo) && item.assignedTo.includes('all');
-                  const targetLabel = isAll ? 'Toàn bộ sinh viên' : `${item.assignedTo.length} sinh viên`;
+                  const targetLabel = this._formatExamTarget(item.assignedTo);
 
                   return `
                     <tr>
@@ -1347,15 +1381,6 @@ export class QuizView {
               <span style="font-size:13px;font-weight:700;background:var(--panel);border:1px solid var(--line);padding:4px 12px;border-radius:6px;color:var(--text);white-space:nowrap;">
                 Câu ${session.currentQIndex + 1} / ${totalQ}
               </span>
-              <!-- Quick Top Prev & Next Buttons for mobile & desktop convenience -->
-              <div class="exam-q-top-nav" style="display:flex;gap:4px;">
-                <button type="button" class="btn-sm btn-exam-prev-top" ${session.currentQIndex === 0 ? 'disabled style="opacity:0.35;cursor:not-allowed;"' : 'style="cursor:pointer;"'} title="Câu trước (❮)">
-                  ❮ Trước
-                </button>
-                <button type="button" class="btn-sm btn-exam-next-top" ${session.currentQIndex === totalQ - 1 ? 'disabled style="opacity:0.35;cursor:not-allowed;"' : 'style="cursor:pointer;"'} title="Câu sau (❯)">
-                  Sau ❯
-                </button>
-              </div>
             </div>
             <span class="pill-badge" style="background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;white-space:nowrap;">
               ${currentQ.topicName || currentQ.topic}
@@ -3832,13 +3857,9 @@ export class QuizView {
 
       const btnExamPrevQ = this.container.querySelector('#btnExamPrevQ');
       if (btnExamPrevQ) btnExamPrevQ.addEventListener('click', handlePrevQ);
-      const btnExamPrevTop = this.container.querySelector('.btn-exam-prev-top');
-      if (btnExamPrevTop) btnExamPrevTop.addEventListener('click', handlePrevQ);
 
       const btnExamNextQ = this.container.querySelector('#btnExamNextQ');
       if (btnExamNextQ) btnExamNextQ.addEventListener('click', handleNextQ);
-      const btnExamNextTop = this.container.querySelector('.btn-exam-next-top');
-      if (btnExamNextTop) btnExamNextTop.addEventListener('click', handleNextQ);
 
       const btnExamNextQSubmit = this.container.querySelector('#btnExamNextQSubmit');
       if (btnExamNextQSubmit) {
@@ -3848,12 +3869,19 @@ export class QuizView {
         });
       }
 
-      // Auto-scroll current question in horizontal jump bar so student always sees their progress
+      // Auto-scroll current question in horizontal jump bar only when outside visible view
       const activeJumpBtn = this.container.querySelector('.exam-q-jump-btn.current');
-      if (activeJumpBtn && typeof activeJumpBtn.scrollIntoView === 'function') {
-        try {
-          activeJumpBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-        } catch {}
+      const jumpGrid = this.container.querySelector('.exam-q-jump-grid');
+      if (activeJumpBtn && jumpGrid) {
+        const gridRect = (typeof jumpGrid.getBoundingClientRect === 'function') ? jumpGrid.getBoundingClientRect() : null;
+        const btnRect = (typeof activeJumpBtn.getBoundingClientRect === 'function') ? activeJumpBtn.getBoundingClientRect() : null;
+        const hasLayout = gridRect && gridRect.width > 0 && btnRect && btnRect.width > 0;
+        const isFullyVisible = hasLayout && (btnRect.left >= gridRect.left + 4 && btnRect.right <= gridRect.right - 4);
+        if (!isFullyVisible && typeof activeJumpBtn.scrollIntoView === 'function') {
+          try {
+            activeJumpBtn.scrollIntoView({ behavior: 'auto', block: 'nearest', inline: 'nearest' });
+          } catch {}
+        }
       }
 
       // Choose Option
@@ -4535,13 +4563,7 @@ export class QuizView {
               fileExportError = expErr.message;
             }
 
-            let targetLabel = 'Toàn bộ sinh viên';
-            if (assignedTo.some(a => (a || '').startsWith('class:'))) {
-              const cls = assignedTo.find(a => (a || '').startsWith('class:')).replace('class:', '');
-              targetLabel = `Lớp ${cls}`;
-            } else if (!assignedTo.includes('all')) {
-              targetLabel = `${assignedTo.length} sinh viên`;
-            }
+            const targetLabel = this._formatExamTarget(assignedTo);
 
             if (fileExportSuccess) {
               this._showAlert(`🎉 Tạo & phát đề thi thành công và đã xuất File Đáp Án!\n\nĐề thi: "${title}" (Mã: ${result.exam.examCode || 'N/A'})\nSố câu: ${questionIds.length} câu\nThời lượng: ${durationMinutes} phút\nĐối tượng: ${targetLabel}\n\nĐề thi đã được chuyển vào mục "Quản Lý Đề Thi". File đáp án chi tiết đã được tự động tải về máy của bạn.`);

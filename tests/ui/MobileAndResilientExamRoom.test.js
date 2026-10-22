@@ -552,4 +552,74 @@ describe('Mobile & Resilient Exam Room (100+ Concurrency & Cross-Device Protecti
     triggerBtn.click();
     expect(requestFullscreenSpy).toHaveBeenCalled();
   });
+
+  it('correctly calculates and displays class student count in exam management table instead of 1 student', () => {
+    // Register 4 students into class CQ.67
+    authManager.quickLogin('user_admin');
+    ['sv1', 'sv2', 'sv3', 'sv4'].forEach((uname, i) => {
+      authManager.adminCreateUser({
+        username: uname,
+        fullName: `Sinh Viên ${i + 1}`,
+        className: 'CQ.67',
+        email: `${uname}@toanrr.edu.vn`,
+        password: '123',
+      });
+    });
+
+    const examRes = examManager.createExam({
+      title: 'Đề Thi Khảo Sát Lớp CQ.67',
+      questionIds: ['logic_q01'],
+      durationMinutes: 15,
+      assignedTo: ['class:CQ.67'],
+      createdBy: 'user_admin',
+    });
+    expect(examRes.success).toBe(true);
+
+    const quizView = new QuizView({ container });
+    quizView.setTab('myExams');
+
+    // Check table pill badge: MUST NOT show "1 sinh viên"
+    const tableBadge = container.querySelector('.leaderboard-table .pill-badge');
+    expect(tableBadge).not.toBeNull();
+    expect(tableBadge.textContent).toContain('Lớp CQ.67 (4 sinh viên)');
+  });
+
+  it('removes redundant top prev/next buttons and preserves horizontal question jump grid scroll position', () => {
+    const examRes = examManager.createExam({
+      title: 'Đề Thi Thanh Trượt Câu Hỏi',
+      questionIds: ['logic_q01', 'logic_q02'],
+      durationMinutes: 15,
+      assignedTo: [testStudent.id],
+      createdBy: 'user_admin',
+    });
+    const examId = examRes.exam.id;
+
+    const quizView = new QuizView({ container });
+    quizView.setTab('myExams');
+    window.confirm = () => true;
+
+    container.querySelector(`.btn-start-exam[data-exam-id="${examId}"]`).click();
+    expect(quizView.activeExamSession).not.toBeNull();
+
+    // Verify top prev/next buttons are completely removed
+    expect(container.querySelector('.exam-q-top-nav')).toBeNull();
+    expect(container.querySelector('.btn-exam-prev-top')).toBeNull();
+    expect(container.querySelector('.btn-exam-next-top')).toBeNull();
+
+    // Verify question counter is still cleanly present
+    expect(container.textContent).toContain('Câu 1 / 2');
+
+    // Simulate jump grid scroll position at 250px
+    const jumpGrid = container.querySelector('.exam-q-jump-grid');
+    expect(jumpGrid).not.toBeNull();
+    jumpGrid.scrollLeft = 250;
+
+    // Student selects an option on Question 1 -> triggers re-render
+    const optBtn = container.querySelector('.btn-active-exam-opt');
+    optBtn.click();
+
+    // Scroll position MUST be preserved and not reset to 0
+    const reRenderedGrid = container.querySelector('.exam-q-jump-grid');
+    expect(reRenderedGrid.scrollLeft).toBe(250);
+  });
 });
