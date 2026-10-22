@@ -7579,6 +7579,61 @@ body.in-active-exam .active-exam-room,
   box-sizing: border-box !important;
 }
 
+/* Zero-Latency Anti-Screen Capture & Anti-AI Shield (Phase 1 & 2) */
+.exam-anti-capture-shield {
+  display: none;
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  height: 100dvh !important;
+  background: rgba(0, 0, 0, 0.98) !important;
+  backdrop-filter: blur(40px) !important;
+  -webkit-backdrop-filter: blur(40px) !important;
+  z-index: 999998 !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+  padding: 24px !important;
+  box-sizing: border-box !important;
+}
+
+.active-exam-room.screen-guarded .exam-question-card,
+.active-exam-room.screen-guarded .exam-q-jump-grid,
+.active-exam-room.screen-guarded .active-exam-topbar {
+  filter: blur(45px) grayscale(1) !important;
+  opacity: 0.03 !important;
+  pointer-events: none !important;
+  user-select: none !important;
+  transition: filter 0.04s ease, opacity 0.04s ease;
+}
+
+/* Dynamic Anti-Photo Personalized Watermark */
+.exam-dynamic-watermark {
+  position: fixed !important;
+  inset: 0 !important;
+  pointer-events: none !important;
+  z-index: 40 !important;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  grid-template-rows: repeat(2, 1fr);
+  align-items: center;
+  justify-items: center;
+  opacity: 0.07;
+  user-select: none !important;
+  transform: rotate(-15deg) scale(1.05);
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text, #fff);
+  overflow: hidden;
+}
+
+.exam-dynamic-watermark .watermark-item {
+  padding: 20px;
+  text-align: center;
+  white-space: nowrap;
+}
+
 /* Teacher's Studio Exam Assignment Button */
 .btn-studio-assign {
   padding: 10px 24px;

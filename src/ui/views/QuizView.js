@@ -1316,6 +1316,8 @@ export class QuizView {
     const graceClass = remainingGraceSec > 60 ? 'safe' : (remainingGraceSec > 30 ? 'warning' : 'danger');
 
     const isViolationRecorded = session.awayViolationRecorded || session.violationCount > 0;
+    const currentUser = authManager.getCurrentUser() || { fullName: 'Thí sinh', username: 'student' };
+    const isScreenGuarded = Boolean(session.isAway || session.lockdownPending);
     let overlayTitle = isViolationRecorded ? 'Cảnh Báo: Đã Ghi Nhận Vi Phạm Quy Chế!' : 'Cảnh Báo: Rời Màn Hình Làm Bài!';
     let overlayIcon = isViolationRecorded ? '❌' : '⚠️';
     let violationDetailMessage = 'Hệ thống phát hiện bạn vừa chuyển tab (Alt+Tab), bấm F11, rời cửa sổ làm bài hoặc thoát toàn màn hình. Thời gian rời màn hình được tính <strong>cộng dồn</strong>.';
@@ -1332,6 +1334,14 @@ export class QuizView {
       overlayTitle = 'Cảnh Báo: Phát Hiện Chia Đôi Màn Hình!';
       overlayIcon = '📱';
       violationDetailMessage = 'Hệ thống phát hiện bạn đang bật <strong>Chế độ chia đôi màn hình (Split-Screen)</strong> hoặc Cửa sổ nổi! Vui lòng mở toàn màn hình để tiếp tục thi.';
+    } else if (session.awayReason === 'three_finger_screenshot_attempt') {
+      overlayTitle = 'Cảnh Báo: Chặn Cử Chỉ Chụp Màn Hình 3 Ngón Tay!';
+      overlayIcon = '📸';
+      violationDetailMessage = 'Hệ thống phát hiện bạn vừa dùng <strong>cử chỉ chạm 3 ngón tay để chụp ảnh màn hình</strong> bài thi! Mọi hành vi chụp / quét đề thi đều bị chặn và tính 1 lần vi phạm.';
+    } else if (session.awayReason === 'quick_assistant_detected') {
+      overlayTitle = 'Cảnh Báo: Kích Hoạt Trợ Lý Ảo / Quét Màn Hình Nhanh!';
+      overlayIcon = '🤖';
+      violationDetailMessage = 'Hệ thống phát hiện thao tác <strong>chớp màn hình / gọi Trợ lý AI (Google Assistant, Circle to Search, Gemini, Siri)</strong>! Toàn bộ nội dung đề thi đã bị che đen chống quét và tính 1 lần vi phạm.';
     }
 
     const lockdownOverlay = session.lockdownPending ? `
@@ -1365,7 +1375,28 @@ export class QuizView {
     ` : '';
 
     return `
-      <div class="active-exam-room">
+      <div class="active-exam-room ${isScreenGuarded ? 'screen-guarded' : ''}">
+        <!-- Zero-Latency Anti-Screen Capture Shield -->
+        <div id="examAntiCaptureShield" class="exam-anti-capture-shield" style="${isScreenGuarded ? 'display:flex;' : 'display:none;'}">
+          <div style="background:var(--panel,#1e2130);border:2px solid #ef4444;border-radius:14px;padding:24px 20px;max-width:380px;text-align:center;box-shadow:0 12px 40px rgba(0,0,0,0.8);">
+            <div style="font-size:38px;margin-bottom:10px;">🔒</div>
+            <div style="font-size:16px;font-weight:800;color:#f87171;margin-bottom:8px;">
+              ĐANG BẢO VỆ MÀN HÌNH BÀI THI
+            </div>
+            <div style="font-size:13px;color:var(--text,#e2e8f0);line-height:1.5;">
+              Nội dung đề thi được che đen bảo mật tự động khi phát hiện mất tiêu điểm, chụp màn hình hoặc kích hoạt ứng dụng nổi.
+            </div>
+          </div>
+        </div>
+
+        <!-- Dynamic Anti-Photo Personalized Watermark -->
+        <div class="exam-dynamic-watermark" aria-hidden="true">
+          <div class="watermark-item">${this._escapeHtml(currentUser.fullName || currentUser.username)} • ${this._escapeHtml(currentUser.username)} • ${this._escapeHtml(exam.id)}</div>
+          <div class="watermark-item">${this._escapeHtml(currentUser.fullName || currentUser.username)} • ${this._escapeHtml(currentUser.username)} • ${this._escapeHtml(exam.id)}</div>
+          <div class="watermark-item">${this._escapeHtml(currentUser.fullName || currentUser.username)} • ${this._escapeHtml(currentUser.username)} • ${this._escapeHtml(exam.id)}</div>
+          <div class="watermark-item">${this._escapeHtml(currentUser.fullName || currentUser.username)} • ${this._escapeHtml(currentUser.username)} • ${this._escapeHtml(exam.id)}</div>
+        </div>
+
         ${lockdownOverlay}
 
         ${(this._supportsFullscreen() && !this._getFullscreenElement() && !session.lockdownPending) ? `
@@ -1463,8 +1494,8 @@ export class QuizView {
             </span>
           </div>
 
-          <div style="font-size:16.5px;font-weight:600;color:var(--text);line-height:1.6;margin-bottom:24px;border-left:4px solid var(--accent);padding-left:14px;word-break:break-word;overflow-wrap:break-word;">
-            ${this._formatExamContent(currentQ.question)}
+          <div class="exam-question-text-wrap" style="font-size:16.5px;font-weight:600;color:var(--text);line-height:1.6;margin-bottom:24px;border-left:4px solid var(--accent);padding-left:14px;word-break:break-word;overflow-wrap:break-word;" data-anti-ai="protected">
+            ${this._injectAntiAiNoise(this._formatExamContent(currentQ.question))}
           </div>
 
           <!-- Options -->
@@ -1485,7 +1516,7 @@ export class QuizView {
                   <span class="opt-badge" style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;font-size:13px;font-weight:700;flex-shrink:0;margin-top:2px;${badgeStyle}">
                     ${displayLabel}
                   </span>
-                  <span class="opt-text" style="flex:1;min-width:0;font-weight:500;white-space:normal !important;word-break:break-word !important;overflow-wrap:anywhere !important;line-height:1.5;">${this._formatExamContent(opt.text)}</span>
+                  <span class="opt-text" style="flex:1;min-width:0;font-weight:500;white-space:normal !important;word-break:break-word !important;overflow-wrap:anywhere !important;line-height:1.5;">${this._injectAntiAiNoise(this._formatExamContent(opt.text))}</span>
                   ${isSelected ? '<span class="opt-selected-tag" style="color:var(--accent);font-weight:bold;font-size:12.5px;flex-shrink:0;white-space:nowrap;margin-left:8px;margin-top:2px;">● Đã chọn</span>' : ''}
                 </button>
               `;
@@ -2832,6 +2863,69 @@ export class QuizView {
     return text;
   }
 
+  /**
+   * Injects invisible zero-width spaces into plain text segments (outside HTML and LaTeX formulas)
+   * to poison AI OCR and Accessibility Scrapers (Phase 1 & 2 anti-cheat).
+   * Visual rendering for human readers remains 100% unaffected.
+   * @param {string} str
+   * @returns {string}
+   */
+  _injectAntiAiNoise(str) {
+    if (!str || typeof str !== 'string') return '';
+    // Preserve HTML tags, LaTeX delimiters, and HTML entities
+    const parts = str.split(/(<[^>]+>|\$\$[\s\S]+?\$\$|\$[^\$]+?\$|\\\[[\s\S]+?\\\]|\\\([^\)]+?\\\)|&[a-zA-Z0-9#]+;)/g);
+    return parts.map(part => {
+      if (!part) return '';
+      // Tag, math block, or HTML entity -> keep unmodified
+      if (
+        (part.startsWith('<') && part.endsWith('>')) ||
+        (part.startsWith('$') && part.endsWith('$')) ||
+        (part.startsWith('\\[') && part.endsWith('\\]')) ||
+        (part.startsWith('\\(') && part.endsWith('\\)')) ||
+        (part.startsWith('&') && part.endsWith(';'))
+      ) {
+        return part;
+      }
+      // Inject zero-width space every 3 word characters (including Vietnamese accents)
+      return part.replace(/([a-zA-Z0-9\u00C0-\u024F\u1EA0-\u1EF9]{3})/g, '$1\u200B');
+    }).join('');
+  }
+
+  /**
+   * Instantly obscures question content with a blackout blur shield upon blur, screenshot, or overlay.
+   * @param {boolean} enable
+   */
+  _applyScreenGuard(enable) {
+    if (typeof document === 'undefined') return;
+    const examRoom = this.container ? this.container.querySelector('.active-exam-room') : null;
+    if (examRoom) {
+      if (enable) {
+        examRoom.classList.add('screen-guarded');
+      } else {
+        examRoom.classList.remove('screen-guarded');
+      }
+    }
+    const shield = this.container ? this.container.querySelector('#examAntiCaptureShield') : null;
+    if (shield) {
+      shield.style.display = enable ? 'flex' : 'none';
+    }
+  }
+
+  /**
+   * Detects rapid blur/focus snapping characteristic of Google Assistant, Circle to Search, or Gemini Overlay.
+   * @param {Object} session
+   */
+  _checkQuickAssistantTrigger(session) {
+    if (!session || !session.lastBlurAt) return;
+    const durationMs = Date.now() - session.lastBlurAt;
+    session.lastBlurAt = null;
+    if (durationMs >= 200 && durationMs <= 2500 && !session.awayViolationRecorded) {
+      session.quickAssistantCount = (session.quickAssistantCount || 0) + 1;
+      this._handleScreenDeparture('quick_assistant_detected');
+      this._recordExamLockdownTimeoutViolation(session);
+    }
+  }
+
   _showAlert(msg) {
     if (typeof window !== 'undefined' && typeof window.alert === 'function') {
       window.alert(msg);
@@ -3366,19 +3460,32 @@ export class QuizView {
 
     const onVisibilityChange = () => {
       if (document.visibilityState === 'hidden') {
+        this._applyScreenGuard(true);
+        if (this.activeExamSession) {
+          this.activeExamSession.lastBlurAt = Date.now();
+        }
         this._recordDepartureTimestamp();
         this._handleScreenDeparture('visibility_hidden');
       } else if (document.visibilityState === 'visible') {
         this._recordReturnTimestamp();
         const session = this.activeExamSession;
-        if (session && session.isAway) {
-          this._flushAwayTime(session);
-          this.render();
+        if (session) {
+          this._checkQuickAssistantTrigger(session);
+          if (session.isAway) {
+            this._flushAwayTime(session);
+            this.render();
+          } else {
+            this._applyScreenGuard(false);
+          }
         }
       }
     };
 
     const onBlur = () => {
+      this._applyScreenGuard(true);
+      if (this.activeExamSession) {
+        this.activeExamSession.lastBlurAt = Date.now();
+      }
       if (this._allowExamBlurEvent) {
         const reason = this._isMobileDevice() ? 'mobile_drawer_or_blur' : 'window_blur';
         this._handleScreenDeparture(reason);
@@ -3412,9 +3519,14 @@ export class QuizView {
     const onFocus = () => {
       this._recordReturnTimestamp();
       const session = this.activeExamSession;
-      if (session && session.isAway) {
-        this._flushAwayTime(session);
-        this.render();
+      if (session) {
+        this._checkQuickAssistantTrigger(session);
+        if (session.isAway) {
+          this._flushAwayTime(session);
+          this.render();
+        } else {
+          this._applyScreenGuard(false);
+        }
       }
     };
 
@@ -3543,6 +3655,27 @@ export class QuizView {
       }
     };
 
+    const onTouchStart = (e) => {
+      const session = this.activeExamSession;
+      if (!session || session.timeRemaining <= 0) return;
+      if (e.touches && e.touches.length >= 3) {
+        if (e.cancelable) e.preventDefault();
+        e.stopPropagation();
+        this._applyScreenGuard(true);
+        this._handleScreenDeparture('three_finger_screenshot_attempt');
+        this._recordExamLockdownTimeoutViolation(session);
+      }
+    };
+
+    const onTouchMove = (e) => {
+      const session = this.activeExamSession;
+      if (!session || session.timeRemaining <= 0) return;
+      if (e.touches && e.touches.length >= 3) {
+        if (e.cancelable) e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+
     const preventDefaultEvent = (e) => {
       e.preventDefault();
     };
@@ -3556,6 +3689,8 @@ export class QuizView {
       onPageHide,
       onResize,
       onKeyDown,
+      onTouchStart,
+      onTouchMove,
       onOffline,
       onOnline,
       onBeforeUnload,
@@ -3567,6 +3702,8 @@ export class QuizView {
     document.addEventListener('mozfullscreenchange', onFullscreenChange);
     document.addEventListener('MSFullscreenChange', onFullscreenChange);
     document.addEventListener('visibilitychange', onVisibilityChange);
+    document.addEventListener('touchstart', onTouchStart, { passive: false });
+    document.addEventListener('touchmove', onTouchMove, { passive: false });
     document.addEventListener('contextmenu', preventDefaultEvent);
     document.addEventListener('copy', preventDefaultEvent);
     document.addEventListener('cut', preventDefaultEvent);
@@ -3599,6 +3736,8 @@ export class QuizView {
       document.removeEventListener('mozfullscreenchange', h.onFullscreenChange);
       document.removeEventListener('MSFullscreenChange', h.onFullscreenChange);
       document.removeEventListener('visibilitychange', h.onVisibilityChange);
+      document.removeEventListener('touchstart', h.onTouchStart);
+      document.removeEventListener('touchmove', h.onTouchMove);
       document.removeEventListener('contextmenu', h.preventDefaultEvent);
       document.removeEventListener('copy', h.preventDefaultEvent);
       document.removeEventListener('cut', h.preventDefaultEvent);
@@ -3696,6 +3835,7 @@ export class QuizView {
     session.lockdownPending = false;
     session.awayStartedAt = null;
     session.lockdownCountdown = null;
+    this._applyScreenGuard(false);
 
     await this._requestExamFullscreen({ preserveLockdownState: false });
     this.render();
