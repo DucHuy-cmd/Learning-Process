@@ -387,4 +387,169 @@ describe('Mobile & Resilient Exam Room (100+ Concurrency & Cross-Device Protecti
     expect(quizView.reviewSubmission).not.toBeNull();
     expect(quizView.activeExamSession).toBeNull();
   });
+
+  it('traps mobile back button / gesture via popstate, prevents page exit, and records immediate violation', () => {
+    vi.spyOn(window.navigator, 'userAgent', 'get').mockReturnValue(
+      'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 Mobile Safari/537.36'
+    );
+    const pushStateSpy = vi.spyOn(window.history, 'pushState');
+    const vibrateSpy = vi.fn();
+    window.navigator.vibrate = vibrateSpy;
+
+    const examRes = examManager.createExam({
+      title: 'Đề Thi Chống Phím Back Android',
+      questionIds: ['logic_q01'],
+      durationMinutes: 15,
+      assignedTo: [testStudent.id],
+      createdBy: 'user_admin',
+    });
+    const examId = examRes.exam.id;
+
+    const quizView = new QuizView({ container });
+    quizView.setTab('myExams');
+    window.confirm = () => true;
+
+    container.querySelector(`.btn-start-exam[data-exam-id="${examId}"]`).click();
+    const session = quizView.activeExamSession;
+    expect(session).not.toBeNull();
+    expect(session.violationCount).toBe(0);
+
+    // Initial pushState was called on exam start
+    expect(pushStateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ inExamLockdown: true, examId }),
+      '',
+      expect.any(String)
+    );
+
+    // Student presses Android Hardware Back or Edge Swipe Gesture -> fires popstate
+    window.dispatchEvent(new window.PopStateEvent('popstate'));
+
+    // Verify: Trapped inside exam room, vibration triggered, 1 immediate violation recorded
+    expect(vibrateSpy).toHaveBeenCalledWith([200, 100, 200]);
+    expect(session.isAway).toBe(true);
+    expect(session.awayReason).toBe('mobile_back_button_pressed');
+    expect(session.violationCount).toBe(1);
+    expect(session.awayViolationRecorded).toBe(true);
+
+    // Verify lockdown overlay message
+    const title = container.querySelector('#examLockdownTitle');
+    expect(title.textContent).toContain('Bấm Nút Quay Lại Trên Điện Thoại');
+    const warning = container.querySelector('.exam-lockdown-warning');
+    expect(warning.textContent).toContain('1/3');
+
+    // Click "Quay trở lại bài thi" resumes exam
+    const resumeBtn = container.querySelector('#btnResumeExamLockdown');
+    expect(resumeBtn).not.toBeNull();
+    resumeBtn.click();
+    expect(session.isAway).toBe(false);
+  });
+
+  it('detects notification shade / quick settings pull-down on mobile and triggers lockdown overlay', () => {
+    vi.spyOn(window.navigator, 'userAgent', 'get').mockReturnValue(
+      'Mozilla/5.0 (Linux; Android 14; Samsung Galaxy S24) AppleWebKit/537.36 Mobile Safari/537.36'
+    );
+
+    const examRes = examManager.createExam({
+      title: 'Đề Thi Chống Vuốt Notification Shade',
+      questionIds: ['logic_q01'],
+      durationMinutes: 15,
+      assignedTo: [testStudent.id],
+      createdBy: 'user_admin',
+    });
+    const examId = examRes.exam.id;
+
+    const quizView = new QuizView({ container });
+    quizView.setTab('myExams');
+    window.confirm = () => true;
+
+    container.querySelector(`.btn-start-exam[data-exam-id="${examId}"]`).click();
+    const session = quizView.activeExamSession;
+    expect(session).not.toBeNull();
+
+    // User swipes down notification drawer or quick settings -> fires window.blur
+    window.dispatchEvent(new window.Event('blur'));
+
+    expect(session.isAway).toBe(true);
+    expect(session.awayReason).toBe('mobile_drawer_or_blur');
+    expect(session.lockdownPending).toBe(true);
+
+    // Verify overlay shows notification drawer specific warning
+    const title = container.querySelector('#examLockdownTitle');
+    expect(title.textContent).toContain('Kéo Thanh Thông Báo / Chuyển Ứng Dụng');
+  });
+
+  it('detects split-screen or floating multi-window mode on mobile devices', () => {
+    vi.spyOn(window.navigator, 'userAgent', 'get').mockReturnValue(
+      'Mozilla/5.0 (Linux; Android 14; Pixel 7 Pro) AppleWebKit/537.36 Mobile Safari/537.36'
+    );
+
+    const examRes = examManager.createExam({
+      title: 'Đề Thi Chống Split Screen',
+      questionIds: ['logic_q01'],
+      durationMinutes: 15,
+      assignedTo: [testStudent.id],
+      createdBy: 'user_admin',
+    });
+    const examId = examRes.exam.id;
+
+    const quizView = new QuizView({ container });
+    quizView.setTab('myExams');
+    window.confirm = () => true;
+
+    container.querySelector(`.btn-start-exam[data-exam-id="${examId}"]`).click();
+    const session = quizView.activeExamSession;
+    expect(session).not.toBeNull();
+
+    // Simulate mobile screen dimensions: screen height = 800
+    window.screen = { height: 800, width: 400 };
+    // Normal mobile full height (e.g. 740px with status bar)
+    window.innerHeight = 740;
+    window.dispatchEvent(new window.Event('resize'));
+    expect(session.isAway).toBeFalsy();
+
+    // Now user switches into 50/50 split-screen -> innerHeight drops to 380 (< 800 * 0.58 = 464)
+    window.innerHeight = 380;
+    window.dispatchEvent(new window.Event('resize'));
+
+    expect(session.isAway).toBe(true);
+    expect(session.awayReason).toBe('split_screen_detected');
+    const title = container.querySelector('#examLockdownTitle');
+    expect(title.textContent).toContain('Chia Đôi Màn Hình');
+  });
+
+  it('renders fullscreen warning banner when not in fullscreen and activates fullscreen on direct tap', async () => {
+    vi.spyOn(window.navigator, 'userAgent', 'get').mockReturnValue(
+      'Mozilla/5.0 (Linux; Android 14; Xiaomi 13) AppleWebKit/537.36 Mobile Safari/537.36'
+    );
+    const requestFullscreenSpy = vi.fn().mockResolvedValue(undefined);
+    document.documentElement.requestFullscreen = requestFullscreenSpy;
+
+    const examRes = examManager.createExam({
+      title: 'Đề Thi Fullscreen Banner',
+      questionIds: ['logic_q01'],
+      durationMinutes: 15,
+      assignedTo: [testStudent.id],
+      createdBy: 'user_admin',
+    });
+    const examId = examRes.exam.id;
+
+    const quizView = new QuizView({ container });
+    quizView.setTab('myExams');
+    window.confirm = () => true;
+
+    container.querySelector(`.btn-start-exam[data-exam-id="${examId}"]`).click();
+    const session = quizView.activeExamSession;
+    expect(session).not.toBeNull();
+
+    // If document.fullscreenElement is null (not yet in fullscreen), banner is visible
+    const banner = container.querySelector('#mobileFullscreenWarningBanner');
+    expect(banner).not.toBeNull();
+    expect(banner.textContent).toContain('Chưa bật Toàn Màn Hình');
+
+    // Tapping the banner button triggers direct requestFullscreen
+    const triggerBtn = container.querySelector('#btnTriggerExamFullscreen');
+    expect(triggerBtn).not.toBeNull();
+    triggerBtn.click();
+    expect(requestFullscreenSpy).toHaveBeenCalled();
+  });
 });

@@ -1205,20 +1205,39 @@ export class QuizView {
     const graceFormatted = `${String(graceMin).padStart(2, '0')}:${String(graceSec).padStart(2, '0')}`;
     const graceClass = remainingGraceSec > 60 ? 'safe' : (remainingGraceSec > 30 ? 'warning' : 'danger');
 
+    const isViolationRecorded = session.awayViolationRecorded || session.violationCount > 0;
+    let overlayTitle = isViolationRecorded ? 'Cảnh Báo: Đã Ghi Nhận Vi Phạm Quy Chế!' : 'Cảnh Báo: Rời Màn Hình Làm Bài!';
+    let overlayIcon = isViolationRecorded ? '❌' : '⚠️';
+    let violationDetailMessage = 'Hệ thống phát hiện bạn vừa chuyển tab (Alt+Tab), bấm F11, rời cửa sổ làm bài hoặc thoát toàn màn hình. Thời gian rời màn hình được tính <strong>cộng dồn</strong>.';
+
+    if (session.awayReason === 'mobile_back_button_pressed') {
+      overlayTitle = 'Cảnh Báo: Bấm Nút Quay Lại Trên Điện Thoại!';
+      overlayIcon = '🚫';
+      violationDetailMessage = 'Hệ thống phát hiện bạn vừa <strong>bấm nút Quay lại (Back/Gesture)</strong> trên điện thoại! Hành vi này đã bị chặn và tính <strong>1 lần vi phạm quy chế</strong>.';
+    } else if (session.awayReason === 'mobile_drawer_or_blur') {
+      overlayTitle = 'Cảnh Báo: Kéo Thanh Thông Báo / Chuyển Ứng Dụng!';
+      overlayIcon = '📱';
+      violationDetailMessage = 'Hệ thống phát hiện bạn vừa <strong>kéo thanh thông báo (Notification Shade)</strong>, mở Cài đặt nhanh hoặc chuyển ứng dụng trên điện thoại! Vui lòng quay lại ngay.';
+    } else if (session.awayReason === 'split_screen_detected') {
+      overlayTitle = 'Cảnh Báo: Phát Hiện Chia Đôi Màn Hình!';
+      overlayIcon = '📱';
+      violationDetailMessage = 'Hệ thống phát hiện bạn đang bật <strong>Chế độ chia đôi màn hình (Split-Screen)</strong> hoặc Cửa sổ nổi! Vui lòng mở toàn màn hình để tiếp tục thi.';
+    }
+
     const lockdownOverlay = session.lockdownPending ? `
       <div class="exam-lockdown-overlay" role="dialog" aria-modal="true" aria-labelledby="examLockdownTitle"
         style="position:fixed;inset:0;background:rgba(0,0,0,0.85);backdrop-filter:blur(6px);z-index:999999;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;">
         <div class="exam-lockdown-dialog" style="background:var(--panel,#1e2130);border:2px solid ${(session.awayViolationRecorded || session.violationCount > 0) ? '#ef4444' : '#f59e0b'};border-radius:16px;padding:32px 28px;max-width:480px;width:100%;box-shadow:0 20px 50px rgba(0,0,0,0.7);text-align:center;box-sizing:border-box;">
-          <div class="exam-lockdown-icon" style="font-size:46px;margin-bottom:12px;">${(session.awayViolationRecorded || session.violationCount > 0) ? '❌' : '⚠️'}</div>
+          <div class="exam-lockdown-icon" style="font-size:46px;margin-bottom:12px;">${overlayIcon}</div>
           <h2 id="examLockdownTitle" style="font-size:20px;font-weight:800;color:${(session.awayViolationRecorded || session.violationCount > 0) ? '#ef4444' : '#fbbf24'};margin:0 0 10px;">
-            ${(session.awayViolationRecorded || session.violationCount > 0) ? 'Cảnh Báo: Đã Ghi Nhận Vi Phạm Quy Chế!' : 'Cảnh Báo: Rời Màn Hình Làm Bài!'}
+            ${overlayTitle}
           </h2>
           <p style="font-size:14px;color:var(--text,#e2e8f0);line-height:1.5;margin:0 0 14px;">
-            Hệ thống phát hiện bạn vừa chuyển tab (Alt+Tab), bấm F11, rời cửa sổ làm bài hoặc thoát toàn màn hình. Thời gian rời màn hình được tính <strong>cộng dồn</strong>.
+            ${violationDetailMessage}
           </p>
           ${(session.awayViolationRecorded || session.violationCount > 0) ? `
             <div class="exam-lockdown-warning" role="alert" style="background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.4);border-radius:8px;padding:12px;color:#f87171;font-weight:700;font-size:13.5px;margin-bottom:18px;">
-              Đã hết 10 giây! Bạn bị cộng vi phạm quy chế.<br>
+              Đã hết 10 giây hoặc vi phạm quy chế nghiêm trọng!<br>
               Tổng số vi phạm: <strong style="font-size:16px;color:#ef4444;">${session.violationCount}/3</strong> (Đủ 3 lần sẽ bị 0đ và dừng bài thi).<br>
               <span style="font-size:12px;color:#fca5a5;font-weight:500;">Thời gian rời cộng dồn còn: <strong id="examLockdownCountdown">${lockdownCountdown !== null ? lockdownCountdown : 10}</strong> giây trước khi bị cộng thêm 1 vi phạm.</span>
             </div>
@@ -1238,6 +1257,18 @@ export class QuizView {
     return `
       <div class="active-exam-room">
         ${lockdownOverlay}
+
+        ${(this._supportsFullscreen() && !this._getFullscreenElement() && !session.lockdownPending) ? `
+          <div class="active-exam-fullscreen-banner" id="mobileFullscreenWarningBanner" style="background:#f59e0b;color:#000;padding:12px 16px;border-radius:10px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:12px;font-weight:700;font-size:13.5px;box-shadow:0 4px 12px rgba(245,158,11,0.25);">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="font-size:20px;">⛶</span>
+              <span>Chưa bật Toàn Màn Hình! Vui lòng bấm kích hoạt để tuân thủ quy chế thi.</span>
+            </div>
+            <button type="button" class="btn-primary" id="btnTriggerExamFullscreen" style="background:#000;color:#fff;padding:8px 16px;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;">
+              ⛶ Bật Toàn Màn Hình
+            </button>
+          </div>
+        ` : ''}
 
         ${session.isOffline ? `
           <div class="active-exam-offline-banner" id="examOfflineBanner">
@@ -2809,6 +2840,13 @@ export class QuizView {
           isOffline: (typeof navigator !== 'undefined' && navigator.onLine === false),
         };
 
+        // History Trap: Push state to trap Android Hardware/Gesture Back button before attaching listeners
+        if (typeof window !== 'undefined' && window.history && typeof window.history.pushState === 'function') {
+          try {
+            window.history.pushState({ inExamLockdown: true, examId }, '', window.location.href);
+          } catch (e) {}
+        }
+
         this.render();
         this._attachExamLockdownListeners();
         this._requestExamFullscreen();
@@ -2882,6 +2920,13 @@ export class QuizView {
       disconnectStartedAt: null,
     });
 
+    // History Trap: Push state to trap Android Hardware/Gesture Back button before attaching listeners
+    if (typeof window !== 'undefined' && window.history && typeof window.history.pushState === 'function') {
+      try {
+        window.history.pushState({ inExamLockdown: true, examId: exam.id }, '', window.location.href);
+      } catch (e) {}
+    }
+
     this.render();
     this._attachExamLockdownListeners();
     this._requestExamFullscreen();
@@ -2903,6 +2948,14 @@ export class QuizView {
           this._showAlert('⛔ Bạn đã mất kết nối mạng quá 2 phút cho phép! Bài thi đang tự động được nộp.');
           this._submitActiveExam({ integrityBan: false });
           return;
+        }
+      }
+
+      // 1b. Mobile Notification Shade / Quick Settings / Loss of focus check
+      if (this._allowExamBlurEvent && typeof document !== 'undefined' && typeof document.hasFocus === 'function') {
+        if (!document.hasFocus() && !session.isAway) {
+          const reason = this._isMobileDevice() ? 'mobile_drawer_or_blur' : 'window_blur';
+          this._handleScreenDeparture(reason);
         }
       }
 
@@ -2990,8 +3043,13 @@ export class QuizView {
   _attachExamLockdownListeners() {
     if (typeof document === 'undefined' || this._examLockdownHandlers) return;
 
+    this._allowExamBlurEvent = Boolean(typeof process !== 'undefined' && process.env?.NODE_ENV === 'test');
+    if (!this._allowExamBlurEvent && typeof setTimeout !== 'undefined') {
+      setTimeout(() => { this._allowExamBlurEvent = true; }, 300);
+    }
+
     const onFullscreenChange = () => {
-      if (this._isPhoneDevice() || !this._supportsFullscreen()) return;
+      if (!this._supportsFullscreen()) return;
       const session = this.activeExamSession;
       if (!session) return;
       const isFullscreen = Boolean(this._getFullscreenElement());
@@ -3000,6 +3058,7 @@ export class QuizView {
         if (session.isAway) {
           this._flushAwayTime(session);
         }
+        this.render();
       } else {
         if (session.fullscreenActive) {
           session.fullscreenActive = false;
@@ -3022,17 +3081,35 @@ export class QuizView {
       }
     };
 
-    let allowBlurEvent = Boolean(typeof process !== 'undefined' && process.env?.NODE_ENV === 'test');
-    if (!allowBlurEvent && typeof setTimeout !== 'undefined') {
-      setTimeout(() => { allowBlurEvent = true; }, 150);
-    }
-
     const onBlur = () => {
-      // On mobile, rely strictly on visibilitychange and pagehide to avoid virtual keyboard / scroll blur glitches
-      if (this._isMobileDevice()) return;
-      if (allowBlurEvent) {
-        this._handleScreenDeparture('window_blur');
+      if (this._allowExamBlurEvent) {
+        const reason = this._isMobileDevice() ? 'mobile_drawer_or_blur' : 'window_blur';
+        this._handleScreenDeparture(reason);
       }
+    };
+
+    const onPopState = () => {
+      const session = this.activeExamSession;
+      if (!session || session.timeRemaining <= 0) return;
+
+      // 1. History Trap: Re-push state so user stays inside exam room
+      if (typeof window !== 'undefined' && window.history && typeof window.history.pushState === 'function') {
+        try {
+          window.history.pushState({ inExamLockdown: true, examId: session.exam.id }, '', window.location.href);
+        } catch (err) {}
+      }
+
+      // 2. Mobile vibration feedback
+      const nav = (typeof window !== 'undefined' && window.navigator) ? window.navigator : (typeof navigator !== 'undefined' ? navigator : null);
+      if (nav && typeof nav.vibrate === 'function') {
+        try {
+          nav.vibrate([200, 100, 200]);
+        } catch (err) {}
+      }
+
+      // 3. Mark departure with mobile_back_button_pressed and record immediate violation
+      this._handleScreenDeparture('mobile_back_button_pressed');
+      this._recordExamLockdownTimeoutViolation(session);
     };
 
     const onFocus = () => {
@@ -3080,12 +3157,27 @@ export class QuizView {
     };
 
     const onResize = () => {
-      if (this._isPhoneDevice() || !this._supportsFullscreen()) return;
       const session = this.activeExamSession;
       if (!session || session.timeRemaining <= 0) return;
-      if (session.fullscreenActive && !this._getFullscreenElement()) {
-        session.fullscreenActive = false;
-        this._handleScreenDeparture('fullscreen_exit');
+
+      // On desktop: fullscreen exit detection
+      if (!this._isMobileDevice() && this._supportsFullscreen()) {
+        if (session.fullscreenActive && !this._getFullscreenElement()) {
+          session.fullscreenActive = false;
+          this._handleScreenDeparture('fullscreen_exit');
+          return;
+        }
+      }
+
+      // On mobile: detect Split-screen or Floating window
+      if (this._isMobileDevice() && typeof window !== 'undefined' && window.screen) {
+        const screenH = window.screen.height || 0;
+        const screenW = window.screen.width || 0;
+        if (screenH > 400 && window.innerHeight > 0 && window.innerHeight < screenH * 0.58) {
+          this._handleScreenDeparture('split_screen_detected');
+        } else if (screenW > 400 && window.innerWidth > 0 && window.innerWidth < screenW * 0.58) {
+          this._handleScreenDeparture('split_screen_detected');
+        }
       }
     };
 
@@ -3162,6 +3254,7 @@ export class QuizView {
       onFullscreenChange,
       onVisibilityChange,
       onBlur,
+      onPopState,
       onFocus,
       onPageHide,
       onResize,
@@ -3186,6 +3279,7 @@ export class QuizView {
 
     if (typeof window !== 'undefined') {
       window.addEventListener('blur', onBlur);
+      window.addEventListener('popstate', onPopState);
       window.addEventListener('focus', onFocus);
       window.addEventListener('pagehide', onPageHide);
       window.addEventListener('resize', onResize);
@@ -3197,6 +3291,7 @@ export class QuizView {
   }
 
   _detachExamLockdownListeners() {
+    this._allowExamBlurEvent = false;
     if (this.activeExamSession) {
       this._cancelExamLockdownCountdown(this.activeExamSession);
     }
@@ -3217,6 +3312,7 @@ export class QuizView {
     if (typeof window !== 'undefined' && this._examLockdownHandlers) {
       const h = this._examLockdownHandlers;
       window.removeEventListener('blur', h.onBlur);
+      window.removeEventListener('popstate', h.onPopState);
       window.removeEventListener('focus', h.onFocus);
       window.removeEventListener('pagehide', h.onPageHide);
       window.removeEventListener('resize', h.onResize);
@@ -3691,6 +3787,13 @@ export class QuizView {
       const btnToggleExamFullscreen = this.container.querySelector('#btnToggleExamFullscreen');
       if (btnToggleExamFullscreen) {
         btnToggleExamFullscreen.addEventListener('click', () => {
+          this._requestExamFullscreen();
+        });
+      }
+
+      const btnTriggerExamFullscreen = this.container.querySelector('#btnTriggerExamFullscreen');
+      if (btnTriggerExamFullscreen) {
+        btnTriggerExamFullscreen.addEventListener('click', () => {
           this._requestExamFullscreen();
         });
       }
