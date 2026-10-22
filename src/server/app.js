@@ -64,8 +64,9 @@ import {
   getPaginatedServerUsers,
   getPaginatedServerSubmissions
 } from './auth/ServerDataStore.js';
-import { DEFAULT_EXAMS } from '../core/quiz/ExamManager.js';
+import { DEFAULT_EXAMS, examManager } from '../core/quiz/ExamManager.js';
 import { STATIC_QUESTION_BANK } from '../core/quiz/QuizBank.js';
+import { liveQuizManager } from '../core/quiz/LiveQuizManager.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -2520,6 +2521,186 @@ export async function handleRequest(req, res) {
     } catch (err) {
       console.error('[POST /api/exam-submissions] Error:', err.message);
       sendJson(res, 400, { success: false, error: 'Dữ liệu nộp bài không hợp lệ: ' + err.message });
+      return;
+    }
+  }
+
+  // =========================================================================
+  // LIVE QUIZ (KAHOOT / QUIZIZZ REALTIME ARENA) API ROUTES
+  // =========================================================================
+
+  // Route: GET /api/live-quiz/stream (Server-Sent Events Realtime Channel)
+  if (req.method === 'GET' && (pathname === '/api/live-quiz/stream' || pathname.endsWith('/live-quiz/stream'))) {
+    const pin = parsedUrl.searchParams.get('pin');
+    const userId = parsedUrl.searchParams.get('userId');
+    if (!pin) {
+      sendJson(res, 400, { success: false, error: 'Thiếu mã PIN phòng Live Quiz.' });
+      return;
+    }
+    const room = liveQuizManager.getRoom(pin);
+    if (!room) {
+      sendJson(res, 404, { success: false, error: 'Phòng Live Quiz không tồn tại hoặc đã đóng.' });
+      return;
+    }
+
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache, no-transform',
+      'Connection': 'keep-alive',
+      'Access-Control-Allow-Origin': '*',
+    });
+
+    res.write(`data: ${JSON.stringify({ event: 'CONNECTED', room: liveQuizManager.getPublicRoomState(pin, userId) })}\n\n`);
+
+    const unsubscribe = liveQuizManager.subscribe(pin, (payload) => {
+      try {
+        res.write(`data: ${JSON.stringify(payload)}\n\n`);
+      } catch (err) {}
+    });
+
+    // 15-second heartbeat ping
+    const pingTimer = setInterval(() => {
+      try {
+        res.write(': ping\n\n');
+      } catch (e) {
+        clearInterval(pingTimer);
+      }
+    }, 15000);
+
+    req.on('close', () => {
+      clearInterval(pingTimer);
+      unsubscribe();
+    });
+    return;
+  }
+
+  // Route: POST /api/live-quiz/create (Host creates a new Live Quiz Room)
+  if (req.method === 'POST' && pathname === '/api/live-quiz/create') {
+    try {
+      const rawBody = await readRequestBody(req);
+      const data = JSON.parse(rawBody || '{}');
+      const result = liveQuizManager.createRoom({
+        title: data.title,
+        examId: data.examId,
+        questions: data.questions,
+        createdBy: data.createdBy || 'user_admin',
+        durationSeconds: data.durationSeconds || 30,
+      });
+      sendJson(res, result.success ? 201 : 400, result);
+      return;
+    } catch (err) {
+      sendJson(res, 400, { success: false, error: err.message });
+      return;
+    }
+  }
+
+  // Route: GET /api/live-quiz/room/:pin (Get sanitized room state)
+  if (req.method === 'GET' && pathname.startsWith('/api/live-quiz/room/')) {
+    const pin = decodeURIComponent(pathname.replace('/api/live-quiz/room/', '')).trim();
+    const userId = parsedUrl.searchParams.get('userId');
+    const state = liveQuizManager.getPublicRoomState(pin, userId);
+    if (!state) {
+      sendJson(res, 404, { success: false, error: 'Không tìm thấy phòng Live Quiz.' });
+      return;
+    }
+    sendJson(res, 200, { success: true, room: state });
+    return;
+  }
+
+  // Route: POST /api/live-quiz/join (Student joins live room by PIN)
+  if (req.method === 'POST' && pathname === '/api/live-quiz/join') {
+    try {
+      const rawBody = await readRequestBody(req);
+      const data = JSON.parse(rawBody || '{}');
+      const result = liveQuizManager.joinRoom(data.pin, data.user);
+      sendJson(res, result.success ? 200 : 400, result);
+      return;
+    } catch (err) {
+      sendJson(res, 400, { success: false, error: err.message });
+      return;
+    }
+  }
+
+  // Route: POST /api/live-quiz/start-question (Host starts question round)
+  if (req.method === 'POST' && pathname === '/api/live-quiz/start-question') {
+    try {
+      const rawBody = await readRequestBody(req);
+      const data = JSON.parse(rawBody || '{}');
+      const result = liveQuizManager.startQuestion(data.pin, data.hostUserId);
+      sendJson(res, result.success ? 200 : 400, result);
+      return;
+    } catch (err) {
+      sendJson(res, 400, { success: false, error: err.message });
+      return;
+    }
+  }
+
+  // Route: POST /api/live-quiz/answer (Player submits answer with speed points)
+  if (req.method === 'POST' && pathname === '/api/live-quiz/answer') {
+    try {
+      const rawBody = await readRequestBody(req);
+      const data = JSON.parse(rawBody || '{}');
+      const result = liveQuizManager.submitAnswer(data.pin, data.userId, data.optionId);
+      sendJson(res, result.success ? 200 : 400, result);
+      return;
+    } catch (err) {
+      sendJson(res, 400, { success: false, error: err.message });
+      return;
+    }
+  }
+
+  // Route: POST /api/live-quiz/end-round (Host ends question and reveals stats)
+  if (req.method === 'POST' && pathname === '/api/live-quiz/end-round') {
+    try {
+      const rawBody = await readRequestBody(req);
+      const data = JSON.parse(rawBody || '{}');
+      const result = liveQuizManager.endRound(data.pin, data.hostUserId);
+      sendJson(res, result.success ? 200 : 400, result);
+      return;
+    } catch (err) {
+      sendJson(res, 400, { success: false, error: err.message });
+      return;
+    }
+  }
+
+  // Route: POST /api/live-quiz/leaderboard (Host displays leaderboard)
+  if (req.method === 'POST' && pathname === '/api/live-quiz/leaderboard') {
+    try {
+      const rawBody = await readRequestBody(req);
+      const data = JSON.parse(rawBody || '{}');
+      const result = liveQuizManager.showLeaderboard(data.pin, data.hostUserId);
+      sendJson(res, result.success ? 200 : 400, result);
+      return;
+    } catch (err) {
+      sendJson(res, 400, { success: false, error: err.message });
+      return;
+    }
+  }
+
+  // Route: POST /api/live-quiz/next (Host advances to next question or finishes)
+  if (req.method === 'POST' && pathname === '/api/live-quiz/next') {
+    try {
+      const rawBody = await readRequestBody(req);
+      const data = JSON.parse(rawBody || '{}');
+      const result = liveQuizManager.nextQuestion(data.pin, data.hostUserId);
+      sendJson(res, result.success ? 200 : 400, result);
+      return;
+    } catch (err) {
+      sendJson(res, 400, { success: false, error: err.message });
+      return;
+    }
+  }
+
+  // Route: POST /api/live-quiz/save-gradebook (Host saves scores into ExamManager Gradebook)
+  if (req.method === 'POST' && pathname === '/api/live-quiz/save-gradebook') {
+    try {
+      const rawBody = await readRequestBody(req);
+      const data = JSON.parse(rawBody || '{}');
+      const result = liveQuizManager.saveToGradebook(data.pin, data.hostUserId, examManager);
+      sendJson(res, result.success ? 200 : 400, result);
+      return;
+    } catch (err) {
+      sendJson(res, 400, { success: false, error: err.message });
       return;
     }
   }

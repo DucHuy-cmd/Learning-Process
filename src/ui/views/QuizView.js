@@ -43,6 +43,7 @@ import { authManager } from '../../core/auth/AuthManager.js';
 import { quizHistoryManager } from '../../core/quiz/QuizHistoryManager.js';
 import { cloudSyncManager } from '../../core/sync/CloudSyncManager.js';
 import { examManager, MAX_DISCONNECT_GRACE_SECONDS } from '../../core/quiz/ExamManager.js';
+import { liveQuizManager } from '../../core/quiz/LiveQuizManager.js';
 import {
   parseExamText,
   parseExamCsv,
@@ -94,6 +95,19 @@ export class QuizView {
     // Timed Exam Taking Session State
     this.activeExamSession = null; // { exam, questions, answers, currentQIndex, timeRemaining, timerId, startedAt }
     this.reviewSubmission = null; // Submission object being reviewed
+
+    // Live Quiz (Kahoot / Quizizz Realtime Arena) State
+    this.liveQuizRoom = null; // Room state object (public state)
+    this.liveQuizRole = null; // 'host' | 'player'
+    this.liveQuizPinInput = ''; // User-typed PIN in join banner
+    this.liveQuizEventSource = null; // Browser EventSource instance for SSE
+    this.liveQuizUnsubscribe = null; // Local pubsub unsubscribe callback
+    this.liveQuizSelectedOption = null; // Selected option ID for current question
+    this.liveQuizLastFeedback = null; // Feedback on last answer { isCorrect, points, streak, ... }
+    this.liveQuizTimerInterval = null; // Local seconds countdown interval
+    this.liveQuizLocalSecondsLeft = 0; // Local seconds remaining for active question
+    this.liveQuizLaunchExamId = null; // Exam selected for host launch
+    this.liveQuizDurationSeconds = 30; // Seconds per question config
 
     // Teacher's Exam Studio State (3 Sub-Tabs: distribute | publish | print, with 'assign' alias)
     this.studioSubTab = 'distribute'; // 'distribute' | 'publish' | 'print'
@@ -620,18 +634,22 @@ export class QuizView {
     const pubSec = this.container.querySelector('#studioPublishSection');
     const printSec = this.container.querySelector('#studioPrintSection');
     const assignSec = this.container.querySelector('#studioAssignSection');
+    const liveSec = this.container.querySelector('#studioLiveQuizSection');
 
-    if (distSec) distSec.style.display = (subTab === 'distribute' || (subTab !== 'publish' && subTab !== 'print' && subTab !== 'assign')) ? 'block' : 'none';
+    if (distSec) distSec.style.display = (subTab === 'distribute' || (subTab !== 'publish' && subTab !== 'print' && subTab !== 'assign' && subTab !== 'liveQuiz')) ? 'block' : 'none';
     if (pubSec) pubSec.style.display = (subTab === 'publish' || subTab === 'assign') ? 'block' : 'none';
-    if (assignSec) assignSec.style.display = subTab === 'print' ? 'none' : 'block';
+    if (assignSec) assignSec.style.display = (subTab === 'print' || subTab === 'liveQuiz') ? 'none' : 'block';
     if (printSec) printSec.style.display = subTab === 'print' ? 'block' : 'none';
+    if (liveSec) liveSec.style.display = subTab === 'liveQuiz' ? 'block' : 'none';
 
     const btnDist = this.container.querySelector('#tabStudioDistribute');
     const btnPub = this.container.querySelector('#tabStudioPublish');
     const btnPrint = this.container.querySelector('#tabStudioPrint');
-    if (btnDist) btnDist.classList.toggle('active', (subTab === 'distribute' || (subTab !== 'publish' && subTab !== 'print' && subTab !== 'assign')));
+    const btnLive = this.container.querySelector('#tabStudioLiveQuiz');
+    if (btnDist) btnDist.classList.toggle('active', (subTab === 'distribute' || (subTab !== 'publish' && subTab !== 'print' && subTab !== 'assign' && subTab !== 'liveQuiz')));
     if (btnPub) btnPub.classList.toggle('active', (subTab === 'publish' || subTab === 'assign'));
     if (btnPrint) btnPrint.classList.toggle('active', subTab === 'print');
+    if (btnLive) btnLive.classList.toggle('active', subTab === 'liveQuiz');
   }
 
   _getStudioPrintPool() {
@@ -851,6 +869,17 @@ export class QuizView {
     }
     if (!this.container) return;
 
+    // Live Quiz Realtime Arena Mode (Kahoot Style)
+    if (this.liveQuizRoom) {
+      this.container.innerHTML = `
+        <div class="quiz-view-container" style="max-width:1300px;margin:0 auto;padding:16px 20px 40px;">
+          ${this._renderLiveQuizArena()}
+        </div>
+      `;
+      this._bindLiveQuizEvents();
+      return;
+    }
+
     const isAdmin = authManager.isAdmin();
     const currentUser = authManager.getCurrentUser();
 
@@ -1044,6 +1073,23 @@ export class QuizView {
       : 0;
 
     return `
+      <!-- Live Quiz Join Banner (Kahoot-style Realtime Arena) -->
+      <div class="live-quiz-join-banner">
+        <div class="live-quiz-join-content">
+          <div class="live-quiz-join-icon">🎮</div>
+          <div class="live-quiz-join-text">
+            <h3>Đấu Trường Trực Tiếp (Live Quiz Kahoot)</h3>
+            <p>Tham gia phòng thi đấu thời gian thực trên lớp cùng Giảng viên &amp; Bạn bè bằng mã PIN 6 số</p>
+          </div>
+        </div>
+        <div class="live-quiz-join-form">
+          <input type="text" id="inputLiveQuizPin" placeholder="MÃ PIN 6 SỐ" maxlength="6" value="${this._escapeHtml(this.liveQuizPinInput || '')}" autocomplete="off" />
+          <button type="button" class="btn-join-live-quiz" id="btnJoinLiveQuiz">
+            🚀 Vào Phòng Thi
+          </button>
+        </div>
+      </div>
+
       <!-- Student Exam Dashboard Header (Only shown for Students) -->
       ${!isAdmin ? `
       <div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px 24px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px;">
@@ -1149,6 +1195,9 @@ export class QuizView {
                         ${new Date(item.createdAt).toLocaleDateString('vi-VN')}
                       </td>
                       <td style="text-align:right;white-space:nowrap;">
+                        <button type="button" class="btn-sm btn-launch-live-quiz" data-exam-id="${item.id}" title="Mở phòng đấu trường Live Quiz chiếu máy chiếu" style="background:linear-gradient(135deg, #6366f1 0%, #ec4899 100%);color:#fff;border:none;margin-right:6px;font-weight:700;padding:4px 10px;border-radius:6px;cursor:pointer;">
+                          🎮 Live Quiz
+                        </button>
                         <button type="button" class="btn-sm btn-view-admin-key" data-exam-id="${item.id}" style="background:rgba(245,158,11,0.18);color:#f59e0b;border:1px solid rgba(245,158,11,0.4);margin-right:6px;font-weight:700;padding:4px 10px;border-radius:6px;cursor:pointer;">
                           🔑 File Đáp Án
                         </button>
@@ -1801,6 +1850,9 @@ export class QuizView {
         <button type="button" class="btn-tab ${this.studioSubTab === 'print' ? 'active' : ''}" id="tabStudioPrint" style="padding:8px 18px;font-size:13.5px;font-weight:700;border-radius:6px;cursor:pointer;">
           🖨️ 3. Soạn Đề In Ấn Chuẩn A4 &amp; Xuất LaTeX
         </button>
+        <button type="button" class="btn-tab ${this.studioSubTab === 'liveQuiz' ? 'active' : ''}" id="tabStudioLiveQuiz" style="padding:8px 18px;font-size:13.5px;font-weight:700;border-radius:6px;cursor:pointer;background:${this.studioSubTab === 'liveQuiz' ? 'linear-gradient(135deg, #6366f1 0%, #ec4899 100%)' : 'rgba(99,102,241,0.1)'};border:1px solid #8b5cf6;color:${this.studioSubTab === 'liveQuiz' ? '#fff' : '#c084fc'};">
+          🎮 4. Đấu Trường Live Quiz
+        </button>
       </div>
 
       <!-- SECTION A: ASSIGN / DISTRIBUTE & PUBLISH WRAPPER -->
@@ -2442,6 +2494,75 @@ export class QuizView {
 
         </div>
         `}
+      </div>
+
+      <!-- SECTION C: LIVE QUIZ KAHOOT STUDIO -->
+      <div id="studioLiveQuizSection" style="display:${this.studioSubTab === 'liveQuiz' ? 'block' : 'none'};">
+        <div class="studio-card" style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:24px;margin-bottom:24px;">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+            <span style="font-size:32px;">🎮</span>
+            <div>
+              <h3 style="font-size:18px;font-weight:800;color:var(--text);margin:0 0 4px;">
+                Đấu Trường Trực Tiếp (Live Quiz Kahoot)
+              </h3>
+              <p style="font-size:13px;color:var(--dim);margin:0;">
+                Chiếu màn hình lên máy chiếu / TV, sinh viên dùng điện thoại nhập PIN để cùng tranh tài thời gian thực.
+              </p>
+            </div>
+          </div>
+
+          <div style="background:var(--panel-alt);border:1px solid var(--line);border-radius:10px;padding:20px;max-width:700px;margin-bottom:20px;">
+            <div style="margin-bottom:16px;">
+              <label style="display:block;font-size:13px;font-weight:700;color:var(--text);margin-bottom:6px;">
+                1. Nguồn Câu Hỏi Đấu Trường:
+              </label>
+              <select id="selectLiveQuizSource" style="width:100%;padding:10px 12px;border-radius:8px;background:var(--panel);border:1px solid var(--line);color:var(--text);font-size:13.5px;">
+                <optgroup label="Từ Đề Thi Đã Phân Phối">
+                  ${assignedExamsList.map(e => `
+                    <option value="exam_${e.id}" ${this.liveQuizLaunchExamId === e.id ? 'selected' : ''}>
+                      📑 ${this._escapeHtml(e.title)} (${(e.questionIds || []).length} câu)
+                    </option>
+                  `).join('')}
+                </optgroup>
+                <optgroup label="Từ Ngân Hàng Câu Hỏi">
+                  ${this.importedQuestions.length > 0 ? `
+                    <option value="imported_all">
+                      📁 Toàn bộ câu hỏi Word đã nạp (${this.importedQuestions.length} câu)
+                    </option>
+                  ` : ''}
+                  <option value="bank_100">
+                    🏛️ Ngân hàng 100 câu Toán Rời Rạc &amp; Đồ Thị
+                  </option>
+                </optgroup>
+              </select>
+            </div>
+
+            <div style="margin-bottom:16px;">
+              <label style="display:block;font-size:13px;font-weight:700;color:var(--text);margin-bottom:6px;">
+                2. Tiêu Đề Phòng Đấu Trường:
+              </label>
+              <input type="text" id="inputLiveQuizTitle" value="${this._escapeHtml(defaultExamTitle || 'Đấu Trường Toán Rời Rạc')}" style="width:100%;padding:10px 12px;border-radius:8px;background:var(--panel);border:1px solid var(--line);color:var(--text);font-size:14px;font-weight:600;box-sizing:border-box;" />
+            </div>
+
+            <div style="margin-bottom:20px;">
+              <label style="display:block;font-size:13px;font-weight:700;color:var(--text);margin-bottom:6px;">
+                3. Thời Gian Trả Lời Mỗi Câu:
+              </label>
+              <select id="selectLiveQuizDuration" style="width:100%;padding:10px 12px;border-radius:8px;background:var(--panel);border:1px solid var(--line);color:var(--text);font-size:13.5px;">
+                <option value="15">⚡ 15 Giây (Thử thách tốc độ cao)</option>
+                <option value="20">⚡ 20 Giây</option>
+                <option value="30" selected>⏱️ 30 Giây (Tiêu chuẩn Kahoot)</option>
+                <option value="45">⏱️ 45 Giây</option>
+                <option value="60">⏳ 60 Giây (Dành cho câu hỏi tính toán dài)</option>
+              </select>
+            </div>
+
+            <button type="button" class="btn-primary" id="btnCreateLiveQuizFromStudio" style="width:100%;padding:14px;font-size:15px;font-weight:800;border-radius:10px;background:linear-gradient(135deg, #6366f1 0%, #ec4899 100%);border:none;box-shadow:0 6px 20px rgba(99,102,241,0.35);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">
+              <span>🚀</span>
+              <span>TẠO PHÒNG &amp; MỞ MÀN CHIẾU LIVE QUIZ</span>
+            </button>
+          </div>
+        </div>
       </div>
     `;
   }
@@ -4226,6 +4347,38 @@ export class QuizView {
 
 
     // 3. My Exams & Timed Exam Events
+    const inputLivePin = this.container.querySelector('#inputLiveQuizPin');
+    if (inputLivePin) {
+      inputLivePin.addEventListener('input', (e) => {
+        this.liveQuizPinInput = (e.target.value || '').replace(/\D/g, '').slice(0, 6);
+        if (e.target.value !== this.liveQuizPinInput) {
+          e.target.value = this.liveQuizPinInput;
+        }
+      });
+      inputLivePin.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          this._joinLiveQuiz(this.liveQuizPinInput);
+        }
+      });
+    }
+
+    const btnJoinLive = this.container.querySelector('#btnJoinLiveQuiz');
+    if (btnJoinLive) {
+      btnJoinLive.addEventListener('click', (e) => {
+        e.preventDefault();
+        this._joinLiveQuiz(this.liveQuizPinInput);
+      });
+    }
+
+    this.container.querySelectorAll('.btn-launch-live-quiz').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const examId = btn.getAttribute('data-exam-id');
+        this._launchLiveQuizFromExam(examId);
+      });
+    });
+
     this.container.querySelectorAll('.btn-start-exam').forEach(btn => {
       btn.addEventListener('click', () => {
         const examId = btn.getAttribute('data-exam-id');
@@ -4477,6 +4630,70 @@ export class QuizView {
       tabStudioAssign.addEventListener('click', (e) => {
         e.preventDefault();
         this.setStudioSubTab('publish');
+      });
+    }
+
+    const tabStudioLiveQuiz = this.container.querySelector('#tabStudioLiveQuiz');
+    if (tabStudioLiveQuiz) {
+      tabStudioLiveQuiz.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.setStudioSubTab('liveQuiz');
+      });
+    }
+
+    const btnCreateLive = this.container.querySelector('#btnCreateLiveQuizFromStudio');
+    if (btnCreateLive) {
+      btnCreateLive.addEventListener('click', async (e) => {
+        e.preventDefault();
+        const sourceEl = this.container.querySelector('#selectLiveQuizSource');
+        const titleEl = this.container.querySelector('#inputLiveQuizTitle');
+        const durEl = this.container.querySelector('#selectLiveQuizDuration');
+        const source = sourceEl ? sourceEl.value : 'bank_100';
+        const title = titleEl ? titleEl.value.trim() : 'Đấu Trường Live Quiz';
+        const duration = durEl ? parseInt(durEl.value, 10) : 30;
+
+        let questions = [];
+        let examId = null;
+
+        if (source.startsWith('exam_')) {
+          examId = source.replace('exam_', '');
+          const exam = examManager.getExamById(examId);
+          if (exam) {
+            const allQ = getAllQuestions();
+            const customQ = Array.isArray(exam.customQuestions) ? exam.customQuestions : [];
+            const pool = [...allQ, ...customQ, ...this.importedQuestions];
+            questions = (exam.questionIds || []).map(id => pool.find(q => q.id === id)).filter(Boolean);
+          }
+        } else if (source === 'imported_all') {
+          questions = this.importedQuestions;
+        } else {
+          questions = getAllQuestions().slice(0, 10);
+        }
+
+        if (questions.length === 0) {
+          this._showAlert('Không có câu hỏi nào trong nguồn đã chọn!');
+          return;
+        }
+
+        const currentUser = authManager.getCurrentUser() || { id: 'admin', username: 'admin' };
+        const res = await this._apiLiveQuizCreate({
+          title,
+          examId,
+          questions,
+          createdBy: currentUser.id,
+          durationSeconds: duration,
+        });
+
+        if (res && res.success) {
+          this.liveQuizRoom = res.room;
+          this.liveQuizRole = 'host';
+          this.liveQuizSelectedOption = null;
+          this.liveQuizLastFeedback = null;
+          this._connectLiveQuiz(res.room.pin, currentUser.id);
+          this.render();
+        } else {
+          this._showAlert(res?.error || 'Không thể tạo phòng Live Quiz.');
+        }
       });
     }
 
@@ -5723,5 +5940,1114 @@ export class QuizView {
         }
       }
     });
+  }
+
+  // =========================================================================
+  // SUB-VIEW: LIVE QUIZ KAHOOT REALTIME ARENA
+  // =========================================================================
+
+  _renderLiveQuizArena() {
+    if (!this.liveQuizRoom) return '';
+    const room = this.liveQuizRoom;
+    const isHost = this.liveQuizRole === 'host';
+    const currentUser = authManager.getCurrentUser() || { id: 'guest', username: 'guest', fullName: 'Khách' };
+
+    return `
+      <div class="live-quiz-arena" id="liveQuizArena">
+        <!-- Top Arena Header -->
+        <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(255,255,255,0.15);padding-bottom:14px;flex-wrap:wrap;gap:12px;">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <span style="font-size:28px;">🎮</span>
+            <div>
+              <div style="display:flex;align-items:center;gap:8px;">
+                <span class="live-mode-badge" style="background:${isHost ? 'linear-gradient(135deg,#6366f1,#ec4899)' : 'linear-gradient(135deg,#10b981,#059669)'};padding:2px 10px;border-radius:12px;font-size:11px;font-weight:800;letter-spacing:0.5px;color:#fff;">
+                  ${isHost ? '📺 HOST • MÀN CHIẾU' : '📱 THÍ SINH'}
+                </span>
+                <span style="font-size:12px;color:rgba(255,255,255,0.7);">Mã PIN: <strong style="color:#fbbf24;font-family:monospace;letter-spacing:1px;font-size:14px;">${room.pin}</strong></span>
+              </div>
+              <h2 style="font-size:18px;font-weight:800;margin:4px 0 0;color:#fff;line-height:1.3;">
+                ${this._escapeHtml(room.title)}
+              </h2>
+            </div>
+          </div>
+
+          <div style="display:flex;align-items:center;gap:10px;">
+            <button type="button" class="btn-sm" id="${isHost ? 'btnHostExitRoom' : 'btnPlayerLeaveRoom'}" style="padding:7px 16px;border-radius:8px;background:rgba(239,68,68,0.2);color:#ef4444;border:1px solid rgba(239,68,68,0.4);font-weight:700;cursor:pointer;">
+              ${isHost ? '❌ Đóng Phòng' : '🚪 Rời Phòng'}
+            </button>
+          </div>
+        </div>
+
+        <!-- Arena Body based on Role & Status -->
+        ${isHost ? this._renderHostArenaBody(room) : this._renderPlayerArenaBody(room, currentUser)}
+      </div>
+    `;
+  }
+
+  _renderHostArenaBody(room) {
+    const status = room.status || 'lobby';
+    const participantsList = Array.isArray(room.participants)
+      ? room.participants
+      : Object.values(room.participants || {});
+    const totalCount = room.totalParticipants || participantsList.length;
+
+    // 1. LOBBY STATUS
+    if (status === 'lobby') {
+      return `
+        <div style="padding:20px 0;text-align:center;">
+          <div class="live-pin-card">
+            <div style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.7);text-transform:uppercase;letter-spacing:1px;">
+              🎮 MÃ PIN THAM GIA ĐẤU TRƯỜNG
+            </div>
+            <div class="live-pin-number" id="liveQuizDisplayPin">${room.pin}</div>
+            <p style="margin:0 0 16px;font-size:14px;color:rgba(255,255,255,0.85);line-height:1.5;">
+              Sinh viên truy cập mục <strong>"Đề Thi Của Tôi"</strong> trên điện thoại và nhập mã PIN trên để tham gia!
+            </p>
+            <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:20px;">
+              <span class="live-status-pill" style="background:rgba(16,185,129,0.2);color:#10b981;padding:6px 18px;border-radius:20px;font-weight:700;font-size:14px;border:1px solid rgba(16,185,129,0.4);">
+                👥 <span id="liveQuizLobbyCount">${totalCount}</span> Thí sinh đã vào phòng
+              </span>
+            </div>
+            <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">
+              <button type="button" class="btn-primary" id="btnHostStartGame" style="padding:14px 32px;font-size:16px;font-weight:800;border-radius:10px;background:linear-gradient(135deg,#10b981,#059669);box-shadow:0 4px 16px rgba(16,185,129,0.4);border:none;cursor:pointer;">
+                ▶️ BẮT ĐẦU ĐẤU TRƯỜNG (${room.totalQuestions} CÂU HỎI)
+              </button>
+            </div>
+          </div>
+
+          <div style="margin-top:24px;max-width:800px;margin-left:auto;margin-right:auto;">
+            <h4 style="font-size:14px;color:rgba(255,255,255,0.7);text-align:center;margin-bottom:12px;">
+              Danh sách thí sinh trong phòng chờ:
+            </h4>
+            <div class="live-participants-chips" style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;">
+              ${participantsList.map(p => `
+                <div style="background:rgba(255,255,255,0.12);padding:6px 14px;border-radius:20px;font-size:13px;font-weight:700;border:1px solid rgba(255,255,255,0.2);display:flex;align-items:center;gap:6px;color:#fff;">
+                  <span>👤</span>
+                  <span>${this._escapeHtml(p.fullName || p.username)}</span>
+                </div>
+              `).join('')}
+              ${participantsList.length === 0 ? `
+                <div style="color:rgba(255,255,255,0.5);font-size:13px;font-style:italic;padding:12px;">
+                  Đang chờ thí sinh đầu tiên tham gia...
+                </div>
+              ` : ''}
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // 2. IN_QUESTION STATUS
+    if (status === 'in_question') {
+      const q = room.currentQuestion || {};
+      const options = q.options || [];
+      const optA = options.find(o => o.id === 'A') || { text: '' };
+      const optB = options.find(o => o.id === 'B') || { text: '' };
+      const optC = options.find(o => o.id === 'C') || { text: '' };
+      const optD = options.find(o => o.id === 'D') || { text: '' };
+
+      return `
+        <div style="padding:10px 0;">
+          <!-- Question Top Bar -->
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:12px;">
+            <span style="font-size:15px;font-weight:700;background:rgba(255,255,255,0.15);padding:6px 14px;border-radius:8px;">
+              Câu ${room.currentQIndex + 1} / ${room.totalQuestions}
+            </span>
+            <div style="font-size:32px;font-weight:900;color:#fbbf24;font-family:monospace;" id="liveQuizTimerDisplay">
+              ⏱️ ${this.liveQuizLocalSecondsLeft}s
+            </div>
+            <span id="liveQuizAnswerCounter" style="font-size:14px;background:rgba(255,255,255,0.15);padding:6px 14px;border-radius:20px;font-weight:700;">
+              Đã trả lời: ${room.answersCount || 0} / ${totalCount}
+            </span>
+          </div>
+
+          <!-- Question Text Card -->
+          <div style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.18);border-radius:14px;padding:26px 20px;margin-bottom:20px;font-size:20px;font-weight:700;color:#fff;line-height:1.6;text-align:center;">
+            ${this._formatExamContent(q.question)}
+          </div>
+
+          <!-- 4 Large Option Boxes -->
+          <div class="live-options-grid">
+            <div class="btn-live-opt opt-a">
+              <span style="font-size:22px;font-weight:900;">🔴 A</span>
+              <span style="flex:1;">${this._formatExamContent(optA.text)}</span>
+            </div>
+            <div class="btn-live-opt opt-b">
+              <span style="font-size:22px;font-weight:900;">🔷 B</span>
+              <span style="flex:1;">${this._formatExamContent(optB.text)}</span>
+            </div>
+            <div class="btn-live-opt opt-c">
+              <span style="font-size:22px;font-weight:900;">🟡 C</span>
+              <span style="flex:1;">${this._formatExamContent(optC.text)}</span>
+            </div>
+            <div class="btn-live-opt opt-d">
+              <span style="font-size:22px;font-weight:900;">🟩 D</span>
+              <span style="flex:1;">${this._formatExamContent(optD.text)}</span>
+            </div>
+          </div>
+
+          <!-- Host End Round Button -->
+          <div style="text-align:center;margin-top:24px;">
+            <button type="button" class="btn-secondary" id="btnHostEndRound" style="padding:12px 28px;font-size:15px;font-weight:800;border-radius:10px;background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.3);cursor:pointer;">
+              ⏹️ Khóa &amp; Xem Kết Quả (Hết Giờ)
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    // 3. ROUND_RESULT STATUS
+    if (status === 'round_result') {
+      const q = room.currentQuestion || {};
+      const options = q.options || [];
+      const stats = room.optionStats || { A: 0, B: 0, C: 0, D: 0 };
+      const totalAnswers = (stats.A || 0) + (stats.B || 0) + (stats.C || 0) + (stats.D || 0) || 1;
+      const correctId = q.correctId || 'A';
+
+      return `
+        <div style="padding:10px 0;">
+          <div style="text-align:center;margin-bottom:16px;">
+            <span style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.7);text-transform:uppercase;">
+              KẾT QUẢ CÂU ${room.currentQIndex + 1} / ${room.totalQuestions}
+            </span>
+            <h3 style="font-size:20px;font-weight:800;color:#fff;margin:6px 0 0;">
+              ${this._formatExamContent(q.question)}
+            </h3>
+          </div>
+
+          <!-- Answer distribution chart -->
+          <div class="live-options-grid">
+            ${['A', 'B', 'C', 'D'].map(optId => {
+              const opt = options.find(o => o.id === optId) || { text: '' };
+              const count = stats[optId] || 0;
+              const pct = Math.round((count / totalAnswers) * 100);
+              const isCorrect = optId === correctId;
+              const optClass = optId.toLowerCase();
+
+              return `
+                <div class="btn-live-opt opt-${optClass}" style="position:relative;overflow:hidden;flex-direction:column;align-items:flex-start;justify-content:center;gap:6px;${isCorrect ? 'outline:4px solid #10b981;box-shadow:0 0 20px rgba(16,185,129,0.8);' : 'opacity:0.8;'}">
+                  <div style="display:flex;justify-content:space-between;width:100%;align-items:center;">
+                    <span style="font-size:20px;font-weight:900;">${optId} ${isCorrect ? '🏆 ĐÁP ÁN ĐÚNG' : ''}</span>
+                    <span style="font-size:18px;font-weight:800;">${count} người (${pct}%)</span>
+                  </div>
+                  <div style="font-size:14px;line-height:1.4;">${this._formatExamContent(opt.text)}</div>
+                  <!-- Progress bar fill -->
+                  <div style="position:absolute;bottom:0;left:0;height:6px;background:rgba(255,255,255,0.6);width:${pct}%;"></div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+
+          ${q.explanation ? `
+            <div style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:10px;padding:14px 18px;margin-top:20px;font-size:14px;color:rgba(255,255,255,0.9);line-height:1.5;">
+              💡 <strong>Hướng dẫn giải:</strong> ${this._formatExamContent(q.explanation)}
+            </div>
+          ` : ''}
+
+          <div style="text-align:center;margin-top:24px;">
+            <button type="button" class="btn-primary" id="btnHostShowLeaderboard" style="padding:14px 32px;font-size:16px;font-weight:800;border-radius:10px;background:linear-gradient(135deg,#6366f1,#ec4899);border:none;cursor:pointer;box-shadow:0 4px 16px rgba(99,102,241,0.4);">
+              📊 Xem Bảng Vàng (Leaderboard)
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    // 4. LEADERBOARD STATUS
+    if (status === 'leaderboard') {
+      const leaderboard = Array.isArray(room.leaderboard) ? room.leaderboard : [];
+      const top5 = leaderboard.slice(0, 5);
+      const isLastQ = (room.currentQIndex + 1) >= room.totalQuestions;
+
+      return `
+        <div style="padding:10px 0;max-width:700px;margin:0 auto;width:100%;">
+          <div style="text-align:center;margin-bottom:20px;">
+            <div style="font-size:36px;margin-bottom:4px;">🏆</div>
+            <h3 style="font-size:22px;font-weight:900;color:#fff;margin:0;">
+              BẢNG VÀNG DẪN ĐẦU (TOP 5)
+            </h3>
+            <p style="font-size:13px;color:rgba(255,255,255,0.7);margin:4px 0 0;">
+              Sau câu hỏi ${room.currentQIndex + 1} / ${room.totalQuestions}
+            </p>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            ${top5.map((p, idx) => {
+              const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'];
+              const bgGradients = [
+                'linear-gradient(135deg,rgba(251,191,36,0.3),rgba(180,83,9,0.3))',
+                'linear-gradient(135deg,rgba(148,163,184,0.3),rgba(71,85,105,0.3))',
+                'linear-gradient(135deg,rgba(217,119,6,0.3),rgba(120,53,15,0.3))',
+                'rgba(255,255,255,0.08)',
+                'rgba(255,255,255,0.08)',
+              ];
+
+              return `
+                <div style="background:${bgGradients[idx] || 'rgba(255,255,255,0.08)'};border:1px solid rgba(255,255,255,0.2);border-radius:12px;padding:12px 18px;display:flex;justify-content:space-between;align-items:center;">
+                  <div style="display:flex;align-items:center;gap:12px;">
+                    <span style="font-size:24px;">${medals[idx] || (idx + 1)}</span>
+                    <div>
+                      <div style="font-size:16px;font-weight:800;color:#fff;">${this._escapeHtml(p.fullName || p.username)}</div>
+                      <div style="font-size:12px;color:rgba(255,255,255,0.65);">${this._escapeHtml(p.className || '')}</div>
+                    </div>
+                  </div>
+                  <div style="text-align:right;">
+                    <div style="font-size:20px;font-weight:900;color:#fbbf24;font-family:monospace;">${p.score} pts</div>
+                    ${p.streak > 1 ? `<div style="font-size:11px;color:#f97316;font-weight:700;">🔥 Chuỗi ${p.streak}</div>` : ''}
+                  </div>
+                </div>
+              `;
+            }).join('')}
+            ${top5.length === 0 ? `
+              <div style="text-align:center;padding:24px;color:rgba(255,255,255,0.5);">Chưa có điểm số nào.</div>
+            ` : ''}
+          </div>
+
+          <div style="text-align:center;margin-top:28px;">
+            <button type="button" class="btn-primary" id="btnHostNextQuestion" style="padding:14px 34px;font-size:16px;font-weight:800;border-radius:10px;background:linear-gradient(135deg,#10b981,#059669);border:none;cursor:pointer;box-shadow:0 4px 16px rgba(16,185,129,0.4);">
+              ${isLastQ ? '🏆 XEM BỤC VINH QUANG (PODIUM)' : `⏩ CÂU TIẾP THEO (${room.currentQIndex + 2} / ${room.totalQuestions})`}
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    // 5. PODIUM / FINISHED STATUS
+    const leaderboard = Array.isArray(room.leaderboard) ? room.leaderboard : [];
+    const first = leaderboard[0] || null;
+    const second = leaderboard[1] || null;
+    const third = leaderboard[2] || null;
+
+    return `
+      <div style="padding:10px 0;max-width:850px;margin:0 auto;width:100%;">
+        <div style="text-align:center;margin-bottom:20px;">
+          <div style="font-size:42px;margin-bottom:4px;">🎉</div>
+          <h2 style="font-size:26px;font-weight:900;color:#fff;margin:0;">
+            BỤC VINH QUANG CHUNG CUỘC
+          </h2>
+          <p style="font-size:14px;color:rgba(255,255,255,0.7);margin:4px 0 0;">
+            Đấu Trường Live Quiz đã kết thúc thành công rực rỡ!
+          </p>
+        </div>
+
+        <!-- 3-Step Podium -->
+        <div class="live-podium">
+          <!-- 2nd Step (Silver) -->
+          <div class="podium-step step-2">
+            <span style="font-size:32px;">🥈</span>
+            <div style="font-size:15px;font-weight:800;margin-top:6px;word-break:break-word;">${second ? this._escapeHtml(second.fullName || second.username) : '---'}</div>
+            <div style="font-size:16px;font-weight:900;color:#fff;margin-top:4px;">${second ? `${second.score} pts` : ''}</div>
+            <div style="font-size:20px;font-weight:900;margin-top:auto;">2</div>
+          </div>
+
+          <!-- 1st Step (Gold) -->
+          <div class="podium-step step-1">
+            <span style="font-size:40px;">👑</span>
+            <div style="font-size:16px;font-weight:900;margin-top:6px;word-break:break-word;">${first ? this._escapeHtml(first.fullName || first.username) : '---'}</div>
+            <div style="font-size:18px;font-weight:900;color:#fef08a;margin-top:4px;">${first ? `${first.score} pts` : ''}</div>
+            <div style="font-size:26px;font-weight:900;margin-top:auto;">1</div>
+          </div>
+
+          <!-- 3rd Step (Bronze) -->
+          <div class="podium-step step-3">
+            <span style="font-size:28px;">🥉</span>
+            <div style="font-size:14px;font-weight:800;margin-top:6px;word-break:break-word;">${third ? this._escapeHtml(third.fullName || third.username) : '---'}</div>
+            <div style="font-size:15px;font-weight:900;color:#fff;margin-top:4px;">${third ? `${third.score} pts` : ''}</div>
+            <div style="font-size:18px;font-weight:900;margin-top:auto;">3</div>
+          </div>
+        </div>
+
+        <!-- Action Toolbar -->
+        <div style="display:flex;justify-content:center;gap:12px;margin:24px 0;flex-wrap:wrap;">
+          <button type="button" class="btn-primary" id="btnHostSaveGradebook" ${room.savedToGradebook ? 'disabled' : ''} style="padding:12px 24px;font-size:14px;font-weight:800;border-radius:8px;background:${room.savedToGradebook ? '#059669' : 'linear-gradient(135deg,#10b981,#059669)'};border:none;cursor:${room.savedToGradebook ? 'default' : 'pointer'};box-shadow:0 4px 16px rgba(16,185,129,0.4);">
+            ${room.savedToGradebook ? '✅ ĐÃ LƯU VÀO SỔ ĐIỂM' : '💾 LƯU BẢNG ĐIỂM VÀO SỔ ĐIỂM LỚP HỌC'}
+          </button>
+          <button type="button" class="btn-secondary" id="btnHostExportCsv" style="padding:12px 20px;font-size:14px;font-weight:700;border-radius:8px;background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.3);cursor:pointer;">
+            📊 Tải File Báo Cáo (CSV)
+          </button>
+          <button type="button" class="btn-sm" id="btnHostExitRoom" style="padding:12px 20px;font-size:14px;font-weight:700;border-radius:8px;background:rgba(239,68,68,0.2);color:#ef4444;border:1px solid rgba(239,68,68,0.4);cursor:pointer;">
+            ❌ Đóng Đấu Trường
+          </button>
+        </div>
+
+        <!-- Full Results Table -->
+        <div style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);border-radius:12px;padding:16px;overflow-x:auto;">
+          <h4 style="font-size:14px;color:rgba(255,255,255,0.8);margin:0 0 12px;font-weight:700;">
+            Bảng Tổng Sắp Toàn Đoàn (${leaderboard.length} Thí sinh):
+          </h4>
+          <table style="width:100%;border-collapse:collapse;font-size:13px;text-align:left;color:#fff;">
+            <thead>
+              <tr style="border-bottom:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);">
+                <th style="padding:8px 10px;">Hạng</th>
+                <th style="padding:8px 10px;">Thí Sinh</th>
+                <th style="padding:8px 10px;">Lớp</th>
+                <th style="padding:8px 10px;text-align:right;">Điểm Kahoot</th>
+                <th style="padding:8px 10px;text-align:right;">Thang Điểm 10</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${leaderboard.map((p, idx) => `
+                <tr style="border-bottom:1px solid rgba(255,255,255,0.08);">
+                  <td style="padding:8px 10px;font-weight:800;">#${idx + 1}</td>
+                  <td style="padding:8px 10px;font-weight:700;">${this._escapeHtml(p.fullName || p.username)}</td>
+                  <td style="padding:8px 10px;color:rgba(255,255,255,0.7);">${this._escapeHtml(p.className || '')}</td>
+                  <td style="padding:8px 10px;text-align:right;font-weight:800;color:#fbbf24;">${p.score}</td>
+                  <td style="padding:8px 10px;text-align:right;font-weight:800;color:#10b981;">${this._getPlayerScale10(room, p.id)} / 10</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }
+
+  _renderPlayerArenaBody(room, currentUser) {
+    const status = room.status || 'lobby';
+
+    // 1. LOBBY STATUS
+    if (status === 'lobby') {
+      return `
+        <div style="padding:40px 16px;text-align:center;">
+          <div style="font-size:52px;margin-bottom:14px;">📱</div>
+          <h2 style="font-size:22px;font-weight:800;color:#fff;margin:0 0 8px;">
+            Đã Vào Phòng: ${this._escapeHtml(room.title)}
+          </h2>
+          <p style="font-size:14px;color:rgba(255,255,255,0.7);margin:0 0 24px;">
+            Thí sinh: <strong>${this._escapeHtml(currentUser.fullName)}</strong> (${this._escapeHtml(currentUser.username)})
+          </p>
+
+          <div style="background:rgba(255,255,255,0.08);padding:20px;border-radius:14px;border:1px solid rgba(255,255,255,0.18);max-width:380px;margin:0 auto 24px;text-align:center;">
+            <div style="font-size:26px;margin-bottom:8px;">👀</div>
+            <div style="font-size:16px;font-weight:800;color:#fbbf24;margin-bottom:6px;">
+              Hãy nhìn lên màn chiếu của Giảng viên
+            </div>
+            <div style="font-size:13px;color:rgba(255,255,255,0.8);line-height:1.5;">
+              Khi Giảng viên bấm Bắt đầu, 4 nút màu sắc cảm ứng sẽ xuất hiện trên màn hình điện thoại của bạn.
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // 2. IN_QUESTION STATUS
+    if (status === 'in_question') {
+      const hasAnswered = Boolean(this.liveQuizSelectedOption);
+
+      if (hasAnswered) {
+        return `
+          <div style="padding:30px 16px;text-align:center;min-height:360px;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+            <div style="font-size:60px;margin-bottom:12px;">✅</div>
+            <h3 style="font-size:24px;font-weight:900;color:#fff;margin:0 0 8px;">
+              ĐÃ CHỌN ĐÁP ÁN: ${this.liveQuizSelectedOption}
+            </h3>
+            <p style="font-size:15px;color:rgba(255,255,255,0.75);margin:0 0 20px;">
+              Câu trả lời của bạn đã được ghi nhận. Đang chờ các bạn khác và hết thời gian...
+            </p>
+            <div style="font-size:28px;font-weight:900;color:#fbbf24;font-family:monospace;" id="liveQuizTimerDisplay">
+              ⏱️ ${this.liveQuizLocalSecondsLeft}s
+            </div>
+          </div>
+        `;
+      }
+
+      // 4 Massive touch buttons for mobile player
+      return `
+        <div style="padding:10px 0;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+            <span style="font-size:14px;font-weight:700;color:rgba(255,255,255,0.8);">
+              Câu ${room.currentQIndex + 1} / ${room.totalQuestions}
+            </span>
+            <span style="font-size:24px;font-weight:900;color:#fbbf24;font-family:monospace;" id="liveQuizTimerDisplay">
+              ⏱️ ${this.liveQuizLocalSecondsLeft}s
+            </span>
+          </div>
+
+          <div class="live-player-grid">
+            <button type="button" class="btn-player-shape opt-a" data-opt="A">
+              <span>▲</span>
+              <span style="font-size:16px;">A (Đỏ)</span>
+            </button>
+            <button type="button" class="btn-player-shape opt-b" data-opt="B">
+              <span>◆</span>
+              <span style="font-size:16px;">B (Xanh)</span>
+            </button>
+            <button type="button" class="btn-player-shape opt-c" data-opt="C">
+              <span>●</span>
+              <span style="font-size:16px;">C (Vàng)</span>
+            </button>
+            <button type="button" class="btn-player-shape opt-d" data-opt="D">
+              <span>■</span>
+              <span style="font-size:16px;">D (Lục)</span>
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    // 3. ROUND_RESULT STATUS
+    if (status === 'round_result') {
+      const fb = this.liveQuizLastFeedback || {};
+      const isCorrect = Boolean(fb.isCorrect);
+      const points = fb.points || 0;
+      const streak = fb.streak || 0;
+      const rank = this._getPlayerRank(room, currentUser.id);
+
+      return `
+        <div style="padding:30px 16px;text-align:center;">
+          <div style="background:${isCorrect ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)'};border:2px solid ${isCorrect ? '#10b981' : '#ef4444'};border-radius:18px;padding:30px 20px;max-width:440px;margin:0 auto 20px;">
+            <div style="font-size:56px;margin-bottom:10px;">${isCorrect ? '🎉' : '❌'}</div>
+            <h2 style="font-size:26px;font-weight:900;color:#fff;margin:0 0 8px;">
+              ${isCorrect ? 'CHÍNH XÁC!' : 'RẤT TIẾC!'}
+            </h2>
+            <div style="font-size:28px;font-weight:900;color:${isCorrect ? '#10b981' : '#ef4444'};margin-bottom:10px;font-family:monospace;">
+              ${isCorrect ? `+${points} pts` : '+0 pts'}
+            </div>
+            ${streak > 1 ? `<div style="font-size:13px;color:#f97316;font-weight:800;margin-bottom:12px;">🔥 Chuỗi đúng liên tiếp: ${streak}</div>` : ''}
+            <div style="font-size:14px;color:rgba(255,255,255,0.8);">
+              Thứ hạng hiện tại: <strong style="color:#fbbf24;font-size:16px;">#${rank}</strong> / ${room.totalParticipants || 1}
+            </div>
+          </div>
+
+          <p style="font-size:14px;color:rgba(255,255,255,0.7);">
+            Hãy nhìn lên màn chiếu của Giảng viên để xem hướng dẫn giải câu vừa rồi!
+          </p>
+        </div>
+      `;
+    }
+
+    // 4. LEADERBOARD STATUS
+    if (status === 'leaderboard') {
+      const rank = this._getPlayerRank(room, currentUser.id);
+      const score = this._getPlayerScore(room, currentUser.id);
+
+      return `
+        <div style="padding:30px 16px;text-align:center;">
+          <div style="font-size:48px;margin-bottom:12px;">📊</div>
+          <h2 style="font-size:22px;font-weight:900;color:#fff;margin:0 0 16px;">
+            VỊ TRÍ CỦA BẠN
+          </h2>
+
+          <div style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);border-radius:16px;padding:24px;max-width:380px;margin:0 auto 20px;">
+            <div style="font-size:13px;color:rgba(255,255,255,0.7);text-transform:uppercase;">Thứ Hạng Hiện Tại</div>
+            <div style="font-size:44px;font-weight:900;color:#fbbf24;margin:4px 0;">#${rank}</div>
+            <div style="font-size:20px;font-weight:800;color:#fff;font-family:monospace;">${score} pts</div>
+          </div>
+
+          <p style="font-size:14px;color:rgba(255,255,255,0.75);">
+            Sẵn sàng cho câu hỏi tiếp theo...
+          </p>
+        </div>
+      `;
+    }
+
+    // 5. PODIUM / FINISHED STATUS
+    const rank = this._getPlayerRank(room, currentUser.id);
+    const score = this._getPlayerScore(room, currentUser.id);
+    const scale10 = this._getPlayerScale10(room, currentUser.id);
+
+    return `
+      <div style="padding:30px 16px;text-align:center;">
+        <div style="font-size:56px;margin-bottom:10px;">🏆</div>
+        <h2 style="font-size:24px;font-weight:900;color:#fff;margin:0 0 8px;">
+          HOÀN THÀNH ĐẤU TRƯỜNG!
+        </h2>
+        <p style="font-size:14px;color:rgba(255,255,255,0.7);margin:0 0 20px;">
+          Chúc mừng bạn đã hoàn tất phần thi đấu thời gian thực!
+        </p>
+
+        <div style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);border-radius:16px;padding:24px;max-width:380px;margin:0 auto 24px;">
+          <div style="font-size:13px;color:rgba(255,255,255,0.7);text-transform:uppercase;">Thứ Hạng Chung Cuộc</div>
+          <div style="font-size:48px;font-weight:900;color:#fbbf24;margin:4px 0;">#${rank}</div>
+          <div style="font-size:18px;font-weight:800;color:#fff;margin-bottom:8px;">${score} Điểm Kahoot</div>
+          <div style="font-size:16px;font-weight:800;color:#10b981;background:rgba(16,185,129,0.2);padding:6px 14px;border-radius:20px;display:inline-block;">
+            Điểm Thang 10: ${scale10} / 10
+          </div>
+        </div>
+
+        <button type="button" class="btn-primary" id="btnPlayerExitQuiz" style="padding:12px 28px;font-size:15px;font-weight:800;border-radius:10px;background:linear-gradient(135deg,#6366f1,#ec4899);border:none;cursor:pointer;">
+          🚪 Quay Lại Đề Thi Của Tôi
+        </button>
+      </div>
+    `;
+  }
+
+  _bindLiveQuizEvents() {
+    if (!this.container) return;
+
+    // Host: Start game (Q1)
+    const btnHostStart = this.container.querySelector('#btnHostStartGame');
+    if (btnHostStart) {
+      btnHostStart.addEventListener('click', (e) => {
+        e.preventDefault();
+        this._hostStartQuestion();
+      });
+    }
+
+    // Host: End round
+    const btnHostEndRound = this.container.querySelector('#btnHostEndRound');
+    if (btnHostEndRound) {
+      btnHostEndRound.addEventListener('click', (e) => {
+        e.preventDefault();
+        this._hostEndRound();
+      });
+    }
+
+    // Host: Show leaderboard
+    const btnHostLb = this.container.querySelector('#btnHostShowLeaderboard');
+    if (btnHostLb) {
+      btnHostLb.addEventListener('click', (e) => {
+        e.preventDefault();
+        this._hostShowLeaderboard();
+      });
+    }
+
+    // Host: Next question or Podium
+    const btnHostNext = this.container.querySelector('#btnHostNextQuestion');
+    if (btnHostNext) {
+      btnHostNext.addEventListener('click', (e) => {
+        e.preventDefault();
+        this._hostNextQuestion();
+      });
+    }
+
+    // Host: Save Gradebook
+    const btnHostSave = this.container.querySelector('#btnHostSaveGradebook');
+    if (btnHostSave) {
+      btnHostSave.addEventListener('click', (e) => {
+        e.preventDefault();
+        this._hostSaveGradebook();
+      });
+    }
+
+    // Host: Export CSV
+    const btnHostCsv = this.container.querySelector('#btnHostExportCsv');
+    if (btnHostCsv) {
+      btnHostCsv.addEventListener('click', (e) => {
+        e.preventDefault();
+        this._hostExportCsv();
+      });
+    }
+
+    // Host & Player exit room
+    const btnHostExit = this.container.querySelector('#btnHostExitRoom');
+    if (btnHostExit) {
+      btnHostExit.addEventListener('click', (e) => {
+        e.preventDefault();
+        this._exitLiveQuiz();
+      });
+    }
+
+    const btnPlayerLeave = this.container.querySelector('#btnPlayerLeaveRoom');
+    if (btnPlayerLeave) {
+      btnPlayerLeave.addEventListener('click', (e) => {
+        e.preventDefault();
+        this._exitLiveQuiz();
+      });
+    }
+
+    const btnPlayerExitQuiz = this.container.querySelector('#btnPlayerExitQuiz');
+    if (btnPlayerExitQuiz) {
+      btnPlayerExitQuiz.addEventListener('click', (e) => {
+        e.preventDefault();
+        this._exitLiveQuiz();
+      });
+    }
+
+    // Player mobile shape taps
+    this.container.querySelectorAll('.btn-player-shape').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const opt = btn.getAttribute('data-opt');
+        if (opt) {
+          this._playerAnswer(opt);
+        }
+      });
+    });
+  }
+
+  // =========================================================================
+  // LIVE QUIZ CLIENT LOGIC & REALTIME CONTROLLER
+  // =========================================================================
+
+  _startLiveTimer() {
+    if (this.liveQuizTimerInterval) {
+      clearInterval(this.liveQuizTimerInterval);
+      this.liveQuizTimerInterval = null;
+    }
+
+    if (!this.liveQuizRoom || this.liveQuizRoom.status !== 'in_question') return;
+
+    const startedAt = this.liveQuizRoom.questionStartedAt || Date.now();
+    const duration = this.liveQuizRoom.questionDuration || 30;
+    const elapsedSec = Math.floor((Date.now() - startedAt) / 1000);
+    this.liveQuizLocalSecondsLeft = Math.max(0, duration - elapsedSec);
+
+    this.liveQuizTimerInterval = setInterval(() => {
+      this.liveQuizLocalSecondsLeft--;
+      const timerEl = this.container ? this.container.querySelector('#liveQuizTimerDisplay') : null;
+      if (timerEl) {
+        timerEl.textContent = `⏱️ ${Math.max(0, this.liveQuizLocalSecondsLeft)}s`;
+        if (this.liveQuizLocalSecondsLeft <= 5) {
+          timerEl.style.color = '#ef4444';
+        }
+      }
+      if (this.liveQuizLocalSecondsLeft <= 0) {
+        clearInterval(this.liveQuizTimerInterval);
+        this.liveQuizTimerInterval = null;
+        if (this.liveQuizRole === 'host') {
+          this._hostEndRound();
+        }
+      }
+    }, 1000);
+  }
+
+  _connectLiveQuiz(pin, userId) {
+    this._disconnectLiveQuiz();
+
+    // 1. Native EventSource (SSE)
+    if (typeof EventSource !== 'undefined') {
+      try {
+        const sseUrl = `/api/live-quiz/stream?pin=${encodeURIComponent(pin)}&userId=${encodeURIComponent(userId || '')}`;
+        this.liveQuizEventSource = new EventSource(sseUrl);
+        this.liveQuizEventSource.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            if (data && data.room) {
+              this._handleLiveRoomUpdate(data.room);
+            }
+          } catch {}
+        };
+      } catch {}
+    }
+
+    // 2. Direct local pubsub subscription (guarantees offline/vitest reliability)
+    if (liveQuizManager && typeof liveQuizManager.subscribe === 'function') {
+      this.liveQuizUnsubscribe = liveQuizManager.subscribe(pin, (data) => {
+        const room = (data && data.room) || liveQuizManager.getPublicRoomState(pin, userId) || data;
+        this._handleLiveRoomUpdate(room);
+      });
+    }
+  }
+
+  _disconnectLiveQuiz() {
+    if (this.liveQuizTimerInterval) {
+      clearInterval(this.liveQuizTimerInterval);
+      this.liveQuizTimerInterval = null;
+    }
+    if (this.liveQuizEventSource) {
+      try {
+        this.liveQuizEventSource.close();
+      } catch {}
+      this.liveQuizEventSource = null;
+    }
+    if (typeof this.liveQuizUnsubscribe === 'function') {
+      try {
+        this.liveQuizUnsubscribe();
+      } catch {}
+      this.liveQuizUnsubscribe = null;
+    }
+  }
+
+  _exitLiveQuiz() {
+    this._disconnectLiveQuiz();
+    this.liveQuizRoom = null;
+    this.liveQuizRole = null;
+    this.liveQuizSelectedOption = null;
+    this.liveQuizLastFeedback = null;
+    this.render();
+  }
+
+  _handleLiveRoomUpdate(roomState) {
+    if (!roomState) return;
+    const prevStatus = this.liveQuizRoom ? this.liveQuizRoom.status : null;
+    const prevQIndex = this.liveQuizRoom ? this.liveQuizRoom.currentQIndex : null;
+
+    this.liveQuizRoom = roomState;
+
+    if (roomState.status === 'in_question') {
+      if (prevStatus !== 'in_question' || prevQIndex !== roomState.currentQIndex) {
+        this.liveQuizSelectedOption = null;
+        this.liveQuizLastFeedback = null;
+        this._startLiveTimer();
+      }
+    } else {
+      if (this.liveQuizTimerInterval) {
+        clearInterval(this.liveQuizTimerInterval);
+        this.liveQuizTimerInterval = null;
+      }
+    }
+
+    // Dynamic partial DOM updates to prevent tearing down inputs
+    if (roomState.status === 'lobby' && prevStatus === 'lobby') {
+      const countEl = this.container ? this.container.querySelector('#liveQuizLobbyCount') : null;
+      if (countEl) {
+        countEl.textContent = String(roomState.totalParticipants || 0);
+      }
+      this.render();
+      return;
+    }
+
+    if (roomState.status === 'in_question' && prevStatus === 'in_question' && prevQIndex === roomState.currentQIndex) {
+      const ansEl = this.container ? this.container.querySelector('#liveQuizAnswerCounter') : null;
+      if (ansEl) {
+        ansEl.textContent = `Đã trả lời: ${roomState.answersCount || 0} / ${roomState.totalParticipants || 0}`;
+      }
+      return;
+    }
+
+    this.render();
+  }
+
+  async _joinLiveQuiz(pin) {
+    if (!pin || pin.trim().length !== 6) {
+      this._showAlert('Vui lòng nhập đúng mã PIN 6 chữ số hiển thị trên màn chiếu của Giảng viên.');
+      return;
+    }
+
+    const currentUser = authManager.getCurrentUser();
+    if (!currentUser) {
+      this._showAlert('Vui lòng đăng nhập tài khoản sinh viên trước khi tham gia thi đấu Live Quiz.');
+      this._openAuthModal('login');
+      return;
+    }
+
+    const res = await this._apiLiveQuizJoin(pin.trim(), currentUser);
+    if (!res || !res.success) {
+      this._showAlert(res?.error || 'Không thể tham gia phòng thi! Hãy kiểm tra lại mã PIN.');
+      return;
+    }
+
+    this.liveQuizRoom = res.room;
+    this.liveQuizRole = 'player';
+    this.liveQuizSelectedOption = null;
+    this.liveQuizLastFeedback = null;
+    this._connectLiveQuiz(pin.trim(), currentUser.id);
+    this.render();
+  }
+
+  async _launchLiveQuizFromExam(examId) {
+    const exam = examManager.getExamById(examId);
+    if (!exam) {
+      this._showAlert('Không tìm thấy đề thi!');
+      return;
+    }
+
+    const allQuestions = getAllQuestions();
+    const customQuestions = Array.isArray(exam.customQuestions) ? exam.customQuestions : [];
+    const pool = [...allQuestions, ...customQuestions, ...this.importedQuestions];
+    const examQuestions = (exam.questionIds || []).map(id => pool.find(q => q.id === id)).filter(Boolean);
+
+    if (examQuestions.length === 0) {
+      this._showAlert('Đề thi này không có câu hỏi nào để mở Live Quiz.');
+      return;
+    }
+
+    const currentUser = authManager.getCurrentUser() || { id: 'admin', username: 'admin' };
+    const res = await this._apiLiveQuizCreate({
+      title: exam.title || 'Đấu Trường Live Quiz',
+      examId: exam.id,
+      questions: examQuestions,
+      createdBy: currentUser.id,
+      durationSeconds: 30,
+    });
+
+    if (!res || !res.success) {
+      this._showAlert(res?.error || 'Không thể tạo phòng Live Quiz.');
+      return;
+    }
+
+    this.liveQuizRoom = res.room;
+    this.liveQuizRole = 'host';
+    this.liveQuizSelectedOption = null;
+    this.liveQuizLastFeedback = null;
+    this._connectLiveQuiz(res.room.pin, currentUser.id);
+    this.render();
+  }
+
+  async _playerAnswer(optionId) {
+    if (!this.liveQuizRoom || this.liveQuizRoom.status !== 'in_question') return;
+    if (this.liveQuizSelectedOption) return;
+
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      try { navigator.vibrate(50); } catch {}
+    }
+
+    this.liveQuizSelectedOption = optionId;
+    const currentUser = authManager.getCurrentUser();
+    if (!currentUser) return;
+
+    this.render();
+
+    const res = await this._apiLiveQuizAnswer(this.liveQuizRoom.pin, currentUser.id, optionId);
+    if (res && res.success) {
+      this.liveQuizLastFeedback = res;
+    }
+  }
+
+  async _hostStartQuestion() {
+    if (!this.liveQuizRoom) return;
+    const currentUser = authManager.getCurrentUser() || { id: 'admin' };
+    const res = await this._apiLiveQuizStartQuestion(this.liveQuizRoom.pin, currentUser.id);
+    if (res && res.success) {
+      this.liveQuizRoom = res.room;
+      this._startLiveTimer();
+      this.render();
+    } else {
+      this._showAlert(res?.error || 'Không thể bắt đầu câu hỏi.');
+    }
+  }
+
+  async _hostEndRound() {
+    if (!this.liveQuizRoom) return;
+    if (this.liveQuizTimerInterval) {
+      clearInterval(this.liveQuizTimerInterval);
+      this.liveQuizTimerInterval = null;
+    }
+    const currentUser = authManager.getCurrentUser() || { id: 'admin' };
+    const res = await this._apiLiveQuizEndRound(this.liveQuizRoom.pin, currentUser.id);
+    if (res && res.success) {
+      this.liveQuizRoom = res.room;
+      this.render();
+    }
+  }
+
+  async _hostShowLeaderboard() {
+    if (!this.liveQuizRoom) return;
+    const currentUser = authManager.getCurrentUser() || { id: 'admin' };
+    const res = await this._apiLiveQuizLeaderboard(this.liveQuizRoom.pin, currentUser.id);
+    if (res && res.success) {
+      this.liveQuizRoom = res.room;
+      this.render();
+    }
+  }
+
+  async _hostNextQuestion() {
+    if (!this.liveQuizRoom) return;
+    const currentUser = authManager.getCurrentUser() || { id: 'admin' };
+    const res = await this._apiLiveQuizNext(this.liveQuizRoom.pin, currentUser.id);
+    if (res && res.success) {
+      this.liveQuizRoom = res.room;
+      if (res.room.status === 'in_question') {
+        this._startLiveTimer();
+      }
+      this.render();
+    }
+  }
+
+  async _hostSaveGradebook() {
+    if (!this.liveQuizRoom) return;
+    const currentUser = authManager.getCurrentUser() || { id: 'admin' };
+    const res = await this._apiLiveQuizSaveGradebook(this.liveQuizRoom.pin, currentUser.id);
+    if (res && res.success) {
+      this.liveQuizRoom.savedToGradebook = true;
+      this._showAlert(`🎉 Đã lưu bảng điểm của ${res.count || 0} thí sinh vào Sổ Điểm lớp học thành công!`);
+      if (cloudSyncManager && typeof cloudSyncManager.pushExamSubmissions === 'function') {
+        cloudSyncManager.pushExamSubmissions(examManager).catch(() => {});
+      }
+      this.render();
+    } else {
+      this._showAlert(res?.error || 'Không thể lưu vào Sổ Điểm.');
+    }
+  }
+
+  _hostExportCsv() {
+    if (!this.liveQuizRoom) return;
+    const room = this.liveQuizRoom;
+    const leaderboard = Array.isArray(room.leaderboard)
+      ? room.leaderboard
+      : Object.values(room.participants || {}).sort((a, b) => b.score - a.score);
+
+    let csv = '\uFEFFHạng,Tài Khoản / MSSV,Họ và Tên,Lớp,Điểm Kahoot,Điểm Thang 10\n';
+    leaderboard.forEach((p, idx) => {
+      const rank = idx + 1;
+      const username = `"${(p.username || '').replace(/"/g, '""')}"`;
+      const fullName = `"${(p.fullName || '').replace(/"/g, '""')}"`;
+      const className = `"${(p.className || '').replace(/"/g, '""')}"`;
+      const score = p.score || 0;
+      const scale10 = this._getPlayerScale10(room, p.id);
+      csv += `${rank},${username},${fullName},${className},${score},${scale10}\n`;
+    });
+
+    try {
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `[LiveQuiz]_${room.title.replace(/[^\w\s-]/g, '')}_KetQua.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error('Export CSV error:', e);
+    }
+  }
+
+  _getPlayerRank(room, userId) {
+    if (!room) return 1;
+    const lb = Array.isArray(room.leaderboard)
+      ? room.leaderboard
+      : Object.values(room.participants || {}).sort((a, b) => b.score - a.score);
+    const idx = lb.findIndex(p => p.id === userId);
+    return idx >= 0 ? idx + 1 : 1;
+  }
+
+  _getPlayerScore(room, userId) {
+    if (!room) return 0;
+    if (room.participants && room.participants[userId]) {
+      return room.participants[userId].score || 0;
+    }
+    const lb = Array.isArray(room.leaderboard) ? room.leaderboard : [];
+    const p = lb.find(x => x.id === userId);
+    return p ? (p.score || 0) : 0;
+  }
+
+  _getPlayerScale10(room, userId) {
+    if (!room) return '0.0';
+    const totalQ = room.totalQuestions || (room.questions ? room.questions.length : 1) || 1;
+    let correctCount = 0;
+    if (room.answers) {
+      for (const qIdx of Object.keys(room.answers)) {
+        if (room.answers[qIdx]?.[userId]?.isCorrect) {
+          correctCount++;
+        }
+      }
+    } else {
+      const score = this._getPlayerScore(room, userId);
+      const maxScore = totalQ * 1000;
+      return Math.min(10, Math.max(0, Math.round((score / maxScore) * 100) / 10)).toFixed(1);
+    }
+    return ((correctCount / totalQ) * 10).toFixed(1);
+  }
+
+  // --- Live Quiz REST API with fallback to local LiveQuizManager ---
+
+  async _apiLiveQuizCreate(payload) {
+    if (cloudSyncManager && cloudSyncManager.isConnected) {
+      try {
+        const res = await fetch('/api/live-quiz/create', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (res.ok) {
+          return await res.json();
+        }
+      } catch {}
+    }
+    return liveQuizManager.createRoom(payload);
+  }
+
+  async _apiLiveQuizJoin(pin, user) {
+    if (cloudSyncManager && cloudSyncManager.isConnected) {
+      try {
+        const res = await fetch('/api/live-quiz/join', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ pin, user }),
+        });
+        if (res.ok) {
+          return await res.json();
+        }
+      } catch {}
+    }
+    return liveQuizManager.joinRoom(pin, user);
+  }
+
+  async _apiLiveQuizStartQuestion(pin, hostUserId) {
+    if (cloudSyncManager && cloudSyncManager.isConnected) {
+      try {
+        const res = await fetch('/api/live-quiz/start-question', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ pin, hostUserId }),
+        });
+        if (res.ok) {
+          return await res.json();
+        }
+      } catch {}
+    }
+    return liveQuizManager.startQuestion(pin, hostUserId);
+  }
+
+  async _apiLiveQuizAnswer(pin, userId, optionId) {
+    if (cloudSyncManager && cloudSyncManager.isConnected) {
+      try {
+        const res = await fetch('/api/live-quiz/answer', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ pin, userId, optionId }),
+        });
+        if (res.ok) {
+          return await res.json();
+        }
+      } catch {}
+    }
+    return liveQuizManager.submitAnswer(pin, userId, optionId);
+  }
+
+  async _apiLiveQuizEndRound(pin, hostUserId) {
+    if (cloudSyncManager && cloudSyncManager.isConnected) {
+      try {
+        const res = await fetch('/api/live-quiz/end-round', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ pin, hostUserId }),
+        });
+        if (res.ok) {
+          return await res.json();
+        }
+      } catch {}
+    }
+    return liveQuizManager.endRound(pin, hostUserId);
+  }
+
+  async _apiLiveQuizLeaderboard(pin, hostUserId) {
+    if (cloudSyncManager && cloudSyncManager.isConnected) {
+      try {
+        const res = await fetch('/api/live-quiz/leaderboard', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ pin, hostUserId }),
+        });
+        if (res.ok) {
+          return await res.json();
+        }
+      } catch {}
+    }
+    return liveQuizManager.showLeaderboard(pin, hostUserId);
+  }
+
+  async _apiLiveQuizNext(pin, hostUserId) {
+    if (cloudSyncManager && cloudSyncManager.isConnected) {
+      try {
+        const res = await fetch('/api/live-quiz/next', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ pin, hostUserId }),
+        });
+        if (res.ok) {
+          return await res.json();
+        }
+      } catch {}
+    }
+    return liveQuizManager.nextQuestion(pin, hostUserId);
+  }
+
+  async _apiLiveQuizSaveGradebook(pin, hostUserId) {
+    if (cloudSyncManager && cloudSyncManager.isConnected) {
+      try {
+        const res = await fetch('/api/live-quiz/save-gradebook', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ pin, hostUserId }),
+        });
+        if (res.ok) {
+          return await res.json();
+        }
+      } catch {}
+    }
+    return liveQuizManager.saveToGradebook(pin, hostUserId, examManager);
   }
 }
