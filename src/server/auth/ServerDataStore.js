@@ -594,6 +594,9 @@ export async function fetchFromPostgres(options = {}) {
                 const isCleared = m.value === true || m.value?.cleared === true || String(m.value) === 'true';
                 if (isCleared) {
                   serverExams.length = 0;
+                  sqlDb.tables.system_metadata.set('exams_cleared_by_admin', { key: 'exams_cleared_by_admin', value: true });
+                } else {
+                  sqlDb.tables.system_metadata.delete('exams_cleared_by_admin');
                 }
               }
               if (m.key === 'deleted_exams') {

@@ -125,7 +125,11 @@ export class QuizView {
     this._generateNewExam();
 
     if (authManager && typeof authManager.subscribe === 'function') {
-      authManager.subscribe(() => {
+      authManager.subscribe((event) => {
+        if (cloudSyncManager && (event === 'login' || event === 'logout')) {
+          cloudSyncManager.syncExams(examManager, authManager).catch(() => {});
+          cloudSyncManager.syncExamSubmissions(examManager, authManager).catch(() => {});
+        }
         if (this.container) {
           this.render();
         }
@@ -160,12 +164,12 @@ export class QuizView {
     // Trigger initial sync once on mount
     if (cloudSyncManager) {
       try {
-        cloudSyncManager.syncExams(examManager).then(() => {
+        cloudSyncManager.syncExams(examManager, authManager).then(() => {
           if (this.container && this.activeTab === 'myExams') {
             this.render();
           }
         }).catch(() => {});
-        cloudSyncManager.syncExamSubmissions(examManager).then(() => {
+        cloudSyncManager.syncExamSubmissions(examManager, authManager).then(() => {
           if (this.container && this.activeTab === 'myExams') {
             this.render();
           }
@@ -799,10 +803,10 @@ export class QuizView {
       if (tabName === 'myExams') {
         try {
           if (cloudSyncManager) {
-            cloudSyncManager.syncExams(examManager).then(() => {
+            cloudSyncManager.syncExams(examManager, authManager).then(() => {
               if (this.activeTab === 'myExams') this.render();
             }).catch(() => {});
-            cloudSyncManager.syncExamSubmissions(examManager).catch(() => {});
+            cloudSyncManager.syncExamSubmissions(examManager, authManager).catch(() => {});
           }
         } catch {}
       }
@@ -4619,10 +4623,10 @@ export class QuizView {
           if (isOnline && cloudSyncManager) {
             try {
               if (typeof cloudSyncManager.syncExams === 'function') {
-                await cloudSyncManager.syncExams(examManager);
+                await cloudSyncManager.syncExams(examManager, authManager);
               }
               if (typeof cloudSyncManager.syncExamSubmissions === 'function') {
-                await cloudSyncManager.syncExamSubmissions(examManager);
+                await cloudSyncManager.syncExamSubmissions(examManager, authManager);
               }
             } catch {}
           }

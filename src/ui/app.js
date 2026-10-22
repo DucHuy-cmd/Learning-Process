@@ -23,6 +23,7 @@ import { authManager } from '../core/auth/AuthManager.js';
 import { cloudSyncManager } from '../core/sync/CloudSyncManager.js';
 import { quizHistoryManager } from '../core/quiz/QuizHistoryManager.js';
 import { aiHistoryManager } from '../core/ai/AiHistoryManager.js';
+import { examManager } from '../core/quiz/ExamManager.js';
 
 export class App {
   constructor() {
@@ -497,6 +498,8 @@ export class App {
           }
           cloudSyncManager.syncQuizLeaderboard(quizHistoryManager);
           cloudSyncManager.verifyCurrentUser(authManager);
+          cloudSyncManager.syncExams(examManager, authManager).catch(() => {});
+          cloudSyncManager.syncExamSubmissions(examManager, authManager).catch(() => {});
           const user = authManager.getCurrentUser();
           if (user) {
             cloudSyncManager.syncAiHistory(user.id, aiHistoryManager);

@@ -487,8 +487,8 @@ export class AdminView {
           cloudSyncManager.getDatabaseStatus(),
           cloudSyncManager.syncUsers(authManager),
           cloudSyncManager.syncQuizLeaderboard(quizHistoryManager),
-          cloudSyncManager.syncExams(examManager),
-          cloudSyncManager.syncExamSubmissions(examManager),
+          cloudSyncManager.syncExams(examManager, authManager),
+          cloudSyncManager.syncExamSubmissions(examManager, authManager),
         ]);
 
         if (currentSyncId !== this._activeSyncId) return;
@@ -1292,8 +1292,8 @@ export class AdminView {
               }
               await cloudSyncManager.syncUsers(authManager);
               await cloudSyncManager.syncQuizLeaderboard(quizHistoryManager);
-              await cloudSyncManager.syncExams(examManager);
-              await cloudSyncManager.syncExamSubmissions(examManager);
+              await cloudSyncManager.syncExams(examManager, authManager);
+              await cloudSyncManager.syncExamSubmissions(examManager, authManager);
             } catch {}
           }
 

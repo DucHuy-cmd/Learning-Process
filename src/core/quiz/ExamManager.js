@@ -370,6 +370,7 @@ export class ExamManager {
 
     if (this.storage) {
       try {
+        this.storage.removeItem(STORAGE_KEY_EXAMS_CLEARED);
         this.storage.setItem(STORAGE_KEY_EXAMS, JSON.stringify(exams));
       } catch (err) {
         return { success: false, error: err.message };

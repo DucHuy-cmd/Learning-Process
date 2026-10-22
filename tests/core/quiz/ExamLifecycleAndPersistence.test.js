@@ -629,4 +629,135 @@ describe('Exam Lifecycle, Drafts, Idempotency & Persistence Test Suite', () => {
     expect(subResB.success).toBe(false);
     expect(subResB.error).toContain('không được giao cho tài khoản hoặc lớp của bạn');
   });
+
+  // Scenario 14: When admin clears all exams on server (clearedByAdmin: true), syncExams purges local exams & submissions
+  it('Scenario 14: When admin clears all exams on server (clearedByAdmin: true), syncExams completely purges local exams & submissions', async () => {
+    const storage = new MockStorage();
+    const manager = new ExamManager({ storage });
+
+    manager.createExam({
+      id: 'exam_de_1',
+      title: 'Đề 1',
+      durationMinutes: 90,
+      questionIds: ['logic_q01'],
+      assignedTo: ['all'],
+    });
+    manager.submitExam({
+      examId: 'exam_de_1',
+      userId: 'user_student_1',
+      answers: { logic_q01: 'A' },
+    });
+
+    expect(manager.getExams().some(e => e.id === 'exam_de_1')).toBe(true);
+    expect(manager.getSubmissions().length).toBe(1);
+
+    const sync = new CloudSyncManager({ baseUrl: 'http://localhost:3000' });
+    globalThis.fetch = vi.fn().mockImplementation(async (url) => {
+      if (url.includes('/api/exams')) {
+        return {
+          ok: true,
+          json: async () => ({ success: true, exams: [], deletedExams: [], clearedByAdmin: true }),
+        };
+      }
+      if (url.includes('/api/exam-submissions')) {
+        return {
+          ok: true,
+          json: async () => ({ success: true, submissions: [], clearedByAdmin: true }),
+        };
+      }
+      return { ok: true, json: async () => ({ success: true }) };
+    });
+
+    const res = await sync.syncExams(manager);
+    expect(res.success).toBe(true);
+    expect(manager.getExams().length).toBe(0);
+
+    const resSubs = await sync.syncExamSubmissions(manager);
+    expect(resSubs.success).toBe(true);
+    expect(manager.getSubmissions().length).toBe(0);
+  });
+
+  // Scenario 15: When server has 0 exams, student client syncing must never retain orphan exams
+  it('Scenario 15: Student client with orphan exams cleanly syncs to 0 exams when server has 0 exams', async () => {
+    const storage = new MockStorage();
+    // Student user in localStorage
+    storage.setItem('trr_current_user', JSON.stringify({
+      id: 'student_nguyen_duc_trung',
+      username: 'trungnd',
+      fullName: 'Nguyễn Đức Trung',
+      role: 'student',
+    }));
+
+    const manager = new ExamManager({ storage });
+    manager.createExam({
+      id: 'exam_stale_yesterday',
+      title: 'Đề 1 (từ hôm qua)',
+      durationMinutes: 90,
+      questionIds: ['logic_q01'],
+      assignedTo: ['all'],
+    });
+
+    const sync = new CloudSyncManager({ baseUrl: 'http://localhost:3000' });
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        success: true,
+        exams: [], // Admin has 0 exams
+        deletedExams: [],
+      }),
+    });
+
+    const syncRes = await sync.syncExams(manager);
+    expect(syncRes.success).toBe(true);
+
+    // Student must have 0 exams (no orphan exams displayed)
+    expect(manager.getExams().length).toBe(0);
+    const assignedForStudent = manager.getExamsForUser('student_nguyen_duc_trung');
+    expect(assignedForStudent.length).toBe(0);
+  });
+
+  // Scenario 16: Student only retains active server exams, removing obsolete exams
+  it('Scenario 16: Student only receives active server exams and purges obsolete local exams', async () => {
+    const storage = new MockStorage();
+    storage.setItem('trr_current_user', JSON.stringify({
+      id: 'student_1',
+      username: 'student1',
+      role: 'student',
+    }));
+
+    const manager = new ExamManager({ storage });
+    manager.createExam({
+      id: 'exam_old_orphan',
+      title: 'Đề cũ mồ côi',
+      durationMinutes: 60,
+      questionIds: ['logic_q01'],
+      assignedTo: ['all'],
+    });
+
+    const sync = new CloudSyncManager({ baseUrl: 'http://localhost:3000' });
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        success: true,
+        exams: [
+          {
+            id: 'exam_new_2026',
+            title: 'Đề thi mới từ Admin',
+            durationMinutes: 45,
+            questionIds: ['logic_q01', 'logic_q02'],
+            assignedTo: ['all'],
+          }
+        ],
+        deletedExams: [],
+      }),
+    });
+
+    const syncRes = await sync.syncExams(manager);
+    expect(syncRes.success).toBe(true);
+
+    const exams = manager.getExams();
+    expect(exams.length).toBe(1);
+    expect(exams[0].id).toBe('exam_new_2026');
+    expect(exams.some(e => e.id === 'exam_old_orphan')).toBe(false);
+  });
 });

@@ -662,6 +662,57 @@ export class CloudSyncManager {
   }
 
   /**
+   * Safe helper to retrieve current user from authManager or storage.
+   * @param {Object} [authManager]
+   * @param {Object} [examManager]
+   * @returns {Object|null}
+   * @private
+   */
+  _getCurrentUser(authManager = null, examManager = null) {
+    if (authManager && typeof authManager.getCurrentUser === 'function') {
+      const u = authManager.getCurrentUser();
+      if (u) return u;
+    }
+    if (typeof window !== 'undefined' && window.authManager && typeof window.authManager.getCurrentUser === 'function') {
+      const u = window.authManager.getCurrentUser();
+      if (u) return u;
+    }
+    const storage = examManager?.storage || (typeof window !== 'undefined' ? window.localStorage : null);
+    if (storage) {
+      try {
+        const raw = storage.getItem('trr_current_user');
+        if (raw) return JSON.parse(raw);
+      } catch {}
+    }
+    return null;
+  }
+
+  /**
+   * Determines if the current client session belongs to a student user.
+   * @param {Object} [authManager]
+   * @param {Object} [examManager]
+   * @returns {boolean}
+   * @private
+   */
+  _isStudentUser(authManager = null, examManager = null) {
+    if (authManager && typeof authManager.isAdmin === 'function') {
+      if (authManager.isAdmin()) return false;
+      const cu = authManager.getCurrentUser();
+      if (cu) return true;
+    }
+    if (typeof window !== 'undefined' && window.authManager && typeof window.authManager.isAdmin === 'function') {
+      if (window.authManager.isAdmin()) return false;
+      const cu = window.authManager.getCurrentUser();
+      if (cu) return true;
+    }
+    const cu = this._getCurrentUser(authManager, examManager);
+    if (cu) {
+      return cu.role !== 'admin';
+    }
+    return false;
+  }
+
+  /**
    * Helper to retrieve admin credentials headers for authenticated admin operations.
    * In production, sends the cryptographically signed session token.
    * In automated test mode (NODE_ENV === 'test'), falls back to test headers.
@@ -1059,8 +1110,9 @@ export class CloudSyncManager {
    * Synchronizes exams from server to local ExamManager.
    * Protects against wiping local exams when server returns empty or encounters errors.
    * @param {Object} examManager
+   * @param {Object} [authManager]
    */
-  async syncExams(examManager) {
+  async syncExams(examManager, authManager = null) {
     if (typeof fetch === 'undefined') {
       return { success: false, error: 'Môi trường ngoại tuyến' };
     }
@@ -1075,6 +1127,8 @@ export class CloudSyncManager {
           const localExams = examManager.getExams();
           const serverExams = data.exams;
           const serverIds = new Set(serverExams.map(e => e.id));
+          const isStudent = this._isStudentUser(authManager, examManager);
+          const clearedByAdmin = Boolean(data.clearedByAdmin);
 
           // 1. Process deleted exam tombstones from server
           const deletedExamsList = Array.isArray(data.deletedExams) ? data.deletedExams : [];
@@ -1085,14 +1139,58 @@ export class CloudSyncManager {
             }
           }
 
-          // 2. Build merged exam list: start with valid server exams
-          const merged = serverExams.filter(e => !examManager._isExamDeletedLocally(e.id));
+          // 2. If admin explicitly cleared all exams on the server:
+          if (clearedByAdmin) {
+            examManager.clearAllExams();
+            examManager.memoryExams = [];
+            if (examManager.storage) {
+              examManager.storage.setItem('trr_assigned_exams_v1', JSON.stringify([]));
+              examManager.storage.setItem('trr_exam_submissions_v1', JSON.stringify([]));
+            }
+            examManager._notifyListeners('exams_synced', []);
+            return { success: true, count: 0 };
+          }
 
-          // 3. For local exams not in server list:
-          // In online sync mode, if server returned a valid list of exams:
-          // - For students: any exam not on server is purged (students cannot create exams).
-          // - For admins: retain only if server has 0 exams (offline/mock) or newly created local draft.
-          const isStudent = typeof authManager !== 'undefined' && authManager && !authManager.isAdmin();
+          // 3. For student accounts:
+          // Students never create exams; server is the single source of truth.
+          if (isStudent) {
+            if (serverExams.length === 0) {
+              for (const le of localExams) {
+                if (le && le.id) {
+                  examManager._markExamDeletedLocally(le.id);
+                  if (typeof examManager.deleteExam === 'function') {
+                    examManager.deleteExam(le.id);
+                  }
+                }
+              }
+              examManager.memoryExams = [];
+              if (examManager.storage) {
+                examManager.storage.setItem('trr_assigned_exams_v1', JSON.stringify([]));
+              }
+              examManager._notifyListeners('exams_synced', []);
+              return { success: true, count: 0 };
+            }
+
+            // Server has exams -> student must ONLY keep exams that exist in serverIds
+            const merged = serverExams.filter(e => !examManager._isExamDeletedLocally(e.id));
+            for (const le of localExams) {
+              if (le && le.id && !serverIds.has(le.id)) {
+                examManager._markExamDeletedLocally(le.id);
+                if (typeof examManager.deleteExam === 'function') {
+                  examManager.deleteExam(le.id);
+                }
+              }
+            }
+            examManager.memoryExams = merged;
+            if (examManager.storage) {
+              examManager.storage.setItem('trr_assigned_exams_v1', JSON.stringify(merged));
+            }
+            examManager._notifyListeners('exams_synced', merged);
+            return { success: true, count: merged.length };
+          }
+
+          // 4. For non-student (Admin / test environment without active student):
+          const merged = serverExams.filter(e => !examManager._isExamDeletedLocally(e.id));
           for (const le of localExams) {
             if (
               le &&
@@ -1103,7 +1201,7 @@ export class CloudSyncManager {
             ) {
               if (serverExams.length === 0) {
                 merged.push(le);
-              } else if (!isStudent && (Date.now() - new Date(le.createdAt || 0).getTime() < 300000)) {
+              } else if (Date.now() - new Date(le.createdAt || 0).getTime() < 300000) {
                 merged.push(le);
               } else {
                 examManager._markExamDeletedLocally(le.id);
@@ -1213,8 +1311,9 @@ export class CloudSyncManager {
    * Synchronizes exam submissions from server to local ExamManager.
    * Merges server submissions intelligently to protect offline / pending records.
    * @param {Object} examManager
+   * @param {Object} [authManager]
    */
-  async syncExamSubmissions(examManager) {
+  async syncExamSubmissions(examManager, authManager = null) {
     if (typeof fetch === 'undefined') {
       return { success: false, error: 'Môi trường ngoại tuyến' };
     }
@@ -1226,16 +1325,26 @@ export class CloudSyncManager {
       const data = await res.json().catch(() => null);
       if (data && data.success && Array.isArray(data.submissions)) {
         if (examManager) {
+          const clearedByAdmin = Boolean(data.clearedByAdmin);
+          if (clearedByAdmin) {
+            examManager.memorySubmissions = [];
+            if (examManager.storage) {
+              examManager.storage.setItem('trr_exam_submissions_v1', JSON.stringify([]));
+            }
+            examManager._notifyListeners('submissions_synced', []);
+            return { success: true, count: 0 };
+          }
+
           const localSubmissions = examManager.getSubmissions();
           const serverSubmissions = data.submissions;
+          const currentExamIds = new Set(examManager.getExams().map(e => e.id));
 
           // Merge: server submissions are primary, filter out any deleted exams
-          const validServerSubmissions = serverSubmissions.filter(s => s && s.examId && !examManager._isExamDeletedLocally(s.examId));
+          const validServerSubmissions = serverSubmissions.filter(s => s && s.examId && !examManager._isExamDeletedLocally(s.examId) && (currentExamIds.size === 0 || currentExamIds.has(s.examId)));
           const serverKeySet = new Set(validServerSubmissions.map(s => `${s.examId}___${s.userId}`));
           const merged = [...validServerSubmissions];
 
           // Retain local submissions not yet on server ONLY if exam exists and is not deleted
-          const currentExamIds = new Set(examManager.getExams().map(e => e.id));
           for (const ls of localSubmissions) {
             if (
               ls &&

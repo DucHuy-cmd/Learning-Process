@@ -1251,6 +1251,7 @@ export async function handleRequest(req, res) {
       if (u.username !== 'admin') sqlDb.tables.users.delete(id);
     }
     sqlDb.tables.system_metadata.set('db_reset_time', { key: 'db_reset_time', value: { timestamp: resetTimestamp } });
+    sqlDb.tables.system_metadata.set('exams_cleared_by_admin', { key: 'exams_cleared_by_admin', value: true });
 
     sendJson(res, 200, {
       success: true,
@@ -1906,10 +1907,13 @@ export async function handleRequest(req, res) {
     if (sqlDb && sqlDb.isCloudEnabled) {
       await fetchFromPostgres().catch(() => {});
     }
+    const isCleared = sqlDb?.tables?.system_metadata?.get('exams_cleared_by_admin')?.value === true;
+    const activeExams = serverExams.filter(e => !isExamDeleted(e.id));
     sendJson(res, 200, {
       success: true,
-      exams: serverExams.filter(e => !isExamDeleted(e.id)),
-      deletedExams: Array.from(serverDeletedExams)
+      exams: activeExams,
+      deletedExams: Array.from(serverDeletedExams),
+      clearedByAdmin: Boolean(isCleared && activeExams.length === 0)
     });
     return;
   }
@@ -2031,6 +2035,17 @@ export async function handleRequest(req, res) {
       unmarkExamDeleted(examId);
       serverExams.unshift(exam);
       await saveExamToPostgres(exam);
+      if (sqlDb) {
+        sqlDb.tables.system_metadata.delete('exams_cleared_by_admin');
+        if (sqlDb.isCloudEnabled) {
+          await sqlDb.executeTransaction([
+            {
+              sql: "DELETE FROM system_metadata WHERE key = 'exams_cleared_by_admin';",
+              params: []
+            }
+          ]).catch(() => {});
+        }
+      }
       sendJson(res, 201, { success: true, exam });
       return;
     } catch (err) {
@@ -2162,6 +2177,7 @@ export async function handleRequest(req, res) {
 
   // Route: GET /api/exam-submissions
   if (req.method === 'GET' && pathname === '/api/exam-submissions') {
+    const isCleared = sqlDb?.tables?.system_metadata?.get('exams_cleared_by_admin')?.value === true;
     const examId = parsedUrl.searchParams.get('examId');
     const userId = parsedUrl.searchParams.get('userId');
     let list = [...serverExamSubmissions];
@@ -2185,7 +2201,11 @@ export async function handleRequest(req, res) {
       };
     });
 
-    sendJson(res, 200, { success: true, submissions: enrichedList });
+    sendJson(res, 200, {
+      success: true,
+      submissions: enrichedList,
+      clearedByAdmin: Boolean(isCleared && serverExamSubmissions.length === 0)
+    });
     return;
   }
 
