@@ -82,6 +82,52 @@ describe('Assigned exam API', () => {
     expect(result.data.exam.shuffleOptions).toBe(true);
   });
 
+  it('creates an exam assigned to a specific class (class:CQ.67.CNTT) and allows only students from that class to submit', async () => {
+    const exam = {
+      id: `exam_class_${Date.now()}`,
+      title: 'Đề kiểm tra lớp CNTT',
+      durationMinutes: 45,
+      questionIds: ['logic_q01'],
+      assignedTo: ['class:CQ.67.CNTT'],
+    };
+
+    const createRes = await sendRequest({
+      method: 'POST',
+      url: '/api/exams',
+      body: exam,
+    });
+
+    expect(createRes.statusCode).toBe(201);
+    expect(createRes.data.exam.assignedTo).toEqual(['class:CQ.67.CNTT']);
+
+    // Student from CQ.67.CNTT submits -> should succeed (201)
+    const validSubRes = await sendRequest({
+      method: 'POST',
+      url: '/api/exam-submissions',
+      body: {
+        examId: exam.id,
+        userId: 'student_cntt_1',
+        userInfo: { username: 'cntt_user', className: 'CQ.67.CNTT' },
+        answers: { logic_q01: 'A' },
+      },
+    });
+    expect(validSubRes.statusCode).toBe(201);
+
+    // Student from different class (K68-KTPM) submits -> should be rejected (403)
+    const invalidSubRes = await sendRequest({
+      method: 'POST',
+      url: '/api/exam-submissions',
+      body: {
+        examId: exam.id,
+        userId: 'student_ktpm_1',
+        userInfo: { username: 'ktpm_user', className: 'K68-KTPM' },
+        answers: { logic_q01: 'A' },
+      },
+    });
+    expect(invalidSubRes.statusCode).toBe(403);
+    expect(invalidSubRes.data.error).toContain('không được giao');
+  });
+
   it('rejects a submission for an exam not assigned to that student', async () => {
     const examId = `exam_private_${Date.now()}`;
     serverExams.unshift({

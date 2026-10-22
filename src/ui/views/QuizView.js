@@ -4407,7 +4407,8 @@ export class QuizView {
           if (isOnline) {
             const serverRes = await cloudSyncManager.serverCreateExam(examPayload);
             if (!serverRes || !serverRes.success) {
-              this._showAlert(`❌ Không thể phát đề thi: ${serverRes?.error || 'Máy chủ từ chối yêu cầu'}. Vui lòng thử lại.`);
+              const errMsg = (serverRes?.error || 'Máy chủ từ chối yêu cầu').replace(/\.+$/, '');
+              this._showAlert(`❌ Không thể phát đề thi: ${errMsg}. Vui lòng thử lại.`);
               btnCreateAndAssign.disabled = false;
               btnCreateAndAssign.innerHTML = originalBtnHtml;
               return;

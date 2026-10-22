@@ -1984,20 +1984,31 @@ export async function handleRequest(req, res) {
       ]);
       const assignedTo = Array.isArray(data.assignedTo) && data.assignedTo.length > 0 ? data.assignedTo : ['all'];
 
+      if (title.length < 2) {
+        sendJson(res, 400, { success: false, error: 'Tiêu đề đề thi phải có ít nhất 2 ký tự.' });
+        return;
+      }
+
+      if (!Number.isInteger(durationMinutes) || durationMinutes < 1 || durationMinutes > 180) {
+        sendJson(res, 400, { success: false, error: 'Thời gian làm bài phải từ 1 đến 180 phút.' });
+        return;
+      }
+
+      if (questionIds.length === 0) {
+        sendJson(res, 400, { success: false, error: 'Đề thi phải có ít nhất 1 câu hỏi.' });
+        return;
+      }
+
+      if (questionIds.some(id => !validQuestionIds.has(id))) {
+        sendJson(res, 400, { success: false, error: 'Một số câu hỏi không tồn tại trong hệ thống.' });
+        return;
+      }
+
       if (
-        title.length < 2 ||
-        questionIds.length === 0 ||
-        questionIds.some(id => !validQuestionIds.has(id)) ||
-        !Number.isInteger(durationMinutes) ||
-        durationMinutes < 1 ||
-        durationMinutes > 180 ||
         assignedTo.length === 0 ||
-        assignedTo.some(id => typeof id !== 'string' || (
-          id !== 'all' && 
-          !serverUsers.some(user => user.id === id || user.username.toLowerCase() === id.toLowerCase() || id.startsWith('user_'))
-        ))
+        assignedTo.some(id => typeof id !== 'string' || !id.trim())
       ) {
-        sendJson(res, 400, { success: false, error: 'Thông tin đề thi, thời lượng, câu hỏi hoặc danh sách sinh viên không hợp lệ.' });
+        sendJson(res, 400, { success: false, error: 'Danh sách đối tượng sinh viên hoặc lớp học nhận đề không hợp lệ.' });
         return;
       }
 
@@ -2259,13 +2270,18 @@ export async function handleRequest(req, res) {
       }
 
       const studentUsername = (userInfo.username || data.username || userId).toLowerCase();
+      const studentClass = (userInfo.className || data.className || '').trim().toLowerCase();
       const isAssigned = Array.isArray(exam.assignedTo) && (
         exam.assignedTo.includes('all') ||
         exam.assignedTo.includes(userId) ||
-        exam.assignedTo.some(a => (a || '').toLowerCase() === studentUsername)
+        exam.assignedTo.some(a => (a || '').toLowerCase() === studentUsername) ||
+        (studentClass && exam.assignedTo.some(a => {
+          const target = (a || '').trim().toLowerCase();
+          return target === `class:${studentClass}` || target === studentClass;
+        }))
       );
       if (!isAssigned) {
-        sendJson(res, 403, { success: false, error: 'Đề thi này không được giao cho tài khoản của bạn.' });
+        sendJson(res, 403, { success: false, error: 'Đề thi này không được giao cho tài khoản hoặc lớp học của bạn.' });
         return;
       }
 
