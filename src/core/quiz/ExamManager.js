@@ -23,6 +23,7 @@ export const STORAGE_KEY_EXAMS_CLEARED = 'trr_exams_cleared_by_admin';
 // Active exam draft key pattern : trr_active_exam_${examId}_${userId}
 // Offline submission queue key  : trr_offline_submission_queue_v1
 export const STORAGE_KEY_OFFLINE_QUEUE = 'trr_offline_submission_queue_v1';
+export const MAX_DISCONNECT_GRACE_SECONDS = 120; // 2 minutes cumulative allowed disconnect / away grace period
 
 export const DEFAULT_EXAMS = [
   {
@@ -840,6 +841,8 @@ export class ExamManager {
         currentQIndex: draftData.currentQIndex != null ? draftData.currentQIndex : 0,
         questionIds:   draftData.questionIds   || [],
         optionOrder:   draftData.optionOrder   || {},
+        cumulativeDisconnectedSeconds: draftData.cumulativeDisconnectedSeconds != null ? Number(draftData.cumulativeDisconnectedSeconds) : 0,
+        disconnectStartedAt: draftData.disconnectStartedAt != null ? Number(draftData.disconnectStartedAt) : null,
         updatedAt:     Date.now(),
       };
       this.storage.setItem(this._draftKey(examId, userId), JSON.stringify(payload));
@@ -883,6 +886,8 @@ export class ExamManager {
           ...draft,
           deadline,
           expired: true,
+          cumulativeDisconnectedSeconds: draft.cumulativeDisconnectedSeconds != null ? Number(draft.cumulativeDisconnectedSeconds) : 0,
+          disconnectStartedAt: draft.disconnectStartedAt != null ? Number(draft.disconnectStartedAt) : null,
           timeRemaining: 0,
         };
       }
@@ -893,6 +898,8 @@ export class ExamManager {
         ...draft,
         deadline,
         expired: false,
+        cumulativeDisconnectedSeconds: draft.cumulativeDisconnectedSeconds != null ? Number(draft.cumulativeDisconnectedSeconds) : 0,
+        disconnectStartedAt: draft.disconnectStartedAt != null ? Number(draft.disconnectStartedAt) : null,
         timeRemaining: (draft.timeRemaining != null && Math.abs(draft.timeRemaining - actualRemainingSeconds) <= 1)
           ? draft.timeRemaining
           : actualRemainingSeconds,

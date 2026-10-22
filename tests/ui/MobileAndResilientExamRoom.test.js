@@ -92,7 +92,7 @@ describe('Mobile & Resilient Exam Room (100+ Concurrency & Cross-Device Protecti
     expect(quizView._isMobileDevice()).toBe(true);
   });
 
-  it('never invokes Fullscreen API on mobile devices and bypasses resize departure false-positives', async () => {
+  it('requests Fullscreen API on mobile devices when supported and enables CSS immersive fullscreen mode', async () => {
     // Set user agent to Android
     vi.spyOn(window.navigator, 'userAgent', 'get').mockReturnValue(
       'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 Mobile Safari/537.36'
@@ -115,12 +115,18 @@ describe('Mobile & Resilient Exam Room (100+ Concurrency & Cross-Device Protecti
     window.confirm = () => true;
 
     container.querySelector(`.btn-start-exam[data-exam-id="${examId}"]`).click();
+    await Promise.resolve();
     const session = quizView.activeExamSession;
     expect(session).not.toBeNull();
 
-    // Fullscreen API should NEVER be requested on mobile
-    expect(requestFullscreenSpy).not.toHaveBeenCalled();
+    // Fullscreen API is requested to hide browser address bar on Android
+    expect(requestFullscreenSpy).toHaveBeenCalled();
     expect(session.fullscreenActive).toBe(true);
+    expect(document.body.classList.contains('in-active-exam')).toBe(true);
+
+    // Fullscreen toggle button is present on the topbar
+    const toggleBtn = container.querySelector('#btnToggleExamFullscreen');
+    expect(toggleBtn).not.toBeNull();
 
     // Simulate virtual keyboard popup (resize event) -> MUST NOT trigger departure!
     window.dispatchEvent(new window.Event('resize'));
@@ -288,5 +294,97 @@ describe('Mobile & Resilient Exam Room (100+ Concurrency & Cross-Device Protecti
     // Trigger download slip
     const slipResult = examManager.downloadEmergencyBackupSlip(quizView.reviewSubmission);
     expect(slipResult).toBe(true);
+  });
+
+  it('tracks cumulative disconnect time across multiple offline/exit events, reducing remaining grace from 120s', () => {
+    const examRes = examManager.createExam({
+      title: 'Đề Thi Quỹ Mất Mạng Tích Lũy',
+      questionIds: ['logic_q01', 'logic_q02'],
+      durationMinutes: 20,
+      assignedTo: [testStudent.id],
+      createdBy: 'user_admin',
+    });
+    const examId = examRes.exam.id;
+
+    // Simulate 1st disconnect: departed 30s ago
+    const startedAt = Date.now() - 60000;
+    const deadline = startedAt + 20 * 60 * 1000;
+    const disconnectStartedAt = Date.now() - 30000; // 30s away
+    examManager.saveDraft(examId, testStudent.id, {
+      examId,
+      answers: { logic_q01: 'A' },
+      startedAt,
+      deadline,
+      durationMinutes: 20,
+      cumulativeDisconnectedSeconds: 0,
+      disconnectStartedAt,
+      questionIds: ['logic_q01', 'logic_q02'],
+    });
+
+    const quizView = new QuizView({ container });
+    quizView.setTab('myExams');
+    window.confirm = () => true;
+
+    // Student clicks to resume exam
+    container.querySelector(`.btn-start-exam[data-exam-id="${examId}"]`).click();
+    const session = quizView.activeExamSession;
+    expect(session).not.toBeNull();
+
+    // 1st exit: away for 30s -> cumulativeDisconnectedSeconds is now 30
+    expect(session.cumulativeDisconnectedSeconds).toBe(30);
+
+    // Grace badge displays remaining: 120 - 30 = 90s (01:30)
+    const graceText = container.querySelector('#examGraceTimeText');
+    expect(graceText).not.toBeNull();
+    expect(graceText.textContent).toBe('01:30');
+
+    // Simulate 2nd exit: student leaves for 40s
+    session.cumulativeDisconnectedSeconds = 30;
+    session.disconnectStartedAt = Date.now() - 40000;
+    quizView._recordReturnTimestamp();
+
+    // Cumulative is now 30 + 40 = 70s, remaining grace is 50s
+    expect(session.cumulativeDisconnectedSeconds).toBe(70);
+  });
+
+  it('automatically submits exam when cumulative disconnect/away time exceeds 120 seconds', () => {
+    const examRes = examManager.createExam({
+      title: 'Đề Thi Vi Phạm Quá 2 Phút Mất Mạng',
+      questionIds: ['logic_q01'],
+      durationMinutes: 15,
+      assignedTo: [testStudent.id],
+      createdBy: 'user_admin',
+    });
+    const examId = examRes.exam.id;
+
+    // Student was already away for 90s, and then disconnected 35s ago (total = 125s > 120s)
+    const startedAt = Date.now() - 10 * 60 * 1000;
+    const deadline = startedAt + 15 * 60 * 1000; // still 5 minutes left in exam!
+    const disconnectStartedAt = Date.now() - 35000;
+    examManager.saveDraft(examId, testStudent.id, {
+      examId,
+      answers: { logic_q01: 'C' },
+      startedAt,
+      deadline,
+      durationMinutes: 15,
+      cumulativeDisconnectedSeconds: 90,
+      disconnectStartedAt,
+      questionIds: ['logic_q01'],
+    });
+
+    const quizView = new QuizView({ container });
+    quizView.setTab('myExams');
+
+    // Attempting to resume -> detects total cumulative away >= 120s -> AUTO SUBMIT!
+    container.querySelector(`.btn-start-exam[data-exam-id="${examId}"]`).click();
+
+    // Draft is cleaned up
+    expect(examManager.loadDraft(examId, testStudent.id, { includeExpired: false })).toBeNull();
+
+    // Submission was recorded with student's answers
+    const sub = examManager.getSubmission(examId, testStudent.id);
+    expect(sub).not.toBeNull();
+    expect(quizView.reviewSubmission).not.toBeNull();
+    expect(quizView.activeExamSession).toBeNull();
   });
 });

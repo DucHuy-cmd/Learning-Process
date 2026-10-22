@@ -42,7 +42,7 @@ import {
 import { authManager } from '../../core/auth/AuthManager.js';
 import { quizHistoryManager } from '../../core/quiz/QuizHistoryManager.js';
 import { cloudSyncManager } from '../../core/sync/CloudSyncManager.js';
-import { examManager } from '../../core/quiz/ExamManager.js';
+import { examManager, MAX_DISCONNECT_GRACE_SECONDS } from '../../core/quiz/ExamManager.js';
 import {
   parseExamText,
   parseExamCsv,
@@ -1190,6 +1190,17 @@ export class QuizView {
     const timeFormatted = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
     const isUrgent = session.timeRemaining <= 120;
     const lockdownCountdown = session.lockdownCountdown;
+
+    const extraOfflineSec = (session.isOffline && session.offlineStartedAt)
+      ? Math.max(0, Math.floor((Date.now() - session.offlineStartedAt) / 1000))
+      : 0;
+    const currentCumulativeAway = (session.cumulativeDisconnectedSeconds || 0) + extraOfflineSec;
+    const remainingGraceSec = Math.max(0, 120 - currentCumulativeAway);
+    const graceMin = Math.floor(remainingGraceSec / 60);
+    const graceSec = remainingGraceSec % 60;
+    const graceFormatted = `${String(graceMin).padStart(2, '0')}:${String(graceSec).padStart(2, '0')}`;
+    const graceClass = remainingGraceSec > 60 ? 'safe' : (remainingGraceSec > 30 ? 'warning' : 'danger');
+
     const lockdownOverlay = session.lockdownPending ? `
       <div class="exam-lockdown-overlay" role="dialog" aria-modal="true" aria-labelledby="examLockdownTitle"
         style="position:fixed;inset:0;background:rgba(0,0,0,0.85);backdrop-filter:blur(6px);z-index:999999;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;">
@@ -1223,6 +1234,13 @@ export class QuizView {
     return `
       <div class="active-exam-room">
         ${lockdownOverlay}
+
+        ${session.isOffline ? `
+          <div class="active-exam-offline-banner" id="examOfflineBanner">
+            <span>📡 <strong>CẢNH BÁO: MẤT KẾT NỐI INTERNET!</strong> Quỹ thời gian offline còn lại: <strong id="examOfflineTimeText">${graceFormatted}</strong></span>
+            <span style="font-size:11.5px;opacity:0.9;">Vui lòng kết nối lại Wi-Fi / 4G ngay!</span>
+          </div>
+        ` : ''}
         
         <!-- Top bar: Title, Timer, Submitting -->
         <div class="active-exam-topbar">
@@ -1236,17 +1254,27 @@ export class QuizView {
                 <span class="autosave-dot"></span>
                 <span>🟢 Đã tự động lưu bài</span>
               </span>
+              <!-- 2-Minute Disconnect / Away Grace Indicator -->
+              <span class="active-exam-grace-box ${graceClass}" id="examGraceBadge" title="Quỹ thời gian mất mạng hoặc rời phòng thi cho phép (Tối đa tích lũy 2 phút cho cả ca thi)">
+                <span>📶 Quỹ vắng mặt:</span>
+                <span id="examGraceTimeText" style="font-family:monospace;font-size:12.5px;">${graceFormatted}</span>
+              </span>
             </div>
             <h2 style="font-size:19px;font-weight:700;color:var(--text);margin:0;line-height:1.3;word-break:break-word;">
               ${this._escapeHtml(exam.title)}
             </h2>
           </div>
 
-          <div class="active-exam-actions-wrap" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+          <div class="active-exam-actions-wrap" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
             <!-- Countdown Timer -->
             <div class="active-exam-timer-box ${isUrgent ? 'urgent' : ''}" id="activeExamTimer">
               ⏱️ ${timeFormatted}
             </div>
+
+            <!-- Fullscreen Toggle Button -->
+            <button type="button" class="btn-fullscreen-toggle" id="btnToggleExamFullscreen" title="Bật/Tắt chế độ Toàn Màn Hình">
+              ⛶ Toàn màn hình
+            </button>
 
             <!-- Submit Button (Min height 44px-48px) -->
             <button type="button" class="btn-primary" id="btnSubmitActiveExam" style="background:#10b981;border-color:#10b981;font-weight:700;font-size:14px;padding:10px 20px;min-height:46px;display:flex;align-items:center;justify-content:center;touch-action:manipulation;">
@@ -2630,7 +2658,7 @@ export class QuizView {
       return;
     }
 
-    // ── Zero Data Loss: Check for a saved draft and auto-resume ───────────────
+    // ── Zero Data Loss & 2-Minute Disconnect/Exit Grace Period Enforcement ────
     const existingDraft = examManager.loadDraft(examId, currentUser.id, { includeExpired: true });
     if (existingDraft) {
       // 1. If draft expired while student was away -> auto-submit immediately
@@ -2657,12 +2685,66 @@ export class QuizView {
         return;
       }
 
+      // 2. Calculate cumulative disconnected / away time while web was closed / offline
+      const awaySinceLastLeft = existingDraft.disconnectStartedAt
+        ? Math.max(0, Math.floor((Date.now() - existingDraft.disconnectStartedAt) / 1000))
+        : 0;
+      const totalCumulativeDisconnected = (existingDraft.cumulativeDisconnectedSeconds || 0) + awaySinceLastLeft;
+
+      // 3. If total cumulative disconnected time >= 120 seconds (2 minutes) -> AUTO-SUBMIT WITH DISCONNECT VIOLATION
+      if (totalCumulativeDisconnected >= MAX_DISCONNECT_GRACE_SECONDS) {
+        this._showAlert(
+          `⛔ BÀI THI BỊ TỰ ĐỘNG NỘP DO QUÁ THỜI GIAN VẮNG MẶT / MẤT KẾT NỐI!\n\n` +
+          `Hệ thống ghi nhận bạn đã rời phòng thi / ngắt kết nối quá thời gian quy định:\n` +
+          `• Vừa vắng mặt: ${awaySinceLastLeft} giây\n` +
+          `• Tổng thời gian vắng mặt tích lũy: ${totalCumulativeDisconnected} giây (Hạn mức tối đa: 120 giây / 2 phút).\n\n` +
+          `Bài thi đã tự động kết thúc và chấm điểm theo các câu bạn đã hoàn thành.`
+        );
+        const submissionPayload = {
+          examId: existingDraft.examId,
+          userId: currentUser.id,
+          userInfo: currentUser || {},
+          answers: existingDraft.answers || {},
+          timeSpentSeconds: Math.min((exam.durationMinutes || 15) * 60, Math.max(0, Math.floor((Date.now() - (existingDraft.startedAt || Date.now())) / 1000))),
+          optionOrder: existingDraft.optionOrder || {},
+          integrityBan: false,
+          awayViolation: true,
+          cumulativeDisconnectedSeconds: totalCumulativeDisconnected,
+        };
+        examManager.clearDraft(examId, currentUser.id);
+        const res = examManager.submitExam(submissionPayload);
+        if (cloudSyncManager) {
+          cloudSyncManager.serverSubmitExam(res.submission || submissionPayload).catch(() => {
+            examManager.enqueueOfflineSubmission(submissionPayload);
+          });
+        }
+        this.reviewSubmission = res.submission;
+        this.render();
+        return;
+      }
+
+      // Update draft with fresh cumulative disconnected seconds and clear disconnectStartedAt
+      existingDraft.cumulativeDisconnectedSeconds = totalCumulativeDisconnected;
+      existingDraft.disconnectStartedAt = null;
+      examManager.saveDraft(examId, currentUser.id, existingDraft);
+
+      const remainingGrace = MAX_DISCONNECT_GRACE_SECONDS - totalCumulativeDisconnected;
+      if (awaySinceLastLeft > 0) {
+        this._showAlert(
+          `⚠️ CẢNH BÁO VẮNG MẶT / MẤT KẾT NỐI!\n\n` +
+          `Bạn vừa rời phòng thi / ngắt kết nối ${awaySinceLastLeft} giây.\n` +
+          `• Quỹ thời gian vắng mặt cho phép còn lại: ${remainingGrace} giây (Tối đa tích lũy 2 phút).\n` +
+          `Nếu tiếp tục thoát ra quá ${remainingGrace} giây, bài thi sẽ bị tự động nộp ngay lập tức!`
+        );
+      }
+
       const timeLeftMin = Math.ceil((existingDraft.timeRemaining || 0) / 60);
       const wantResume = typeof window !== 'undefined' && window.confirm
         ? window.confirm(
             `📂 Phát hiện bài làm chưa hoàn thành của đề thi "${exam.title}"!\n\n` +
             `• Số câu đã trả lời: ${Object.keys(existingDraft.answers || {}).length} / ${exam.questionIds.length}\n` +
-            `• Thời gian còn lại: ~${timeLeftMin} phút\n\n` +
+            `• Thời gian còn lại: ~${timeLeftMin} phút\n` +
+            `• Quỹ vắng mặt còn lại: ~${remainingGrace} giây\n\n` +
             `Bấm OK để tiếp tục làm từ chỗ đã dừng.\n` +
             `Bấm Hủy để bỏ bản nháp và bắt đầu lại từ đầu (Lưu ý: thời gian vẫn tính từ lúc bắt đầu đầu tiên).`
           )
@@ -2718,6 +2800,9 @@ export class QuizView {
           lockdownWarning:   false,
           fullscreenActive:  false,
           _showSubmitConfirm: false,
+          cumulativeDisconnectedSeconds: totalCumulativeDisconnected,
+          disconnectStartedAt: null,
+          isOffline: (typeof navigator !== 'undefined' && navigator.onLine === false),
         };
 
         this.render();
@@ -2733,7 +2818,7 @@ export class QuizView {
     // ── End Zero Data Loss ────────────────────────────────────────────────────
 
     const confirmStart = typeof window !== 'undefined' && window.confirm
-      ? window.confirm(`Bắt đầu làm đề thi: "${exam.title}"?\n\nLưu ý quan trọng:\n- Mỗi thí sinh chỉ có duy nhất 1 lượt làm.\n- Màn hình sẽ tự động khóa khi vào thi, VI PHẠM 3 lần sẽ bị 0đ (thoát toàn màn hình hoặc rời cửa sổ thi sẽ tính là VI PHẠM).\n- Thời gian làm bài: ${exam.durationMinutes} phút.\n- Đồng hồ đếm ngược sẽ bắt đầu ngay bây giờ!\n\nBạn đã sẵn sàng chưa?`)
+      ? window.confirm(`Bắt đầu làm đề thi: "${exam.title}"?\n\nLưu ý quan trọng:\n- Mỗi thí sinh chỉ có duy nhất 1 lượt làm.\n- Màn hình sẽ tự động khóa khi vào thi, VI PHẠM 3 lần sẽ bị 0đ (thoát toàn màn hình hoặc rời cửa sổ thi sẽ tính là VI PHẠM).\n- Quỹ thời gian mất kết nối/rời phòng thi tối đa: 2 phút (tích lũy).\n- Thời gian làm bài: ${exam.durationMinutes} phút.\n- Đồng hồ đếm ngược sẽ bắt đầu ngay bây giờ!\n\nBạn đã sẵn sàng chưa?`)
       : true;
 
     if (!confirmStart) return;
@@ -2773,6 +2858,9 @@ export class QuizView {
       lockdownWarning: false,
       fullscreenActive: false,
       _showSubmitConfirm: false,
+      cumulativeDisconnectedSeconds: 0,
+      disconnectStartedAt: null,
+      isOffline: (typeof navigator !== 'undefined' && navigator.onLine === false),
     };
 
     // Save initial draft immediately so early refresh never loses session
@@ -2786,6 +2874,8 @@ export class QuizView {
       currentQIndex: 0,
       questionIds: questions.map(q => q.id),
       optionOrder,
+      cumulativeDisconnectedSeconds: 0,
+      disconnectStartedAt: null,
     });
 
     this.render();
@@ -2799,6 +2889,20 @@ export class QuizView {
     if (!session || session.timerId) return;
     session.timerId = setInterval(() => {
       if (this.activeExamSession !== session) return;
+
+      // 1. Live Offline Accumulation Check (2-Minute Disconnect Grace Period)
+      if (session.isOffline && session.offlineStartedAt) {
+        const liveOfflineSec = Math.max(0, Math.floor((Date.now() - session.offlineStartedAt) / 1000));
+        const totalOffline = (session.cumulativeDisconnectedSeconds || 0) + liveOfflineSec;
+        if (totalOffline >= MAX_DISCONNECT_GRACE_SECONDS) {
+          session.cumulativeDisconnectedSeconds = totalOffline;
+          this._showAlert('⛔ Bạn đã mất kết nối mạng quá 2 phút cho phép! Bài thi đang tự động được nộp.');
+          this._submitActiveExam({ integrityBan: false });
+          return;
+        }
+      }
+
+      // 2. Decrement exam time
       session.timeRemaining--;
 
       const timerEl = this.container ? this.container.querySelector('#activeExamTimer') : null;
@@ -2807,6 +2911,26 @@ export class QuizView {
         const s = Math.max(0, session.timeRemaining) % 60;
         timerEl.textContent = `⏱️ ${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
         if (session.timeRemaining <= 120) timerEl.classList.add('urgent');
+      }
+
+      // 3. Live Update of Grace Box on Topbar
+      const graceTextEl = this.container ? this.container.querySelector('#examGraceTimeText') : null;
+      const graceBadgeEl = this.container ? this.container.querySelector('#examGraceBadge') : null;
+      if (graceTextEl && graceBadgeEl) {
+        const extraOffline = (session.isOffline && session.offlineStartedAt)
+          ? Math.max(0, Math.floor((Date.now() - session.offlineStartedAt) / 1000))
+          : 0;
+        const currentTotalAway = (session.cumulativeDisconnectedSeconds || 0) + extraOffline;
+        const remainingGrace = Math.max(0, MAX_DISCONNECT_GRACE_SECONDS - currentTotalAway);
+        const gMin = Math.floor(remainingGrace / 60);
+        const gSec = remainingGrace % 60;
+        graceTextEl.textContent = `${String(gMin).padStart(2, '0')}:${String(gSec).padStart(2, '0')}`;
+        graceBadgeEl.className = `active-exam-grace-box ${remainingGrace > 60 ? 'safe' : (remainingGrace > 30 ? 'warning' : 'danger')}`;
+
+        const offlineTimeEl = this.container ? this.container.querySelector('#examOfflineTimeText') : null;
+        if (offlineTimeEl) {
+          offlineTimeEl.textContent = `${String(gMin).padStart(2, '0')}:${String(gSec).padStart(2, '0')}`;
+        }
       }
 
       if (session.timeRemaining <= 0) {
@@ -2882,8 +3006,10 @@ export class QuizView {
 
     const onVisibilityChange = () => {
       if (document.visibilityState === 'hidden') {
+        this._recordDepartureTimestamp();
         this._handleScreenDeparture('visibility_hidden');
       } else if (document.visibilityState === 'visible') {
+        this._recordReturnTimestamp();
         const session = this.activeExamSession;
         if (session && session.isAway) {
           this._flushAwayTime(session);
@@ -2906,6 +3032,7 @@ export class QuizView {
     };
 
     const onFocus = () => {
+      this._recordReturnTimestamp();
       const session = this.activeExamSession;
       if (session && session.isAway) {
         this._flushAwayTime(session);
@@ -2914,7 +3041,38 @@ export class QuizView {
     };
 
     const onPageHide = () => {
+      this._recordDepartureTimestamp();
       this._handleScreenDeparture('pagehide');
+    };
+
+    const onOffline = () => {
+      const session = this.activeExamSession;
+      if (!session) return;
+      session.isOffline = true;
+      session.offlineStartedAt = Date.now();
+      this.render();
+    };
+
+    const onOnline = () => {
+      const session = this.activeExamSession;
+      if (!session) return;
+      session.isOffline = false;
+      if (session.offlineStartedAt) {
+        const elapsedSec = Math.max(0, Math.floor((Date.now() - session.offlineStartedAt) / 1000));
+        session.cumulativeDisconnectedSeconds = (session.cumulativeDisconnectedSeconds || 0) + elapsedSec;
+        session.offlineStartedAt = null;
+      }
+      this._saveCurrentSessionDraft();
+      if (session.cumulativeDisconnectedSeconds >= MAX_DISCONNECT_GRACE_SECONDS) {
+        this._showAlert('⛔ Bạn đã mất kết nối mạng quá 2 phút cho phép! Bài thi đang tự động được nộp.');
+        this._submitActiveExam({ integrityBan: false });
+        return;
+      }
+      this.render();
+    };
+
+    const onBeforeUnload = () => {
+      this._recordDepartureTimestamp();
     };
 
     const onResize = () => {
@@ -3004,6 +3162,9 @@ export class QuizView {
       onPageHide,
       onResize,
       onKeyDown,
+      onOffline,
+      onOnline,
+      onBeforeUnload,
       preventDefaultEvent,
     };
 
@@ -3025,6 +3186,9 @@ export class QuizView {
       window.addEventListener('pagehide', onPageHide);
       window.addEventListener('resize', onResize);
       window.addEventListener('keydown', onKeyDown, true);
+      window.addEventListener('offline', onOffline);
+      window.addEventListener('online', onOnline);
+      window.addEventListener('beforeunload', onBeforeUnload);
     }
   }
 
@@ -3053,8 +3217,53 @@ export class QuizView {
       window.removeEventListener('pagehide', h.onPageHide);
       window.removeEventListener('resize', h.onResize);
       window.removeEventListener('keydown', h.onKeyDown, true);
+      window.removeEventListener('offline', h.onOffline);
+      window.removeEventListener('online', h.onOnline);
+      window.removeEventListener('beforeunload', h.onBeforeUnload);
     }
     this._examLockdownHandlers = null;
+  }
+
+  _saveCurrentSessionDraft() {
+    const session = this.activeExamSession;
+    if (!session) return;
+    const currentUser = authManager.getCurrentUser();
+    if (!currentUser) return;
+    examManager.saveDraft(session.exam.id, currentUser.id, {
+      examId: session.exam.id,
+      answers: session.answers,
+      startedAt: session.startedAt,
+      deadline: session.deadline,
+      durationMinutes: session.exam.durationMinutes,
+      timeRemaining: session.timeRemaining,
+      currentQIndex: session.currentQIndex,
+      questionIds: session.questions.map(q => q.id),
+      optionOrder: session.optionOrder,
+      cumulativeDisconnectedSeconds: session.cumulativeDisconnectedSeconds || 0,
+      disconnectStartedAt: session.disconnectStartedAt || null,
+    });
+  }
+
+  _recordDepartureTimestamp() {
+    const session = this.activeExamSession;
+    if (!session || session.timeRemaining <= 0) return;
+    session.disconnectStartedAt = Date.now();
+    this._saveCurrentSessionDraft();
+  }
+
+  _recordReturnTimestamp() {
+    const session = this.activeExamSession;
+    if (!session || !session.disconnectStartedAt) return;
+    const awaySec = Math.max(0, Math.floor((Date.now() - session.disconnectStartedAt) / 1000));
+    session.cumulativeDisconnectedSeconds = (session.cumulativeDisconnectedSeconds || 0) + awaySec;
+    session.disconnectStartedAt = null;
+    this._saveCurrentSessionDraft();
+
+    if (session.cumulativeDisconnectedSeconds >= MAX_DISCONNECT_GRACE_SECONDS) {
+      this._showAlert('⛔ Bạn đã rời phòng thi / ngắt kết nối quá 2 phút cho phép! Bài thi đang tự động được nộp.');
+      this._submitActiveExam({ integrityBan: false });
+      return;
+    }
   }
 
   _handleScreenDeparture(reason) {
@@ -3110,6 +3319,13 @@ export class QuizView {
 
     session.awayStartedAt += elapsedSeconds * 1000;
     session.cumulativeAwaySeconds = (session.cumulativeAwaySeconds || 0) + elapsedSeconds;
+    session.cumulativeDisconnectedSeconds = (session.cumulativeDisconnectedSeconds || 0) + elapsedSeconds;
+
+    if (session.cumulativeDisconnectedSeconds >= MAX_DISCONNECT_GRACE_SECONDS) {
+      this._showAlert('⛔ Bạn đã rời phòng thi / ngắt kết nối quá 2 phút cho phép! Bài thi đang tự động được nộp.');
+      this._submitActiveExam({ integrityBan: false });
+      return;
+    }
 
     // Check if 10-second cumulative threshold(s) crossed
     while (session.cumulativeAwaySeconds >= 10 && session.violationCount < 3) {
@@ -3174,15 +3390,16 @@ export class QuizView {
   }
 
   _requestExamFullscreen({ preserveLockdownState = false } = {}) {
-    if (this._isPhoneDevice() || !this._supportsFullscreen()) {
-      const session = this.activeExamSession;
-      if (session) {
-        session.fullscreenActive = true;
-        if (!preserveLockdownState) {
-          session.lockdownPending = false;
-        }
+    if (typeof document !== 'undefined' && document.body) {
+      document.body.classList.add('in-active-exam');
+    }
+
+    const session = this.activeExamSession;
+    if (session) {
+      session.fullscreenActive = true;
+      if (!preserveLockdownState) {
+        session.lockdownPending = false;
       }
-      return Promise.resolve();
     }
 
     if (typeof document === 'undefined') return Promise.resolve();
@@ -3194,17 +3411,12 @@ export class QuizView {
       docEl.msRequestFullscreen
     );
 
-    if (typeof requestMethod !== 'function') return Promise.resolve();
-    const session = this.activeExamSession;
+    if (typeof requestMethod !== 'function') {
+      return Promise.resolve();
+    }
 
     try {
-      return Promise.resolve(requestMethod.call(docEl)).then(() => {
-        if (this.activeExamSession !== session) return;
-        session.fullscreenActive = true;
-        if (!preserveLockdownState) {
-          session.lockdownPending = false;
-        }
-      }).catch((err) => {
+      return Promise.resolve(requestMethod.call(docEl)).catch((err) => {
         console.warn('[ExamLockdown] Fullscreen request rejected:', err);
       });
     } catch (err) {
@@ -3219,6 +3431,10 @@ export class QuizView {
 
   async _submitActiveExam({ integrityBan = false } = {}) {
     if (!this.activeExamSession) return;
+
+    if (typeof document !== 'undefined' && document.body) {
+      document.body.classList.remove('in-active-exam');
+    }
 
     this._cancelExamLockdownCountdown(this.activeExamSession);
     if (this.activeExamSession.timerId) {
@@ -3468,6 +3684,13 @@ export class QuizView {
 
     // In Active Exam Room Events
     if (this.activeExamSession) {
+      const btnToggleExamFullscreen = this.container.querySelector('#btnToggleExamFullscreen');
+      if (btnToggleExamFullscreen) {
+        btnToggleExamFullscreen.addEventListener('click', () => {
+          this._requestExamFullscreen();
+        });
+      }
+
       const btnResumeExamLockdown = this.container.querySelector('#btnResumeExamLockdown');
       if (btnResumeExamLockdown) {
         btnResumeExamLockdown.addEventListener('click', async () => {
@@ -3548,6 +3771,8 @@ export class QuizView {
                 currentQIndex: session.currentQIndex,
                 questionIds:   session.questions.map(q => q.id),
                 optionOrder:   session.optionOrder,
+                cumulativeDisconnectedSeconds: session.cumulativeDisconnectedSeconds || 0,
+                disconnectStartedAt: session.disconnectStartedAt || null,
               });
             }
             // ── End Auto-save ─────────────────────────────────────────────

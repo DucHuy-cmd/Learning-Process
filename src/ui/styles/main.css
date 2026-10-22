@@ -7102,6 +7102,116 @@ body.theme-light .btn-close-modal:hover {
   border: 1px solid rgba(245, 158, 11, 0.35);
 }
 
+/* Fullscreen Immersive Exam Mode (Desktop & Mobile) */
+body.in-active-exam {
+  overflow: hidden !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
+
+body.in-active-exam .app-header,
+body.in-active-exam .site-header,
+body.in-active-exam .nav-container,
+body.in-active-exam footer,
+body.in-active-exam .quiz-header,
+body.in-active-exam .quiz-main-tabs,
+body:has(.active-exam-room) .app-header,
+body:has(.active-exam-room) .quiz-header,
+body:has(.active-exam-room) .quiz-main-tabs {
+  display: none !important;
+}
+
+body.in-active-exam .active-exam-room,
+.active-exam-room.fullscreen-mode {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  height: 100dvh !important;
+  max-width: 100vw !important;
+  margin: 0 !important;
+  border: none !important;
+  border-radius: 0 !important;
+  z-index: 99999 !important;
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+  background: var(--bg, #0b0f19) !important;
+  padding: 14px 18px 80px 18px !important;
+  box-sizing: border-box !important;
+}
+
+/* Grace & Offline Indicators */
+.active-exam-grace-box {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  transition: all 0.3s ease;
+}
+
+.active-exam-grace-box.safe {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.4);
+}
+
+.active-exam-grace-box.warning {
+  background: rgba(245, 158, 11, 0.2);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.5);
+}
+
+.active-exam-grace-box.danger {
+  background: rgba(239, 68, 68, 0.25);
+  color: #ef4444;
+  border: 1px solid #ef4444;
+  animation: pulseGrace 1s infinite alternate;
+}
+
+@keyframes pulseGrace {
+  0% { transform: scale(1); box-shadow: 0 0 0 rgba(239, 68, 68, 0); }
+  100% { transform: scale(1.02); box-shadow: 0 0 10px rgba(239, 68, 68, 0.5); }
+}
+
+.active-exam-offline-banner {
+  background: #ef4444;
+  color: #ffffff;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  box-shadow: 0 4px 14px rgba(239, 68, 68, 0.4);
+  animation: pulseGrace 1s infinite alternate;
+}
+
+.btn-fullscreen-toggle {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  min-height: 38px;
+}
+.btn-fullscreen-toggle:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
 /* Active Timed Exam Room */
 .active-exam-room {
   background: var(--panel);
