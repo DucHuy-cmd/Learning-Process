@@ -940,23 +940,47 @@ export class QuizView {
     this._bindEvents();
   }
 
+  /**
+   * Resolves actual student accounts assigned to an exam target with fuzzy class matching.
+   * @param {Array<string>} assignedTo
+   * @returns {Array<Object>}
+   * @private
+   */
+  _resolveAssignedStudents(assignedTo) {
+    const allUsers = (typeof authManager !== 'undefined' && authManager.getUsers) ? authManager.getUsers() : [];
+    const students = allUsers.filter(u => u && u.role !== 'admin' && u.username !== 'admin' && u.id !== 'user_admin');
+    if (!Array.isArray(assignedTo) || assignedTo.length === 0 || assignedTo.includes('all')) {
+      return students;
+    }
+    const classItems = assignedTo.filter(a => typeof a === 'string' && a.startsWith('class:'));
+    const directStudents = new Set(assignedTo.filter(a => typeof a === 'string' && !a.startsWith('class:') && a !== 'all'));
+
+    const cleanClassNames = classItems.map(c =>
+      c.replace('class:', '').trim().toLowerCase().replace(/^lớp\s*:?\s*/i, '').replace(/\s+/g, '')
+    );
+
+    return students.filter(st => {
+      if (directStudents.has(st.id) || directStudents.has(st.username)) return true;
+      if (cleanClassNames.length > 0) {
+        const uClass = (st.className || st.studentClass || '').trim().toLowerCase().replace(/^lớp\s*:?\s*/i, '').replace(/\s+/g, '');
+        return cleanClassNames.some(cn => cn === uClass);
+      }
+      return false;
+    });
+  }
+
   _formatExamTarget(assignedTo) {
     if (!Array.isArray(assignedTo) || assignedTo.length === 0 || assignedTo.includes('all')) {
       return 'Toàn bộ sinh viên';
     }
 
-    const allUsers = (typeof authManager !== 'undefined' && authManager.getUsers) ? authManager.getUsers() : [];
     const classItems = assignedTo.filter(a => typeof a === 'string' && a.startsWith('class:'));
     const directStudents = assignedTo.filter(a => typeof a === 'string' && !a.startsWith('class:') && a !== 'all');
 
     if (classItems.length > 0) {
       const classNames = classItems.map(c => c.replace('class:', '').trim());
-      const classStudents = allUsers.filter(u => {
-        if (u.role === 'admin' || u.username === 'admin') return false;
-        const uClass = (u.className || u.studentClass || '').trim().toLowerCase();
-        return classNames.some(cn => cn.toLowerCase() === uClass);
-      });
-      const totalCount = classStudents.length + directStudents.length;
+      const classStudents = this._resolveAssignedStudents(assignedTo);
+      const totalCount = classStudents.length;
       return totalCount > 0 ? `Lớp ${classNames.join(', ')} (${totalCount} sinh viên)` : `Lớp ${classNames.join(', ')}`;
     }
 
@@ -1073,6 +1097,7 @@ export class QuizView {
                   <th>Tên đề thi</th>
                   <th style="text-align:center;">Thời gian</th>
                   <th style="text-align:center;">Số câu</th>
+                  <th style="text-align:center;">Ngày &amp; Khung Giờ</th>
                   <th style="text-align:center;">Đối tượng</th>
                   <th style="text-align:center;">Đã nộp bài</th>
                   <th style="text-align:center;">Ngày tạo</th>
@@ -1082,13 +1107,14 @@ export class QuizView {
               <tbody>
                 ${assignedExams.length === 0 ? `
                   <tr>
-                    <td colspan="7" style="text-align:center;padding:28px;color:var(--dim);font-style:italic;">
+                    <td colspan="8" style="text-align:center;padding:28px;color:var(--dim);font-style:italic;">
                       Chưa có đề thi nào được tạo. Hãy chuyển sang tab "Soạn Đề Từ File Word" để nạp file và phát đề!
                     </td>
                   </tr>
                 ` : assignedExams.map(item => {
                   const subs = examManager.getSubmissionsForExam(item.id);
                   const targetLabel = this._formatExamTarget(item.assignedTo);
+                  const sched = examManager.getExamScheduleStatus(item);
 
                   return `
                     <tr>
@@ -1098,6 +1124,19 @@ export class QuizView {
                       </td>
                       <td style="text-align:center;">${item.durationMinutes} phút</td>
                       <td style="text-align:center;">${item.questionIds.length} câu</td>
+                      <td style="text-align:center;font-size:12px;">
+                        ${item.scheduleType === 'scheduled' && item.examDate && item.startTime ? `
+                          <div style="font-weight:700;color:var(--text);">📅 ${item.examDate.split('-').reverse().join('/')}</div>
+                          <div style="color:var(--dim);margin:2px 0;">⏰ ${item.startTime} ➔ ${item.entryDeadline || (item.startTime + ' (+' + (item.lateEntryGraceMinutes || 15) + 'p)')}</div>
+                          ${sched.status === 'open' 
+                            ? '<span class="pill-badge" style="background:rgba(16,185,129,0.18);color:#10b981;font-weight:700;padding:2px 7px;border-radius:6px;font-size:10.5px;">🟢 Đang mở</span>' 
+                            : sched.status === 'upcoming' 
+                              ? '<span class="pill-badge" style="background:rgba(245,158,11,0.18);color:#f59e0b;font-weight:700;padding:2px 7px;border-radius:6px;font-size:10.5px;">⏳ Chưa mở</span>' 
+                              : '<span class="pill-badge" style="background:rgba(239,68,68,0.18);color:#ef4444;font-weight:700;padding:2px 7px;border-radius:6px;font-size:10.5px;">🚫 Đã khóa</span>'}
+                        ` : `
+                          <span style="color:var(--dim);">🌐 Tự do</span>
+                        `}
+                      </td>
                       <td style="text-align:center;">
                         <span class="pill-badge" style="background:rgba(56,189,248,0.12);color:#38bdf8;padding:2px 8px;border-radius:8px;font-size:11px;">
                           ${targetLabel}
@@ -1152,14 +1191,32 @@ export class QuizView {
             const violationRecord = examManager.getExamViolationRecord(exam.id, currentUser.id);
             const isBanned = Boolean(violationRecord.banned);
             const activeDraft = (!isCompleted && !isBanned) ? examManager.loadDraft(exam.id, currentUser.id, { includeExpired: false }) : null;
+            const sched = examManager.getExamScheduleStatus(exam);
+            const isScheduled = sched.isScheduled;
+            const isUpcoming = isScheduled && sched.status === 'upcoming';
+            const isClosed = isScheduled && sched.status === 'closed';
+
+            // Determine status badge
+            let statusBadgeHtml = '';
+            if (isBanned) {
+              statusBadgeHtml = `<span class="exam-status-badge banned">🚫 VI PHẠM (3/3): ${sub ? sub.score : 0} / 10 ĐIỂM (BỊ CẤM THI LẠI ĐỀ NÀY)</span>`;
+            } else if (isCompleted) {
+              statusBadgeHtml = `<span class="exam-status-badge completed">✅ ĐÃ HOÀN THÀNH: ${sub.score} / 10</span>`;
+            } else if (activeDraft) {
+              statusBadgeHtml = `<span class="exam-status-badge in-progress" style="background:rgba(245,158,11,0.18);border:1px solid rgba(245,158,11,0.5);color:#f59e0b;font-weight:700;">🔄 ĐANG LÀM DỞ DANG (~${Math.ceil(activeDraft.timeRemaining / 60)} phút còn lại)</span>`;
+            } else if (isUpcoming) {
+              statusBadgeHtml = `<span class="exam-status-badge pending" style="background:rgba(245,158,11,0.18);border:1px solid rgba(245,158,11,0.5);color:#f59e0b;font-weight:700;">⏳ CHƯA ĐẾN GIỜ MỞ THI (Mở lúc ${exam.startTime})</span>`;
+            } else if (isClosed) {
+              statusBadgeHtml = `<span class="exam-status-badge banned" style="background:rgba(239,68,68,0.18);border:1px solid rgba(239,68,68,0.5);color:#ef4444;font-weight:700;">🚫 ĐÃ KHÓA CỔNG THI: 0 / 10 ĐIỂM (VẮNG THI)</span>`;
+            } else {
+              statusBadgeHtml = `<span class="exam-status-badge pending" style="${isScheduled ? 'background:rgba(16,185,129,0.18);border:1px solid rgba(16,185,129,0.5);color:#10b981;font-weight:700;' : ''}">${isScheduled ? `🟢 CỔNG ĐANG MỞ (Đóng lúc ${exam.entryDeadline || ''})` : '⏳ CHƯA LÀM (Chỉ 1 lượt)'}</span>`;
+            }
 
             return `
               <div class="exam-card">
                 <div>
                   <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:10px;">
-                    <span class="exam-status-badge ${isBanned ? 'banned' : (isCompleted ? 'completed' : (activeDraft ? 'in-progress' : 'pending'))}" style="${activeDraft ? 'background:rgba(245,158,11,0.18);border:1px solid rgba(245,158,11,0.5);color:#f59e0b;font-weight:700;' : ''}">
-                      ${isBanned ? `🚫 VI PHẠM (3/3): ${sub ? sub.score : 0} / 10 ĐIỂM (BỊ CẤM THI LẠI ĐỀ NÀY)` : (isCompleted ? `✅ ĐÃ HOÀN THÀNH: ${sub.score} / 10` : (activeDraft ? `🔄 ĐANG LÀM DỞ DANG (~${Math.ceil(activeDraft.timeRemaining / 60)} phút còn lại)` : '⏳ CHƯA LÀM (Chỉ 1 lượt)'))}
-                    </span>
+                    ${statusBadgeHtml}
                     <span style="font-size:11px;color:var(--dim);">
                       ${new Date(exam.createdAt).toLocaleDateString('vi-VN')}
                     </span>
@@ -1171,6 +1228,11 @@ export class QuizView {
                     <span class="exam-meta-pill">⏱️ ${exam.durationMinutes} phút</span>
                     <span class="exam-meta-pill">🔢 ${exam.questionIds.length} câu trắc nghiệm</span>
                     <span class="exam-meta-pill">🎯 Thang 10 điểm</span>
+                    ${isScheduled ? `
+                      <span class="exam-meta-pill" style="background:rgba(56,189,248,0.15);color:#38bdf8;font-weight:700;">
+                        📅 ${exam.examDate ? exam.examDate.split('-').reverse().join('/') : ''} • ⏰ ${exam.startTime} ➔ ${exam.entryDeadline || ''}
+                      </span>
+                    ` : ''}
                   </div>
                 </div>
 
@@ -1186,12 +1248,26 @@ export class QuizView {
                     <div class="exam-ban-notice">
                       Đã vi phạm quy chế ${violationRecord.count} lần. Bạn bị xử lý 0 điểm và bị cấm thi lại đề này.
                     </div>
-                  ` : `
-                    <div style="font-size:12px;color:#f59e0b;font-weight:600;">
-                      ${activeDraft ? '💡 Bài làm đã được tự động lưu an toàn trên máy' : '⚠️ Duy nhất 1 lượt làm • <strong style="color:#ef4444;">VI PHẠM</strong> 3 lần sẽ bị 0đ'}
+                  ` : isClosed ? `
+                    <div style="font-size:12px;color:#ef4444;font-weight:700;">
+                      ⚠️ Đã quá giờ mở phòng thi (${exam.entryDeadline || exam.startTime}). Thí sinh không vào thi tính là vắng thi (0 điểm).
                     </div>
-                    <button type="button" class="btn-primary btn-start-exam" data-exam-id="${exam.id}" style="font-size:13px;font-weight:700;padding:8px 18px;border-radius:6px;${activeDraft ? 'background:#f59e0b;border-color:#f59e0b;color:#000;' : ''}">
-                      ${activeDraft ? '🔄 Tiếp Tục Làm Bài' : '▶️ Bắt Đầu Làm Bài'}
+                    <button type="button" class="btn-sm" disabled style="font-size:13px;font-weight:700;padding:8px 18px;border-radius:6px;opacity:0.5;cursor:not-allowed;background:rgba(239,68,68,0.1);color:#ef4444;border:1px solid rgba(239,68,68,0.3);">
+                      🚫 Đã Hết Giờ Vào
+                    </button>
+                  ` : isUpcoming ? `
+                    <div style="font-size:12px;color:#f59e0b;font-weight:600;">
+                      🔒 Cổng thi sẽ mở đúng lúc ${exam.startTime} ngày ${exam.examDate ? exam.examDate.split('-').reverse().join('/') : ''} • Đóng sau ${exam.lateEntryGraceMinutes || 15} phút
+                    </div>
+                    <button type="button" class="btn-sm" disabled style="font-size:13px;font-weight:700;padding:8px 18px;border-radius:6px;opacity:0.55;cursor:not-allowed;background:var(--panel-alt);border:1px solid var(--line);color:var(--dim);">
+                      ⏳ Chưa Mở Cổng
+                    </button>
+                  ` : `
+                    <div style="font-size:12px;color:${isScheduled ? '#10b981' : '#f59e0b'};font-weight:600;">
+                      ${activeDraft ? '💡 Bài làm đã được tự động lưu an toàn trên máy' : (isScheduled ? `⚡ Cổng mở đến ${exam.entryDeadline || ''} • Vào làm ngay để nhận đủ ${exam.durationMinutes} phút` : '⚠️ Duy nhất 1 lượt làm • <strong style="color:#ef4444;">VI PHẠM</strong> 3 lần sẽ bị 0đ')}
+                    </div>
+                    <button type="button" class="btn-primary btn-start-exam" data-exam-id="${exam.id}" style="font-size:13px;font-weight:700;padding:8px 18px;border-radius:6px;${activeDraft ? 'background:#f59e0b;border-color:#f59e0b;color:#000;' : (isScheduled ? 'background:#10b981;border-color:#10b981;color:#fff;' : '')}">
+                      ${activeDraft ? '🔄 Tiếp Tục Làm Bài' : (isScheduled ? '▶️ Bắt Đầu Vào Thi' : '▶️ Bắt Đầu Làm Bài')}
                     </button>
                   `}
                 </div>
@@ -2018,7 +2094,50 @@ export class QuizView {
               </div>
             </div>
 
+            <!-- SCHEDULE / TIMED ENTRY WINDOW CONFIGURATION -->
+            <div style="background:var(--panel-alt);border:1px solid var(--line);border-radius:8px;padding:14px;margin-bottom:18px;">
+              <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px;display:flex;align-items:center;gap:6px;">
+                <span>⏰ Lập Lịch Thi &amp; Khóa Cổng Vào Phòng Thi:</span>
+              </div>
+              <div style="display:flex;gap:20px;margin-bottom:10px;flex-wrap:wrap;">
+                <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:var(--text);">
+                  <input type="radio" name="scheduleType" value="flexible" checked id="radSchedFlexible" />
+                  <strong>🌐 Tự do</strong> (Sinh viên có thể vào thi bất kỳ lúc nào)
+                </label>
+                <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:var(--text);">
+                  <input type="radio" name="scheduleType" value="scheduled" id="radSchedFixed" />
+                  <strong>📅 Cố định theo khung giờ</strong> (Khóa cổng theo ngày và giờ quy định)
+                </label>
+              </div>
 
+              <!-- Fixed Schedule Controls (hidden by default) -->
+              <div id="scheduleSettingsWrap" style="display:none;margin-top:12px;padding-top:12px;border-top:1px dashed var(--line);">
+                <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:14px;margin-bottom:12px;">
+                  <div>
+                    <label style="display:block;font-size:12px;font-weight:600;color:var(--text);margin-bottom:4px;">
+                      📅 Ngày thi: *
+                    </label>
+                    <input type="date" id="dtExamDate" value="${new Date().toISOString().split('T')[0]}" style="width:100%;padding:8px 12px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--text);font-size:13px;font-weight:600;" />
+                  </div>
+                  <div>
+                    <label style="display:block;font-size:12px;font-weight:600;color:var(--text);margin-bottom:4px;">
+                      ⏰ Giờ bắt đầu mở cổng: *
+                    </label>
+                    <input type="time" id="tmStartTime" value="07:00" style="width:100%;padding:8px 12px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--text);font-size:13px;font-weight:600;" />
+                  </div>
+                  <div>
+                    <label style="display:block;font-size:12px;font-weight:600;color:var(--text);margin-bottom:4px;">
+                      ⏳ Thời gian ân hạn vào thi (phút): *
+                    </label>
+                    <input type="number" id="numLateGrace" min="1" max="120" value="15" style="width:100%;padding:8px 12px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--text);font-size:13px;font-weight:700;" />
+                  </div>
+                </div>
+
+                <div style="padding:10px 14px;background:rgba(56,189,248,0.08);border:1px solid rgba(56,189,248,0.25);border-radius:6px;font-size:12px;color:var(--dim);line-height:1.5;">
+                  💡 <strong style="color:var(--text);">Quy chế khóa cổng:</strong> Sinh viên chỉ được bấm vào thi trong khung giờ mở (Ví dụ: Giờ mở 07:00 + 15 phút ân hạn ➔ Được vào thi từ <strong>07:00 đến 07:15</strong>). Sau 07:15, cổng đóng hoàn toàn. Thí sinh đến trễ hoặc không vào thi sẽ bị <strong>0 điểm (Ghi chú: Vắng thi)</strong>. Khi đã vào phòng đúng giờ, thí sinh nhận đủ trọn vẹn số phút làm bài quy định.
+                </div>
+              </div>
+            </div>
 
             <div class="studio-assign-action-bar" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
               <div class="studio-assign-action-hint" style="font-size:12.5px;color:var(--dim);">
@@ -2279,9 +2398,22 @@ export class QuizView {
       ? Math.round((submissions.reduce((acc, s) => acc + s.score, 0) / submissions.length) * 10) / 10 
       : 0;
 
+    const assignedStudents = this._resolveAssignedStudents(exam.assignedTo);
+    const submittedUserIds = new Set(submissions.map(s => s.userId).filter(Boolean));
+    submissions.forEach(s => {
+      if (s.username) submittedUserIds.add(s.username.toLowerCase());
+    });
+
+    const unsubmittedStudents = assignedStudents.filter(st => {
+      return !submittedUserIds.has(st.id) && !submittedUserIds.has((st.username || '').toLowerCase());
+    });
+
+    const sched = examManager.getExamScheduleStatus(exam);
+    const isClosed = sched.isScheduled && sched.status === 'closed';
+
     return `
       <div class="gradebook-modal-backdrop" id="gradebookModalBackdrop" style="position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px;">
-        <div class="gradebook-modal-card" style="background:var(--panel);border:1px solid var(--line);border-radius:12px;width:100%;max-width:960px;max-height:88vh;max-height:88dvh;display:flex;flex-direction:column;box-shadow:0 20px 40px rgba(0,0,0,0.4);overflow:hidden;">
+        <div class="gradebook-modal-card" style="background:var(--panel);border:1px solid var(--line);border-radius:12px;width:100%;max-width:980px;max-height:88vh;max-height:88dvh;display:flex;flex-direction:column;box-shadow:0 20px 40px rgba(0,0,0,0.4);overflow:hidden;">
           <div style="padding:18px 24px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
             <div>
               <div style="font-size:12px;color:var(--accent);font-weight:700;text-transform:uppercase;">
@@ -2303,23 +2435,36 @@ export class QuizView {
 
           <div style="padding:16px 24px;background:var(--panel-alt);border-bottom:1px solid var(--line);display:flex;gap:20px;align-items:center;flex-wrap:wrap;">
             <div>
-              <span style="font-size:12px;color:var(--dim);">Tổng số bài đã nộp:</span>
-              <strong style="color:var(--text);margin-left:6px;font-size:15px;">${submissions.length}</strong>
+              <span style="font-size:12px;color:var(--dim);">Tổng sinh viên được phân:</span>
+              <strong style="color:var(--text);margin-left:6px;font-size:15px;">${assignedStudents.length}</strong>
             </div>
             <div>
-              <span style="font-size:12px;color:var(--dim);">Điểm trung bình lớp:</span>
+              <span style="font-size:12px;color:var(--dim);">Đã nộp bài:</span>
+              <strong style="color:#10b981;margin-left:6px;font-size:15px;">${submissions.length}</strong>
+            </div>
+            <div>
+              <span style="font-size:12px;color:var(--dim);">${isClosed ? 'Vắng thi (0đ):' : 'Chưa nộp bài:'}</span>
+              <strong style="color:${isClosed && unsubmittedStudents.length > 0 ? '#ef4444' : 'var(--text)'};margin-left:6px;font-size:15px;">${unsubmittedStudents.length}</strong>
+            </div>
+            <div>
+              <span style="font-size:12px;color:var(--dim);">Điểm TB bài nộp:</span>
               <strong style="color:var(--accent);margin-left:6px;font-size:15px;">${avgScore.toFixed(1)} / 10</strong>
             </div>
             <div>
-              <span style="font-size:12px;color:var(--dim);">Thời lượng đề:</span>
+              <span style="font-size:12px;color:var(--dim);">Thời lượng:</span>
               <strong style="color:var(--text);margin-left:6px;font-size:15px;">${exam.durationMinutes} phút (${exam.questionIds.length} câu)</strong>
             </div>
+            ${sched.isScheduled ? `
+              <div style="font-size:12px;padding:3px 8px;border-radius:6px;background:rgba(56,189,248,0.12);color:#38bdf8;font-weight:600;">
+                📅 Lịch: ${exam.startTime} ngày ${exam.examDate ? exam.examDate.split('-').reverse().join('/') : ''} (Khóa: ${exam.entryDeadline || ''})
+              </div>
+            ` : ''}
           </div>
 
           <div style="padding:20px 24px;overflow-y:auto;overflow-x:auto;-webkit-overflow-scrolling:touch;flex:1;">
-            ${submissions.length === 0 ? `
+            ${(submissions.length === 0 && unsubmittedStudents.length === 0) ? `
               <div style="text-align:center;padding:40px;color:var(--dim);font-style:italic;">
-                Chưa có sinh viên nào nộp bài cho đề thi này.
+                Chưa có sinh viên nào trong danh sách được phân của đề thi này.
               </div>
             ` : `
               <table class="leaderboard-table" style="font-size:13px;">
@@ -2330,6 +2475,7 @@ export class QuizView {
                     <th style="text-align:center;">Số câu đúng</th>
                     <th style="text-align:center;">Thời gian làm</th>
                     <th style="text-align:center;">Thời điểm nộp</th>
+                    <th style="text-align:right;">Thao tác</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -2365,6 +2511,46 @@ export class QuizView {
                       </td>
                       <td style="text-align:center;color:var(--dim);font-size:12px;">
                         ${new Date(sub.submittedAt).toLocaleString('vi-VN')}
+                      </td>
+                      <td style="text-align:right;white-space:nowrap;">
+                        <button type="button" class="btn-sm btn-admin-review-sub" data-exam-id="${exam.id}" data-user-id="${sub.userId}" style="background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);font-weight:600;padding:4px 10px;border-radius:6px;cursor:pointer;">
+                          👁️ Xem bài làm
+                        </button>
+                      </td>
+                    </tr>
+                    `;
+                  }).join('')}
+
+                  ${unsubmittedStudents.map(st => {
+                    const displayName = st.fullName || `@${st.username}`;
+                    const displayClass = st.className || 'Sinh viên';
+                    const displayAvatar = st.avatar || '👤';
+
+                    return `
+                    <tr style="${isClosed ? 'background:rgba(239,68,68,0.04);' : ''}">
+                      <td>
+                        <div class="table-user-cell">
+                          <span class="cell-avatar">${displayAvatar}</span>
+                          <div>
+                            <span class="cell-name">${this._escapeHtml(displayName)}</span>
+                            <span class="cell-class">${this._escapeHtml(displayClass)} • @${this._escapeHtml(st.username)}</span>
+                          </div>
+                        </div>
+                      </td>
+                      <td style="text-align:right;font-weight:800;color:${isClosed ? '#ef4444' : 'var(--dim)'};font-size:15px;">
+                        ${isClosed ? '0 / 10 <span class="pill-badge" style="background:rgba(239,68,68,0.2);color:#ef4444;font-size:10.5px;padding:2px 6px;margin-left:4px;border-radius:6px;">Vắng thi</span>' : '--'}
+                      </td>
+                      <td style="text-align:center;font-weight:600;color:var(--dim);">
+                        0 / ${exam.questionIds.length}
+                      </td>
+                      <td style="text-align:center;color:var(--dim);">
+                        --
+                      </td>
+                      <td style="text-align:center;color:${isClosed ? '#ef4444' : 'var(--dim)'};font-size:12px;font-weight:${isClosed ? '700' : 'normal'};">
+                        ${isClosed ? '🚫 Quá hạn vào thi' : '⏳ Chưa làm bài'}
+                      </td>
+                      <td style="text-align:right;color:var(--dim);font-size:12px;font-style:italic;">
+                        ${isClosed ? 'Không nộp bài' : 'Đang chờ thí sinh'}
                       </td>
                     </tr>
                     `;
@@ -2622,20 +2808,35 @@ export class QuizView {
 
   /**
    * Exports an exam's submissions to an Excel-friendly CSV with BOM.
+   * Includes absent students when entry deadline has passed or when they have not submitted.
    * @param {string} examId
    */
   _exportExamSubmissionsToCsv(examId) {
     const exam = examManager.getExamById(examId);
     if (!exam) return;
     const subs = examManager.getSubmissionsForExam(examId);
-    if (subs.length === 0) {
-      this._showAlert(`Đề thi "${exam.title}" chưa có sinh viên nào nộp bài để xuất điểm!`);
+    const assignedStudents = this._resolveAssignedStudents(exam.assignedTo);
+    const sched = examManager.getExamScheduleStatus(exam);
+    const isClosed = sched.isScheduled && sched.status === 'closed';
+
+    const submittedUserIds = new Set(subs.map(s => s.userId).filter(Boolean));
+    subs.forEach(s => {
+      if (s.username) submittedUserIds.add(s.username.toLowerCase());
+    });
+
+    const unsubmittedStudents = assignedStudents.filter(st => {
+      return !submittedUserIds.has(st.id) && !submittedUserIds.has((st.username || '').toLowerCase());
+    });
+
+    if (subs.length === 0 && unsubmittedStudents.length === 0) {
+      this._showAlert(`Đề thi "${exam.title}" chưa có dữ liệu sinh viên để xuất điểm!`);
       return;
     }
 
-    let csv = '\uFEFF"STT","Họ và Tên","Tài Khoản (Username)","Lớp / Đơn Vị","Điểm (Thang 10)","Số Câu Đúng","Tổng Số Câu","Thời Gian Làm","Thời Điểm Nộp","Xếp Loại"\r\n';
+    let csv = '\uFEFF"STT","Họ và Tên","Tài Khoản (Username)","Lớp / Đơn Vị","Điểm (Thang 10)","Số Câu Đúng","Tổng Số Câu","Thời Gian Làm","Thời Điểm Nộp","Xếp Loại / Trạng Thái"\r\n';
+    let rowIndex = 1;
 
-    subs.forEach((s, idx) => {
+    subs.forEach((s) => {
       const allUsers = (typeof authManager !== 'undefined' && typeof authManager.getUsers === 'function')
         ? authManager.getUsers()
         : ((typeof authManager !== 'undefined' && typeof authManager.getAllUsers === 'function') ? authManager.getAllUsers() : []);
@@ -2657,7 +2858,7 @@ export class QuizView {
       else if (s.score >= 5.0) rating = 'Trung bình';
 
       const row = [
-        idx + 1,
+        rowIndex++,
         `"${(fullName || '').replace(/"/g, '""')}"`,
         `"${(username || '').replace(/"/g, '""')}"`,
         `"${(className || 'Sinh viên').replace(/"/g, '""')}"`,
@@ -2665,6 +2866,29 @@ export class QuizView {
         `"${s.correctCount}"`,
         `"${s.totalQuestions}"`,
         `"${durationStr}"`,
+        `"${dateStr}"`,
+        `"${rating}"`,
+      ];
+      csv += row.join(',') + '\r\n';
+    });
+
+    unsubmittedStudents.forEach((st) => {
+      const username = st.username || '';
+      const fullName = st.fullName || `@${username}`;
+      const className = st.className || 'Sinh viên';
+      const score = isClosed ? '0' : '--';
+      const rating = isClosed ? 'Vắng thi / Trễ giờ (0đ)' : 'Chưa nộp bài';
+      const dateStr = isClosed ? 'Quá hạn vào thi' : 'Chưa thi';
+
+      const row = [
+        rowIndex++,
+        `"${(fullName || '').replace(/"/g, '""')}"`,
+        `"${(username || '').replace(/"/g, '""')}"`,
+        `"${(className || 'Sinh viên').replace(/"/g, '""')}"`,
+        `"${score}"`,
+        `"0"`,
+        `"${exam.questionIds.length}"`,
+        `"0p 0s"`,
         `"${dateStr}"`,
         `"${rating}"`,
       ];
@@ -2718,8 +2942,24 @@ export class QuizView {
       return;
     }
 
-    // ── Zero Data Loss & 2-Minute Disconnect/Exit Grace Period Enforcement ────
+    // ── Fixed Schedule & Entry Window Check ────
+    const sched = examManager.getExamScheduleStatus(exam);
+    const isAdmin = (typeof authManager !== 'undefined' && authManager.isAdmin && authManager.isAdmin());
     const existingDraft = examManager.loadDraft(examId, currentUser.id, { includeExpired: true });
+
+    if (!isAdmin && sched.isScheduled && !existingDraft) {
+      if (sched.status === 'upcoming') {
+        this._showAlert(`⏳ Chưa đến giờ mở phòng thi!\n\n${sched.message}\nVui lòng quay lại vào lúc ${exam.startTime} ngày ${exam.examDate ? exam.examDate.split('-').reverse().join('/') : ''}.`);
+        return;
+      }
+      if (sched.status === 'closed') {
+        this._showAlert(`🚫 Đã hết thời gian vào phòng thi!\n\n${sched.message}\nTheo quy chế, bạn không thể vào thi nữa và được ghi nhận 0 điểm (Vắng thi).`);
+        this.render();
+        return;
+      }
+    }
+
+    // ── Zero Data Loss & 2-Minute Disconnect/Exit Grace Period Enforcement ────
     if (existingDraft) {
       // 1. If draft expired while student was away -> auto-submit immediately
       if (existingDraft.expired) {
@@ -3786,6 +4026,10 @@ export class QuizView {
     const btnBackFromReview = this.container.querySelector('#btnBackFromReview');
     if (btnBackFromReview) {
       btnBackFromReview.addEventListener('click', () => {
+        if (this.returnToGradebookExamId) {
+          this.gradebookExamId = this.returnToGradebookExamId;
+          this.returnToGradebookExamId = null;
+        }
         this.reviewSubmission = null;
         this.render();
       });
@@ -3794,6 +4038,10 @@ export class QuizView {
     const btnBackFromScore = this.container.querySelector('#btnBackToExamsFromScore');
     if (btnBackFromScore) {
       btnBackFromScore.addEventListener('click', () => {
+        if (this.returnToGradebookExamId) {
+          this.gradebookExamId = this.returnToGradebookExamId;
+          this.returnToGradebookExamId = null;
+        }
         this.reviewSubmission = null;
         this.render();
       });
@@ -4371,6 +4619,19 @@ export class QuizView {
     if (radAssignClass) radAssignClass.addEventListener('change', updateAssignTargetUI);
     if (radAssignCustom) radAssignCustom.addEventListener('change', updateAssignTargetUI);
 
+    // Radio schedule type toggle
+    const radSchedFlexible = this.container.querySelector('#radSchedFlexible');
+    const radSchedFixed = this.container.querySelector('#radSchedFixed');
+    const scheduleSettingsWrap = this.container.querySelector('#scheduleSettingsWrap');
+
+    const updateScheduleUI = () => {
+      if (scheduleSettingsWrap) {
+        scheduleSettingsWrap.style.display = radSchedFixed?.checked ? 'block' : 'none';
+      }
+    };
+    if (radSchedFlexible) radSchedFlexible.addEventListener('change', updateScheduleUI);
+    if (radSchedFixed) radSchedFixed.addEventListener('change', updateScheduleUI);
+
     // Track custom exam title input
     const txtAssignTitle = this.container.querySelector('#txtAssignTitle');
     if (txtAssignTitle) {
@@ -4507,6 +4768,37 @@ export class QuizView {
           });
           const questionIds = customQuestions.map(q => q.id);
 
+          const radSchedFixed = this.container.querySelector('#radSchedFixed');
+          const isScheduled = Boolean(radSchedFixed && radSchedFixed.checked);
+          let examDate = null;
+          let startTime = null;
+          let entryDeadline = null;
+          let lateEntryGraceMinutes = 15;
+
+          if (isScheduled) {
+            const dtInput = this.container.querySelector('#dtExamDate');
+            const tmStartInput = this.container.querySelector('#tmStartTime');
+            const numGraceInput = this.container.querySelector('#numLateGrace');
+
+            examDate = dtInput ? dtInput.value.trim() : null;
+            startTime = tmStartInput ? tmStartInput.value.trim() : null;
+            lateEntryGraceMinutes = numGraceInput ? (parseInt(numGraceInput.value, 10) || 15) : 15;
+
+            if (!examDate || !startTime) {
+              this._showAlert('⚠️ Vui lòng chọn đầy đủ Ngày thi và Giờ bắt đầu mở cổng thi!');
+              btnCreateAndAssign.disabled = false;
+              btnCreateAndAssign.innerHTML = originalBtnHtml;
+              this._isCreatingExam = false;
+              return;
+            }
+
+            const [sh, sm] = startTime.split(':').map(Number);
+            const totalMin = sh * 60 + sm + lateEntryGraceMinutes;
+            const deadH = String(Math.floor(totalMin / 60) % 24).padStart(2, '0');
+            const deadM = String(totalMin % 60).padStart(2, '0');
+            entryDeadline = `${deadH}:${deadM}`;
+          }
+
           const candidateId = `exam_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
           const examPayload = {
             id: candidateId,
@@ -4520,6 +4812,11 @@ export class QuizView {
             createdBy: authManager.getCurrentUser() ? authManager.getCurrentUser().id : 'user_admin',
             shuffleQuestions: chkShuffleQ ? chkShuffleQ.checked : true,
             shuffleOptions: chkShuffleOpt ? chkShuffleOpt.checked : true,
+            scheduleType: isScheduled ? 'scheduled' : 'flexible',
+            examDate,
+            startTime,
+            entryDeadline,
+            lateEntryGraceMinutes,
           };
 
           let serverConfirmedExam = null;
@@ -4554,7 +4851,10 @@ export class QuizView {
             this.adminAnswerKeyExamId = null;
 
             const targetLabel = this._formatExamTarget(assignedTo);
-            this._showAlert(`🎉 Phát đề thi thành công!\n\nĐề thi: "${title}" (Mã: ${result.exam.examCode || 'N/A'})\nSố câu: ${questionIds.length} câu\nThời lượng: ${durationMinutes} phút\nĐối tượng: ${targetLabel}\n\nĐề thi đã được chuyển vào mục "Quản Lý Đề Thi". Bạn có thể bấm nút "🔑 File Đáp Án" trong bảng bất kỳ lúc nào để xem hoặc tải đáp án.`);
+            const schedMsg = isScheduled
+              ? `\nLịch thi: ${examDate.split('-').reverse().join('/')} từ ${startTime} (Khóa cổng lúc ${entryDeadline})`
+              : '\nHình thức: Tự do (Vào thi bất kỳ lúc nào)';
+            this._showAlert(`🎉 Phát đề thi thành công!\n\nĐề thi: "${title}" (Mã: ${result.exam.examCode || 'N/A'})\nSố câu: ${questionIds.length} câu\nThời lượng: ${durationMinutes} phút\nĐối tượng: ${targetLabel}${schedMsg}\n\nĐề thi đã được chuyển vào mục "Quản Lý Đề Thi". Bạn có thể bấm nút "🔑 File Đáp Án" trong bảng bất kỳ lúc nào để xem hoặc tải đáp án.`);
 
             this.studioAssignTitle = null;
             this.studioAssignExamCode = null;
@@ -4675,6 +4975,23 @@ export class QuizView {
         this._exportExamSubmissionsToCsv(this.gradebookExamId);
       });
     }
+
+    // Admin Review Individual Submission from Gradebook
+    this.container.querySelectorAll('.btn-admin-review-sub').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const examId = btn.getAttribute('data-exam-id');
+        const userId = btn.getAttribute('data-user-id');
+        const sub = examManager.getSubmission(examId, userId);
+        if (sub) {
+          this.returnToGradebookExamId = examId;
+          this.gradebookExamId = null;
+          this.reviewSubmission = sub;
+          this.render();
+        }
+      });
+    });
 
     // Export Exam Excel from assigned exams table
     this.container.querySelectorAll('.btn-export-exam-excel').forEach(btn => {

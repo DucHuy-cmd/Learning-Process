@@ -285,6 +285,11 @@ export class ExamManager {
     isPublished = true,
     allowReview = true,
     showAnswersOnComplete = true,
+    scheduleType = 'flexible',
+    examDate = null,
+    startTime = null,
+    entryDeadline = null,
+    lateEntryGraceMinutes = 15,
   }) {
     if (typeof title !== 'string' || title.trim().length < 3) {
       return { success: false, error: 'Tiêu đề đề thi phải có ít nhất 3 ký tự.' };
@@ -356,6 +361,11 @@ export class ExamManager {
       isPublished: isPublished !== false,
       allowReview: allowReview !== false,
       showAnswersOnComplete: showAnswersOnComplete !== false,
+      scheduleType: scheduleType === 'scheduled' ? 'scheduled' : 'flexible',
+      examDate: (typeof examDate === 'string' && examDate.trim()) ? examDate.trim() : null,
+      startTime: (typeof startTime === 'string' && startTime.trim()) ? startTime.trim() : null,
+      entryDeadline: (typeof entryDeadline === 'string' && entryDeadline.trim()) ? entryDeadline.trim() : null,
+      lateEntryGraceMinutes: Number(lateEntryGraceMinutes) || 15,
     };
 
     this._unmarkExamDeletedLocally(examId);
@@ -399,6 +409,80 @@ export class ExamManager {
     }
 
     return exam.questionIds.map(id => questionMap.get(id)).filter(Boolean);
+  }
+
+  /**
+   * Evaluates the entry window status for a scheduled or flexible exam.
+   * @param {Object} exam
+   * @param {number} [nowMs] Optional reference timestamp (defaults to Date.now())
+   * @returns {{ status: 'open'|'upcoming'|'closed', isScheduled: boolean, canEnter: boolean, startMs?: number, deadlineMs?: number, remainingBeforeOpenMs?: number, remainingOpenMs?: number, message: string }}
+   */
+  getExamScheduleStatus(exam, nowMs = Date.now()) {
+    if (!exam || exam.scheduleType !== 'scheduled' || !exam.examDate || !exam.startTime) {
+      return {
+        status: 'open',
+        isScheduled: false,
+        canEnter: true,
+        message: 'Đề thi tự do (Làm bài bất kỳ lúc nào)'
+      };
+    }
+
+    try {
+      const [year, month, day] = exam.examDate.split('-').map(Number);
+      const [startHour, startMin] = exam.startTime.split(':').map(Number);
+      const startDate = new Date(year, month - 1, day, startHour, startMin, 0, 0);
+      const startMs = startDate.getTime();
+
+      let deadlineMs;
+      if (exam.entryDeadline && typeof exam.entryDeadline === 'string' && exam.entryDeadline.includes(':')) {
+        const [deadHour, deadMin] = exam.entryDeadline.split(':').map(Number);
+        const deadlineDate = new Date(year, month - 1, day, deadHour, deadMin, 0, 0);
+        deadlineMs = deadlineDate.getTime();
+      } else {
+        const grace = Number(exam.lateEntryGraceMinutes) || 15;
+        deadlineMs = startMs + grace * 60 * 1000;
+      }
+
+      if (nowMs < startMs) {
+        return {
+          status: 'upcoming',
+          isScheduled: true,
+          canEnter: false,
+          startMs,
+          deadlineMs,
+          remainingBeforeOpenMs: startMs - nowMs,
+          message: `Chưa đến giờ mở cổng thi (Mở lúc ${exam.startTime} ngày ${exam.examDate.split('-').reverse().join('/')})`
+        };
+      }
+
+      if (nowMs >= startMs && nowMs <= deadlineMs) {
+        return {
+          status: 'open',
+          isScheduled: true,
+          canEnter: true,
+          startMs,
+          deadlineMs,
+          remainingOpenMs: deadlineMs - nowMs,
+          message: `Cổng thi đang mở (Đóng cổng lúc ${exam.entryDeadline || (new Date(deadlineMs)).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })})`
+        };
+      }
+
+      return {
+        status: 'closed',
+        isScheduled: true,
+        canEnter: false,
+        startMs,
+        deadlineMs,
+        message: `Đã đóng cổng vào thi (Hết hạn lúc ${exam.entryDeadline || (new Date(deadlineMs)).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })})`
+      };
+    } catch {
+      return {
+        status: 'open',
+        isScheduled: false,
+        canEnter: true,
+        message: 'Đề thi tự do'
+      };
+    }
   }
 
   /**

@@ -529,6 +529,8 @@ export async function handleRequest(req, res) {
   if (req.method === 'GET' && (pathname === '/api/health' || pathname.endsWith('/health'))) {
     sendJson(res, 200, {
       status: 'ok',
+      timestamp: Date.now(),
+      iso: new Date().toISOString(),
       aiConfigured: isAIConfigured(),
       kvConfigured: false,
       sqlConfigured: sqlDb.isCloudEnabled,
@@ -538,6 +540,18 @@ export async function handleRequest(req, res) {
       usersCount: serverUsers.length,
       examsCount: serverExams.length,
       supportedFormats: BACKEND_SUPPORTED_EXTENSIONS,
+    });
+    return;
+  }
+
+  // Route: GET /api/time (tamper-proof official server timestamp for scheduled exams)
+  if (req.method === 'GET' && pathname === '/api/time') {
+    const now = Date.now();
+    sendJson(res, 200, {
+      success: true,
+      timestamp: now,
+      serverTime: now,
+      iso: new Date(now).toISOString(),
     });
     return;
   }
@@ -2106,6 +2120,11 @@ export async function handleRequest(req, res) {
         isPublished: data.isPublished !== false,
         allowReview: data.allowReview !== false,
         showAnswersOnComplete: data.showAnswersOnComplete !== false,
+        scheduleType: data.scheduleType === 'scheduled' ? 'scheduled' : 'flexible',
+        examDate: (typeof data.examDate === 'string' && data.examDate.trim()) ? data.examDate.trim() : null,
+        startTime: (typeof data.startTime === 'string' && data.startTime.trim()) ? data.startTime.trim() : null,
+        entryDeadline: (typeof data.entryDeadline === 'string' && data.entryDeadline.trim()) ? data.entryDeadline.trim() : null,
+        lateEntryGraceMinutes: Number(data.lateEntryGraceMinutes) || 15,
       };
 
       unmarkExamDeleted(examId);

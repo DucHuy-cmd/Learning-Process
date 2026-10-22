@@ -507,6 +507,11 @@ export async function fetchFromPostgres(options = {}) {
                 allowReview: r.allow_review !== false,
                 showAnswersOnComplete: r.show_answers_on_complete !== false,
                 createdAt: r.created_at || new Date().toISOString(),
+                scheduleType: r.schedule_type || r.scheduleType || 'flexible',
+                examDate: r.exam_date || r.examDate || null,
+                startTime: r.start_time || r.startTime || null,
+                entryDeadline: r.entry_deadline || r.entryDeadline || null,
+                lateEntryGraceMinutes: Number(r.late_entry_grace_minutes || r.lateEntryGraceMinutes) || 15,
               });
             }
           }
@@ -721,9 +726,10 @@ export async function saveExamToPostgres(exam) {
           id, title, description, duration_minutes, created_by,
           question_ids, custom_questions, questions, assigned_to, exam_code,
           shuffle_questions, shuffle_options, max_attempts, is_published,
-          allow_review, show_answers_on_complete, created_at
+          allow_review, show_answers_on_complete, created_at,
+          schedule_type, exam_date, start_time, entry_deadline, late_entry_grace_minutes
         )
-        VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8::jsonb, $9::jsonb, $10, $11, $12, $13, $14, $15, $16, $17)
+        VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8::jsonb, $9::jsonb, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
         ON CONFLICT (id) DO UPDATE SET
           title = EXCLUDED.title,
           description = EXCLUDED.description,
@@ -738,7 +744,12 @@ export async function saveExamToPostgres(exam) {
           max_attempts = EXCLUDED.max_attempts,
           is_published = EXCLUDED.is_published,
           allow_review = EXCLUDED.allow_review,
-          show_answers_on_complete = EXCLUDED.show_answers_on_complete;
+          show_answers_on_complete = EXCLUDED.show_answers_on_complete,
+          schedule_type = EXCLUDED.schedule_type,
+          exam_date = EXCLUDED.exam_date,
+          start_time = EXCLUDED.start_time,
+          entry_deadline = EXCLUDED.entry_deadline,
+          late_entry_grace_minutes = EXCLUDED.late_entry_grace_minutes;
       `, [
         exam.id,
         exam.title,
@@ -756,7 +767,12 @@ export async function saveExamToPostgres(exam) {
         exam.isPublished !== false,
         exam.allowReview !== false,
         exam.showAnswersOnComplete !== false,
-        exam.createdAt || new Date().toISOString()
+        exam.createdAt || new Date().toISOString(),
+        exam.scheduleType || 'flexible',
+        exam.examDate || null,
+        exam.startTime || null,
+        exam.entryDeadline || null,
+        Number(exam.lateEntryGraceMinutes) || 15
       ]);
       return true;
     } catch (err) {

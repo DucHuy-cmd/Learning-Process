@@ -1842,6 +1842,24 @@ export class CloudSyncManager {
     }
   }
 
+  /**
+   * Fetches authoritative server timestamp to prevent client-side time tampering on scheduled exams.
+   * @returns {Promise<number>}
+   */
+  async getServerTimestamp() {
+    if (typeof fetch === 'undefined') return Date.now();
+    try {
+      const res = await this.fetchWithTimeout(`${this.baseUrl}/api/time`, {}, 3000);
+      if (res.ok) {
+        const data = await res.json();
+        if (data && typeof data.timestamp === 'number') {
+          return data.timestamp;
+        }
+      }
+    } catch {}
+    return Date.now();
+  }
+
 }
 
 export const cloudSyncManager = new CloudSyncManager();
