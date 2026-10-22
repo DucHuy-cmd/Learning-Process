@@ -7634,6 +7634,36 @@ body.in-active-exam .active-exam-room,
   white-space: nowrap;
 }
 
+/* Optical Anti-OCR & Anti-Vision Multi-Chromatic Interference */
+.exam-question-text-wrap,
+.opt-text {
+  -webkit-touch-callout: none !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  text-shadow: 0.35px 0.35px 0.2px rgba(56, 189, 248, 0.45), -0.35px -0.35px 0.2px rgba(239, 68, 68, 0.45) !important;
+  letter-spacing: 0.25px !important;
+}
+
+.exam-question-card {
+  position: relative !important;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px) !important;
+  background-size: 16px 16px !important;
+}
+
+.active-exam-mic-box {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  color: #10b981;
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 8px;
+  user-select: none;
+}
+
 /* Teacher's Studio Exam Assignment Button */
 .btn-studio-assign {
   padding: 10px 24px;
