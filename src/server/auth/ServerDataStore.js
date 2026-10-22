@@ -1233,6 +1233,153 @@ export async function restoreDatabaseBackup(backupData) {
   };
 }
 
+/**
+ * Retrieves paginated, filtered user accounts.
+ * @param {Object} options
+ * @param {number} [options.page=1]
+ * @param {number} [options.limit]
+ * @param {string} [options.search='']
+ * @param {string} [options.className='']
+ * @returns {{ users: Array<Object>, total: number, page: number, limit: number, totalPages: number }}
+ */
+export function getPaginatedServerUsers({ page = 1, limit = null, search = '', className = '' } = {}) {
+  let list = serverUsers.map(u => ({
+    id: u.id,
+    username: u.username,
+    fullName: u.fullName || u.studentName || '',
+    className: u.className || u.studentClass || 'Sinh viên',
+    email: u.email || '',
+    avatar: u.avatar || '👤',
+    role: u.role || 'student',
+    bio: u.bio || '',
+    createdAt: u.createdAt || undefined,
+  }));
+
+  if (className && className !== 'all') {
+    const cls = className.trim().toLowerCase();
+    list = list.filter(u => {
+      if (u.username === 'admin' || u.id === 'user_admin' || u.role === 'admin') return false;
+      return (u.className || '').trim().toLowerCase() === cls;
+    });
+  }
+
+  if (search && search.trim()) {
+    const q = search.trim().toLowerCase();
+    list = list.filter(u =>
+      (u.fullName || '').toLowerCase().includes(q) ||
+      (u.username || '').toLowerCase().includes(q) ||
+      (u.className || '').toLowerCase().includes(q) ||
+      (u.email || '').toLowerCase().includes(q)
+    );
+  }
+
+  const total = list.length;
+  const p = Math.max(1, parseInt(page, 10) || 1);
+  const l = limit !== null && limit !== undefined ? Math.max(1, parseInt(limit, 10) || 25) : total;
+  const totalPages = Math.max(1, Math.ceil(total / (l || 1)));
+  const offset = (p - 1) * l;
+  const paginatedUsers = list.slice(offset, offset + l);
+
+  return {
+    users: paginatedUsers,
+    total,
+    page: p,
+    limit: l,
+    totalPages,
+  };
+}
+
+/**
+ * Retrieves paginated, filtered exam submissions with student metadata.
+ * @param {Object} options
+ * @param {number} [options.page=1]
+ * @param {number} [options.limit]
+ * @param {string} [options.search='']
+ * @param {string} [options.className='']
+ * @param {string} [options.examId='']
+ * @param {string} [options.userId='']
+ * @param {string} [options.sortBy='submittedAt']
+ * @param {string} [options.sortOrder='desc']
+ * @returns {{ submissions: Array<Object>, total: number, page: number, limit: number, totalPages: number }}
+ */
+export function getPaginatedServerSubmissions({
+  page = 1,
+  limit = null,
+  search = '',
+  className = '',
+  examId = '',
+  userId = '',
+  sortBy = 'submittedAt',
+  sortOrder = 'desc',
+} = {}) {
+  let list = [...serverExamSubmissions];
+  if (examId) list = list.filter(s => s.examId === examId);
+  if (userId) list = list.filter(s => s.userId === userId);
+
+  let enrichedList = list.map(s => {
+    const user = serverUsers.find(u => u.id === s.userId || (u.username && u.username.toLowerCase() === (s.userId || '').toLowerCase()));
+    const username = s.username || user?.username || s.userId || '';
+    const fullName = s.fullName || s.studentName || user?.fullName || (username ? `@${username}` : s.userId);
+    const resolvedClass = s.className || s.studentClass || user?.className || 'Sinh viên';
+    return {
+      ...s,
+      username,
+      fullName,
+      studentName: fullName,
+      className: resolvedClass,
+      studentClass: resolvedClass,
+      submittedAt: s.submittedAt || s.createdAt || new Date().toISOString(),
+    };
+  });
+
+  if (className && className !== 'all') {
+    const cls = className.trim().toLowerCase();
+    enrichedList = enrichedList.filter(s => (s.className || '').trim().toLowerCase() === cls);
+  }
+
+  if (search && search.trim()) {
+    const q = search.trim().toLowerCase();
+    enrichedList = enrichedList.filter(s =>
+      (s.fullName || '').toLowerCase().includes(q) ||
+      (s.username || '').toLowerCase().includes(q) ||
+      (s.className || '').toLowerCase().includes(q) ||
+      (s.examTitle || '').toLowerCase().includes(q) ||
+      (s.examId || '').toLowerCase().includes(q)
+    );
+  }
+
+  // Sort
+  enrichedList.sort((a, b) => {
+    let valA = a[sortBy];
+    let valB = b[sortBy];
+    if (sortBy === 'score' || sortBy === 'timeSpentSeconds' || sortBy === 'correctCount') {
+      valA = Number(valA) || 0;
+      valB = Number(valB) || 0;
+    } else {
+      valA = String(valA || '');
+      valB = String(valB || '');
+    }
+    if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
+    if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  const total = enrichedList.length;
+  const p = Math.max(1, parseInt(page, 10) || 1);
+  const l = limit !== null && limit !== undefined ? Math.max(1, parseInt(limit, 10) || 25) : total;
+  const totalPages = Math.max(1, Math.ceil(total / (l || 1)));
+  const offset = (p - 1) * l;
+  const paginated = enrichedList.slice(offset, offset + l);
+
+  return {
+    submissions: paginated,
+    total,
+    page: p,
+    limit: l,
+    totalPages,
+  };
+}
+
 // Initial load
 loadDatabase();
 if (sqlDb.isCloudEnabled) {

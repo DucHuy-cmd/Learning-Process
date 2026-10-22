@@ -60,7 +60,9 @@ import {
   getAdminTokenVersion,
   getAdminPasswordChangedAt,
   resetAdminSessionState,
-  getAdminUsername
+  getAdminUsername,
+  getPaginatedServerUsers,
+  getPaginatedServerSubmissions
 } from './auth/ServerDataStore.js';
 import { DEFAULT_EXAMS } from '../core/quiz/ExamManager.js';
 import { STATIC_QUESTION_BANK } from '../core/quiz/QuizBank.js';
@@ -509,7 +511,7 @@ export function validateCustomQuestion(data) {
  * @param {import('node:http').ServerResponse} res
  */
 export async function handleRequest(req, res) {
-  const parsedUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+  const parsedUrl = new URL(req.url, `http://${req.headers?.host || 'localhost'}`);
   const pathname = parsedUrl.pathname;
 
   // CORS Preflight
@@ -604,9 +606,40 @@ export async function handleRequest(req, res) {
     if (sqlDb.isCloudEnabled) {
       await fetchFromPostgres().catch(() => {});
     }
+
+    const hasPage = parsedUrl.searchParams.has('page');
+    const hasLimit = parsedUrl.searchParams.has('limit');
+    const hasSearch = parsedUrl.searchParams.has('search');
+    const hasClass = parsedUrl.searchParams.has('className') || parsedUrl.searchParams.has('class');
+
+    if (hasPage || hasLimit || hasSearch || hasClass) {
+      const page = parseInt(parsedUrl.searchParams.get('page') || '1', 10);
+      const limit = parsedUrl.searchParams.get('limit') ? parseInt(parsedUrl.searchParams.get('limit'), 10) : null;
+      const search = parsedUrl.searchParams.get('search') || '';
+      const className = parsedUrl.searchParams.get('className') || parsedUrl.searchParams.get('class') || '';
+
+      const paged = getPaginatedServerUsers({ page, limit, search, className });
+      sendJson(res, 200, {
+        success: true,
+        users: paged.users,
+        total: paged.total,
+        page: paged.page,
+        limit: paged.limit,
+        totalPages: paged.totalPages,
+        deletedUsers: Array.from(serverDeletedUsers),
+        dbResetTime: serverDbResetTime,
+      });
+      return;
+    }
+
+    const allUsers = serverUsers.map(u => sanitizeUserForAdmin(u)).filter(Boolean);
     sendJson(res, 200, {
       success: true,
-      users: serverUsers.map(u => sanitizeUserForAdmin(u)).filter(Boolean),
+      users: allUsers,
+      total: allUsers.length,
+      page: 1,
+      limit: allUsers.length,
+      totalPages: 1,
       deletedUsers: Array.from(serverDeletedUsers),
       dbResetTime: serverDbResetTime,
     });
@@ -2221,8 +2254,44 @@ export async function handleRequest(req, res) {
   // Route: GET /api/exam-submissions
   if (req.method === 'GET' && pathname === '/api/exam-submissions') {
     const isCleared = sqlDb?.tables?.system_metadata?.get('exams_cleared_by_admin')?.value === true;
-    const examId = parsedUrl.searchParams.get('examId');
-    const userId = parsedUrl.searchParams.get('userId');
+    const examId = parsedUrl.searchParams.get('examId') || '';
+    const userId = parsedUrl.searchParams.get('userId') || '';
+    const hasPage = parsedUrl.searchParams.has('page');
+    const hasLimit = parsedUrl.searchParams.has('limit');
+    const hasSearch = parsedUrl.searchParams.has('search');
+    const hasClass = parsedUrl.searchParams.has('className') || parsedUrl.searchParams.has('class');
+    const sortBy = parsedUrl.searchParams.get('sortBy') || 'submittedAt';
+    const sortOrder = parsedUrl.searchParams.get('sortOrder') || 'desc';
+
+    if (hasPage || hasLimit || hasSearch || hasClass) {
+      const page = parseInt(parsedUrl.searchParams.get('page') || '1', 10);
+      const limit = parsedUrl.searchParams.get('limit') ? parseInt(parsedUrl.searchParams.get('limit'), 10) : null;
+      const search = parsedUrl.searchParams.get('search') || '';
+      const className = parsedUrl.searchParams.get('className') || parsedUrl.searchParams.get('class') || '';
+
+      const paged = getPaginatedServerSubmissions({
+        page,
+        limit,
+        search,
+        className,
+        examId,
+        userId,
+        sortBy,
+        sortOrder,
+      });
+
+      sendJson(res, 200, {
+        success: true,
+        submissions: paged.submissions,
+        total: paged.total,
+        page: paged.page,
+        limit: paged.limit,
+        totalPages: paged.totalPages,
+        clearedByAdmin: Boolean(isCleared && serverExamSubmissions.length === 0),
+      });
+      return;
+    }
+
     let list = [...serverExamSubmissions];
     if (examId) list = list.filter(s => s.examId === examId);
     if (userId) list = list.filter(s => s.userId === userId);
@@ -2247,6 +2316,10 @@ export async function handleRequest(req, res) {
     sendJson(res, 200, {
       success: true,
       submissions: enrichedList,
+      total: enrichedList.length,
+      page: 1,
+      limit: enrichedList.length,
+      totalPages: 1,
       clearedByAdmin: Boolean(isCleared && serverExamSubmissions.length === 0)
     });
     return;

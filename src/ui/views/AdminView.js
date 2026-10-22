@@ -34,6 +34,8 @@ export class AdminView {
     this._activeSyncId = 0;
     this.activeTab = 'students';
     this.isAddUserFormCollapsed = false;
+    this.userCurrentPage = 1;
+    this.userPageSize = 25;
     this.dbStatus = { storageMode: 'unknown', databaseLabel: 'Đang kiểm tra...', kvConfigured: false };
     this.syncTasks = {
       dbStatus: { status: 'idle', label: 'Cơ sở dữ liệu', error: null },
@@ -326,6 +328,9 @@ export class AdminView {
                 ${this._renderUserTableRows(allUsers)}
               </tbody>
             </table>
+            <div id="adminUsersPaginationWrap">
+              ${this._renderPaginationBar(allUsers)}
+            </div>
           </div>
         </section>
         </div>
@@ -726,10 +731,138 @@ export class AdminView {
           const searchInput = this.container.querySelector('#adminUserSearchInput');
           if (searchInput) searchInput.value = '';
           this.searchQuery = '';
+          this.userCurrentPage = 1;
           this._updateUserTableAndTitle();
           if (searchInput) searchInput.focus();
         });
       }
+    }
+
+    // 3.5 Render and bind Pagination bar
+    const paginationWrap = this.container.querySelector('#adminUsersPaginationWrap');
+    if (paginationWrap) {
+      paginationWrap.innerHTML = this._renderPaginationBar(allUsers);
+      this._bindPaginationEvents(allUsers);
+    }
+  }
+
+  /**
+   * Calculates paginated subset of filtered users.
+   * @param {Array<Object>} users
+   * @returns {{ paged: Array<Object>, total: number, page: number, totalPages: number }}
+   * @private
+   */
+  _getPaginatedFilteredUsers(users) {
+    const filtered = this._getFilteredUsers(users);
+    if (!this.userPageSize || this.userPageSize <= 0) {
+      return { paged: filtered, total: filtered.length, page: 1, totalPages: 1 };
+    }
+    const total = filtered.length;
+    const totalPages = Math.max(1, Math.ceil(total / this.userPageSize));
+    if (this.userCurrentPage > totalPages) {
+      this.userCurrentPage = totalPages;
+    }
+    if (this.userCurrentPage < 1) {
+      this.userCurrentPage = 1;
+    }
+    const offset = (this.userCurrentPage - 1) * this.userPageSize;
+    const paged = filtered.slice(offset, offset + this.userPageSize);
+    return { paged, total, page: this.userCurrentPage, totalPages };
+  }
+
+  /**
+   * Renders pagination bar with page information and page size controls.
+   * @param {Array<Object>} users
+   * @returns {string}
+   * @private
+   */
+  _renderPaginationBar(users) {
+    const { total, page, totalPages } = this._getPaginatedFilteredUsers(users);
+    if (total === 0) return '';
+
+    if (total <= 25 && this.userPageSize === 25 && page === 1) {
+      return `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--panel-alt);border-top:1px solid var(--line);font-size:12px;color:var(--dim);flex-wrap:wrap;gap:8px;">
+          <div>Hiển thị <strong>${total}</strong> / ${total} tài khoản</div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span>Mỗi trang:</span>
+            <select id="adminSelectUserPageSize" style="padding:2px 6px;font-size:11.5px;border-radius:4px;border:1px solid var(--line);background:var(--bg);color:var(--text);cursor:pointer;">
+              <option value="25" ${this.userPageSize === 25 ? 'selected' : ''}>25</option>
+              <option value="50" ${this.userPageSize === 50 ? 'selected' : ''}>50</option>
+              <option value="100" ${this.userPageSize === 100 ? 'selected' : ''}>100</option>
+              <option value="0" ${this.userPageSize === 0 ? 'selected' : ''}>Tất cả</option>
+            </select>
+          </div>
+        </div>
+      `;
+    }
+
+    const startIdx = (page - 1) * (this.userPageSize || total) + 1;
+    const endIdx = !this.userPageSize ? total : Math.min(page * this.userPageSize, total);
+
+    return `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--panel-alt);border-top:1px solid var(--line);font-size:12px;color:var(--dim);flex-wrap:wrap;gap:8px;">
+        <div>
+          Hiển thị <strong>${startIdx} - ${endIdx}</strong> trên tổng số <strong>${total}</strong> tài khoản
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span>Mỗi trang:</span>
+            <select id="adminSelectUserPageSize" style="padding:2px 6px;font-size:11.5px;border-radius:4px;border:1px solid var(--line);background:var(--bg);color:var(--text);cursor:pointer;">
+              <option value="25" ${this.userPageSize === 25 ? 'selected' : ''}>25</option>
+              <option value="50" ${this.userPageSize === 50 ? 'selected' : ''}>50</option>
+              <option value="100" ${this.userPageSize === 100 ? 'selected' : ''}>100</option>
+              <option value="0" ${this.userPageSize === 0 ? 'selected' : ''}>Tất cả</option>
+            </select>
+          </div>
+          <div style="display:inline-flex;gap:6px;align-items:center;">
+            <button type="button" id="btnAdminPrevUserPage" ${page <= 1 ? 'disabled' : ''} style="padding:4px 10px;font-size:11.5px;font-weight:600;border-radius:4px;border:1px solid var(--line);background:var(--bg);color:var(--text);cursor:${page <= 1 ? 'not-allowed' : 'pointer'};opacity:${page <= 1 ? '0.5' : '1'};">
+              ← Trước
+            </button>
+            <span style="font-weight:700;color:var(--text);font-size:12px;">Trang ${page} / ${totalPages}</span>
+            <button type="button" id="btnAdminNextUserPage" ${page >= totalPages ? 'disabled' : ''} style="padding:4px 10px;font-size:11.5px;font-weight:600;border-radius:4px;border:1px solid var(--line);background:var(--bg);color:var(--text);cursor:${page >= totalPages ? 'not-allowed' : 'pointer'};opacity:${page >= totalPages ? '0.5' : '1'};">
+              Sau →
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  /**
+   * Binds pagination control events.
+   * @param {Array<Object>} users
+   * @private
+   */
+  _bindPaginationEvents(users) {
+    const prevBtn = this.container.querySelector('#btnAdminPrevUserPage');
+    if (prevBtn) {
+      prevBtn.addEventListener('click', () => {
+        if (this.userCurrentPage > 1) {
+          this.userCurrentPage--;
+          this._updateUserTableAndTitle();
+        }
+      });
+    }
+
+    const nextBtn = this.container.querySelector('#btnAdminNextUserPage');
+    if (nextBtn) {
+      nextBtn.addEventListener('click', () => {
+        const { totalPages } = this._getPaginatedFilteredUsers(users);
+        if (this.userCurrentPage < totalPages) {
+          this.userCurrentPage++;
+          this._updateUserTableAndTitle();
+        }
+      });
+    }
+
+    const pageSizeSelect = this.container.querySelector('#adminSelectUserPageSize');
+    if (pageSizeSelect) {
+      pageSizeSelect.addEventListener('change', (e) => {
+        this.userPageSize = parseInt(e.target.value, 10);
+        this.userCurrentPage = 1;
+        this._updateUserTableAndTitle();
+      });
     }
   }
 
@@ -764,7 +897,9 @@ export class AdminView {
       `;
     }
 
-    return filtered.map(u => {
+    const { paged } = this._getPaginatedFilteredUsers(users);
+
+    return paged.map(u => {
       const isUserAdmin = u.username === 'admin' || u.role === 'admin' || u.id === 'user_admin';
       const cleanFullName = isUserAdmin 
         ? 'Quản Trị Viên' 
@@ -899,6 +1034,7 @@ export class AdminView {
 
       searchInput.addEventListener('input', (e) => {
         this.searchQuery = e.target.value;
+        this.userCurrentPage = 1;
         this._updateUserTableAndTitle();
       });
     }
@@ -909,6 +1045,7 @@ export class AdminView {
         if (searchInput) searchInput.value = '';
         this.searchQuery = '';
         this.selectedClass = 'all';
+        this.userCurrentPage = 1;
         const classFilter = this.container.querySelector('#adminUserClassFilter');
         if (classFilter) classFilter.value = 'all';
         this._updateUserTableAndTitle();
@@ -921,6 +1058,7 @@ export class AdminView {
     if (classFilter) {
       classFilter.addEventListener('change', (e) => {
         this.selectedClass = e.target.value;
+        this.userCurrentPage = 1;
         this._updateUserTableAndTitle();
       });
     }
@@ -1336,6 +1474,7 @@ export class AdminView {
     }
 
     this._bindTableActionButtons();
+    this._bindPaginationEvents(authManager.getUsers());
   }
 
   /**

@@ -1410,6 +1410,81 @@ export class CloudSyncManager {
   }
 
   /**
+   * Fetches paginated users from server for administrative pagination.
+   * @param {Object} [params]
+   * @param {number} [params.page=1]
+   * @param {number} [params.limit=25]
+   * @param {string} [params.search='']
+   * @param {string} [params.className='']
+   * @returns {Promise<{ success: boolean, users?: Array, total?: number, page?: number, limit?: number, totalPages?: number, error?: string }>}
+   */
+  async fetchPaginatedUsers({ page = 1, limit = 25, search = '', className = '' } = {}) {
+    if (typeof fetch === 'undefined') return { success: false, error: 'Môi trường ngoại tuyến' };
+    const query = new URLSearchParams();
+    if (page) query.set('page', String(page));
+    if (limit) query.set('limit', String(limit));
+    if (search) query.set('search', String(search));
+    if (className && className !== 'all') query.set('className', String(className));
+
+    try {
+      const res = await this.fetchWithTimeout(`${this.baseUrl}/api/auth/users?${query.toString()}`, {
+        headers: {
+          ...this._getAdminAuthHeaders(),
+        },
+      });
+      if (!res.ok) return { success: false, error: `HTTP ${res.status}` };
+      const data = await res.json().catch(() => null);
+      return data || { success: false, error: 'Phản hồi rỗng từ máy chủ' };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  }
+
+  /**
+   * Fetches paginated submissions from server.
+   * @param {Object} [params]
+   * @param {number} [params.page=1]
+   * @param {number} [params.limit=25]
+   * @param {string} [params.search='']
+   * @param {string} [params.className='']
+   * @param {string} [params.examId='']
+   * @param {string} [params.userId='']
+   * @param {string} [params.sortBy='submittedAt']
+   * @param {string} [params.sortOrder='desc']
+   * @returns {Promise<{ success: boolean, submissions?: Array, total?: number, page?: number, limit?: number, totalPages?: number, error?: string }>}
+   */
+  async fetchPaginatedSubmissions({
+    page = 1,
+    limit = 25,
+    search = '',
+    className = '',
+    examId = '',
+    userId = '',
+    sortBy = 'submittedAt',
+    sortOrder = 'desc',
+  } = {}) {
+    if (typeof fetch === 'undefined') return { success: false, error: 'Môi trường ngoại tuyến' };
+    const query = new URLSearchParams();
+    if (page) query.set('page', String(page));
+    if (limit) query.set('limit', String(limit));
+    if (search) query.set('search', String(search));
+    if (className && className !== 'all') query.set('className', String(className));
+    if (examId) query.set('examId', String(examId));
+    if (userId) query.set('userId', String(userId));
+    if (sortBy) query.set('sortBy', String(sortBy));
+    if (sortOrder) query.set('sortOrder', String(sortOrder));
+
+    try {
+      const res = await this.fetchWithTimeout(`${this.baseUrl}/api/exam-submissions?${query.toString()}`);
+      if (!res.ok) return { success: false, error: `HTTP ${res.status}` };
+      const data = await res.json().catch(() => null);
+      return data || { success: false, error: 'Phản hồi rỗng từ máy chủ' };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  }
+
+  /**
    * Pushes an exam submission to server with idempotent retry and structured response.
    * @param {Object} submissionData
    */

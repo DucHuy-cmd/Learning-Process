@@ -336,6 +336,12 @@ export class SqlDatabaseAdapter {
       results.sort(options.orderBy);
     }
 
+    if (typeof options.offset === 'number' && options.offset > 0) {
+      results = results.slice(options.offset);
+    } else if (typeof options.page === 'number' && typeof options.limit === 'number' && options.page > 1) {
+      results = results.slice((options.page - 1) * options.limit);
+    }
+
     if (typeof options.limit === 'number' && options.limit > 0) {
       results = results.slice(0, options.limit);
     }
