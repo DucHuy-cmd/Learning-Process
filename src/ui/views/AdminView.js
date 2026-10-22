@@ -122,57 +122,82 @@ export class AdminView {
         <!-- Notification Banner -->
         <div id="adminActionAlert" class="auth-alert" style="display:none;margin-bottom:20px;padding:12px 16px;border-radius:8px;font-size:13px;line-height:1.5;"></div>
 
-        <!-- Metric Stat Cards -->
+        <!-- Metric Stat Cards (Balanced 4-Card System Grid) -->
         <div class="admin-stats-grid" style="display:grid;grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));gap:16px;margin-bottom:24px;">
           <!-- Card 1: Users -->
-          <div style="background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 18px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-              <span style="font-size:12px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:0.5px;">Tổng Sinh Viên</span>
-              <span style="font-size:20px;">👥</span>
+          <div style="background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 18px;display:flex;flex-direction:column;justify-content:space-between;">
+            <div>
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                <span style="font-size:12px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:0.5px;">Tổng Sinh Viên</span>
+                <span style="font-size:20px;">👥</span>
+              </div>
+              <div id="adminMetricStudentCount" style="font-size:26px;font-weight:800;color:var(--text);">${studentCount}</div>
             </div>
-            <div id="adminMetricStudentCount" style="font-size:26px;font-weight:800;color:var(--text);">${studentCount}</div>
+            <div style="font-size:11.5px;color:var(--dim);margin-top:6px;">
+              Tài khoản đang hoạt động
+            </div>
           </div>
 
           <!-- Card 2: Server Status -->
-          <div style="background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 18px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-              <span style="font-size:12px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:0.5px;">Trạng Thái Máy Chủ</span>
-              <span style="font-size:20px;">🌐</span>
-            </div>
-            <div id="adminMetricServerStatusWrap">
-              <div style="font-size:16px;font-weight:800;color:${this.isSyncing ? '#3b82f6' : (this.isServerConnected ? '#10b981' : '#f59e0b')};display:flex;align-items:center;gap:6px;margin-bottom:6px;">
-                <span>${this.isSyncing ? '🔄 Đang đồng bộ máy chủ...' : (this.isServerConnected ? '● Đã kết nối' : '○ Chế độ Ngoại tuyến')}</span>
-                ${!this.isServerConnected && !this.isSyncing ? `<button type="button" id="btnAdminRetrySync" style="font-size:11px;padding:2px 8px;border-radius:4px;cursor:pointer;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);margin-left:6px;">🔄 Thử lại</button>` : ''}
-              </div>
-              <div style="font-size:11.5px;font-weight:700;color:#10b981;">
-                🏛️ ${this.dbStatus.databaseLabel || 'PostgreSQL Relational DB (SQL)'}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Database Backup & Disaster Recovery Section -->
-        <div style="background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 18px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
-          <div style="display:flex;align-items:center;gap:12px;">
-            <span style="font-size:24px;">💾</span>
+          <div style="background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 18px;display:flex;flex-direction:column;justify-content:space-between;">
             <div>
-              <div style="font-size:13.5px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:6px;">
-                <span>Sao Lưu &amp; Phục Hồi Dữ Liệu 1-Chạm</span>
-                <span style="font-size:10.5px;padding:1px 6px;border-radius:4px;background:rgba(16,185,129,0.15);color:#10b981;font-weight:700;">Disaster Recovery</span>
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                <span style="font-size:12px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:0.5px;">Trạng Thái Máy Chủ</span>
+                <span style="font-size:20px;">🌐</span>
               </div>
-              <div style="font-size:11.5px;color:var(--dim);margin-top:2px;">
-                Tải file sao lưu (.json) lưu trữ an toàn hoặc phục hồi dữ liệu tức thì khi chuyển đổi máy chủ.
+              <div id="adminMetricServerStatusWrap">
+                <div style="font-size:16px;font-weight:800;color:${this.isSyncing ? '#3b82f6' : (this.isServerConnected ? '#10b981' : '#f59e0b')};display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+                  <span>${this.isSyncing ? '🔄 Đang đồng bộ...' : (this.isServerConnected ? '● Đã kết nối' : '○ Chế độ Ngoại tuyến')}</span>
+                  ${!this.isServerConnected && !this.isSyncing ? `<button type="button" id="btnAdminRetrySync" style="font-size:11px;padding:2px 8px;border-radius:4px;cursor:pointer;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);margin-left:6px;">🔄 Thử lại</button>` : ''}
+                </div>
+                <div style="font-size:11.5px;font-weight:700;color:#10b981;">
+                  🏛️ ${this.dbStatus.databaseLabel || 'PostgreSQL Relational DB (SQL)'}
+                </div>
               </div>
             </div>
           </div>
-          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-            <button type="button" id="btnAdminBackupDb" class="btn-sm" style="padding:6px 14px;font-size:12px;font-weight:700;background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.3);color:#10b981;border-radius:6px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
-              <span>📥</span> Tải File Sao Lưu (.json)
-            </button>
-            <button type="button" id="btnAdminTriggerRestoreDb" class="btn-sm" style="padding:6px 14px;font-size:12px;font-weight:700;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);border-radius:6px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
-              <span>📤</span> Phục Hồi Dữ Liệu
-            </button>
-            <input type="file" id="adminFileInputRestoreDb" accept=".json" style="display:none;" />
+
+          <!-- Card 3: Backup Database -->
+          <div style="background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 18px;display:flex;flex-direction:column;justify-content:space-between;">
+            <div>
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                <span style="font-size:12px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:0.5px;">Sao Lưu CSDL</span>
+                <span style="font-size:20px;">💾</span>
+              </div>
+              <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:4px;">
+                Snapshot 1-Chạm (.json)
+              </div>
+              <div style="font-size:11px;color:var(--dim);margin-bottom:10px;">
+                Lưu trữ an toàn toàn bộ dữ liệu
+              </div>
+            </div>
+            <div>
+              <button type="button" id="btnAdminBackupDb" class="btn-sm" style="width:100%;padding:8px 12px;font-size:12px;font-weight:700;background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.3);color:#10b981;border-radius:6px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;">
+                <span>📥</span> Tải File Sao Lưu (.json)
+              </button>
+            </div>
+          </div>
+
+          <!-- Card 4: Restore Database -->
+          <div style="background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 18px;display:flex;flex-direction:column;justify-content:space-between;">
+            <div>
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                <span style="font-size:12px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:0.5px;">Phục Hồi Dữ Liệu</span>
+                <span style="font-size:20px;">📤</span>
+              </div>
+              <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:4px;">
+                Disaster Recovery
+              </div>
+              <div style="font-size:11px;color:var(--dim);margin-bottom:10px;">
+                Nạp lại dữ liệu từ file sao lưu
+              </div>
+            </div>
+            <div>
+              <button type="button" id="btnAdminTriggerRestoreDb" class="btn-sm" style="width:100%;padding:8px 12px;font-size:12px;font-weight:700;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);border-radius:6px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;">
+                <span>📤</span> Phục Hồi Dữ Liệu
+              </button>
+              <input type="file" id="adminFileInputRestoreDb" accept=".json" style="display:none;" />
+            </div>
           </div>
         </div>
 

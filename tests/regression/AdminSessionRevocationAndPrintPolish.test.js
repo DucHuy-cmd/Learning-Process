@@ -95,8 +95,8 @@ describe('Admin Session Revocation, Print Polish, and Answer Key Modal Flow', ()
     });
   });
 
-  describe('3. AdminView: Hiding the 2 metric cards', () => {
-    it('does not render "Chuẩn CSDL Quan Hệ" or "Quản Trị Hệ Thống" metric cards', async () => {
+  describe('3. AdminView: Hiding the 2 metric cards & Unifying 4 Cards in Balanced Grid', () => {
+    it('does not render "Chuẩn CSDL Quan Hệ" or "Quản Trị Hệ Thống", and unifies Backup/Restore into a balanced 4-card grid', async () => {
       authManager.quickLogin('user_admin');
 
       const adminView = new AdminView({ container });
@@ -109,6 +109,13 @@ describe('Admin Session Revocation, Print Polish, and Answer Key Modal Flow', ()
       expect(grid.textContent).toContain('Tổng Sinh Viên');
       // Card 2: Server status is kept
       expect(grid.textContent).toContain('Trạng Thái Máy Chủ');
+      // Card 3: Backup
+      expect(grid.textContent).toContain('Sao Lưu CSDL');
+      expect(grid.querySelector('#btnAdminBackupDb')).not.toBeNull();
+      // Card 4: Restore
+      expect(grid.textContent).toContain('Phục Hồi Dữ Liệu');
+      expect(grid.querySelector('#btnAdminTriggerRestoreDb')).not.toBeNull();
+      expect(grid.querySelector('#adminFileInputRestoreDb')).not.toBeNull();
 
       // The 2 hidden cards must NOT be in the DOM
       expect(grid.textContent).not.toContain('Chuẩn CSDL Quan Hệ');
