@@ -28,6 +28,24 @@ export class CloudSyncManager {
   }
 
   /**
+   * Resolves a URL to a valid absolute URL to prevent ERR_INVALID_URL in Node/test environments.
+   * @param {string} url
+   * @returns {string}
+   */
+  _resolveUrl(url) {
+    if (!url || typeof url !== 'string') return '';
+    if (url.startsWith('http://') || url.startsWith('https://')) return url;
+    let base = this.baseUrl;
+    if (!base && typeof window !== 'undefined' && window.location && window.location.origin && window.location.origin !== 'null') {
+      base = window.location.origin;
+    }
+    if (!base) {
+      base = 'http://localhost:3000';
+    }
+    return `${base.replace(/\/+$/, '')}/${url.replace(/^\/+/, '')}`;
+  }
+
+  /**
    * Safe fetch with automatic AbortController timeout to prevent indefinite hanging.
    * @param {string} url
    * @param {Object} [options]
@@ -46,10 +64,23 @@ export class CloudSyncManager {
     }
 
     try {
-      const response = await fetch(url, {
-        ...options,
-        signal: controller ? controller.signal : options.signal,
-      });
+      const resolvedUrl = this._resolveUrl(url);
+      const fetchOpts = { ...options };
+      if (controller && !fetchOpts.signal) {
+        fetchOpts.signal = controller.signal;
+      }
+      let response;
+      try {
+        response = await fetch(resolvedUrl, fetchOpts);
+      } catch (fetchErr) {
+        // If undici/Node fails due to jsdom cross-realm AbortSignal mismatch, retry without signal
+        if (fetchOpts.signal && fetchErr && fetchErr.message && fetchErr.message.includes('AbortSignal')) {
+          delete fetchOpts.signal;
+          response = await fetch(resolvedUrl, fetchOpts);
+        } else {
+          throw fetchErr;
+        }
+      }
       return response;
     } finally {
       if (timer) clearTimeout(timer);
@@ -127,16 +158,10 @@ export class CloudSyncManager {
 
     for (const url of testUrls) {
       try {
-        const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-        const timer = controller ? setTimeout(() => controller.abort(), this.timeoutMs) : null;
-
-        const res = await fetch(url, {
+        const res = await this.fetchWithTimeout(url, {
           method: 'GET',
           headers: { 'Accept': 'application/json' },
-          signal: controller ? controller.signal : undefined,
-        });
-
-        if (timer) clearTimeout(timer);
+        }, this.timeoutMs);
         if (res.ok) {
           this.isConnected = true;
           try {
@@ -422,7 +447,7 @@ export class CloudSyncManager {
   async pushRegister(userData) {
     if (typeof fetch === 'undefined') return null;
     try {
-      const res = await fetch(`${this.baseUrl}/api/auth/register`, {
+      const res = await this.fetchWithTimeout(`${this.baseUrl}/api/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(userData),
@@ -445,7 +470,7 @@ export class CloudSyncManager {
       return { success: false, error: 'Không có kết nối mạng.' };
     }
     try {
-      const res = await fetch(`${this.baseUrl}/api/auth/login`, {
+      const res = await this.fetchWithTimeout(`${this.baseUrl}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password }),
@@ -469,7 +494,7 @@ export class CloudSyncManager {
     if (!userId || !aiHistoryManager || typeof fetch === 'undefined') return;
 
     try {
-      const res = await fetch(`${this.baseUrl}/api/ai/history?userId=${encodeURIComponent(userId)}`);
+      const res = await this.fetchWithTimeout(`${this.baseUrl}/api/ai/history?userId=${encodeURIComponent(userId)}`);
       if (!res.ok) return;
       const data = await res.json();
       if (data.success && Array.isArray(data.sessions)) {
@@ -495,7 +520,7 @@ export class CloudSyncManager {
   async pushAiSession(session) {
     if (typeof fetch === 'undefined') return null;
     try {
-      const res = await fetch(`${this.baseUrl}/api/ai/history`, {
+      const res = await this.fetchWithTimeout(`${this.baseUrl}/api/ai/history`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(session),
@@ -514,7 +539,7 @@ export class CloudSyncManager {
   async pushDeleteAiSession(sessionId) {
     if (typeof fetch === 'undefined') return null;
     try {
-      const res = await fetch(`${this.baseUrl}/api/ai/history/${encodeURIComponent(sessionId)}`, {
+      const res = await this.fetchWithTimeout(`${this.baseUrl}/api/ai/history/${encodeURIComponent(sessionId)}`, {
         method: 'DELETE',
       });
       if (!res.ok) return null;
@@ -567,7 +592,7 @@ export class CloudSyncManager {
   async pushQuizAnswer(userId, isCorrect, userInfo = {}) {
     if (typeof fetch === 'undefined') return null;
     try {
-      const res = await fetch(`${this.baseUrl}/api/quiz/answer`, {
+      const res = await this.fetchWithTimeout(`${this.baseUrl}/api/quiz/answer`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId, isCorrect, userInfo }),
@@ -588,7 +613,7 @@ export class CloudSyncManager {
   async pushQuizExam(userId, examResult, userInfo = {}) {
     if (typeof fetch === 'undefined') return null;
     try {
-      const res = await fetch(`${this.baseUrl}/api/quiz/exam`, {
+      const res = await this.fetchWithTimeout(`${this.baseUrl}/api/quiz/exam`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId, examResult, userInfo }),
@@ -759,7 +784,7 @@ export class CloudSyncManager {
     if (typeof fetch === 'undefined') return { success: false, error: 'Không có kết nối mạng.' };
     if (!Array.isArray(usersArray) || usersArray.length === 0) return { success: false, error: 'Danh sách rỗng.' };
     try {
-      const res = await fetch(`${this.baseUrl}/api/admin/users/batch`, {
+      const res = await this.fetchWithTimeout(`${this.baseUrl}/api/admin/users/batch`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -784,7 +809,7 @@ export class CloudSyncManager {
   async adminCreateUser(userData) {
     if (typeof fetch === 'undefined') return { success: false, error: 'Không có kết nối mạng.' };
     try {
-      const res = await fetch(`${this.baseUrl}/api/admin/users`, {
+      const res = await this.fetchWithTimeout(`${this.baseUrl}/api/admin/users`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -811,7 +836,7 @@ export class CloudSyncManager {
     if (typeof fetch === 'undefined') return { success: false, error: 'Không có kết nối mạng.' };
     try {
       const q = username ? `?username=${encodeURIComponent(username)}` : '';
-      const res = await fetch(`${this.baseUrl}/api/admin/users/${encodeURIComponent(userId)}${q}`, {
+      const res = await this.fetchWithTimeout(`${this.baseUrl}/api/admin/users/${encodeURIComponent(userId)}${q}`, {
         method: 'DELETE',
         headers: {
           ...this._getAdminAuthHeaders(),
@@ -833,7 +858,7 @@ export class CloudSyncManager {
   async resetQuizLeaderboard() {
     if (typeof fetch === 'undefined') return null;
     try {
-      const res = await fetch(`${this.baseUrl}/api/quiz/leaderboard/reset`, {
+      const res = await this.fetchWithTimeout(`${this.baseUrl}/api/quiz/leaderboard/reset`, {
         method: 'POST',
         headers: {
           ...this._getAdminAuthHeaders(),
@@ -853,7 +878,7 @@ export class CloudSyncManager {
   async deleteQuizLeaderboardUser(userId) {
     if (typeof fetch === 'undefined') return null;
     try {
-      const res = await fetch(`${this.baseUrl}/api/quiz/leaderboard/${encodeURIComponent(userId)}`, {
+      const res = await this.fetchWithTimeout(`${this.baseUrl}/api/quiz/leaderboard/${encodeURIComponent(userId)}`, {
         method: 'DELETE',
         headers: {
           ...this._getAdminAuthHeaders(),
@@ -872,7 +897,7 @@ export class CloudSyncManager {
   async adminResetDatabase() {
     if (typeof fetch === 'undefined') return { success: false, error: 'Không có kết nối mạng.' };
     try {
-      const res = await fetch(`${this.baseUrl}/api/admin/database/reset`, {
+      const res = await this.fetchWithTimeout(`${this.baseUrl}/api/admin/database/reset`, {
         method: 'POST',
         headers: {
           ...this._getAdminAuthHeaders(),
@@ -1267,7 +1292,7 @@ export class CloudSyncManager {
   async serverDeleteExam(examId) {
     if (typeof fetch === 'undefined') return { success: false, error: 'Không có kết nối mạng.' };
     try {
-      const res = await fetch(`${this.baseUrl}/api/exams/${encodeURIComponent(examId)}`, {
+      const res = await this.fetchWithTimeout(`${this.baseUrl}/api/exams/${encodeURIComponent(examId)}`, {
         method: 'DELETE',
         headers: {
           ...this._getAdminAuthHeaders(),
@@ -1290,7 +1315,7 @@ export class CloudSyncManager {
   async serverClearAllExams() {
     if (typeof fetch === 'undefined') return { success: false, error: 'Không có kết nối mạng.' };
     try {
-      const res = await fetch(`${this.baseUrl}/api/exams/clear-all`, {
+      const res = await this.fetchWithTimeout(`${this.baseUrl}/api/exams/clear-all`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1440,7 +1465,7 @@ export class CloudSyncManager {
   async syncCustomQuestions() {
     if (typeof fetch === 'undefined') return null;
     try {
-      const res = await fetch(`${this.baseUrl}/api/quiz/custom-question`);
+      const res = await this.fetchWithTimeout(`${this.baseUrl}/api/quiz/custom-question`);
       if (!res.ok) return null;
       const data = await res.json();
       if (data.success && Array.isArray(data.questions)) {
@@ -1460,7 +1485,7 @@ export class CloudSyncManager {
   async fetchCustomQuestions() {
     if (typeof fetch === 'undefined') return [];
     try {
-      const res = await fetch(`${this.baseUrl}/api/quiz/custom-question`);
+      const res = await this.fetchWithTimeout(`${this.baseUrl}/api/quiz/custom-question`);
       if (!res.ok) return [];
       const data = await res.json();
       return (data.success && Array.isArray(data.questions)) ? data.questions : [];
@@ -1490,7 +1515,7 @@ export class CloudSyncManager {
         'Content-Type': 'application/json',
         ...authHeaders,
       };
-      const res = await fetch(`${this.baseUrl}/api/quiz/custom-question`, {
+      const res = await this.fetchWithTimeout(`${this.baseUrl}/api/quiz/custom-question`, {
         method: 'POST',
         headers,
         body: JSON.stringify(questionData),
@@ -1532,7 +1557,7 @@ export class CloudSyncManager {
       const headers = {
         ...authHeaders,
       };
-      const res = await fetch(`${this.baseUrl}/api/quiz/custom-question/${encodeURIComponent(questionId)}`, {
+      const res = await this.fetchWithTimeout(`${this.baseUrl}/api/quiz/custom-question/${encodeURIComponent(questionId)}`, {
         method: 'DELETE',
         headers,
       });
@@ -1557,7 +1582,7 @@ export class CloudSyncManager {
   async syncImportedFiles() {
     if (typeof fetch === 'undefined') return null;
     try {
-      const res = await fetch(`${this.baseUrl}/api/quiz/imported-files`);
+      const res = await this.fetchWithTimeout(`${this.baseUrl}/api/quiz/imported-files`);
       if (!res.ok) return null;
       const data = await res.json();
       if (data && data.success && Array.isArray(data.files)) {
@@ -1584,7 +1609,7 @@ export class CloudSyncManager {
   async pushImportedFile(fileEntry) {
     if (typeof fetch === 'undefined') return null;
     try {
-      const res = await fetch(`${this.baseUrl}/api/quiz/imported-files`, {
+      const res = await this.fetchWithTimeout(`${this.baseUrl}/api/quiz/imported-files`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1607,7 +1632,7 @@ export class CloudSyncManager {
   async pushBatchImportedFiles(files) {
     if (typeof fetch === 'undefined') return null;
     try {
-      const res = await fetch(`${this.baseUrl}/api/quiz/imported-files`, {
+      const res = await this.fetchWithTimeout(`${this.baseUrl}/api/quiz/imported-files`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1630,7 +1655,7 @@ export class CloudSyncManager {
   async pushDeleteImportedFile(fileId) {
     if (typeof fetch === 'undefined') return { success: false, error: 'Không có kết nối mạng.' };
     try {
-      const res = await fetch(`${this.baseUrl}/api/quiz/imported-files/${encodeURIComponent(fileId)}`, {
+      const res = await this.fetchWithTimeout(`${this.baseUrl}/api/quiz/imported-files/${encodeURIComponent(fileId)}`, {
         method: 'DELETE',
         headers: {
           ...this._getAdminAuthHeaders(),
@@ -1653,7 +1678,7 @@ export class CloudSyncManager {
   async pushClearAllImportedFiles() {
     if (typeof fetch === 'undefined') return { success: false, error: 'Không có kết nối mạng.' };
     try {
-      const res = await fetch(`${this.baseUrl}/api/quiz/imported-files/clear-all`, {
+      const res = await this.fetchWithTimeout(`${this.baseUrl}/api/quiz/imported-files/clear-all`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1727,7 +1752,7 @@ export class CloudSyncManager {
   async adminResetPassword(userId, username = '', newPassword = '123456') {
     if (typeof fetch === 'undefined' || !userId) return { success: false };
     try {
-      const res = await fetch(`${this.baseUrl}/api/admin/users/${encodeURIComponent(userId)}/reset-password`, {
+      const res = await this.fetchWithTimeout(`${this.baseUrl}/api/admin/users/${encodeURIComponent(userId)}/reset-password`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

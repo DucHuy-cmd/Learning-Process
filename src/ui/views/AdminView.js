@@ -33,6 +33,7 @@ export class AdminView {
     this._syncCounter = 0;
     this._activeSyncId = 0;
     this.activeTab = 'students';
+    this.isAddUserFormCollapsed = false;
     this.dbStatus = { storageMode: 'unknown', databaseLabel: 'Đang kiểm tra...', kvConfigured: false };
     this.syncTasks = {
       dbStatus: { status: 'idle', label: 'Cơ sở dữ liệu', error: null },
@@ -211,6 +212,10 @@ export class AdminView {
               <span>Cấp Tài Khoản Sinh Viên Mới</span>
             </h3>
             <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+              <button type="button" id="btnAdminToggleAddUserForm" class="btn-sm" style="padding:6px 12px;font-size:12px;font-weight:600;background:var(--panel-alt);border:1px solid var(--line);border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:6px;color:var(--text);" title="${this.isAddUserFormCollapsed ? 'Mở rộng form cấp tài khoản' : 'Thu gọn form cấp tài khoản'}">
+                <span id="iconAdminToggleAddUserForm">${this.isAddUserFormCollapsed ? '🔽' : '🔼'}</span>
+                <span id="lblAdminToggleAddUserForm">${this.isAddUserFormCollapsed ? 'Hiện Form' : 'Thu Gọn'}</span>
+              </button>
               <button type="button" id="btnAdminDownloadUserTemplate" class="btn-sm" style="padding:6px 12px;font-size:12px;font-weight:600;background:var(--panel-alt);border:1px solid var(--line);border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:6px;color:var(--text);">
                 <span>📄</span> Tải File Mẫu (.csv)
               </button>
@@ -220,42 +225,45 @@ export class AdminView {
               <input type="file" id="adminFileInputUsers" accept=".csv,.txt" style="display:none;" />
             </div>
           </div>
-          <div style="font-size:12px;color:var(--dim);margin-bottom:12px;background:var(--panel-alt);padding:8px 12px;border-radius:6px;border:1px dashed var(--line);">
-            💡 <strong>Quy định nhập file:</strong> File định dạng <code>.csv</code> hoặc <code>.txt</code> với các cột: <code>username,password,fullName,className,email</code>. Mật khẩu nếu bỏ trống sẽ mặc định là <code>123456</code>.
+
+          <div id="adminAddUserFormBody" style="display:${this.isAddUserFormCollapsed ? 'none' : 'block'};">
+            <div style="font-size:12px;color:var(--dim);margin-bottom:12px;background:var(--panel-alt);padding:8px 12px;border-radius:6px;border:1px dashed var(--line);">
+              💡 <strong>Quy định nhập file:</strong> File định dạng <code>.csv</code> hoặc <code>.txt</code> với các cột: <code>username,password,fullName,className,email</code>. Mật khẩu nếu bỏ trống sẽ mặc định là <code>123456</code>.
+            </div>
+
+            <form id="adminViewAddUserForm" style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:14px;margin-top:12px;">
+              <div>
+                <label for="adminInpUsername" style="display:block;font-size:12px;color:var(--dim);margin-bottom:4px;font-weight:600;">Tên đăng nhập *</label>
+                <input type="text" id="adminInpUsername" placeholder="Ví dụ: sv01, hoangnam..." required autocomplete="off" style="width:100%;box-sizing:border-box;padding:8px 12px;font-size:13px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--text);">
+              </div>
+
+              <div>
+                <label for="adminInpPassword" style="display:block;font-size:12px;color:var(--dim);margin-bottom:4px;font-weight:600;">Mật khẩu *</label>
+                <input type="password" id="adminInpPassword" placeholder="Nhập mật khẩu..." required autocomplete="new-password" data-1p-ignore="true" data-lpignore="true" data-bwignore="true" spellcheck="false" style="width:100%;box-sizing:border-box;padding:8px 12px;font-size:13px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--text);">
+              </div>
+
+              <div>
+                <label for="adminInpFullName" style="display:block;font-size:12px;color:var(--dim);margin-bottom:4px;font-weight:600;">Họ và tên sinh viên *</label>
+                <input type="text" id="adminInpFullName" placeholder="Ví dụ: Trần Văn Nam" required autocomplete="off" style="width:100%;box-sizing:border-box;padding:8px 12px;font-size:13px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--text);">
+              </div>
+
+              <div>
+                <label for="adminInpClass" style="display:block;font-size:12px;color:var(--dim);margin-bottom:4px;font-weight:600;">Lớp / Đơn vị</label>
+                <input type="text" id="adminInpClass" placeholder="Sinh viên" value="Sinh viên" autocomplete="off" style="width:100%;box-sizing:border-box;padding:8px 12px;font-size:13px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--text);">
+              </div>
+
+              <div>
+                <label for="adminInpEmail" style="display:block;font-size:12px;color:var(--dim);margin-bottom:4px;font-weight:600;">Email (Tùy chọn)</label>
+                <input type="email" id="adminInpEmail" placeholder="sinhvien@toanrr.edu.vn" autocomplete="off" style="width:100%;box-sizing:border-box;padding:8px 12px;font-size:13px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--text);">
+              </div>
+
+              <div style="display:flex;align-items:flex-end;">
+                <button type="submit" class="btn-primary" style="width:100%;padding:9px 16px;font-size:13px;font-weight:700;border-radius:6px;cursor:pointer;">
+                  ✓ Cấp tài khoản
+                </button>
+              </div>
+            </form>
           </div>
-
-          <form id="adminViewAddUserForm" style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:14px;margin-top:12px;">
-            <div>
-              <label for="adminInpUsername" style="display:block;font-size:12px;color:var(--dim);margin-bottom:4px;font-weight:600;">Tên đăng nhập *</label>
-              <input type="text" id="adminInpUsername" placeholder="Ví dụ: sv01, hoangnam..." required autocomplete="off" style="width:100%;box-sizing:border-box;padding:8px 12px;font-size:13px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--text);">
-            </div>
-
-            <div>
-              <label for="adminInpPassword" style="display:block;font-size:12px;color:var(--dim);margin-bottom:4px;font-weight:600;">Mật khẩu *</label>
-              <input type="password" id="adminInpPassword" placeholder="Nhập mật khẩu..." required autocomplete="new-password" data-1p-ignore="true" data-lpignore="true" data-bwignore="true" spellcheck="false" style="width:100%;box-sizing:border-box;padding:8px 12px;font-size:13px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--text);">
-            </div>
-
-            <div>
-              <label for="adminInpFullName" style="display:block;font-size:12px;color:var(--dim);margin-bottom:4px;font-weight:600;">Họ và tên sinh viên *</label>
-              <input type="text" id="adminInpFullName" placeholder="Ví dụ: Trần Văn Nam" required autocomplete="off" style="width:100%;box-sizing:border-box;padding:8px 12px;font-size:13px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--text);">
-            </div>
-
-            <div>
-              <label for="adminInpClass" style="display:block;font-size:12px;color:var(--dim);margin-bottom:4px;font-weight:600;">Lớp / Đơn vị</label>
-              <input type="text" id="adminInpClass" placeholder="Sinh viên" value="Sinh viên" autocomplete="off" style="width:100%;box-sizing:border-box;padding:8px 12px;font-size:13px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--text);">
-            </div>
-
-            <div>
-              <label for="adminInpEmail" style="display:block;font-size:12px;color:var(--dim);margin-bottom:4px;font-weight:600;">Email (Tùy chọn)</label>
-              <input type="email" id="adminInpEmail" placeholder="sinhvien@toanrr.edu.vn" autocomplete="off" style="width:100%;box-sizing:border-box;padding:8px 12px;font-size:13px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--text);">
-            </div>
-
-            <div style="display:flex;align-items:flex-end;">
-              <button type="submit" class="btn-primary" style="width:100%;padding:9px 16px;font-size:13px;font-weight:700;border-radius:6px;cursor:pointer;">
-                ✓ Cấp tài khoản
-              </button>
-            </div>
-          </form>
         </section>
 
         <!-- Data Skew Warning Banner -->
@@ -1080,7 +1088,22 @@ export class AdminView {
       });
     }
 
-    // 2b. Download User Template CSV
+    // 2b. Toggle Collapse/Expand Add User Form
+    const btnToggleAddUserForm = this.container.querySelector('#btnAdminToggleAddUserForm');
+    const formBody = this.container.querySelector('#adminAddUserFormBody');
+    const iconToggle = this.container.querySelector('#iconAdminToggleAddUserForm');
+    const lblToggle = this.container.querySelector('#lblAdminToggleAddUserForm');
+    if (btnToggleAddUserForm && formBody) {
+      btnToggleAddUserForm.addEventListener('click', () => {
+        this.isAddUserFormCollapsed = !this.isAddUserFormCollapsed;
+        formBody.style.display = this.isAddUserFormCollapsed ? 'none' : 'block';
+        if (iconToggle) iconToggle.textContent = this.isAddUserFormCollapsed ? '🔽' : '🔼';
+        if (lblToggle) lblToggle.textContent = this.isAddUserFormCollapsed ? 'Hiện Form' : 'Thu Gọn';
+        btnToggleAddUserForm.title = this.isAddUserFormCollapsed ? 'Mở rộng form cấp tài khoản' : 'Thu gọn form cấp tài khoản';
+      });
+    }
+
+    // 2c. Download User Template CSV
     const btnDownloadTemplate = this.container.querySelector('#btnAdminDownloadUserTemplate');
     if (btnDownloadTemplate) {
       btnDownloadTemplate.addEventListener('click', () => {

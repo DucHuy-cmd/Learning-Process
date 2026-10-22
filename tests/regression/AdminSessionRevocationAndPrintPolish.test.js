@@ -227,4 +227,43 @@ describe('Admin Session Revocation, Print Polish, and Answer Key Modal Flow', ()
       expect(alertSpy).toHaveBeenCalledWith(expect.stringContaining('Toàn bộ phiên đăng nhập Quản trị viên đã được đăng xuất'));
     });
   });
+
+  describe('5. AdminView: Collapsible Add User Form Accordion', () => {
+    it('allows collapsing and expanding the student creation form body', async () => {
+      authManager.quickLogin('user_admin');
+
+      const adminView = new AdminView({ container });
+      await adminView.render();
+
+      const toggleBtn = container.querySelector('#btnAdminToggleAddUserForm');
+      const formBody = container.querySelector('#adminAddUserFormBody');
+      const iconToggle = container.querySelector('#iconAdminToggleAddUserForm');
+      const lblToggle = container.querySelector('#lblAdminToggleAddUserForm');
+
+      expect(toggleBtn).not.toBeNull();
+      expect(formBody).not.toBeNull();
+      expect(iconToggle).not.toBeNull();
+      expect(lblToggle).not.toBeNull();
+
+      // Initially open
+      expect(adminView.isAddUserFormCollapsed).toBe(false);
+      expect(formBody.style.display).toBe('block');
+      expect(lblToggle.textContent).toBe('Thu Gọn');
+      expect(iconToggle.textContent).toBe('🔼');
+
+      // Click to collapse
+      toggleBtn.click();
+      expect(adminView.isAddUserFormCollapsed).toBe(true);
+      expect(formBody.style.display).toBe('none');
+      expect(lblToggle.textContent).toBe('Hiện Form');
+      expect(iconToggle.textContent).toBe('🔽');
+
+      // Click to expand again
+      toggleBtn.click();
+      expect(adminView.isAddUserFormCollapsed).toBe(false);
+      expect(formBody.style.display).toBe('block');
+      expect(lblToggle.textContent).toBe('Thu Gọn');
+      expect(iconToggle.textContent).toBe('🔼');
+    });
+  });
 });
