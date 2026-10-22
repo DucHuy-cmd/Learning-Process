@@ -456,6 +456,9 @@ export class ExamManager {
         };
       }
 
+      const dDate = new Date(deadlineMs);
+      const deadFormatted = `${String(dDate.getHours()).padStart(2, '0')}:${String(dDate.getMinutes()).padStart(2, '0')}`;
+
       if (nowMs >= startMs && nowMs <= deadlineMs) {
         return {
           status: 'open',
@@ -464,7 +467,7 @@ export class ExamManager {
           startMs,
           deadlineMs,
           remainingOpenMs: deadlineMs - nowMs,
-          message: `Cổng thi đang mở (Đóng cổng lúc ${exam.entryDeadline || (new Date(deadlineMs)).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })})`
+          message: `Cổng thi đang mở (Đóng cổng lúc ${exam.entryDeadline || deadFormatted})`
         };
       }
 
@@ -474,7 +477,7 @@ export class ExamManager {
         canEnter: false,
         startMs,
         deadlineMs,
-        message: `Đã đóng cổng vào thi (Hết hạn lúc ${exam.entryDeadline || (new Date(deadlineMs)).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })})`
+        message: `Đã đóng cổng vào thi (Hết hạn lúc ${exam.entryDeadline || deadFormatted})`
       };
     } catch {
       return {

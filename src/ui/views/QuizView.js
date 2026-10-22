@@ -1744,6 +1744,12 @@ export class QuizView {
       ? this.studioAssignDuration
       : (distSummary.totalSelected > 0 ? Math.max(15, Math.round(distSummary.totalSelected * 1.5)) : 15);
 
+    const nowForSchedule = new Date();
+    const defaultStartHour = (nowForSchedule.getHours() + 1) % 24;
+    const defaultStartHourStr = String(defaultStartHour).padStart(2, '0');
+    const defaultStartMinuteStr = '00';
+    const defaultStartTimeStr = `${defaultStartHourStr}:${defaultStartMinuteStr}`;
+
     return `
       <!-- Studio Subtab Navigation (3 Tabs) -->
       <div class="studio-subtabs-nav no-print" style="display:flex;gap:10px;margin-bottom:20px;border-bottom:1px solid var(--line);padding-bottom:10px;flex-wrap:wrap;">
@@ -2121,9 +2127,32 @@ export class QuizView {
                   </div>
                   <div>
                     <label style="display:block;font-size:12px;font-weight:600;color:var(--text);margin-bottom:4px;">
-                      ⏰ Giờ bắt đầu mở cổng: *
+                      ⏰ Giờ mở cổng (Khung 24h: 00h - 23h): *
                     </label>
-                    <input type="time" id="tmStartTime" value="07:00" style="width:100%;padding:8px 12px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--text);font-size:13px;font-weight:600;" />
+                    <div style="display:flex;align-items:center;gap:6px;">
+                      <select id="selStartHour" style="flex:1;padding:8px 8px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--text);font-size:13px;font-weight:700;cursor:pointer;">
+                        ${Array.from({length: 24}, (_, i) => {
+                          const hStr = String(i).padStart(2, '0');
+                          let note = '';
+                          if (i === 0) note = ' (00:00 - Nửa đêm)';
+                          else if (i < 6) note = ' (Đêm / Rạng sáng)';
+                          else if (i < 11) note = ' (Sáng)';
+                          else if (i === 11 || i === 12) note = ' (Trưa)';
+                          else if (i < 18) note = ` (${i - 12}h Chiều)`;
+                          else if (i < 22) note = ` (${i - 12}h Tối)`;
+                          else note = ` (${i - 12}h Đêm)`;
+                          return `<option value="${hStr}" ${i === defaultStartHour ? 'selected' : ''}>${hStr} giờ${note}</option>`;
+                        }).join('')}
+                      </select>
+                      <span style="font-weight:800;color:var(--dim);font-size:16px;">:</span>
+                      <select id="selStartMinute" style="width:105px;padding:8px 8px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--text);font-size:13px;font-weight:700;cursor:pointer;">
+                        ${Array.from({length: 60}, (_, i) => {
+                          const mStr = String(i).padStart(2, '0');
+                          return `<option value="${mStr}" ${i === 0 ? 'selected' : ''}>${mStr} phút</option>`;
+                        }).join('')}
+                      </select>
+                      <input type="hidden" id="tmStartTime" value="${defaultStartTimeStr}" />
+                    </div>
                   </div>
                   <div>
                     <label style="display:block;font-size:12px;font-weight:600;color:var(--text);margin-bottom:4px;">
@@ -4627,15 +4656,39 @@ export class QuizView {
     const radSchedFixed = this.container.querySelector('#radSchedFixed');
     const scheduleSettingsWrap = this.container.querySelector('#scheduleSettingsWrap');
     const dtExamDate = this.container.querySelector('#dtExamDate');
+    const selStartHour = this.container.querySelector('#selStartHour');
+    const selStartMinute = this.container.querySelector('#selStartMinute');
     const tmStartTime = this.container.querySelector('#tmStartTime');
     const numLateGrace = this.container.querySelector('#numLateGrace');
     const scheduleTimeNotice = this.container.querySelector('#scheduleTimeNotice');
 
+    const syncHourMinuteToTmStartTime = () => {
+      if (selStartHour && selStartMinute && tmStartTime) {
+        tmStartTime.value = `${selStartHour.value}:${selStartMinute.value}`;
+      }
+      updateScheduleLiveFeedback();
+    };
+
     const updateScheduleLiveFeedback = () => {
       if (!scheduleTimeNotice || !dtExamDate || !tmStartTime) return;
       const dateVal = dtExamDate.value.trim();
-      const timeVal = tmStartTime.value.trim();
+      let timeVal = tmStartTime.value.trim();
       const graceVal = parseInt(numLateGrace?.value || '15', 10) || 15;
+
+      if (selStartHour && selStartMinute) {
+        if (timeVal && timeVal.includes(':')) {
+          const [hPart, mPart] = timeVal.split(':');
+          if (selStartHour.value !== hPart.padStart(2, '0')) {
+            selStartHour.value = hPart.padStart(2, '0');
+          }
+          if (selStartMinute.value !== mPart.padStart(2, '0')) {
+            selStartMinute.value = mPart.padStart(2, '0');
+          }
+        } else {
+          timeVal = `${selStartHour.value}:${selStartMinute.value}`;
+          tmStartTime.value = timeVal;
+        }
+      }
 
       if (!dateVal || !timeVal) {
         scheduleTimeNotice.style.display = 'none';
@@ -4658,13 +4711,18 @@ export class QuizView {
       const deadStr = `${deadH}:${deadM}`;
 
       const nowMs = Date.now();
+      const nowDate = new Date(nowMs);
+      const nowH = String(nowDate.getHours()).padStart(2, '0');
+      const nowM = String(nowDate.getMinutes()).padStart(2, '0');
+      const nowTimeStr = `${nowH}:${nowM}`;
+
       scheduleTimeNotice.style.display = 'block';
 
       if (deadlineMs <= nowMs) {
         scheduleTimeNotice.style.background = 'rgba(239,68,68,0.12)';
         scheduleTimeNotice.style.border = '1px solid rgba(239,68,68,0.35)';
         scheduleTimeNotice.style.color = '#ef4444';
-        scheduleTimeNotice.innerHTML = `⚠️ <strong>Không hợp lệ:</strong> Khung giờ vào phòng thi (${timeVal} ➔ ${deadStr}) đã kết thúc ở quá khứ. Cần chọn ngày/giờ trong tương lai hoặc tăng số phút ân hạn.`;
+        scheduleTimeNotice.innerHTML = `⚠️ <strong>Không hợp lệ:</strong> Khung giờ vào phòng thi (${timeVal} ➔ ${deadStr} ngày ${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}/${year}) đã kết thúc ở quá khứ so với thời điểm hiện tại (${nowTimeStr}). Cần chọn giờ trong tương lai hoặc tăng số phút ân hạn.`;
       } else if (nowMs >= startMs && nowMs < deadlineMs) {
         const minLeft = Math.ceil((deadlineMs - nowMs) / 60000);
         scheduleTimeNotice.style.background = 'rgba(16,185,129,0.12)';
@@ -4693,6 +4751,8 @@ export class QuizView {
     if (radSchedFlexible) radSchedFlexible.addEventListener('change', updateScheduleUI);
     if (radSchedFixed) radSchedFixed.addEventListener('change', updateScheduleUI);
     if (dtExamDate) dtExamDate.addEventListener('input', updateScheduleLiveFeedback);
+    if (selStartHour) selStartHour.addEventListener('change', syncHourMinuteToTmStartTime);
+    if (selStartMinute) selStartMinute.addEventListener('change', syncHourMinuteToTmStartTime);
     if (tmStartTime) tmStartTime.addEventListener('input', updateScheduleLiveFeedback);
     if (numLateGrace) numLateGrace.addEventListener('input', updateScheduleLiveFeedback);
 
@@ -4876,11 +4936,15 @@ export class QuizView {
             }
 
             if (deadlineMs <= nowMs) {
+              const nowDate = new Date(nowMs);
+              const nowH = String(nowDate.getHours()).padStart(2, '0');
+              const nowM = String(nowDate.getMinutes()).padStart(2, '0');
+              const nowTime24 = `${nowH}:${nowM}`;
               const displayDate = `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}/${year}`;
               this._showAlert(
                 `⚠️ Thời gian đăng ký không hợp lệ vì đã ở trong quá khứ!\n\n` +
-                `• Khung giờ vào phòng thi: ${startTime} ➔ ${entryDeadline} ngày ${displayDate}\n` +
-                `• Thời điểm hiện tại: ${(new Date(nowMs)).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} ngày ${(new Date(nowMs)).toLocaleDateString('vi-VN')}\n\n` +
+                `• Khung giờ vào phòng thi (24h): ${startTime} ➔ ${entryDeadline} ngày ${displayDate}\n` +
+                `• Thời điểm hiện tại (24h): ${nowTime24} ngày ${String(nowDate.getDate()).padStart(2, '0')}/${String(nowDate.getMonth() + 1).padStart(2, '0')}/${nowDate.getFullYear()}\n\n` +
                 `Thời hạn đóng cổng theo cài đặt trên đã kết thúc trước thời điểm hiện tại. Vui lòng chọn ngày giờ thi trong tương lai hoặc tăng thời gian ân hạn để học sinh kịp vào thi!`
               );
               btnCreateAndAssign.disabled = false;
