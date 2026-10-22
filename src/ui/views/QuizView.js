@@ -2117,7 +2117,7 @@ export class QuizView {
                     <label style="display:block;font-size:12px;font-weight:600;color:var(--text);margin-bottom:4px;">
                       📅 Ngày thi: *
                     </label>
-                    <input type="date" id="dtExamDate" value="${new Date().toISOString().split('T')[0]}" style="width:100%;padding:8px 12px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--text);font-size:13px;font-weight:600;" />
+                    <input type="date" id="dtExamDate" min="${new Date().toISOString().split('T')[0]}" value="${new Date().toISOString().split('T')[0]}" style="width:100%;padding:8px 12px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--text);font-size:13px;font-weight:600;" />
                   </div>
                   <div>
                     <label style="display:block;font-size:12px;font-weight:600;color:var(--text);margin-bottom:4px;">
@@ -2136,6 +2136,9 @@ export class QuizView {
                 <div style="padding:10px 14px;background:rgba(56,189,248,0.08);border:1px solid rgba(56,189,248,0.25);border-radius:6px;font-size:12px;color:var(--dim);line-height:1.5;">
                   💡 <strong style="color:var(--text);">Quy chế khóa cổng:</strong> Sinh viên chỉ được bấm vào thi trong khung giờ mở (Ví dụ: Giờ mở 07:00 + 15 phút ân hạn ➔ Được vào thi từ <strong>07:00 đến 07:15</strong>). Sau 07:15, cổng đóng hoàn toàn. Thí sinh đến trễ hoặc không vào thi sẽ bị <strong>0 điểm (Ghi chú: Vắng thi)</strong>. Khi đã vào phòng đúng giờ, thí sinh nhận đủ trọn vẹn số phút làm bài quy định.
                 </div>
+
+                <!-- Real-time Schedule Validation Feedback -->
+                <div id="scheduleTimeNotice" style="margin-top:10px;padding:9px 14px;border-radius:6px;font-size:12px;font-weight:600;display:none;line-height:1.5;"></div>
               </div>
             </div>
 
@@ -4619,18 +4622,79 @@ export class QuizView {
     if (radAssignClass) radAssignClass.addEventListener('change', updateAssignTargetUI);
     if (radAssignCustom) radAssignCustom.addEventListener('change', updateAssignTargetUI);
 
-    // Radio schedule type toggle
+    // Radio schedule type toggle & live time validation helper
     const radSchedFlexible = this.container.querySelector('#radSchedFlexible');
     const radSchedFixed = this.container.querySelector('#radSchedFixed');
     const scheduleSettingsWrap = this.container.querySelector('#scheduleSettingsWrap');
+    const dtExamDate = this.container.querySelector('#dtExamDate');
+    const tmStartTime = this.container.querySelector('#tmStartTime');
+    const numLateGrace = this.container.querySelector('#numLateGrace');
+    const scheduleTimeNotice = this.container.querySelector('#scheduleTimeNotice');
+
+    const updateScheduleLiveFeedback = () => {
+      if (!scheduleTimeNotice || !dtExamDate || !tmStartTime) return;
+      const dateVal = dtExamDate.value.trim();
+      const timeVal = tmStartTime.value.trim();
+      const graceVal = parseInt(numLateGrace?.value || '15', 10) || 15;
+
+      if (!dateVal || !timeVal) {
+        scheduleTimeNotice.style.display = 'none';
+        return;
+      }
+
+      const [year, month, day] = dateVal.split('-').map(Number);
+      const [sh, sm] = timeVal.split(':').map(Number);
+      if (isNaN(year) || isNaN(sh)) {
+        scheduleTimeNotice.style.display = 'none';
+        return;
+      }
+
+      const startDate = new Date(year, month - 1, day, sh, sm, 0, 0);
+      const startMs = startDate.getTime();
+      const deadlineMs = startMs + graceVal * 60 * 1000;
+      const deadlineDate = new Date(deadlineMs);
+      const deadH = String(deadlineDate.getHours()).padStart(2, '0');
+      const deadM = String(deadlineDate.getMinutes()).padStart(2, '0');
+      const deadStr = `${deadH}:${deadM}`;
+
+      const nowMs = Date.now();
+      scheduleTimeNotice.style.display = 'block';
+
+      if (deadlineMs <= nowMs) {
+        scheduleTimeNotice.style.background = 'rgba(239,68,68,0.12)';
+        scheduleTimeNotice.style.border = '1px solid rgba(239,68,68,0.35)';
+        scheduleTimeNotice.style.color = '#ef4444';
+        scheduleTimeNotice.innerHTML = `⚠️ <strong>Không hợp lệ:</strong> Khung giờ vào phòng thi (${timeVal} ➔ ${deadStr}) đã kết thúc ở quá khứ. Cần chọn ngày/giờ trong tương lai hoặc tăng số phút ân hạn.`;
+      } else if (nowMs >= startMs && nowMs < deadlineMs) {
+        const minLeft = Math.ceil((deadlineMs - nowMs) / 60000);
+        scheduleTimeNotice.style.background = 'rgba(16,185,129,0.12)';
+        scheduleTimeNotice.style.border = '1px solid rgba(16,185,129,0.35)';
+        scheduleTimeNotice.style.color = '#10b981';
+        scheduleTimeNotice.innerHTML = `🟢 <strong>Khung giờ hợp lệ (Đang trong giờ mở):</strong> Cổng thi mở từ ${timeVal} và sẽ đóng lúc ${deadStr} (còn ~${minLeft} phút nữa để thí sinh bấm vào thi).`;
+      } else {
+        const minToStart = Math.ceil((startMs - nowMs) / 60000);
+        const timeToStartStr = minToStart > 60 ? `${Math.floor(minToStart / 60)}h ${minToStart % 60}p` : `${minToStart} phút`;
+        scheduleTimeNotice.style.background = 'rgba(56,189,248,0.12)';
+        scheduleTimeNotice.style.border = '1px solid rgba(56,189,248,0.35)';
+        scheduleTimeNotice.style.color = '#38bdf8';
+        scheduleTimeNotice.innerHTML = `⏰ <strong>Khung giờ hợp lệ:</strong> Mở cổng lúc ${timeVal} ngày ${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}/${year} (sau ~${timeToStartStr}), khóa cổng lúc ${deadStr}.`;
+      }
+    };
 
     const updateScheduleUI = () => {
       if (scheduleSettingsWrap) {
         scheduleSettingsWrap.style.display = radSchedFixed?.checked ? 'block' : 'none';
+        if (radSchedFixed?.checked) {
+          updateScheduleLiveFeedback();
+        }
       }
     };
+
     if (radSchedFlexible) radSchedFlexible.addEventListener('change', updateScheduleUI);
     if (radSchedFixed) radSchedFixed.addEventListener('change', updateScheduleUI);
+    if (dtExamDate) dtExamDate.addEventListener('input', updateScheduleLiveFeedback);
+    if (tmStartTime) tmStartTime.addEventListener('input', updateScheduleLiveFeedback);
+    if (numLateGrace) numLateGrace.addEventListener('input', updateScheduleLiveFeedback);
 
     // Track custom exam title input
     const txtAssignTitle = this.container.querySelector('#txtAssignTitle');
@@ -4792,11 +4856,38 @@ export class QuizView {
               return;
             }
 
+            const [year, month, day] = examDate.split('-').map(Number);
             const [sh, sm] = startTime.split(':').map(Number);
-            const totalMin = sh * 60 + sm + lateEntryGraceMinutes;
-            const deadH = String(Math.floor(totalMin / 60) % 24).padStart(2, '0');
-            const deadM = String(totalMin % 60).padStart(2, '0');
+            const startDate = new Date(year, month - 1, day, sh, sm, 0, 0);
+            const startMs = startDate.getTime();
+            const deadlineMs = startMs + lateEntryGraceMinutes * 60 * 1000;
+            const deadlineDate = new Date(deadlineMs);
+            const deadH = String(deadlineDate.getHours()).padStart(2, '0');
+            const deadM = String(deadlineDate.getMinutes()).padStart(2, '0');
             entryDeadline = `${deadH}:${deadM}`;
+
+            let nowMs = Date.now();
+            if (cloudSyncManager && typeof cloudSyncManager.getServerTimestamp === 'function') {
+              try {
+                nowMs = await cloudSyncManager.getServerTimestamp();
+              } catch (e) {
+                nowMs = Date.now();
+              }
+            }
+
+            if (deadlineMs <= nowMs) {
+              const displayDate = `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}/${year}`;
+              this._showAlert(
+                `⚠️ Thời gian đăng ký không hợp lệ vì đã ở trong quá khứ!\n\n` +
+                `• Khung giờ vào phòng thi: ${startTime} ➔ ${entryDeadline} ngày ${displayDate}\n` +
+                `• Thời điểm hiện tại: ${(new Date(nowMs)).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} ngày ${(new Date(nowMs)).toLocaleDateString('vi-VN')}\n\n` +
+                `Thời hạn đóng cổng theo cài đặt trên đã kết thúc trước thời điểm hiện tại. Vui lòng chọn ngày giờ thi trong tương lai hoặc tăng thời gian ân hạn để học sinh kịp vào thi!`
+              );
+              btnCreateAndAssign.disabled = false;
+              btnCreateAndAssign.innerHTML = originalBtnHtml;
+              this._isCreatingExam = false;
+              return;
+            }
           }
 
           const candidateId = `exam_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;

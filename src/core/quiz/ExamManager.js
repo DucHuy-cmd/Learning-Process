@@ -436,7 +436,8 @@ export class ExamManager {
       let deadlineMs;
       if (exam.entryDeadline && typeof exam.entryDeadline === 'string' && exam.entryDeadline.includes(':')) {
         const [deadHour, deadMin] = exam.entryDeadline.split(':').map(Number);
-        const deadlineDate = new Date(year, month - 1, day, deadHour, deadMin, 0, 0);
+        const dayOffset = deadHour < startHour ? 1 : 0;
+        const deadlineDate = new Date(year, month - 1, day + dayOffset, deadHour, deadMin, 0, 0);
         deadlineMs = deadlineDate.getTime();
       } else {
         const grace = Number(exam.lateEntryGraceMinutes) || 15;

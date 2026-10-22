@@ -3,6 +3,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { ExamManager, examManager } from '../../src/core/quiz/ExamManager.js';
 import { AuthManager, authManager } from '../../src/core/auth/AuthManager.js';
 import { QuizView } from '../../src/ui/views/QuizView.js';
+import { cloudSyncManager } from '../../src/core/sync/CloudSyncManager.js';
 import { handleRequest } from '../../src/server/app.js';
 
 describe('Scheduled Exam Window & Fixed Entry Enforcement', () => {
@@ -355,6 +356,174 @@ describe('Scheduled Exam Window & Fixed Entry Enforcement', () => {
       expect(resData.success).toBe(true);
       expect(typeof resData.serverTime).toBe('number');
       expect(resData.serverTime).toBeGreaterThan(0);
+    });
+  });
+
+  describe('6. Past Schedule Validation (No Past Registration Allowed)', () => {
+    it('blocks exam assignment and shows alert when entry deadline is already in the past', async () => {
+      authManager.quickLogin('user_admin');
+
+      // Reference time: 11:35 on 2026-10-22
+      const fixedNowMs = new Date(2026, 9, 22, 11, 35, 0, 0).getTime();
+      vi.spyOn(Date, 'now').mockReturnValue(fixedNowMs);
+      vi.spyOn(cloudSyncManager, 'getServerTimestamp').mockResolvedValue(fixedNowMs);
+
+      const quizView = new QuizView({ container });
+      quizView.setTab('studio');
+      quizView.studioSubTab = 'publish';
+      quizView.importedQuestions = [
+        {
+          id: 'q_past_1',
+          question: 'Câu hỏi mẫu',
+          options: [{ id: 'A', text: 'Đúng' }, { id: 'B', text: 'Sai' }],
+          correctId: 'A',
+          explanation: 'Giải thích',
+        },
+      ];
+      quizView._saveWordQuestions(quizView.importedQuestions);
+      quizView.render();
+
+      // Configure scheduled exam: start 11:30, grace 4 minutes -> closes at 11:34 (in the past relative to 11:35)
+      const radFixed = container.querySelector('#radSchedFixed');
+      radFixed.checked = true;
+      radFixed.dispatchEvent(new Event('change'));
+
+      const dtDate = container.querySelector('#dtExamDate');
+      const tmStart = container.querySelector('#tmStartTime');
+      const numGrace = container.querySelector('#numLateGrace');
+
+      dtDate.value = '2026-10-22';
+      tmStart.value = '11:30';
+      numGrace.value = '4';
+
+      const alertSpy = vi.spyOn(quizView, '_showAlert').mockImplementation(() => {});
+      const createExamSpy = vi.spyOn(examManager, 'createExam');
+
+      const btnAssign = container.querySelector('#btnCreateAndAssignExam');
+      btnAssign.click();
+      await new Promise(r => setTimeout(r, 20));
+
+      expect(alertSpy).toHaveBeenCalled();
+      const alertMsg = alertSpy.mock.calls[0][0];
+      expect(alertMsg).toContain('quá khứ');
+      expect(alertMsg).toContain('11:30 ➔ 11:34');
+      expect(createExamSpy).not.toHaveBeenCalled();
+    });
+
+    it('allows exam assignment when entry deadline is in the future (e.g. 11:30 + 6 mins = 11:36 > 11:35)', async () => {
+      authManager.quickLogin('user_admin');
+
+      // Reference time: 11:35 on 2026-10-22
+      const fixedNowMs = new Date(2026, 9, 22, 11, 35, 0, 0).getTime();
+      vi.spyOn(Date, 'now').mockReturnValue(fixedNowMs);
+      vi.spyOn(cloudSyncManager, 'getServerTimestamp').mockResolvedValue(fixedNowMs);
+
+      const quizView = new QuizView({ container });
+      quizView.setTab('studio');
+      quizView.studioSubTab = 'publish';
+      quizView.importedQuestions = [
+        {
+          id: 'q_future_1',
+          question: 'Câu hỏi mẫu tương lai',
+          options: [{ id: 'A', text: 'Đúng' }, { id: 'B', text: 'Sai' }],
+          correctId: 'A',
+          explanation: 'Giải thích',
+        },
+      ];
+      quizView._saveWordQuestions(quizView.importedQuestions);
+      quizView.render();
+
+      // Configure scheduled exam: start 11:30, grace 6 minutes -> closes at 11:36 (future relative to 11:35)
+      const radFixed = container.querySelector('#radSchedFixed');
+      radFixed.checked = true;
+      radFixed.dispatchEvent(new Event('change'));
+
+      const dtDate = container.querySelector('#dtExamDate');
+      const tmStart = container.querySelector('#tmStartTime');
+      const numGrace = container.querySelector('#numLateGrace');
+
+      dtDate.value = '2026-10-22';
+      tmStart.value = '11:30';
+      numGrace.value = '6';
+
+      const alertSpy = vi.spyOn(quizView, '_showAlert').mockImplementation(() => {});
+      const createExamSpy = vi.spyOn(examManager, 'createExam');
+
+      const btnAssign = container.querySelector('#btnCreateAndAssignExam');
+      btnAssign.click();
+      await new Promise(r => setTimeout(r, 20));
+
+      expect(createExamSpy).toHaveBeenCalled();
+      const examCreated = createExamSpy.mock.calls[0][0];
+      expect(examCreated.scheduleType).toBe('scheduled');
+      expect(examCreated.startTime).toBe('11:30');
+      expect(examCreated.entryDeadline).toBe('11:36');
+      expect(alertSpy).toHaveBeenCalledWith(expect.stringContaining('thành công'));
+    });
+
+    it('displays live real-time schedule feedback (invalid vs valid) in the UI', () => {
+      authManager.quickLogin('user_admin');
+
+      const fixedNowMs = new Date(2026, 9, 22, 11, 35, 0, 0).getTime();
+      vi.spyOn(Date, 'now').mockReturnValue(fixedNowMs);
+
+      const quizView = new QuizView({ container });
+      quizView.setTab('studio');
+      quizView.studioSubTab = 'publish';
+      quizView.render();
+
+      const radFixed = container.querySelector('#radSchedFixed');
+      radFixed.checked = true;
+      radFixed.dispatchEvent(new Event('change'));
+
+      const dtDate = container.querySelector('#dtExamDate');
+      const tmStart = container.querySelector('#tmStartTime');
+      const numGrace = container.querySelector('#numLateGrace');
+      const notice = container.querySelector('#scheduleTimeNotice');
+
+      // Test past: 11:30 + 4 mins = 11:34 (< 11:35)
+      dtDate.value = '2026-10-22';
+      tmStart.value = '11:30';
+      numGrace.value = '4';
+      tmStart.dispatchEvent(new Event('input'));
+
+      expect(notice.style.display).toBe('block');
+      expect(notice.textContent).toContain('Không hợp lệ');
+      expect(notice.textContent).toContain('quá khứ');
+
+      // Test valid: 11:30 + 6 mins = 11:36 (> 11:35)
+      numGrace.value = '6';
+      numGrace.dispatchEvent(new Event('input'));
+
+      expect(notice.style.display).toBe('block');
+      expect(notice.textContent).toContain('Khung giờ hợp lệ');
+      expect(notice.textContent).toContain('11:36');
+    });
+
+    it('backend POST /api/exams returns 400 when schedule deadline is in the past', async () => {
+      const fixedNowMs = new Date(2026, 9, 22, 11, 35, 0, 0).getTime();
+      vi.spyOn(Date, 'now').mockReturnValue(fixedNowMs);
+
+      const req = {
+        method: 'POST',
+        url: '/api/exams',
+        headers: {},
+        body: JSON.stringify({
+          title: 'Đề thi quá hạn',
+          durationMinutes: 30,
+          questionIds: ['q1'],
+          customQuestions: [{ id: 'q1', question: 'Test', options: [{ id: 'A', text: 'Yes' }], correctId: 'A' }],
+          scheduleType: 'scheduled',
+          examDate: '2026-10-22',
+          startTime: '11:30',
+          lateEntryGraceMinutes: 4, // closes at 11:34 <= 11:35
+        }),
+      };
+
+      await handleRequest(req, mockRes);
+      expect(resCode).toBe(400);
+      expect(resData.success).toBe(false);
+      expect(resData.error).toContain('quá khứ');
     });
   });
 });

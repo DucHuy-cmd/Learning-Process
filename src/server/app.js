@@ -2091,6 +2091,31 @@ export async function handleRequest(req, res) {
         return;
       }
 
+      if (data.scheduleType === 'scheduled') {
+        const examDate = (typeof data.examDate === 'string' && data.examDate.trim()) ? data.examDate.trim() : null;
+        const startTime = (typeof data.startTime === 'string' && data.startTime.trim()) ? data.startTime.trim() : null;
+        const graceMinutes = Number(data.lateEntryGraceMinutes) || 15;
+
+        if (!examDate || !startTime) {
+          sendJson(res, 400, { success: false, error: 'Đề thi cố định theo lịch yêu cầu phải có Ngày thi và Giờ mở cổng thi.' });
+          return;
+        }
+
+        const [year, month, day] = examDate.split('-').map(Number);
+        const [sh, sm] = startTime.split(':').map(Number);
+        const startDate = new Date(year, month - 1, day, sh, sm, 0, 0);
+        const startMs = startDate.getTime();
+        const deadlineMs = startMs + graceMinutes * 60 * 1000;
+
+        if (deadlineMs <= Date.now()) {
+          sendJson(res, 400, {
+            success: false,
+            error: 'Thời gian đăng ký không hợp lệ vì khung giờ vào phòng thi đã kết thúc trong quá khứ.',
+          });
+          return;
+        }
+      }
+
       const examId = typeof data.id === 'string' && data.id.trim()
         ? data.id.trim()
         : `exam_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
