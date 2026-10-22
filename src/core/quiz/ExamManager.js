@@ -619,7 +619,6 @@ export class ExamManager {
     timeSpentSeconds = 0,
     optionOrder = {},
     integrityBan = false,
-    note = '',
   }) {
     if (!answers || typeof answers !== 'object' || Array.isArray(answers)) {
       return { success: false, error: 'Danh sách đáp án không hợp lệ.' };
@@ -715,7 +714,6 @@ export class ExamManager {
       correctCount,
       totalQuestions,
       integrityBan: Boolean(integrityBan),
-      note: typeof note === 'string' ? note.trim() : '',
       timeSpentSeconds: Math.max(0, Math.round(timeSpentSeconds)),
       submittedAt: new Date().toISOString(),
     };
